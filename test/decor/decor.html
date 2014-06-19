@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+<link rel="stylesheet" href="decor.css" />
+<style>
+.style-fail { display: none; }
+
+body { background-color: #ffffff; }
+nav ul { margin: 0; padding: 0; }
+nav li { display: inline; list-style: outside none; margin: 0.1em; padding: 0.25em 1em; background-color: #dddddd; }
+#panner { background-color: #77ff77; color: #ffffff; text-align: center; }
+.hidden { display: none; }
+</style>
+<script>
+Meeko.decor.config({ // this will over-ride the <link rel="meeko-decor"> detect and enable panning
+	lookup: function(url) { return 'decor/decor.html'; }
+});
+Meeko.panner.config({
+	duration: 250,
+	pageOut: function(msg) { document.getElementById('panner').className = ''; },
+	nodeRemoved: {
+		before: function(msg) { },
+		after: function(msg) { }
+	}
+});
+</script>
+</head>
+<body>
+<style>
+.style-in-body-fail { display: none; }
+</style>
+
+<h1>HTMLDecor Tests</h1>
+<nav>
+<ul>
+	<li><a href="../normal.html">normal</a></li>
+	<li><a href="../long.html">long</a></li>
+	<li><a href="../get.html">get</a></li>
+	<li><a href="../post.html">post</a></li>
+</ul>
+</nav>
+
+<hr />
+
+<p id="panner" class="hidden"><b>pushState Assisted Navigation</b> is active</p>
+
+<div class="style-fail" style="background-color: red;">
+If you can see this then &lt;style&gt; elements
+from the decor document aren't being imported.
+</div> 
+
+<div class="style-in-body-fail" style="background-color: red;">
+If you can see this then &lt;style&gt; elements
+in the &lt;body&gt; of the decor document aren't being imported.
+</div> 
+
+<div id="decor-header" class="section">
+#decor-header
+<div id="page-header" class="remove">
+#page-header in decor: You should NOT be able to see this.
+</div>
+</div>
+<div id="page-main" class="remove">
+#page-main in decor: You should NOT be able to see this.
+</div>
+<div id="decor-footer" class="section">
+#decor-footer
+<div id="page-footer" class="remove">
+#page-footer in decor: You should NOT be able to see this.
+</div>
+</div>
+<div id="remove" class="remove">
+#remove in decor: You should NOT be able to see this - 
+it is removed by a script.
+</div>
+<script type="text/javascript">
+if (window.name != "meeko-parser") (function() { 
+	var el = document.getElementById("remove");
+	el.parentNode.removeChild(el);
+})();
+else alert("Error: script was executed in " + window.name + " document context");
+</script>
+<script type="text/plain">
+alert('Error: script with type "text/plain" was treated as Javascript');
+</script>
+
+</body>
+</html>
+
