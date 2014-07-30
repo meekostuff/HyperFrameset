@@ -7,15 +7,17 @@
 
 var defaults = { // NOTE defaults also define the type of the associated config option
 	"no_boot": false, // WARN don't remove or change this line, otherwise no_boot when reloading after capture error won't be detected - infinite reload
+	"no_style": false, // FIXME this demo option hasn't been implemented yet
 	"autostart": true,
-	"capturing": false,
+	"no_frameset": false, // FIXME this will replace autostart
+	"capturing": true, // FIXME this must be true for now
 	"log_level": "warn",
-	"hidden_timeout": 3000,
+	"hidden_timeout": 0, // 3000, FIXME 
 	"startup_timeout": 10000, // abort if startup takes longer than this
 	"polling_interval": 50,
 	"html5_block_elements": 'article aside figcaption figure footer header hgroup main nav section',
 	"html5_inline_elements": 'abbr mark output time audio video picture',
-	"htmldecor_script": '{bootscriptdir}HTMLDecor.js',
+	"main_script": '{bootscriptdir}HyperFrameset.js',
 	"config_script": '{bootscriptdir}config.js'
 }
 
@@ -181,8 +183,8 @@ if (no_boot()) return;
 
 function no_boot() {
 
-	// Don't even load HTMLDecor if "nodecor" / "noboot" is one of the search options (or true in Meeko.options)
-	if (/(^\?|&)(no_?decor|no_?boot)($|&)/.test(location.search)) return true;
+	// Don't even load HyperFrameset if "noboot" is one of the search options (or true in Meeko.options)
+	if (/(^\?|&)(no_?boot)($|&)/.test(location.search)) return true;
 	if (bootOptions['no_boot']) return true;
 	
 }
@@ -443,7 +445,7 @@ return {
 
 
 /*
- ### plugin functions for HTMLDecor
+ ### plugin functions for HyperFrameset
  */
 var html5prepare = (function() {
 
@@ -489,7 +491,7 @@ var fragment = document.createDocumentFragment();
 var style = document.createElement("style");
 fragment.appendChild(style); // NOTE on IE this realizes style.styleSheet 
 
-// NOTE hide the page until the decor is ready
+// NOTE hide the page until the frameset is ready
 var selector = 'body', property = 'visibility', value = 'hidden';
 
 var cssText = selector + ' { ' + property + ': ' + value + '; }\n';
@@ -555,7 +557,7 @@ test: function() { // return `false` for strict, otherwise warning message
 	return false; 
 },
 
-getDocument: function() { // WARN this assumes HTMLDecor is ready
+getDocument: function() { // WARN this assumes HyperFrameset is ready
 	return new Meeko.Promise(function(resolve, reject) {
 		domReady(function() {
 			var elts = $$('plaintext');
@@ -626,19 +628,19 @@ if (bootOptions['capturing']) {
 }
 
 // Capturing uses document.write, but after this point document.write, etc is forbidden
-document.write = document.writeln = document.open = document.close = function()  { throw 'document.write(), etc is incompatible with HTMLDecor'; }
+document.write = document.writeln = document.open = document.close = function()  { throw 'document.write(), etc is incompatible with HyperFrameset'; }
 
 
 /*
-	The self-marker is inserted by HTMLDecor (if not already present)
+	The self-marker is inserted by HyperFrameset (if not already present)
 	to mark the head elements associated with the content document
-	as opposed to decor elements or others.
+	as opposed to frameset elements or others.
 	The boot-script inserts one which means <style>, etc inserted above
-	are protected from HTMLDecor
+	are protected from HyperFrameset
 */
    
 var selfMarker = document.createElement('link');
-selfMarker.rel = 'meeko-self';
+selfMarker.rel = 'self';
 selfMarker.href = document.URL;
 document.head.insertBefore(selfMarker, bootScript.parentNode === document.head ? bootScript : document.head.firstChild);
 
@@ -658,8 +660,8 @@ function config() {
 	Meeko.DOM.ready = domReady;
 	Meeko.HTMLParser.prototype.prepare = html5prepare;
 	Meeko.Promise.pollingInterval = bootOptions["polling_interval"];
-	Meeko.decor.config({
-		decorReady: Viewport.unhide
+	Meeko.framer.configFrameset({
+		ready: Viewport.unhide
 	});
 }
 
@@ -669,10 +671,10 @@ function start() {
 		return;
 	}
 
-	if (bootOptions['capturing']) Meeko.decor.start({
+	if (bootOptions['capturing']) Meeko.framer.start({
 		contentDocument: Capture.getDocument()
 	});
-	else Meeko.decor.start();
+	else Meeko.framer.start();
 }
 
 function resolveScript(script) {
@@ -683,9 +685,9 @@ function resolveScript(script) {
 	}
 }
 
-var htmldecor_script = bootOptions['htmldecor_script'];
-if (typeof htmldecor_script !== 'string') throw 'HTMLDecor script URL is not configured';
-htmldecor_script = bootOptions['htmldecor_script'] = resolveURL(htmldecor_script, urlParams);
+var main_script = bootOptions['main_script'];
+if (typeof main_script !== 'string') throw 'HyperFrameset script URL is not configured';
+main_script = bootOptions['main_script'] = resolveURL(main_script, urlParams);
 
 var config_script = bootOptions['config_script'];
 if (config_script instanceof Array) forEach(config_script, function(script, i, list) {
@@ -697,7 +699,7 @@ else {
 }
 
 var startupSequence = [].concat(
-	htmldecor_script,
+	main_script,
 	config,
 	config_script,
 	start

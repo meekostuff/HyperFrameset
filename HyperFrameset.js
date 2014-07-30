@@ -10,7 +10,6 @@
         this would allow the boot-script to modify them as appropriate
     + Up-front feature testing to prevent boot on unsupportable platorms...
         e.g. can't create HTML documents
-    + Can decorate() and pan() share more code?
     + use requestAnimationFrame() when available
  */
 
@@ -79,8 +78,8 @@ var trim = ''.trim ?
 function(str) { return str.trim(); } :
 function(str) { return str.replace(/^\s+/, '').replace(/\s+$/, ''); }
 
-if (!Meeko.stuff) Meeko.stuff = {}
-extend(Meeko.stuff, {
+var _ = Meeko.stuff = {};
+extend(_, {
 	uc: uc, lc: lc, forEach: forEach, some: some, every: every, words: words, each: each, extend: extend, config: config, trim: trim
 });
 
@@ -548,7 +547,32 @@ var $id = function(id, doc) {
 		if (node.id == id) return node;
 	}
 }
-var $$ = function(selector, context) { // WARN only selects by tagName
+
+var $ = document.querySelector ?
+function(selector, context) {
+	context = context || document;
+	return context.querySelector(selector);
+} :
+function(selector, context) { // WARN only selects by tagName
+	context = context || document;
+	try { 
+		var coll = context.getElementsByTagName(selector);
+		return coll[0];
+	}
+	catch (error) {
+		throw (selector + " can only be a tagName selector in $()");
+	}
+}
+
+var $$ = document.querySelectorAll ?
+function(selector, context) {
+	context = context || document;
+	var nodeList = [];
+	var coll = context.querySelectorAll(selector);
+	for (var i=0, n=coll.length; i<n; i++) nodeList[i] = coll[i];
+	return nodeList;
+} :
+function(selector, context) { // WARN only selects by tagName
 	context = context || document;
 	var nodeList = [];
 	try { 
@@ -850,7 +874,7 @@ function onLoaded(e) {
 
 var overrideDefaultAction = function(e, fn) {
 	// Shim the event to detect if external code has called preventDefault(), and to make sure we call it (but late as possible);
-	e['meeko-panner'] = true;
+	e[vendorPrefix + '-event'] = true;
 	var defaultPrevented = false;
 	e._preventDefault = e.preventDefault;
 	e.preventDefault = function(event) { defaultPrevented = true; this._preventDefault(); } // TODO maybe we can just use defaultPrevented?
@@ -1584,8 +1608,6 @@ function iframeParser(html, details) {
 		});
 
 		details.isNeutralized = resolveAll(doc, baseURL, true, details.mustResolve);
-		// FIXME need warning for doc property mismatches between page and decor
-		// eg. charset, doc-mode, content-type, etc
 		return doc;
 	}
 
@@ -1674,584 +1696,6 @@ return HTMLParser;
 })();
 
 
-
-/* BEGIN HTMLDecor code */
-
-polyfill();
-
-var decor = Meeko.decor = {};
-var panner = Meeko.panner = {};
-
-panner.config = decor.config = function(options) { // same method. different context object.
-	config(this.options, options);
-}
-
-extend(decor, {
-
-started: false,
-current: {
-	url: null
-},
-placeHolders: {},
-
-start: function(startOptions) {
-return bfScheduler.now(function() {
-
-	var contentDocument;
-	
-	if (decor.started) throw "Already started";
-	decor.started = true;
-	
-	var domReadyFu = startOptions && startOptions.contentDocument ?
-		startOptions.contentDocument :
-		new Promise(function(resolve, reject) {
-			DOM.ready(function() { resolve(document); });
-		});
-
-	var options = decor.options;
-	var decorURL, decorDocument;
-
-	return pipe(null, [
-		
-	function() { // lookup or detect decorURL
-		if (options.lookup) decorURL = options.lookup(document.URL);
-		if (decorURL) return;
-		if (options.detect) return domReadyFu
-			.then(function(doc) {
-				decorURL = options.detect(doc);
-			});
-	},
-	function() { // initiate fetch of decorURL
-		if (!decorURL) throw "No decor could be determined for this page";
-		decorURL = URL(document.URL).resolve(decorURL);
-		decor.current.url = decorURL;
-		var method = 'get';
-		var f = decor.options.load(method, decorURL, null, { method: method, url: decorURL });
-		f.then(
-			function(result) { decorDocument = result; },
-			function(error) { logger.error("HTMLLoader failed for " + decorURL); } // FIXME need decorError notification / handling
-		);
-		return f;
-	},
-	
-	function() {
-		return wait(function() { return !!document.body; });		
-	},
-
-	function() { resolveURLs(); },
-	
-	function() { // the order of decorate, pageIn (and whether to normalize) depends on whether content is from external document or the default document
-		if (startOptions && startOptions.contentDocument) return pipe(null, [
-		function() {
-			return decor.decorate(decorDocument, decorURL); // FIXME what if decorate fails??
-		},
-		function() {
-			return startOptions.contentDocument
-			.then(function(doc) {
-				if (panner.options.normalize) panner.options.normalize(doc, { url: document.URL });
-				if (!STAGING_DOCUMENT_IS_INERT) deneutralizeAll(doc);
-				return doc;
-			})
-			.then(function(doc) {
-				return pageIn(null, doc); // NOTE this returns the saved landing document
-			});
-		}
-		]);
-		else return pipe(null, [
-		function() {
-			if (panner.options.normalize) return domReadyFu.then(function() {
-				panner.options.normalize(document, { url: document.URL });
-			});
-		},			
-		function() {
-			return decor.decorate(decorDocument, decorURL); // FIXME what if decorate fails??
-		},
-		function() {
-			return pageIn(null, null); // NOTE this returns the saved landing document
-		}
-		]);
-	},
-	function(landingDocument) {
-		scrollToId(location.hash && location.hash.substr(1));
-
-		if (!historyProxy.pushState) return;
-
-		/*
-			If this is the landing page then `history.state` will be null.
-			But if there was a navigation back / forwards sequence then there could be `state`.
-			Ideally the page would be in bfcache and this startup wouldn't even run,
-			but that doesn't seem to work on Chrome & IE10.
-		*/
-		var state;
-		if (panner.ownsBrowserState(historyProxy.state)) {
-			state = panner.getStateFromBrowserState(historyProxy.state);
-			panner.restoreState(state);
-			panner.restoreScroll(state);
-		}
-		else {
-			state = panner.createState({ url: document.URL });
-			panner.commitState(state, true); // replaceState
-			panner.saveScroll(state);
-		}
-
-		panner.bfcache[state.cacheId] = landingDocument;
-		
-		// NOTE fortuitously all the browsers that support pushState() also support addEventListener() and dispatchEvent()
-		window.addEventListener("click", function(e) { panner.onClick(e); }, true);
-		window.addEventListener("submit", function(e) { panner.onSubmit(e); }, true);
-		window.addEventListener("popstate", function(e) { panner.onPopState(e); }, true);
-		window.addEventListener('scroll', function(e) { panner.saveScroll(panner.getState()); }, false); // NOTE first scroll after popstate might be cancelled
-	}
-	
-	]);
-
-});
-	// start() returns now. The following are hoisted
-	
-	function resolveURLs() { // NOTE resolve URLs in landing page
-		// TODO could be merged with code in parseHTML
-		var baseURL = URL(document.URL);
-		function _resolveAttr(el, attrName) {
-			var relURL = el.getAttribute(attrName);
-			if (relURL == null) return;
-			var absURL = baseURL.resolve(relURL);
-			el.setAttribute(attrName, absURL);
-		}
-		
-		function resolveAttr(el, attrName) {
-			if (tagName(el) != 'script') return _resolveAttr(el, attrName);		
-			var scriptType = el.type;
-			var isJS = (!scriptType || /^text\/javascript/i.test(scriptType));
-			if (isJS) el.type = "text/javascript?complete"; // IE6 and IE7 will re-execute script if @src is modified (even to same path)
-			_resolveAttr(el, attrName);
-		}
-		
-		forSiblings("starting", document.head.firstChild, function(node) {
-			switch (tagName(node)) {
-			case 'script':
-				resolveAttr(node, 'src');
-				break;
-			case 'link':
-				resolveAttr(node, 'href');
-				break;
-			}
-		});
-	}
-
-
-},
-
-decorate: function(decorDocument, decorURL) {
-
-	if (getDecorMarker()) throw "Cannot decorate a document that has already been decorated";
-
-	var selfMarker;
-	
-	return pipe(null, [
-
-	function() {
-		selfMarker = getSelfMarker();
-		if (selfMarker) return;
-		selfMarker = document.createElement("link");
-		selfMarker.rel = "meeko-self";
-		selfMarker.href = document.URL;
-		document.head.insertBefore(selfMarker, document.head.firstChild);
-		
-	},
-	function() {
-		var marker = document.createElement("link");
-		marker.rel = "meeko-decor-active";
-		marker.href = decorURL;
-		document.head.insertBefore(marker, selfMarker);
-	},
-	
-	function() {
-		return notify({
-			module: "decor",
-			stage: "before",
-			type: "decorIn",
-			node: decorDocument
-		});
-	},
-	function() {
-		mergeElement(document.documentElement, decorDocument.documentElement);
-		mergeElement(document.head, decorDocument.head);
-		mergeHead(decorDocument, true);
-	},
-	function() { return scriptQueue.empty(); }, // FIXME this should be in mergeHead
-	function() {
-		var contentStart = document.body.firstChild;
-		var decorEnd = document.createElement('plaintext');
-		decorEnd.setAttribute('style', 'display: none;');
-		document.body.insertBefore(decorEnd, contentStart);
-
-		mergeElement(document.body, decorDocument.body);
-		decor_insertBody(decorDocument);
-	},
-	function() {
-		return notify({
-			module: "decor",
-			stage: "after",
-			type: "decorIn",
-			node: decorDocument
-		});
-	},
-	function() { return scriptQueue.empty(); },
-	function() { // this doesn't stall the Promise returned by decorate() 
-		wait(function() { return checkStyleSheets(); })
-		.then(function() {
-			return notify({
-				module: "decor",
-				stage: "after",
-				type: "decorReady",
-				node: decorDocument
-			});
-		});
-	}
-
-	]);
-
-	// NOTE decorate() returns now. The following functions are hoisted
-	
-	function mergeElement(dst, src) { // TODO this removes all dst (= content) attrs and imports all src (= decor) attrs. Is this appropriate?
-		removeAttributes(dst);
-		copyAttributes(dst, src);
-		dst.removeAttribute('style'); // FIXME is this appropriate? There should at least be a warning
-	}
-
-}
-
-});
-
-
-extend(panner, {
-
-onClick: function(e) {
-	// NOTE only pushState enabled browsers use this
-	// We want panning to be the default behavior for clicks on hyperlinks - <a href>
-	// Before panning to the next page, have to work out if that is appropriate
-	// `return` means ignore the click
-
-	if (!decor.options.lookup) return; // no panning if can't lookup decor of next page
-	
-	if (e.button != 0) return; // FIXME what is the value for button in IE's W3C events model??
-	if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return; // FIXME do these always trigger modified click behavior??
-
-	// Find closest <a> to e.target
-	for (var target=e.target; target!=document; target=target.parentNode) if (tagName(target) == "a") break;
-	if (tagName(target) != "a") return; // only handling hyperlink clicks
-	var href = target.getAttribute("href");
-	if (!href) return; // not really a hyperlink
-
-	// test hyperlinks
-	if (target.target) return; // no iframe
-	var baseURL = URL(document.URL);
-	var url = baseURL.resolve(href); // TODO probably don't need to resolve on browsers that support pushstate
-	var oURL = URL(url);
-	if (oURL.origin != baseURL.origin) return; // no external urls
-		
-	// TODO perhaps should test same-site and same-page links
-	var isPageLink = (oURL.nohash == baseURL.nohash); // TODO what about page-links that match the current hash?
-	// From here on we effectively take over the default-action of the event
-	overrideDefaultAction(e, function(event) {
-		if (isPageLink) panner.onPageLink(url);
-		else panner.onSiteLink(url);
-	});
-},
-
-onPageLink: function(url) {	// TODO Need to handle anchor links. The following just replicates browser behavior
-	panner.assign(url);
-},
-
-onSiteLink: function(url) {	// Now attempt to pan
-	panner.assign(url);
-},
-
-onSubmit: function(e) {
-	// NOTE only pushState enabled browsers use this
-	// We want panning to be the default behavior for <form> submission
-	// Before panning to the next page, have to work out if that is appropriate
-	// `return` means ignore the submit
-
-	if (!decor.options.lookup) return; // no panning if can't lookup decor of next page
-	
-	// test submit
-	var form = e.target;
-	if (form.target) return; // no iframe
-	var baseURL = URL(document.URL);
-	var url = baseURL.resolve(form.action); // TODO probably don't need to resolve on browsers that support pushstate
-	var oURL = URL(url);
-	if (oURL.origin != baseURL.origin) return; // no external urls
-	
-	var method = lc(form.method);
-	switch(method) {
-	case 'get': break;
-	default: return; // TODO handle POST
-	}
-	
-	// From here on we effectively take over the default-action of the event
-	overrideDefaultAction(e, function() {
-		panner.onForm(form);
-	});
-},
-
-onForm: function(form) {
-	var method = lc(form.method);
-	switch(method) {
-	case 'get':
-		var baseURL = URL(document.URL);
-		var action = baseURL.resolve(form.action); // TODO probably not needed on browsers that support pushState
-		var oURL = URL(action);
-		var query = encode(form);
-		var url = oURL.nosearch + (oURL.search || '?') + query + oURL.hash;
-		panner.onSiteLink(url);
-		break;
-	default: return; // TODO handle POST
-	}	
-
-	function encode(form) {
-		var data = [];
-		forEach(form.elements, function(el) {
-			if (!el.name) return;
-			data.push(el.name + '=' + encodeURIComponent(el.value));
-		});
-		return data.join('&');
-	}
-},
-
-handlePopState: function(newState) {
-	var oldState = panner.getState();
-	panner.restoreState(newState);
-
-	if (newState.cacheId != oldState.cacheId) {
-		return pan(oldState, newState)
-			.then(function() {
-				panner.restoreScroll(newState);
-			});
-	}
-	else return asap(function() {
-		panner.restoreScroll(newState);
-	});
-},
-
-onPopState: function(e) {
-	var browserState = e.state;
-	if (!panner.ownsBrowserState(browserState)) { // FIXME how to stop external use of history.pushState() ??
-		logger.warn('HTMLDecor should be the only history.state manager');
-		return;
-	}
-	if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-	else e.stopPropagation();
-	// NOTE there is no default-action for popstate
-
-	var newState = panner.getStateFromBrowserState(browserState);
-	bufferPopState(newState);
-
-	/*
-	  All browsers seem to scroll the page around the popstate event.
-	  This causes the page to jump at popstate, as though the content of the incoming state is already present.
-	  There is an associated scroll event within a couple of milliseconds,
-	  so the following listens for that event and restores the page offsets from the outgoing state.
-	  If there is no scroll event then it is effectively a no-op. 
-	*/
-
-	var oldState = panner.getState();
-	panner.restoreScroll(oldState); // TODO IE10 sometimes scrolls visibly before `scroll` event. This might help.
-	window.addEventListener('scroll', undoScroll, true);
-	setTimeout(function() { window.removeEventListener('scroll', undoScroll, true); });
-
-	function undoScroll(scrollEv) { // undo the popstate triggered scroll if appropriate
-		scrollEv.stopPropagation(); // prevent the saveScroll function
-		scrollEv.preventDefault(); // TODO should really use preventDefault() instead of stopPropagation()
-		panner.restoreScroll(oldState);
-		// var refresh = document.documentElement.scrollTop;
-	}
-},
-
-assign: function(url) {
-	return panner.navigate({
-		url: url,
-		replace: false
-	});
-},
-
-replace: function(url) {
-	return panner.navigate({
-		url: url,
-		replace: true
-	});
-},
-
-navigate: historyProxy.pushState ? navigate : defaultNavigate,
-
-stateId: null,
-stateTable: {},
-bfcache: {},
-
-createState: function(options) {
-	var timeStamp = +(new Date);
-	var state = {
-		'meeko-panner': true,
-		pageXOffset: 0,
-		pageYOffset: 0,
-		url: null,
-		timeStamp: timeStamp,
-		cacheId: timeStamp // WARN this will be over-ridden for same-page links
-	};
-	if (options) config(state, options);
-	return state;
-},
-
-commitState: function(state, replace) {
-	var timeStamp = state.timeStamp;
-	panner.stateTable[timeStamp] = state;
-	panner.stateId = timeStamp;
-
-	var modifier = replace ? 'replaceState' : 'pushState';
-	historyProxy[modifier](state, null, state.url);	
-	return state;
-},
-
-updateState: function(options) {
-	var state = panner.getState();
-	config(state, options);
-	var browserState = historyProxy.state;
-	if (panner.ownsBrowserState(browserState) && browserState.timeStamp === state.timeStamp) {
-		historyProxy.replaceState(state);
-	}
-},
-
-ownsBrowserState: function(browserState) {
-	if (!browserState) browserState = historyProxy.state;
-	if (!browserState) return false;
-	return !!browserState['meeko-panner'];
-},
-
-getStateFromBrowserState: function(browserState) {
-	if (!browserState) browserState = historyProxy.state;
-	if (!panner.ownsBrowserState(browserState)) return;
-	var timeStamp = browserState.timeStamp;
-	var state = panner.stateTable[timeStamp];
-	if (!state) panner.stateTable[timeStamp] = state = browserState;
-	return state;
-},
-
-getState: function() {
-	var state = panner.stateTable[panner.stateId];
-	return state;
-},
-
-restoreState: function(state) {
-	panner.stateId = state.timeStamp;
-},
-
-saveScroll: function(state) {
-	var msg = 'saveScroll(state) not in sync with panner.state';
-	if (state && state.timeStamp !== panner.getState().timeStamp) {
-		logger.warn(msg);
-		return;
-	}
-	panner.updateState({pageXOffset: window.pageXOffset, pageYOffset: window.pageYOffset });
-},
-
-restoreScroll: function(state) {
-	var msg = 'restoreScroll(state) not in sync with panner.state';
-	if (state && state.timeStamp !== panner.getState().timeStamp) {
-		logger.warn(msg);
-		return;
-	}
-	window.scroll(state.pageXOffset, state.pageYOffset);
-}
-
-});
-
-function navigate(options) {
-	
-return bfScheduler.now( // grab token immediately or fail
-	function() {
-		var url = options.url;
-	
-		var baseURL = URL(document.URL);
-		var oURL = URL(url);
-		var isPageLink = (oURL.nohash === baseURL.nohash); // TODO what about page-links that match the current hash
-	
-		var oldState = panner.getState();
-		var newState = panner.createState({ url: url });
-	
-		if (isPageLink) return (function() {
-			newState.cacheId = oldState.cacheId;
-			panner.commitState(newState, false); // pushState
-			scrollToId(oURL.hash.substr(1));
-			panner.saveScroll(newState);
-		})();
-	
-		var decorURL = decor.options.lookup(url);
-		if (typeof decorURL !== "string" || URL(document.URL).resolve(decorURL) !== decor.current.url) return (function() {
-			var modifier = options.replace ? "replace" : "assign";
-			location[modifier](url);
-			// NOTE discard newState
-		})();
-	
-		// Change document.URL
-		// FIXME When should this happen?
-		panner.commitState(newState, options.replace);
-	
-		return pan(oldState, newState)
-		.then(function() {
-			var oURL = URL(newState.url);
-			scrollToId(oURL.hash && oURL.hash.substr(1));
-			panner.saveScroll(newState);
-		});
-		
-	},
-	function() {
-		logger.warn('Panner busy when attempting to navigate');
-	}
-
-);
-}
-
-function defaultNavigate(options) {
-return new Promise(function(resolve, reject) {
-	var url = options.url;
-	var modifier = options.replace ? "replace" : "assign";
-	location[modifier](url);
-	resolve();
-});
-}
-
-var bufferPopState = (function() {
-	
-	var nextStateQueue = [];
-	var processing = false;
-	var done;
-	
-	function push(newState) {
-		nextStateQueue.push(newState);
-		bump();
-	}
-	
-	function bump() {
-		if (processing) return;
-		processing = true;
-		bfScheduler.whenever(process);
-	}
-	
-	function process() {
-		if (nextStateQueue.length <= 0) {
-			processing = false;
-			return;
-		}
-		var newState = nextStateQueue.pop();
-		nextStateQueue.length = 0;
-		return panner.handlePopState(newState)
-		.then(process); // FIXME what about errors
-	}
-	
-	return push;
-	
-})();
-
 var bfScheduler = (function() {
 	
 var queue = [];
@@ -2302,428 +1746,6 @@ return bfScheduler;
 
 })();
 
-/*
- Paging handlers are either a function, or an object with `before` and / or `after` listeners. 
- This means that before and after listeners are registered as a pair, which is desirable.
-*/
-
-decor.options = {
-	lookup: function(url) {},
-	detect: function(document) {},
-	load: function(method, url, data, details) {
-		var loader = new HTMLLoader(decor.options);
-		return loader.load(method, url, data, details);
-	}
-	/* The following options are also available (unless otherwise indicated) *
-	decorIn: { before: noop, after: noop },
-	decorOut: { before: noop, after: noop }, // TODO not called at all
-	decorReady: noop // TODO should this be decorIn:complete ??
-	/**/
-}
-
-panner.options = { 
-	duration: 0,
-	load: function(method, url, data, details) {
-		var loader = new HTMLLoader(panner.options);
-		details.mustResolve = false;
-		return loader.load(method, url, data, details);
-	}
-
-	/* The following options are also available *
-	nodeRemoved: { before: hide, after: show },
-	nodeInserted: { before: hide, after: show },
-	pageOut: { before: noop, after: noop },
-	pageIn: { before: noop, after: noop }
-	/**/
-}
-
-var notify = function(msg) {
-	var module = Meeko[msg.module];
-	var handler = module.options[msg.type];
-	if (!handler) return Promise.resolve();
-	var listener;
-
-	if (handler[msg.stage]) listener = handler[msg.stage];
-
-	else switch(msg.module) {
-	case "panner":
-		listener =	(msg.type == "nodeRemoved" || msg.type == "pageOut") ?
-			(msg.stage == "before") ? handler : null :
-			(msg.stage == "after") ? handler : null;
-		break;
-	case "decor":
-		listener = (msg.type == "decorOut") ?
-			(msg.stage == "before") ? handler : null :
-			(msg.stage == "after") ? handler : null;
-		break;
-	default:
-		throw msg.module + " is invalid module";
-		break;
-	}
-
-	if (typeof listener == "function") {
-		var promise = asap(function() { listener(msg); }); // TODO isFunction(listener)
-		promise['catch'](function(err) { throw err; });
-		return promise;
-	}
-	else return Promise.resolve();
-}
-
-var pan = function(oldState, newState) {
-	if (!getDecorMarker()) throw "Cannot pan if the document has not been decorated"; // FIXME Promise#reject()
-
-	var durationFu = delay(panner.options.duration);
-	var oldDoc = panner.bfcache[oldState.cacheId];
-	if (!oldDoc) {
-		oldDoc = createHTMLDocument('');
-		panner.bfcache[oldState.cacheId] = oldDoc;
-	}
-	var oldDocSaved = false;
-
-	var newDoc, newDocFu;
-	newDoc = panner.bfcache[newState.cacheId];
-	if (newDoc) {
-		newDocFu = Promise.resolve(newDoc);
-	}
-	else {
-		var url = newState.url;
-		var method = 'get'; // newState.method
-		newDocFu = panner.options.load(method, url, null, { method: method, url: url });
-		newDocFu.then(
-			function(result) {
-				newDoc = result;
-				panner.bfcache[newState.cacheId] = newDoc;
-			},
-			function(error) { logger.error("HTMLLoader failed"); } // FIXME pan() will stall. Need elegant error handling
-		);
-	}
-	
-	return pipe(null, [
-		
-	function() { // before pageOut 
-		return notify({
-			module: "panner",
-			stage: "before",
-			type: "pageOut",
-			target: document
-		});
-	},
-	function() { // before nodeRemoved
-		return preach(decor.placeHolders, function(id, node) {
-			var target = $id(id);
-			return notify({
-				module: "panner",
-				stage: "before",
-				type: "nodeRemoved",
-				target: document.body,
-				node: target // TODO rename `target` variable
-			});
-		});		
-	},
-
-	function() { return durationFu; },
-
-	function() {
-		if (newDoc) return; // pageIn will take care of pageOut
-
-		separateHead(false, function(target) {
-			insertNode('beforeend', oldDoc.head, target); // FIXME will need to use some of mergeHead()
-		});
-
-		return preach(decor.placeHolders, function(id, node) {
-			var target = $id(id);
-			insertNode('replace', target, node);
-			var placeHolder = $id(id, oldDoc);
-			// FIXME should check that `placeHolder` is a shallow-clone of `target`
-			if (placeHolder) insertNode('replace', placeHolder, target);
-			else { // FIXME assume this is the first time oldDoc is being populated
-				insertNode('beforeend', oldDoc.body, target);
-			}
-			return notify({
-				module: "panner",
-				stage: "after",
-				type: "nodeRemoved",
-				target: document.body,
-				node: target
-			});
-		})
-		.then(function() { oldDocSaved = true; });
-	},
-	function() {
-		return notify({
-			module: "panner",
-			stage: "after",
-			type: "pageOut",
-			target: document
-		});		
-	},
-
-	function() { return newDocFu; },
-	
-	function() { return pageIn(oldDocSaved ? null : oldDoc, newDoc); },
-	
-	function() {
-		var selfMarker = getSelfMarker();
-		selfMarker.href = newState.url;
-	}
-	
-	]);
-
-}
-
-function pageIn(oldDoc, newDoc) {
-/* NOTE:
- `newDoc` undefined means this is a *landing* page AND capturing is OFF
- `oldDoc` undefined means this is a *landing* page OR old-content has already been paged out (by `page()`)
- */
-	var returnDoc;
-	return pipe(null, [
-		
-	function() { // before pageIn
-		return notify({
-			module: "panner",
-			stage: "before",
-			type: "pageIn",
-			target: document,
-			node: newDoc
-		});
-	},
-
-	function() {
-		if (newDoc) return normalPageIn();
-		newDoc = createHTMLDocument('');
-		return landingPageIn();
-	},
-	
-	function(doc) { returnDoc = doc; },
-	
-	function() { return scriptQueue.empty(); },
-	
-	function() { // after pageIn
-		return notify({
-			module: "panner",
-			stage: "after",
-			type: "pageIn",
-			target: document
-		});
-	},
-	
-	function() { return returnDoc; }
-
-	]);
-	
-	function normalPageIn() { // `newDoc` is stand-along, `oldDoc` may exist
-		return pipe(null, [
-
-		function() {
-			mergeHead(newDoc, false, function(target) {
-				if (oldDoc) insertNode('beforeend', oldDoc.head, target);
-			});
-		},
-		
-		function() {
-			var cursor = newDoc.body.firstChild;
-			var afterReplaceFu;
-			
-			return preach(function(i) { // NOTE if this sourcing function returns nothing (or a promise that resolves with nothing) then preach() terminates
-				var node = cursor;
-				cursor = cursor && cursor.nextSibling;
-				return node;
-			},
-			function(i, node) {
-				var id = node.id;
-				if (!id) return;
-				var target = $id(node.id);
-				if (!target) return;
-				// TODO compat check between node and target
-				return beforeReplace(node, target)
-				.then(function() {
-					var newPlaceHolder = node.cloneNode(false);
-					insertNode('replace', node, newPlaceHolder);
-					insertNode('replace', target, node);
-					if (oldDoc) {
-						var oldPlaceHolder = $id(target.id, oldDoc);
-						if (oldPlaceHolder) { // FIXME should test that oldPlaceHolder is shallow-clone of target & is child of oldDoc.body
-							insertNode('replace', oldPlaceHolder, target);
-						}
-						else { // FIXME assuming first time populating `oldDoc`
-							insertNode('beforeend', oldDoc.body, target);
-						}
-					}
-					else decor.placeHolders[target.id] = target;
-				}).
-				then(function() { afterReplaceFu = afterReplace(node, target); });
-			})
-			.then(function() { return afterReplaceFu; }); // this will be the last `afterReplaceFu`
-		},
-		
-		function() {
-			return newDoc;
-		}
-			
-		]);
-	}
-
-	function landingPageIn() { // there will be no `oldDoc`, `newDoc` is empty, content-nodes are sourced from `document` at end-of-decor
-		return pipe(null, [
-
-		function() {
-			var contentLoaded = false;
-			DOM.ready(function() { contentLoaded = true; });
-			var decorEnd = $$('plaintext')[0];
-			var afterReplaceFu;
-			
-			return preach(function(i) { // NOTE if this sourcing function returns nothing (or a promise that resolves with nothing) then preach() terminates
-				return wait(function() { return decorEnd.nextSibling || contentLoaded; })
-					.then(function() {
-						return decorEnd.nextSibling;
-					});
-			},
-			function(i, node) {
-				var target;
-				var id = node.id;
-				if (id) target = $id(id);
-				if (!target || target === node) return wait(function() { // nowhere for content-node to be placed
-					try { node.parentNode.removeChild(node); }
-					catch (error) { return false; }
-					insertNode('beforeend', newDoc.body, node);
-					return true;
-				});
-				
-				// TODO compat check between node and target
-				return beforeReplace(node, target)
-				.then(function() {
-					var placeHolder = node.cloneNode(false);
-					return wait(function() {
-						try { insertNode('replace', target, node); } // NOTE throws in IE <= 8 if node is still loading. Very slow in IE9 on large pages.
-						catch (error) { return false; } // TODO what error does IE throw? Is it always because the node is still loading?
-						insertNode('beforeend', newDoc.body, placeHolder);
-						decor.placeHolders[target.id] = target;
-						return true;
-					});
-				}).
-				then(function() { afterReplaceFu = afterReplace(node, target); });
-			})
-			.then(function() { return afterReplaceFu; }) // this will be the last `afterReplaceFu`
-			.then(function() { return newDoc; });
-		}
-					
-		]);
-	}
-
-
-	function beforeReplace(node, target) {
-		return notify({
-			module: "panner",
-			stage: "before",
-			type: "nodeInserted",
-			target: document.body,
-			node: node
-		});
-	}
-	function afterReplace(node, target) {
-		return delay(0).then(function() {
-			return notify({
-				module: "panner",
-				stage: "after",
-				type: "nodeInserted",
-				target: document.body,
-				node: node
-			});
-		});
-	}
-
-}
-
-
-function separateHead(isDecor, afterRemove) { // FIXME more callback than just afterRemove?
-	var dstHead = document.head;
-	if (!getDecorMarker()) throw "No meeko-decor marker found. ";
-
-	// remove decor / page elements except for <script type=text/javascript>
-	if (isDecor) forSiblings("after", getDecorMarker(), "before", getSelfMarker(), remove);
-	else forSiblings("after", getSelfMarker(), remove);
-	
-	function remove(node) {
-		if (tagName(node) == "script" && (!node.type || node.type.match(/^text\/javascript/i))) return;
-		dstHead.removeChild(node);
-		if (afterRemove) afterRemove(node);
-	}
-}
-
-function mergeHead(doc, isDecor, afterRemove) { // FIXME more callback than just afterRemove?
-	var baseURL = URL(document.URL);
-	var dstHead = document.head;
-	var decorMarker = getDecorMarker();
-	if (!decorMarker) throw "No meeko-decor marker found. ";
-	var marker = getSelfMarker();
-
-	separateHead(isDecor, afterRemove);
-
-	// remove duplicate scripts from srcHead
-	var srcHead = doc.head;
-	forSiblings ("starting", srcHead.firstChild, function(node) {
-		switch(tagName(node)) {
-		case "script":
-			if (every($$("script", dstHead), function(el) {
-				return baseURL.resolve(el.src) != node.src; // FIXME @src should already be resolved to absURL
-			})) return;
-			break;
-		default: return;
-		}
-		srcHead.removeChild(node);
-	});
-
-	forSiblings ("starting", srcHead.firstChild, function(srcNode) {
-		srcHead.removeChild(srcNode);
-		if (srcNode.nodeType != 1) return;
-		switch (tagName(srcNode)) {
-		case "title":
-			if (!srcNode.innerHTML) return; // IE will add a title even if non-existant
-			if (isDecor) return; // ignore <title> in decor. FIXME what if topic content has no <title>?
-			break;
-		case "link": // FIXME no duplicates @rel, @href pairs
-			break;
-		case "meta": // FIXME no duplicates, warn on clash
-			if (srcNode.httpEquiv) return;
-			if (/^\s*viewport\s*$/i.test(srcNode.name)) srcNode = composeNode(srcNode); // TODO Opera mobile was crashing. Is there another way to fix this?
-			break;
-		case "style": 
-			break;
-		case "script":  // FIXME no duplicate @src
-			break;
-		}
-		if (isDecor) insertNode('beforebegin', marker, srcNode);
-		else insertNode('beforeend', dstHead, srcNode);
-		if (tagName(srcNode) == "link") srcNode.href = srcNode.getAttribute("href"); // Otherwise <link title="..." /> stylesheets don't work on Chrome
-	});
-	// allow scripts to run
-	forEach($$("script", dstHead), function(script) { scriptQueue.push(script); }); // FIXME this breaks if a script inserts other scripts
-}
-
-function decor_insertBody(doc) {
-	var dstBody = document.body,
-	    srcBody = doc.body;
-	var content = dstBody.firstChild;
-	// NOTE remove non-empty text-nodes - 
-	// they can't be hidden if that is appropriate
-	forSiblings ("starting", srcBody.firstChild, function(node) {
-		srcBody.removeChild(node);
-		if (node.nodeType == 3 && !/\s*/.test(node.nodeValue)) {
-			logger.warn("Removing text found as child of decor body.");
-			return;
-		}
-		dstBody.insertBefore(node, content);
-	});
-
-	forSiblings ("before", content, enableScripts);
-	
-	function enableScripts(node) {
-		if (node.nodeType !== 1) return;
-		if ("script" === tagName(node)) scriptQueue.push(node);
-		else forEach($$("script", node), function(script) { scriptQueue.push(script); });
-	}
-}
 
 var scriptQueue = new function() {
 
@@ -2888,26 +1910,947 @@ return new Promise(function(resolve, reject) {
 
 } // end scriptQueue
 
-function getDecorMarker(doc) {
+
+/* BEGIN HFrameset code */
+
+polyfill();
+
+
+
+	
+var hfNamespace = 'hf';
+var hfPrefix = hfNamespace + ':';
+var hfSelector = '[' + hfPrefix.replace(':', '\\:') + 'role=frame' + ']';
+var hfAttr = function(el, attr, value) {
+	var hfAttrName = hfPrefix + attr;
+	if (typeof value === 'undefined') return el.getAttribute(hfAttrName);
+	el.setAttribute(hfAttrName, value);
+}
+
+var HFrameDefinition = (function() {
+
+// <div id="id" hf-type="html" hf-format="css" hf-main="main" hf-transform="ht">...</div>
+function HFrameDefinition(el) {
+    var frameDef = this;
+	extend(frameDef, {
+      element: el,
+	  id: el.id,
+      type: hfAttr(el, 'type'),
+      format: hfAttr(el, 'format') || 'css',
+      mainSelector: hfAttr(el, 'main'), // TODO consider using a hash in `@src`
+	  transform: hfAttr(el, 'transform') || 'ht',
+	  body: firstChild(el, 'div')
+    });
+	var processor = frameDef.processor = framer.createProcessor(frameDef.transform);
+	processor.loadTemplate(frameDef.body);
+}
+
+extend(HFrameDefinition.prototype, {
+	
+render: function(doc) {
+	var frameDef = this;
+	var srcNode = doc;
+	if (frameDef.mainSelector) srcNode = $(frameDef.mainSelector, doc);
+	var decoder = framer.createDecoder(frameDef.format);
+	decoder.init(srcNode);
+	var processor = frameDef.processor;
+	var output = processor.transform(decoder);
+	var result;
+	if (output.nodeType) {
+		var fragment = document.createDocumentFragment();
+		fragment.appendChild(output);
+		result = {
+			fragment: fragment,
+			frames: $$(hfSelector, fragment)
+		}
+	}
+	else result = output;
+	return result;
+}
+	
+});
+
+return HFrameDefinition;
+})();
+
+
+var HFramesetDefinition = (function() {
+
+function HFramesetDefinition(doc, options) {
+	var framesetDef = this;
+	extend(framesetDef, {
+		frames: {} // all hyperframe definitions. Indexed by @id (which may be auto-generated)
+	});
+	framesetDef.init(doc, options);
+}
+
+extend(HFramesetDefinition.prototype, {
+
+init: function(doc, options) {
+	var framesetDef = this;
+
+	// NOTE first rebase scope: urls
+	var scopeURL = URL(options.scope);
+	rebase(doc, scopeURL);
+
+	framesetDef.document = doc;
+	var frameElts = $$(hfSelector, doc);
+	var frameRefElts = [];
+	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
+		// NOTE first rebase @hf:src with scope: urls
+		var src = hfAttr(el, 'src');
+		if (src) {
+			var newSrc = rebaseURL(src, scopeURL);
+			if (newSrc != src) hfAttr(el, 'src', newSrc);
+		}
+		
+		var id = el.getAttribute('id');
+		var defId = hfAttr(el, 'def');
+		if (defId && defId !== id) {
+			frameRefElts.push(el);
+			return;
+		}
+		var placeholder = el.cloneNode(false);
+		el.parentNode.replaceChild(placeholder, el);
+		if (!id) {
+			id = '__frame_' + index + '__'; // FIXME should be a function at top of module
+			el.setAttribute('id', id);
+		}
+		if (!defId) {
+			defId = id;
+			hfAttr(placeholder, 'def', defId);
+		}
+		framesetDef.frames[id] = new HFrameDefinition(el);
+	});
+	_.forEach(frameRefElts, function(el) {
+		var defId = hfAttr(el, 'def');
+		if (!framesetDef.frames[defId]) {
+			throw "Hyperframe references non-existant frame #" + defId;
+		}
+		var placeholder = el.cloneNode(false);
+		el.parentNode.replaceChild(placeholder, el);
+	});
+},
+
+render: function() { // FIXME assuming empty document.body
+	var framesetDef = this;
+	var srcDoc = framesetDef.document.cloneNode(true);
+	var result = {
+		document: srcDoc,
+		frames: $$(hfSelector, srcDoc)
+	};
+	return result;
+}
+
+});
+
+/*
+ Rebase scope URLs:
+	scope:{path}
+ is rewritten with `path` being relative to the current scope.
+ */
+
+function rebase(doc, scopeURL) {
+	function normalize(tag, attrName) {
+		forEach($$(tag, doc), function(el) {
+			var relURL = el.getAttribute(attrName);
+			if (relURL == null) return;
+			var url = rebaseURL(relURL, baseURL);
+			if (url != relURL) el[attrName] = url;
+		});
+	}
+	each(urlAttributes, normalize);
+}
+
+function rebaseURL(url, baseURL) {
+	var relURL = url.replace(/^scope:/i, '');
+	if (relURL == url) return url;
+	return baseURL.resolve(relURL);
+}
+
+
+return HFramesetDefinition;	
+})();
+
+
+var HFrame = (function() {
+
+function HFrame(el) {
+	var hframe = this;
+	extend(hframe, {
+      element: el,
+	  id: el.id,
+	  name: el.getAttribute('name')
+    });
+	var defId = hfAttr(el, 'def');
+	hframe.definition = framer.frameset.definition.frames[defId];
+	var src = hfAttr(el, 'src');
+	var framesetURL = URL(framer.frameset.src);
+	hframe.src = framesetURL.resolve(src); // FIXME need base-url: support
+}
+
+extend(HFrame.prototype, {
+	
+render: function() {
+	var hframe = this;
+	var src = hframe.src;
+	return framer.frameOptions.load('get', src, null, {})
+	.then(function(doc) {
+		var result = hframe.definition.render(doc);
+		hframe.element.appendChild(result.fragment);
+		renderFrames(result.frames);
+	});
+}
+
+});
+
+return HFrame;	
+})();
+
+var renderFrames = function(frames) {
+	_.forEach(frames, function(frameEl) {
+		var hframe = new HFrame(frameEl);
+		hframe.render(); // FIXME promisify
+	});
+}
+
+
+var HFrameset = (function() {
+	
+function HFrameset(dstDoc) {
+	var hframeset = this;
+	extend(hframeset, {
+		document: null,
+		src: null,
+		definition: null
+	});
+	hframeset.init(dstDoc);
+}
+
+extend(HFrameset.prototype, {
+
+init: function(dstDoc) {
+	var hframeset = this;
+	hframeset.document = dstDoc;
+},
+
+load: function(url, options) {
+	var hframeset = this;
+	hframeset.src = url;
+	hframeset.scope = options.scope;
+	var method = 'get';
+	return framer.framesetOptions.load(method, url, null, { method: method, url: url })
+	.then(function(framesetDoc) {
+		hframeset.definition = new HFramesetDefinition(framesetDoc, options);
+	});
+},
+
+render: function() {
+
+	var hframeset = this;
+	var dstDoc = hframeset.document;
+	var definition = hframeset.definition;
+	if (getFramesetMarker(dstDoc)) throw "The HFrameset has already been applied";
+
+	var selfMarker;
+	var srcTree = definition.render();
+	var srcDoc = srcTree.document;
+	
+	return pipe(null, [
+
+	function() {
+		selfMarker = getSelfMarker(dstDoc);
+		if (selfMarker) return;
+		selfMarker = dstDoc.createElement("link");
+		selfMarker.rel = selfRel;
+		selfMarker.href = dstDoc.URL;
+		dstDoc.head.insertBefore(selfMarker, dstDoc.head.firstChild);
+	},
+
+	function() {
+		var framesetMarker = dstDoc.createElement("link");
+		framesetMarker.rel = framesetRel;
+		framesetMarker.href = hframeset.src;
+		dstDoc.head.insertBefore(framesetMarker, selfMarker);
+	},
+	
+	function() {
+		mergeElement(dstDoc.documentElement, srcDoc.documentElement);
+		mergeElement(dstDoc.head, srcDoc.head);
+		mergeHead(dstDoc, srcDoc.head, true);
+	},
+
+	function() { return scriptQueue.empty(); }, // FIXME this should be in mergeHead
+
+	function() {
+		var srcBody = srcDoc.body;
+		mergeElement(dstDoc.body, srcBody);
+
+		var contentStart = dstDoc.body.firstChild;
+		var framesetEnd = dstDoc.createElement('plaintext');
+		framesetEnd.setAttribute('style', 'display: none;');
+		dstDoc.body.insertBefore(framesetEnd, contentStart);
+
+ 		frameset_insertBody(dstDoc, srcBody);
+		renderFrames(srcTree.frames); // FIXME promisify
+	},
+	function() {
+		return notify({
+			module: "frameset",
+			stage: "after",
+			type: "entering",
+			node: dstDoc
+		});
+	},
+	function() { // this doesn't stall the Promise returned by render() 
+		wait(function() { return checkStyleSheets(dstDoc); })
+		.then(function() {
+			return notify({
+				module: "frameset",
+				stage: "after",
+				type: "ready",
+				node: dstDoc
+			});
+		});
+	}
+
+	]);
+
+	// NOTE render() returns now. The following functions are hoisted
+	
+	function mergeElement(dst, src) { // NOTE this removes all dst (= landing page) attrs and imports all src (= frameset) attrs.
+		removeAttributes(dst);
+		copyAttributes(dst, src);
+		dst.removeAttribute('style'); // FIXME is this appropriate? There should at least be a warning
+	}
+
+}
+	
+});
+
+function separateHead(dstDoc, isFrameset, afterRemove) { // FIXME more callback than just afterRemove?
+	var dstHead = dstDoc.head;
+	var framesetMarker = getFramesetMarker(dstDoc);
+	if (!framesetMarker) throw 'No ' + framesetRel + ' marker found. ';
+
+	var selfMarker = getSelfMarker(dstDoc);
+	// remove frameset / page elements except for <script type=text/javascript>
+	if (isFrameset) forSiblings("after", framesetMarker, "before", selfMarker, remove);
+	else forSiblings("after", selfMarker, remove);
+	
+	function remove(node) {
+		if (tagName(node) == "script" && (!node.type || node.type.match(/^text\/javascript/i))) return;
+		dstHead.removeChild(node);
+		if (afterRemove) afterRemove(node);
+	}
+}
+
+function mergeHead(dstDoc, srcHead, isFrameset, afterRemove) { // FIXME more callback than just afterRemove?
+	var baseURL = URL(dstDoc.URL);
+	var dstHead = dstDoc.head;
+	var framesetMarker = getFramesetMarker();
+	if (!framesetMarker) throw 'No ' + framesetRel + ' marker found. ';
+	var selfMarker = getSelfMarker();
+
+	separateHead(dstDoc, isFrameset, afterRemove);
+
+	// remove duplicate scripts from srcHead
+	forSiblings ("starting", srcHead.firstChild, function(node) {
+		switch(tagName(node)) {
+		case "script":
+			if (every($$("script", dstHead), function(el) {
+				return baseURL.resolve(el.src) != node.src; // FIXME @src should already be resolved to absURL
+			})) return;
+			break;
+		default: return;
+		}
+		srcHead.removeChild(node);
+	});
+
+	forSiblings ("starting", srcHead.firstChild, function(srcNode) {
+		srcHead.removeChild(srcNode);
+		if (srcNode.nodeType != 1) return;
+		switch (tagName(srcNode)) {
+		case "title":
+			if (!srcNode.innerHTML) return; // IE will add a title even if non-existant
+			if (isFrameset) return; // ignore <title> in frameset. FIXME what if topic content has no <title>?
+			break;
+		case "link": // FIXME no duplicates @rel, @href pairs
+			break;
+		case "meta": // FIXME no duplicates, warn on clash
+			if (srcNode.httpEquiv) return;
+			if (/^\s*viewport\s*$/i.test(srcNode.name)) srcNode = composeNode(srcNode); // TODO Opera mobile was crashing. Is there another way to fix this?
+			break;
+		case "style": 
+			break;
+		case "script":  // FIXME no duplicate @src
+			break;
+		}
+		if (isFrameset) insertNode('beforebegin', selfMarker, srcNode);
+		else insertNode('beforeend', dstHead, srcNode);
+		if (tagName(srcNode) == "link") srcNode.href = srcNode.getAttribute("href"); // Otherwise <link title="..." /> stylesheets don't work on Chrome
+	});
+	// allow scripts to run
+	forEach($$("script", dstHead), function(script) { scriptQueue.push(script); }); // FIXME this breaks if a script inserts other scripts
+}
+
+function frameset_insertBody(dstDoc, srcBody) {
+	var dstBody = dstDoc.body;
+	var content = dstBody.firstChild;
+	forSiblings ("starting", srcBody.firstChild, function(node) {
+		srcBody.removeChild(node);
+		dstBody.insertBefore(node, content);
+	});
+
+	forSiblings ("before", content, enableScripts);
+	
+	function enableScripts(node) {
+		if (node.nodeType !== 1) return;
+		if ("script" === tagName(node)) scriptQueue.push(node);
+		else forEach($$("script", node), function(script) { scriptQueue.push(script); });
+	}
+}
+
+
+var framesetRel = 'frameset'; // NOTE http://lists.w3.org/Archives/Public/www-html/1996Dec/0143.html
+var selfRel = 'self';
+var framesetRelRegex = new RegExp('\\b' + framesetRel + '\\b', 'i');
+function getFramesetMarker(doc) {
 	if (!doc) doc = document;
 	var marker = firstChild(doc.head, function(el) {
 		return el.nodeType == 1 &&
 			tagName(el) == "link" &&
-			/\bMEEKO-DECOR-ACTIVE\b/i.test(el.rel);
+			framesetRelRegex.test(el.rel);
 	});
 	return marker;
 }
 
+var selfRelRegex = new RegExp('\\b' + selfRel + '\\b', 'i');
 function getSelfMarker(doc) {
 	if (!doc) doc = document;
 	var marker = firstChild(doc.head, function(el) {
 		return el.nodeType == 1 &&
 			tagName(el) == "link" &&
-			/\bMEEKO-SELF\b/i.test(el.rel);
+			selfRelRegex.test(el.rel);
 	});
 	return marker;
 }
 
-// end decor defn
+return HFrameset;
+})();
+
+
+var notify = function(msg) {
+	var module = framer[msg.module + 'Options'];
+	var handler = module[msg.type];
+	if (!handler) return Promise.resolve();
+	var listener;
+
+	if (handler[msg.stage]) listener = handler[msg.stage];
+
+	else switch(msg.module) {
+	case "frame":
+		listener =	(msg.type == "leaving") ?
+			(msg.stage == "before") ? handler : null :
+			(msg.stage == "after") ? handler : null;
+		break;
+	case "frameset":
+		listener = (msg.type == "leaving") ?
+			(msg.stage == "before") ? handler : null :
+			(msg.stage == "after") ? handler : null;
+		break;
+	default:
+		throw msg.module + " is invalid module";
+		break;
+	}
+
+	if (typeof listener == "function") {
+		var promise = asap(function() { listener(msg); }); // TODO isFunction(listener)
+		promise['catch'](function(err) { throw err; });
+		return promise;
+	}
+	else return Promise.resolve();
+}
+
+
+var framer = Meeko.framer = {};
+
+extend(framer, {
+
+frameset: new HFrameset(document),
+
+started: false,
+
+landingDocument: null,
+
+start: function(startOptions) {
+return bfScheduler.now(function() {
+
+	if (framer.started) throw "Already started";
+	if (!startOptions || !startOptions.contentDocument) throw "No contentDocument passed to start()";
+
+	framer.started = true;
+	
+	startOptions.contentDocument
+	.then(function(doc) {
+		if (framer.frameOptions.normalize) framer.frameOptions.normalize(doc, { url: document.URL });
+		if (!STAGING_DOCUMENT_IS_INERT) deneutralizeAll(doc);
+		return doc;
+	})
+	.then(function(doc) {
+		framer.landingDocument = doc;
+	});
+	
+	return pipe(null, [
+		
+	function() { // lookup or detect framesetURL
+		var framesetConf;
+		framesetConf = framer.lookup(document.URL);
+		if (framesetConf) return framesetConf;
+		return startOptions.contentDocument
+			.then(function(doc) {
+				return framer.detect(doc);
+			});
+	},
+	function(framesetConf) { // initiate fetch of framesetURL
+		if (!framesetConf) throw "No frameset could be determined for this page";
+		return framer.frameset.load(framesetConf.framesetURL, framesetConf);
+	},
+	
+	function() {
+		return wait(function() { return !!document.body; });		
+	},
+
+	function() { resolveURLs(); },
+	
+	function() {
+		return framer.frameset.render(); // FIXME what if render fails??
+	}
+	
+	]);
+});
+	// start() returns now. The following are hoisted
+	
+	function resolveURLs() { // NOTE resolve URLs in landing page
+		// TODO could be merged with code in parseHTML
+		var baseURL = URL(document.URL);
+		function _resolveAttr(el, attrName) {
+			var relURL = el.getAttribute(attrName);
+			if (relURL == null) return;
+			var absURL = baseURL.resolve(relURL);
+			el.setAttribute(attrName, absURL);
+		}
+		
+		function resolveAttr(el, attrName) {
+			if (tagName(el) != 'script') return _resolveAttr(el, attrName);		
+			var scriptType = el.type;
+			var isJS = (!scriptType || /^text\/javascript/i.test(scriptType));
+			if (isJS) el.type = "text/javascript?complete"; // IE6 and IE7 will re-execute script if @src is modified (even to same path)
+			_resolveAttr(el, attrName);
+		}
+		
+		forSiblings("starting", document.head.firstChild, function(node) {
+			switch (tagName(node)) {
+			case 'script':
+				resolveAttr(node, 'src');
+				break;
+			case 'link':
+				resolveAttr(node, 'href');
+				break;
+			}
+		});
+	}
+
+}
+
+});
+
+
+extend(framer, {
+
+lookup: function(docURL) {
+	var framer = this;
+	if (!framer.framesetOptions.lookup) return;
+	var result = framer.framesetOptions.lookup(docURL);
+	if (result == null) return null;
+
+	// FIXME error if `result` is a relative URL
+	if (typeof result === 'string') result = implyFramesetScope(result, docURL);
+	if (typeof result !== 'object' || !result.scope || !result.framesetURL) throw 'Unexpected result from frameset lookup';
+	return result;
+},
+
+detect: function(srcDoc) {
+	var framer = this;
+	if (!framer.framesetOptions.detect) return;
+	var result = framer.framesetOptions.detect(srcDoc);
+	if (result == null) return null;
+
+	// FIXME error if `result` is a relative URL
+	if (typeof result === 'string') result = implyFramesetScope(result, document.URL);
+	if (typeof result !== 'object' || !result.scope || !result.framesetURL) throw 'Unexpected result from frameset detect';
+	return result;
+},
+
+compareFramesetScope: function(settings) {
+	var framer = this;
+	if (framer.frameset.src !== settings.framesetURL) return false;
+	if (framer.frameset.scope !== settings.scope) return false;
+}
+
+});
+
+function implyFramesetScope(framesetSrc, docSrc) {
+	var docURL = URL(docSrc);
+	var docSiteURL = URL(docURL.origin);
+	var framesetSrc = docSiteURL.resolve(framesetSrc);
+	var scope = implyScope(framesetSrc, docSrc);
+	return {
+		scope: scope,
+		framesetURL: framesetSrc
+	}
+}
+
+function implyScope(framesetSrc, docSrc) {
+	var docURL = URL(docSrc);
+	var framesetURL = URL(framesetSrc);
+	var scope = docURL.base;
+	var framesetBase = framesetURL.base;
+	if (scope.indexOf(framesetBase) >= 0) scope = framesetBase;
+	return scope;
+}
+
+
+/*
+ Paging handlers are either a function, or an object with `before` and / or `after` listeners. 
+ This means that before and after listeners are registered as a pair, which is desirable.
+*/
+
+extend(framer, {
+framesetOptions: {
+	lookup: function(url) {},
+	detect: function(document) {},
+	load: function(method, url, data, details) {
+		var framesetOptions = this;
+		var loader = new HTMLLoader(framesetOptions);
+		return loader.load(method, url, data, details);
+	}
+	/* The following options are also available (unless otherwise indicated) *
+	entering: { before: noop, after: noop },
+	leaving: { before: noop, after: noop }, // TODO not called at all
+	ready: noop // TODO should this be entering:complete ??
+	/**/
+},
+
+frameOptions: { 
+	duration: 0,
+	load: function(method, url, data, details) {
+		var frameOptions = this;
+		var loader = new HTMLLoader(frameOptions);
+		details.mustResolve = false;
+		return loader.load(method, url, data, details);
+	}
+
+	/* The following options are also available *
+	entering: { before: hide, after: show },
+	leaving: { before: hide, after: show }
+	/**/
+},
+
+configFrameset: function(options) {
+	var framer = this;
+	config(framer.framesetOptions, options);
+},
+
+configFrame: function(options) {
+	var framer = this;
+	config(framer.frameOptions, options);
+}
+
+});
+
+
+extend(framer, {
+
+decoders: {},
+
+registerDecoder: function(type, constructor) {
+	this.decoders[type] = constructor;
+},
+
+createDecoder: function(type) {
+	return new this.decoders[type];	
+},
+
+processors: {},
+
+registerProcessor: function(type, constructor) {
+	this.processors[type] = constructor;
+},
+
+createProcessor: function(type) {
+	return new this.processors[type];	
+}
+
+});
+
+
+var MicrodataDecoder = (function() {
+
+function MicrodataDecoder() {}
+
+extend(MicrodataDecoder.prototype, {
+
+init: function(doc) {
+	this.srcDocument = doc;
+	
+},
+
+evaluate: function(path, context, variables, type) {
+	var pathParts = path.split('.');
+	
+	var value = context;
+	_.forEach(pathParts, function(relPath, i) {
+	  if (i === 0 && relPath.charAt(0) === '$') value = variables[relPath.substr(1)];
+	  else value = value.properties.namedItem(relPath)[0].value;
+	});
+	
+	return value;
+}
+
+});
+
+return MicrodataDecoder;
+})();
+
+framer.registerDecoder('microdata', MicrodataDecoder);
+
+
+var CSSDecoder = (function() {
+
+function CSSDecoder() {}
+
+extend(CSSDecoder.prototype, {
+
+init: function(doc) {
+	this.srcDocument = doc;
+},
+
+evaluate: function(path, context, variables, type) {
+	if (!context) context = this.srcDocument;
+	if (type === 'array') return findAll(context, path, variables);
+	var node = find(context, path, variables);
+	switch(type) {
+	case 'text': return node.textContent || node.innerText; // FIXME legacy
+	case 'boolean': return !!node;
+	case 'node': return node;
+	default: return node;
+	}
+}
+
+});
+
+function find(context, selectorGroup, variables) {
+	var finalSelector = expandSelector(context, selectorGroup, variables);
+	return context.querySelector(finalSelector);
+}
+
+function findAll(context, selectorGroup, variables) {
+	var finalSelector = expandSelector(context, selectorGroup, variables);
+	return context.querySelectorAll(finalSelector);
+}
+
+var uidIndex = 0;
+function expandSelector(context, selectorGroup, variables) { // FIXME currently only implements `context` expansion
+	var isRoot = context.nodeType === 9;
+	var id;
+	if (!isRoot) {
+		id = context.id;
+		if (!id) {
+			id = '__meeko_' + (uidIndex++) + '__';
+			context.id = id;
+		}
+	}
+	var selectors =
+		selectorGroup.split(',')
+		.map(function(s) { return s.trim(); })
+		.filter(function(s) {
+			switch(s.charAt(0)) {
+			case '+': case '~': return false; // FIXME warning or error
+			case '>': return (isRoot) ? false : true; // FIXME probably should be allowed even if isRoot
+			default: return true;	
+			}
+		})
+		.map(function(s) {
+			return (isRoot) ? s : '#' + id + ' ' + s;
+		});
+	
+	return selectors.join(', ');
+}
+
+return CSSDecoder;
+})();
+
+framer.registerDecoder('css', CSSDecoder);
+
+
+var HTemplate = (function() {
+
+var htNamespace = 'ht';
+var htAttrPrefix = htNamespace + ':';
+var exprNamespace = 'expr';
+var exprPrefix = exprNamespace + ':';
+var exprPrefixRegex = new RegExp('^' + exprPrefix, 'i');
+var textAttr = '.text';
+var htmlAttr = '.html';
+var exprTextAttr = exprPrefix + textAttr;
+var exprHtmlAttr = exprPrefix + htmlAttr;
+
+function htAttr(el, attr) {
+	var htAttrName = htAttrPrefix + attr;
+	if (!el.hasAttribute(htAttrName)) return false;
+	var value = el.getAttribute(htAttrName);
+	el.removeAttribute(htAttrName);
+	return value;
+}
+
+
+function HTemplate() {}
+
+extend(HTemplate.prototype, {
+	
+loadTemplate: function(template) {
+	this.template = template;
+},
+
+transform: function(decoder) {
+	var clone = this.template.cloneNode(true);
+	return transform(clone, decoder, null, {});
+}
+
+});
+
+function transform(el, decoder, context, variables) {
+	
+	var ht_if = htAttr(el, 'if');
+	var ht_forEach = htAttr(el, 'for-each');
+	var ht_var = htAttr(el, 'var');
+	
+	if (ht_forEach === false) {
+
+		if (ht_if !== false) {
+			var keep = decoder.evaluate(ht_if, context, variables, 'boolean');
+			if (!keep) return null;
+		}
+	
+		var newEl = transformNode(el, decoder, context, variables); // NOTE newEl === el
+		return newEl;
+	}
+	
+	// handle for-each
+	var subVars = extend({}, variables);
+	var subContexts = decoder.evaluate(ht_forEach, context, variables, 'array');
+	var result = document.createDocumentFragment(); // FIXME which is the right doc to create this frag in??
+	
+	_.forEach(subContexts, function(subContext) {
+		if (ht_var) subVars[ht_var] = subContext;
+		if (ht_if !== false) {
+			var keep = decoder.evaluate(ht_if, subContext, subVars, 'boolean');
+			if (!keep) return;
+		}
+		var srcEl = el.cloneNode(true);
+		var newEl = transformNode(srcEl, decoder, subContext, subVars); // NOTE newEl === srcEl
+		result.appendChild(newEl);
+	});
+	
+	return result;
+}
+
+function transformNode(node, decoder, context, variables) {
+	var nodeType = node.nodeType;
+	if (!nodeType) return node;
+	if (nodeType !== 1 && nodeType !== 11) return node;
+	var deep = true;
+	if (nodeType === 1 && (node.hasAttribute(exprTextAttr) || node.hasAttribute(exprHtmlAttr))) deep = false;
+	expandAttributes(node, decoder, context, variables);
+	if (!deep) return node;
+
+	for (var current=node.firstChild, next=current&&current.nextSibling; current; current=next, next=current&&current.nextSibling) {
+		if (current.nodeType !== 1) continue;
+		var newChild = transform(current, decoder, context, variables);
+		if (newChild !== current) {
+			if (newChild.nodeType) el.replaceChild(newChild, current);
+			else node.removeChild(current); // FIXME warning if newChild not empty
+		}
+	}
+	return node;
+}
+
+function expandAttributes(el, decoder, context, variables) {
+	_.forEach(el.attributes, function(attr) {
+	  if (!attr.specified) return;
+	  var name = attr.name.replace(exprPrefixRegex, '');
+	  if (name === attr.name) return;
+	  var expr = attr.value;
+	  el.removeAttribute(attr.name);
+	  
+	  var exprParts = expr.split('|');
+	  var type = (name === htmlAttr) ? 'node' : 'text';
+	  var value = decoder.evaluate(exprParts.shift(), context, variables, type);
+
+	  switch (name) {
+	  case textAttr:
+		if (value && value.nodeType) value = value.textContent;
+		break;
+	  case htmlAttr:
+		var frag = document.createDocumentFragment();
+		if (value && value.nodeType) frag.appendChild(value.cloneNode(true));
+		else {
+			var div = document.createElement('div');
+			div.innerHTML = value;
+			var node;
+			while (node = div.firstChild) frag.appendChild(node);
+		}
+		value = frag;
+		break;
+	  default:
+		if (value && value.nodeType) value = value.textContent;
+		break;
+	  }
+
+	  _.forEach(exprParts, function(expression) {
+		var fn = Function('value', 'return (' + expression + ');');
+		value = fn(value);
+	  });
+
+	  switch (name) {
+	  case textAttr:
+		el.textContent = value;
+		break;
+	  case htmlAttr:
+		el.innerHTML = '';
+		if (value && value.nodeType) el.appendChild(value);
+		else el.innerHTML = value;
+		break;
+	  default:
+		switch (typeof value) {
+		case 'boolean':
+		  if (value) el.removeAttribute(name);
+		  else el.setAttribute(name, '');
+		  break;
+		default:
+		  el.setAttribute(name, value.toString());
+		  break;
+		}
+	  }
+	});
+}
+
+return HTemplate;	
+})();
+
+framer.registerProcessor('ht', HTemplate);
+
+// end framer defn
 
 }).call(window);

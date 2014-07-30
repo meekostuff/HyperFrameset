@@ -1,6 +1,9 @@
 HyperFrameset
 =============
 
+**WARNING: This project is pre-alpha software. DO NOT USE**
+**WARNING: This documentation is out of date - most of it is probably wrong.**
+
 > HyperFrameset provides **full** separation of content from presentation.
 > With CSS you can change the styling of a whole site with one stylesheet.
 > With HyperFrameset you can change everything -
@@ -12,33 +15,31 @@ HyperFrameset
 HyperFrameset is a Javascript page decoration engine which runs in the browser.
 It allows your site to deliver real page content first and fast
 (think API-first with HTML-payloads).
-Your site decor can be placed in its own page and merged in the browser instead of on the server.
+Your site frameset can be placed in its own page and merged in the browser instead of on the server.
 Auxiliary content could also be conditionally loaded with AJAX
 (think inside-out iframes).
 
-A site decor page is similar to an external stylesheet in that it can be shared between several pages.
+A site frameset page is similar to an external stylesheet in that it can be shared between several pages.
 Originally it was even referenced with a resource link, just like stylesheets:
 
-    <link rel="meeko-decor" type="text/html" href="decor.html" />
+    <link rel="frameset" type="text/html" href="frameset.html" />
 
 <small>**(This referencing method has been superceded by external configuration, which is less limiting.)**</small>
 
 As a bonus, when your site uses HyperFrameset "pushState assisted navigation" requires no additional setup. 
-When someone viewing your page clicks on a link to another page that uses the same decor
+When someone viewing your page clicks on a link to another page that uses the same frameset
 then AJAX updates the real content
 and `history.pushState()` updates the browser URL. 
 
-HyperFrameset.js is around 10kB when minified and gzipped.
+HyperFrameset.js is around 15kB when minified and gzipped.
 
 To see it in action visit my [blog](http://meekostuff.net/blog/).
 Make sure you view the page source and check that it is just raw content.
-The navbar and contact popup are all in the [site-decor page](http://meekostuff.net/blog/decor.html). 
+The navbar and contact popup are all in the [site-frameset page](http://meekostuff.net/blog/frameset.html). 
 
 For more info on the concept of HyperFrameset and its affinity with pushState assisted navigation, read  
 
-- [The HTML decor concept](http://meekostuff.net/blog/HTML-Decor-I/)
-- [Introducing HyperFrameset.js](http://meekostuff.net/blog/HTML-Decor-II/)
-- [pushState was made for HyperFrameset](http://meekostuff.net/blog/pushState-was-made-for-HyperFrameset/)
+- FIXME tutorials, etc
 
 Also make sure you check the [wiki](https://github.com/meekostuff/HyperFrameset/wiki).
 
@@ -72,12 +73,11 @@ Installation
 Quick Start
 -----------
 
-**This is no longer the preferred way of specifying decor, but is conceptually easiest to understand.**
+**Although this is no longer the preferred way of specifying the hyperframeset, it is still the default and is conceptually easiest to understand.**
 **If you are new to HyperFrameset then read this documentation straight through.**
 **Otherwise feel free to skip to the [Configuration](#configuration) section first.**
 
-Create a HTML document (page.html) with some page specific content -
-elements that are children of `<body>` and have `@id`. 
+Create a HTML document (page.html) with some page specific content. 
 Any page specific scripts, styles or meta-data should go in `<head>`. 
 The `<body>` may also contain fallback content, which is
 only displayed if HyperFrameset is NOT enabled.
@@ -87,15 +87,10 @@ only displayed if HyperFrameset is NOT enabled.
 	<head>
 		<!-- source the HyperFrameset boot-script -->
 		<script src="/path/to/HyperFrameset/boot.js"></script>
-		<!-- create a link to the decor page. All attributes are needed -->
-		<link rel="meeko-decor" type="text/html" href="decor.html" />
-		<!-- include fallback stylesheets for when HyperFrameset doesn't run.
-		    @title=nodecor stylesheets are removed !-->
-		<link rel="stylesheet" href="nodecor.css" title="nodecor" />
-		<!-- page specific style -->
-		<style>
-		.styled-from-page { border: 2px dashed green; }
-		</style>
+		<!-- create a link to the frameset page. All attributes are needed -->
+		<link rel="frameset" type="text/html" href="frameset.html" />
+		<!-- include fallback stylesheets for when HyperFrameset doesn't run. -->
+		<link rel="stylesheet" href="noframeset.css" />
 	</head>
 	<body>
 		<header>
@@ -104,8 +99,8 @@ only displayed if HyperFrameset is NOT enabled.
 		
 		<article id="mk_content"><!-- Page specific content, identified by @id -->
 		#mk_content in page
-			<div class="styled-from-decor">
-			This content is styled by the decor stylesheet
+			<div class="styled-from-frameset">
+			This content is styled by the frameset stylesheet
 			</div>	
 			<div class="styled-from-page">
 			This content is styled by the page stylesheet
@@ -118,7 +113,7 @@ only displayed if HyperFrameset is NOT enabled.
 	</body>
 	</html>
 	
-Create the decor document (decor.html).
+Create the frameset document (frameset.html).
 This is a normal page of HTML that, when viewed in the browser,
 will appear as the final page without the page specific content. 
 
@@ -126,39 +121,39 @@ will appear as the final page without the page specific content.
 	<html>
 	<head>
 		<style>
-		.styled-from-decor { border: 2px solid blue; }
+		.styled-from-frameset { border: 2px solid blue; }
 		</style>
 	</head>
 	<body>
 		<header>
-		#header in decor
+		#header in frameset
 		</header>
 		
 		<div id="mk_main">
-			#mk_main in decor
+			#mk_main in frameset
 			<article id="mk_content">
-			#mk_content in decor: This will be replaced by #mk_content from the page
+			#mk_content in frameset: This will be replaced by #mk_content from the page
 			</article>
 		</div>
 		
 		<footer>
-		#footer in decor
+		#footer in frameset
 		</footer>
 	</body>
 	</html>
 
-When page.html is loaded into the browser, HyperFrameset will merge decor.html into it, following these steps:
+When page.html is loaded into the browser, HyperFrameset will merge frameset.html into it, following these steps:
 
 1. Set the visibility of the page to "hidden". \*
-2. Detect the first `<link rel="meeko-decor" href="..." />`, fully resolve the @href and use as the decor URL.
-3. Load the decor URL into an iframe.
-4. Fully resolve URLs for all scripts, images and links in the decor page. 
+2. Detect the first `<link rel="frameset" href="..." />`, fully resolve the @href and use as the frameset URL.
+3. Load the frameset URL into an iframe.
+4. Fully resolve URLs for all scripts, images and links in the frameset page. 
 5. Insert `<script>`, `<style>`, `<link>`, and conditionally `<meta>` and `<title>` 
-from the `<head>` of the decor page into the `<head>` of the content page.
-6. Insert the child nodes of the `<body>` of the decor page at the start of the `<body>` in the content page
-7. For each child node of the `<body>` in the content page, determine whether it should be deleted or moved into the decor.
- If a child node is an element with an ID, and the ID matches an element in the decor,
- then the element in the decor is replaced with the element from the content.
+from the `<head>` of the frameset page into the `<head>` of the content page.
+6. Insert the child nodes of the `<body>` of the frameset page at the start of the `<body>` in the content page
+7. For each child node of the `<body>` in the content page, determine whether it should be deleted or moved into the frameset.
+ If a child node is an element with an ID, and the ID matches an element in the frameset,
+ then the element in the frameset is replaced with the element from the content.
  All other child nodes of the body in the content page are deleted.
 8. When all linked stylesheets for the document have loaded, set the visibility of the page to "visible".
 This step may occur at any time during or after step 7. \*
@@ -171,10 +166,10 @@ This process results in a DOM tree like this:
 	<html>
 	<head>
 		<style>
-		.styled-from-decor { border: 2px solid blue; }
+		.styled-from-frameset { border: 2px solid blue; }
 		</style>
-		<!-- create a link to the decor page -->
-		<link rel="meeko-decor" type="text/html" href="decor.html" />
+		<!-- create a link to the frameset page -->
+		<link rel="frameset" type="text/html" href="frameset.html" />
 		<!-- and source the HyperFrameset boot-script -->
 		<script src="/path/to/HyperFrameset/boot.js"></script>
 		<!-- page specific style -->
@@ -184,15 +179,15 @@ This process results in a DOM tree like this:
 	</head>
 	<body>
 		<header>
-		#header in decor
+		#header in frameset
 		</header>
 		
 		<div id="mk_main">
-			#mk_main in decor
+			#mk_main in frameset
 			<article id="mk_content">
 			#mk_content in page
-				<div class="styled-from-decor">
-				This content is styled by the decor stylesheet
+				<div class="styled-from-frameset">
+				This content is styled by the frameset stylesheet
 				</div>	
 				<div class="styled-from-page">
 				This content is styled by the page stylesheet
@@ -201,7 +196,7 @@ This process results in a DOM tree like this:
 		</div>
 		
 		<footer>
-		#footer in decor
+		#footer in frameset
 		</footer>
 	</body>
 	</html>
@@ -210,23 +205,23 @@ This process results in a DOM tree like this:
 Fallbacks
 ---------
 
-Sometimes HyperFrameset will not be able to apply the decor document to the page.
+Sometimes HyperFrameset will not be able to apply the frameset document to the page.
 This can occur because
 
 - Javascript is disabled
 - the HyperFrameset script failed to download
 - HyperFrameset is configured to NOT autostart
-- the decor document failed to download
+- the frameset document failed to download
 
 In this scenario you would like the page to have some basic styling and auxiliary content -
 something that can be dispensed with when HyperFrameset runs.
 
 ### Stylesheets
 
-Any `<link rel="stylesheet">` or `<style>` elements that have `@title="nodecor"`
-will be removed from the page before the decor document is applied, e.g.
+Any `<link rel="stylesheet">` or `<style>` elements that have `@title="noframeset"`
+will be removed from the page before the frameset document is applied, e.g.
 
-	<style title="nodecor">body { max-width: 72ex; }</style>
+	<style title="noframeset">body { max-width: 72ex; }</style>
 	
 **NOTE:** this is done in the default `config.js`.
 If you want to remove or modify this behavior then do so in your site-specific `config.js`.
@@ -234,8 +229,8 @@ If you want to remove or modify this behavior then do so in your site-specific `
 ### Auxiliary content
 
 Children of `<body>` which have no `@id`,
-or which have `@id` that cannot be found in the decor document
-will be removed from the page before the decor is applied, e.g.
+or which have `@id` that cannot be found in the frameset document
+will be removed from the page before the frameset is applied, e.g.
 
 	<body>
 		<div>
@@ -245,12 +240,12 @@ will be removed from the page before the decor is applied, e.g.
 		
 		<div id="mk_irrelevant">
 		This content will be REMOVED from the page
-		assuming the decor has no element with matching @id
+		assuming the frameset has no element with matching @id
 		</div>
 
 		<div id="mk_content">
 		This content will be RETAINED in the page
-		assuming the decor has an element with matching @id
+		assuming the frameset has an element with matching @id
 		</div>
 	</body>	
 
@@ -259,8 +254,8 @@ PushState Assisted Navigation
 -----------------------------
 
 If `history.pushState` is available then HyperFrameset will conditionally over-ride the default browser behavior when hyperlinks are clicked.
-If the @href of the hyperlink is a document that specifies the same decor as the current page then it can be merged into the current page
-in a _similar_ way to the startup merging of decor and document. 
+If the @href of the hyperlink is a document that specifies the same frameset as the current page then it can be merged into the current page
+in a _similar_ way to the startup merging of frameset and document. 
 
 Some hyperlinks are not appropriate for this and are ignored by HyperFrameset:
 
@@ -273,8 +268,8 @@ Some hyperlinks are not appropriate for this and are ignored by HyperFrameset:
 
 That leaves hyperlinks to other pages within the same site.
 
-If a decor lookup function has been registered then HyperFrameset queries what the decor of the hyperlinked page would be.
-If it is the same as the current decor then the page is downloaded and used to replace the real content of the current page. 
+If a frameset lookup function has been registered then HyperFrameset queries what the frameset of the hyperlinked page would be.
+If it is the same as the current frameset then the page is downloaded and used to replace the real content of the current page. 
 
 Otherwise normal browser navigation to the next page is triggered. 
 
@@ -285,7 +280,7 @@ Otherwise normal browser navigation to the next page is triggered.
 ### Page Transition Animation
 
 To enable author supplied animation of page transitions, HyperFrameset provides the `Meeko.panner.config()` method.
-You could use it by placing something like the following in your **decor document**
+You could use it by placing something like the following in your **frameset document**
 
 	Meeko.panner.config({
 		duration: 0, // minimum time (ms) between paging start and end. 
@@ -302,7 +297,7 @@ You could use it by placing something like the following in your **decor documen
 			after: noop
 		},
 		pageIn: {
-			before: noop, // indicates that the decor is ready for content to be placed. This would allow decor to be mutated in url dependent way
+			before: noop, // indicates that the frameset is ready for content to be placed. This would allow frameset to be mutated in url dependent way
 			after: noop // the equivalent of `window.onload` in non-pushstate enabled environments.
 		}
 	});
@@ -317,9 +312,9 @@ Key / value pairs in the passed options object overwrite the matching previous s
 
 **NOTE** There is not always a notification **after** `pageOut`.
 For instance, if the next page is ready before the transition duration has expired
-then the new nodes replace the old nodes directly, rather than transitioning through the decor placeholders. 
+then the new nodes replace the old nodes directly, rather than transitioning through the frameset placeholders. 
 
-**Example:** A simple way to achieve a fade-out / fade-in effect on page transition is to use the following in the decor document:
+**Example:** A simple way to achieve a fade-out / fade-in effect on page transition is to use the following in the frameset document:
 
 	<script>
 	Meeko.panner.config({
@@ -364,7 +359,7 @@ the following will install them in the view-document when the page is panned in:
 If a new page takes longer than one second to load, the user may wonder if the loading has stalled.
 In this case a waiting indicator is typically used to reassure the user that the page is still loading.
 HyperFrameset provides a simple way to do this - when the `duration` has expired (and the next page still hasn't loaded)
-the decor document is used as the waiting page. 
+the frameset document is used as the waiting page. 
 
 ### Manual handling
 
@@ -401,29 +396,28 @@ This mimics standard browser behavior.
 `<script>` handling
 -------------------
 
-- Scripts in the landing-page are not handled by HyperFrameset - they execute at the expected time in the browser's script handling.
-**RECOMMENDATION:** The page does not need and SHOULD NOT have scripts - they SHOULD all be part of the decor. 
+- Scripts in content-pages are never run by HyperFrameset. 
+**RECOMMENDATION:** Content-pages do not need and SHOULD NOT have scripts - they SHOULD all be part of the frameset. 
 
-- All scripts which are not in the landing-page (that is, decor content or panned page content) are executed via dynamic script insertion, 
-but behave **like** scripts that are part of the page content. Page content is not blocked, but earlier scripts block later scripts 
+- All scripts which are in the frameset document are executed via dynamic script insertion, 
+but behave **like** scripts that are part of a loading document.
+Content is not blocked, but earlier scripts block later scripts 
 unless the earlier script has the `src` and `async` attributes. 
 
     `<script src="..." async></script>`
 
 This dynamic script insertion is referred to as **enabling** in the following rules. 
 
-- Scripts in the `<head>` of the decor are **enabled** AFTER all the content in the `<head>` of the decor is MERGED WITH the page.
+- Scripts in the `<head>` of the frameset are **enabled** AFTER all the content in the `<head>` of the frameset is INSERTED INTO the page.
 
-- Scripts in the `<body>` of the decor are **enabled** AFTER all the content in the `<body>` of the decor is INSERTED INTO the page,
-but BEFORE the page content is MERGED WITH the decor.
-
-- When panning occurs, scripts in the `<head>` of the next page are **enabled** AFTER all the content in the `<head>` of the next page is MERGED WITH the page. 
-Scripts in the `<body>` of the next page are **enabled** AFTER the content in the `<body>` of the next page is MERGED WITH the page.
-**RECOMMENDATION:** You do not need and SHOULD NOT have scripts in any page (other than the decor document). 
+- Scripts in the `<body>` of the frameset are **enabled** AFTER all the content in the `<body>` of the frameset is INSERTED INTO the page,
+but BEFORE any page content is MERGED WITH the frameset.
 
 
 Capturing
 ---------
+
+**NOTE** this option MUST be used (for now)
 
 The **capturing** [boot option](#boot-options) prevents normal browser parsing of the *landing page*.  
 This allows HyperFrameset to manage parsing in the same way that AJAXed pages are handled.
@@ -485,12 +479,12 @@ use these steps to prepare for site specific configuration.
 
 2. Edit your copy of `options.js` to change the following lines
 	
-			"htmldecor_script": '{bootscriptdir}HyperFrameset.js',
+			"main_script": '{bootscriptdir}HyperFrameset.js',
 			"config_script": '{bootscriptdir}config.js'
 	
 	to be
 	
-			"htmldecor_script": '/path/to/HyperFrameset/HyperFrameset.js',
+			"main_script": '/path/to/HyperFrameset/HyperFrameset.js',
 			"config_script": '/config.js'
 
 3. Concatenate your modified `options.js` with `boot.js` from the HyperFrameset directory
@@ -531,7 +525,7 @@ When you want to:
 
 + minify HyperFrameset.js
 	- minify HyperFrameset.js to HyperFrameset.min.js in the /path/to/HyperFrameset directory
-	- change `htmldecor_script` to `/path/to/HyperFrameset/HyperFrameset.min.js` in your copy of the `options.js` file
+	- change `main_script` to `/path/to/HyperFrameset/HyperFrameset.min.js` in your copy of the `options.js` file
 	- repeat step 3
 
 + minify boot.js
@@ -545,11 +539,11 @@ When you want to:
 These options aren't specifically related to the operation of HyperFrameset. 
 The boot-script has the following options (default values in **bold**).
 
-- htmldecor_script: **"{bootscriptdir}HyperFrameset.js"**
+- main_script: **"{bootscriptdir}HyperFrameset.js"**
 - log_level: "none", "error", **"warn"**, "info", "debug"
 - polling_interval: **50** (milliseconds)
 - autostart: false, **true**
-- capturing: **false**, true, "strict"
+- capturing: false, **true**, "strict" FIXME only **true** is acceptable now
 - hidden_timeout: **3000** (milliseconds)
 - html5\_block\_elements: **"article aside figcaption figure footer header hgroup main nav section"**
 - html5\_inline\_elements: **"abbr mark output time audio video picture"**
@@ -575,10 +569,10 @@ Options can be **preset** by script, like this:
 This tells HyperFrameset to
 - log 'info', 'warn' and 'error' messages
 - prevent automatic startup, and
-- when a manual start is requested to hide the page until all decor-resources are loaded *or*
+- when a manual start is requested to hide the page until all frameset-resources are loaded *or*
 	1000 milliseconds (1 second) have elapsed, whichever comes *first*.
 
-If autostart is turned off, HyperFrameset can be manually started by calling `Meeko.decor.start()`.
+If autostart is turned off, HyperFrameset can be manually started by calling `Meeko.framer.start()`.
 
 #### From localStorage and sessionStorage
 When debugging a page you probably don't want to modify the page source to change HyperFrameset options,
@@ -597,9 +591,9 @@ _Note_ that the page would require a refresh after these settings were made.
 
 There are two aspects of HyperFrameset:
 
-1. Decoration - the wrapping of the primary content of the page with site decor
+1. Decoration - the wrapping of the primary content of the page with site frameset
 
-2. Panning - replacing the primary content of the page while retaining the same decor
+2. Panning - replacing the primary content of the page while retaining the same frameset
 
 These aspects are opposite in purpose, but similar in operation.
 In particular, they both involve: 
@@ -608,12 +602,12 @@ In particular, they both involve:
 - notifications of content insertion / removal, etc
 
 
-### Decorator engine
+### Frameset engine
 
-Options for the decorator are stored in `Meeko.decor.options`,
+Options for framing are stored in `Meeko.framer.options`,
 which can be accessed directly or by calling 
 
-	Meeko.decor.config(options);
+	Meeko.framer.config(options);
 	
 where `options` is an object containing key / value pairs
 that will overwrite current values.
@@ -621,14 +615,14 @@ that will overwrite current values.
 Configuration should be done before HyperFrameset starts. 
 This can be achieved by editing the site-specific `config.js` created during [Preparation](#preparation).
 
-Usually you only want to configure how HyperFrameset determines the appropriate decor-document for a page. 
+Usually you only want to configure how HyperFrameset determines the appropriate frameset-document for a page. 
 Do this by providing one of the following options: 
 
 - **`detect(doc)`**  
-	MUST return the decor-URL by inspecting the current page when HyperFrameset starts (this doesn't allow panning)
+	MUST return the frameset-URL by inspecting the current page when HyperFrameset starts (this doesn't allow panning)
 
 - **`lookup(url)`**  
-	MUST return the decor-URL for any URL in the site, either the current `document.URL`,
+	MUST return the frameset-URL for any URL in the site, either the current `document.URL`,
 	or the URL of a different page that is to be panned in.
 
 `lookup(url)` is the recommended option.
@@ -649,7 +643,7 @@ where `options` is an object containing key / value pairs
 that will overwrite current values.
 
 Typically you only want to configure panner animation options.
-These would be set in the decor-document,
+These would be set in the frameset-document,
 as dealt with in [Page Transition Animation](#page-transition-animation).
 
 All other configuration should be done before HyperFrameset starts. 
@@ -658,10 +652,7 @@ This can be achieved by editing the site-specific `config.js` created during [Pr
 
 #### Pre-decorated pages
 
-Pages on your site may not be in the format that HyperFrameset and your decor-document are expecting.
-The most likely scenario for this is that your primary content containers
-are not direct children of the `<body>`,
-or they do not have @id.
+Pages on your site may not be in the format that HyperFrameset and your frameset-document are expecting.
 In this case you need to provide a `normalize(doc)` function
 which will manipulate the DOM of `doc` into the appropriate format, e.g.
 
@@ -675,7 +666,7 @@ which will manipulate the DOM of `doc` into the appropriate format, e.g.
 		});
 
 **NOTE:** configuring the `normalize` option prevents initial page decoration
-until the `DOMContentLoaded` event (or safest equivalent). 
+until the `DOMContentLoaded` event (or safest equivalent). FIXME only **capturing** is supported anyway.
 
 
 #### Non-HTML payloads
@@ -743,23 +734,16 @@ The most useful of these are in the `Meeko.DOM` namespace, and include
 Notes and Warnings
 ------------------
 - HyperFrameset may not be compatible with IE behaviors, eg [CSS3 PIE](http://css3pie.com/).
-- The decor document is loaded via XMLHttpRequest(), parsed to disable scripts, then written into an iframe using `document.write()`. 
-- unlike CSS, decor pages should be in the same domain as the content page otherwise the browsers cross-site restrictions will apply.
+- unlike CSS, frameset pages SHOULD be in the same domain as the content page otherwise the browsers cross-site restrictions will apply.
 Detection for this hasn't been implemented yet. 
-- any stylesheets in the content document and with a title of "nodecor" will be deleted at the start of merging of the decor page. 
-This allows for a fallback styling option of decor-less pages. For example, the following stylesheets would be removed:  
-`<style title="nodecor">...</style>`  
-AND  
-`<link rel="stylesheet" href="style.css" title="nodecor" />`  
-- in most current browsers, elements from the content can be moved into the decor *while the element is still loading*. 
-On IE6,7,8 this will throw an error, so for those browsers the decor is inserted and elements moved only after the DOM has fully loaded.
+- all stylesheets in the content document will be deleted at the start of merging of the frameset page. 
+This allows for a fallback styling option of frameset-less pages. 
 - the configuration options and mechanism may change in future releases
-- URLs in `<style>` sections of the decor are not resolved.
-This means that relative URLs - which are meant to be relative to the decor URL - 
+- URLs in `<style>` sections of the frameset are not resolved.
+This means that relative URLs - which are meant to be relative to the frameset URL - 
 will probably be wrong when imported into the page.
 The work-around for this is to use absolute-paths or absolute-URLs (which you should probably be using anyway).
-- There are no compatibility checks and warnings between the content and decor pages (charset, etc)
-- There are no compatibility checks and warnings between the content element and the decor element it replaces (tagName, attrs, etc). 
+- There are no compatibility checks and warnings between the content and frameset pages (charset, etc)
 
 
 TODO

@@ -13,13 +13,10 @@ nav li { display: inline; list-style: outside none; margin: 0.1em; padding: 0.25
 .hidden { display: none; }
 </style>
 <script>
-Meeko.decor.config({ // this will over-ride the <link rel="meeko-decor"> detect and enable panning
-	lookup: function(url) { return 'decor/decor.html'; }
-});
-Meeko.panner.config({
+Meeko.framer.configFrame({
 	duration: 250,
-	pageOut: function(msg) { document.getElementById('panner').className = ''; },
-	nodeRemoved: {
+	entering: function(msg) { document.getElementById('panner').className = ''; },
+	leaving: {
 		before: function(msg) { },
 		after: function(msg) { }
 	}
@@ -31,15 +28,16 @@ Meeko.panner.config({
 .style-in-body-fail { display: none; }
 </style>
 
-<h1>HTMLDecor Tests</h1>
-<nav>
-<ul>
-	<li><a href="../normal.html">normal</a></li>
-	<li><a href="../long.html">long</a></li>
-	<li><a href="../get.html">get</a></li>
-	<li><a href="../post.html">post</a></li>
-</ul>
-</nav>
+<div hf:role="frame" name="hf_nav" hf:src="scope:./index.html" hf:type="html" hf:transform="ht" hf:format="css">
+	<div hf:role="body">
+	
+		<div expr:.html=".title"><h1>{{title}}</h1></div>
+		
+		<nav expr:.html=".nav">
+		</nav>
+		
+	</div>
+</div>
 
 <hr />
 
@@ -55,25 +53,41 @@ If you can see this then &lt;style&gt; elements
 in the &lt;body&gt; of the decor document aren't being imported.
 </div> 
 
-<div id="decor-header" class="section">
-#decor-header
-<div id="page-header" class="remove">
-#page-header in decor: You should NOT be able to see this.
-</div>
-</div>
-<div id="page-main" class="remove">
-#page-main in decor: You should NOT be able to see this.
-</div>
-<div id="decor-footer" class="section">
-#decor-footer
-<div id="page-footer" class="remove">
-#page-footer in decor: You should NOT be able to see this.
-</div>
-</div>
+<div hf:role="frame" name="hf_main" hf:type="html" hf:transform="ht" hf:format="css">
+	<div hf:role="body">
+	
+		<div id="decor-header" class="section">
+		#decor-header
+		<div expr:.html="#page-header">
+		<div id="page-header" class="remove">
+		#page-header in decor: You should NOT be able to see this.
+		</div>
+		</div>
+		</div #decor-header>
+		
+		<div expr:.html="#page-main">
+		<div id="page-main" class="remove">
+		#page-main in decor: You should NOT be able to see this.
+		</div>
+		</div>
+		
+		<div id="decor-footer" class="section">
+		#decor-footer
+		<div expr:.html="#page-footer">
+		<div id="page-footer" class="remove">
+		#page-footer in decor: You should NOT be able to see this.
+		</div>
+		</div>
+		</div #decor-footer>
+	
+	</div>
+</div #main>
+
 <div id="remove" class="remove">
 #remove in decor: You should NOT be able to see this - 
 it is removed by a script.
 </div>
+
 <script type="text/javascript">
 if (window.name != "meeko-parser") (function() { 
 	var el = document.getElementById("remove");
@@ -81,6 +95,7 @@ if (window.name != "meeko-parser") (function() {
 })();
 else alert("Error: script was executed in " + window.name + " document context");
 </script>
+
 <script type="text/plain">
 alert('Error: script with type "text/plain" was treated as Javascript');
 </script>
