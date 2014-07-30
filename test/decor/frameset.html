@@ -2,7 +2,7 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
-<link rel="stylesheet" href="decor.css" />
+<link rel="stylesheet" href="frameset.css" />
 <style>
 .style-fail { display: none; }
 
@@ -45,46 +45,46 @@ Meeko.framer.configFrame({
 
 <div class="style-fail" style="background-color: red;">
 If you can see this then &lt;style&gt; elements
-from the decor document aren't being imported.
+from the frameset document aren't being imported.
 </div> 
 
 <div class="style-in-body-fail" style="background-color: red;">
 If you can see this then &lt;style&gt; elements
-in the &lt;body&gt; of the decor document aren't being imported.
+in the &lt;body&gt; of the frameset document aren't being imported.
 </div> 
 
 <div hf:role="frame" name="hf_main" hf:type="html" hf:transform="ht" hf:format="css">
 	<div hf:role="body">
 	
-		<div id="decor-header" class="section">
-		#decor-header
+		<div id="frameset-header" class="section">
+		#frameset-header
 		<div expr:.html="#page-header">
 		<div id="page-header" class="remove">
-		#page-header in decor: You should NOT be able to see this.
+		#page-header in frameset: You should NOT be able to see this.
 		</div>
 		</div>
-		</div #decor-header>
+		</div #frameset-header>
 		
 		<div expr:.html="#page-main">
 		<div id="page-main" class="remove">
-		#page-main in decor: You should NOT be able to see this.
+		#page-main in frameset: You should NOT be able to see this.
 		</div>
 		</div>
 		
-		<div id="decor-footer" class="section">
-		#decor-footer
+		<div id="frameset-footer" class="section">
+		#frameset-footer
 		<div expr:.html="#page-footer">
 		<div id="page-footer" class="remove">
-		#page-footer in decor: You should NOT be able to see this.
+		#page-footer in frameset: You should NOT be able to see this.
 		</div>
 		</div>
-		</div #decor-footer>
+		</div #frameset-footer>
 	
 	</div>
 </div #main>
 
 <div id="remove" class="remove">
-#remove in decor: You should NOT be able to see this - 
+#remove in frameset: You should NOT be able to see this - 
 it is removed by a script.
 </div>
 
