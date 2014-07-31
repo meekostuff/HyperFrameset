@@ -4,6 +4,12 @@
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <link rel="stylesheet" href="frameset.css" />
 <style>
+.remove { background-color: red; color: white; }
+.noframeset { border: 1px dashed green; }
+*[id] { margin: 0.5em; border: 1px dashed black; }
+*[hf\:role=frame] { margin: 0.5em; border: 2px dotted black; }
+</style>
+<style>
 .style-fail { display: none; }
 
 body { background-color: #ffffff; }
@@ -53,7 +59,7 @@ If you can see this then &lt;style&gt; elements
 in the &lt;body&gt; of the frameset document aren't being imported.
 </div> 
 
-<div hf:role="frame" name="hf_main" hf:type="html" hf:transform="ht" hf:format="css">
+<div hf:role="frame" name="hf_main" hf:src="scope:./normal.html" hf:type="html" hf:transform="ht" hf:format="css">
 	<div hf:role="body">
 	
 		<div id="frameset-header" class="section">

@@ -7,30 +7,28 @@
 <meta charset="UTF-8" />
 <title>long.html</title>
 <link rel="frameset" type="text/html" href="decor/frameset.html" />
-<link rel="stylesheet" href="normal.css" />
-<style type="text/css">
-div { margin: 0.5em; border: 1px dashed black; }
+<link rel="stylesheet" href="noframeset.css" />
+<style>
+*[id] { margin: 0.5em; border: 1px dashed black; }
 .remove { background-color: red; color: white; }
 </style>
-<style type="text/css" title="nodecor">
-.nodecor { background-color: red; color: white; }
+<style type="text/css">
+.inline.noframeset { background-color: red; color: yellow; }
 </style>
 </head>
 <body>
 <div class="remove">
-before #page-banner: You should NOT be able to see this content. 
+before #page-banner: This is irrelevant content and MUST NOT appear.
 </div>
 <div id="page-header">
 #page-header
 <h1>Long test-page</h1>
-<small>Contents copied from the <a href="http://docs.oracle.com/javase/7/docs/api/overview-tree.html">JavaSE7 API Tree Overview page</a></small>
 </div>
 <div class="remove">
-before #page-main: You should NOT be able to see this content. 
+before #page-main: This is irrelevant content and MUST NOT appear.
 </div>
 <div id="page-main">
 #page-main
-
 <div class="header">
 <h1 class="title">Hierarchy For All Packages</h1>
 <span class="strong">Package Hierarchies:</span>
@@ -8335,14 +8333,14 @@ before #page-main: You should NOT be able to see this content.
 </ul>
 </div>
 
+
 </div>
 <div class="remove">
-after #main: You should NOT be able to see this content. 
+after #main: This is irrelevant content and MUST NOT appear.
 </div>
 <div id="page-footer">
 #page-footer
 </div>
 </body>
 </html>
-
 
