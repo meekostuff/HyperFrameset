@@ -7,6 +7,7 @@ var URL = Meeko.URL, baseURL = URL(document.URL);
 function toArray(list) { var a = []; for (var n=list.length, i=0; i<n; i++) a[i] = list[i]; return a; }
 
 var framesetURL, scope;
+var mainTarget = 'hf_main';
 
 Meeko.framer.configFrameset({
 	/*
@@ -31,6 +32,10 @@ Meeko.framer.configFrameset({
 		framesetURL = getFramesetURL(doc);
 		scope = URL(document.URL).base;
 		return this.lookup(document.URL);
+	},
+	
+	target:function(url, details) {
+		return mainTarget;
 	}
 });
 

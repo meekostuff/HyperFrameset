@@ -646,7 +646,7 @@ var insertNode = function(conf, refNode, node) { // like imsertAdjacentHTML but 
 	return refNode;
 }
 
-var composeNode = function(srcNode) { // document.importNode() NOT available on IE < 9
+var composeNode = function(srcNode) { // document.importNode() NOT available on IE <= 8
 	if (srcNode.nodeType != 1) return;
 	var tag = tagName(srcNode);
 	var node = document.createElement(tag);
@@ -1288,6 +1288,7 @@ var testURL = 'test.html';
   Because HTMLParser writes into an iframe where contentDocument.URL is about:blank or document.URL
   relative URLs can be resolved to the wrong URL.
   canResolve() helps to detect this auto resolve behavior.
+  FIXME: this can be reduced if not supporting IE <= 7
 */
 var canResolve = (function() { 
 	var a;
@@ -1916,8 +1917,8 @@ return new Promise(function(resolve, reject) {
 polyfill();
 
 
+var framer = Meeko.framer = (function(classNamespace) {
 
-	
 var hfNamespace = 'hf';
 var hfPrefix = hfNamespace + ':';
 var hfSelector = '[' + hfPrefix.replace(':', '\\:') + 'role=frame' + ']';
@@ -2110,6 +2111,7 @@ return HFrame;
 var renderFrames = function(frames) {
 	_.forEach(frames, function(frameEl) {
 		var hframe = new HFrame(frameEl);
+		if (hframe.name === framer.currentTarget) hframe.src = framer.currentURL;
 		hframe.render(); // FIXME promisify
 	});
 }
@@ -2373,7 +2375,7 @@ var notify = function(msg) {
 }
 
 
-var framer = Meeko.framer = {};
+var framer = {};
 
 extend(framer, {
 
@@ -2424,6 +2426,10 @@ return bfScheduler.now(function() {
 	function() { resolveURLs(); },
 	
 	function() {
+		var url = framer.currentURL = document.URL;
+		if (framer.framesetOptions.target) {
+			framer.currentTarget = framer.framesetOptions.target(url);
+		}
 		return framer.frameset.render(); // FIXME what if render fails??
 	}
 	
@@ -2445,7 +2451,7 @@ return bfScheduler.now(function() {
 			if (tagName(el) != 'script') return _resolveAttr(el, attrName);		
 			var scriptType = el.type;
 			var isJS = (!scriptType || /^text\/javascript/i.test(scriptType));
-			if (isJS) el.type = "text/javascript?complete"; // IE6 and IE7 will re-execute script if @src is modified (even to same path)
+			if (isJS) el.type = "text/javascript?complete"; // FIXME not needed any more - IE6 and IE7 will re-execute script if @src is modified (even to same path)
 			_resolveAttr(el, attrName);
 		}
 		
@@ -2530,6 +2536,7 @@ extend(framer, {
 framesetOptions: {
 	lookup: function(url) {},
 	detect: function(document) {},
+	target: function(url, details) {},
 	load: function(method, url, data, details) {
 		var framesetOptions = this;
 		var loader = new HTMLLoader(framesetOptions);
@@ -2593,6 +2600,19 @@ createProcessor: function(type) {
 }
 
 });
+
+extend(classNamespace, {
+
+	HFrameDefinition: HFrameDefinition,
+	HFramesetDefinition: HFramesetDefinition,
+	HFrame: HFrame,
+	HFrameset: HFrameset
+
+});
+
+return framer;
+
+})(Meeko);
 
 
 var MicrodataDecoder = (function() {
