@@ -34,7 +34,7 @@ Meeko.framer.configFrame({
 .style-in-body-fail { display: none; }
 </style>
 
-<div hf:role="frame" name="hf_nav" hf:src="scope:./index.html" hf:type="html" hf:transform="ht" hf:format="css">
+<div hf:role="frame" name="hf_top" hf:src="scope:./index.html" hf:type="html" hf:transform="ht" hf:format="css">
 	<div hf:role="body">
 	
 		<div expr:.html=".title"><h1>{{title}}</h1></div>
@@ -42,9 +42,6 @@ Meeko.framer.configFrame({
 		<nav expr:.html=".nav">
 		</nav>
 		
-	</div>
-</div>
-
 <hr />
 
 <p id="panner" class="hidden"><b>pushState Assisted Navigation</b> is active</p>
@@ -87,13 +84,15 @@ in the &lt;body&gt; of the frameset document aren't being imported.
 		</div #frameset-footer>
 	
 	</div>
-</div #main>
+</div #hf_main>
+
+	</div>
+</div #hf_top>
 
 <div id="remove" class="remove">
 #remove in frameset: You should NOT be able to see this - 
 it is removed by a script.
 </div>
-
 <script type="text/javascript">
 if (window.name != "meeko-parser") (function() { 
 	var el = document.getElementById("remove");
