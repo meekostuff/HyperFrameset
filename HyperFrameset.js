@@ -1937,13 +1937,14 @@ function HFrameDefinition(el) {
       element: el,
 	  id: el.id,
       type: hfAttr(el, 'type'),
-      format: hfAttr(el, 'format') || 'css',
       mainSelector: hfAttr(el, 'main'), // TODO consider using a hash in `@src`
-	  transform: hfAttr(el, 'transform') || 'ht',
+	  transform: hfAttr(el, 'transform') || 'main',
+      format: hfAttr(el, 'format'),
 	  body: firstChild(el, 'div')
     });
 	var processor = frameDef.processor = framer.createProcessor(frameDef.transform);
 	processor.loadTemplate(frameDef.body);
+	if (frameDef.transform === 'main') frameDef.format = '';
 }
 
 extend(HFrameDefinition.prototype, {
@@ -1952,8 +1953,15 @@ render: function(doc) {
 	var frameDef = this;
 	var srcNode = doc;
 	if (frameDef.mainSelector) srcNode = $(frameDef.mainSelector, doc);
-	var decoder = framer.createDecoder(frameDef.format);
-	decoder.init(srcNode);
+	var decoder;
+	if (frameDef.format) {
+		decoder = framer.createDecoder(frameDef.format);
+		decoder.init(srcNode);
+	}
+	else decoder = {
+		srcDocument: doc,
+		srcNode: srcNode
+	}
 	var processor = frameDef.processor;
 	var output = processor.transform(decoder);
 	var result;
@@ -2615,35 +2623,188 @@ return framer;
 })(Meeko);
 
 
-var MicrodataDecoder = (function() {
+var MainProcessor = (function() {
 
-function MicrodataDecoder() {}
+function MainProcessor() {}
 
-extend(MicrodataDecoder.prototype, {
+extend(MainProcessor.prototype, {
 
-init: function(doc) {
-	this.srcDocument = doc;
+transform: function(provider) {
+	var frag = document.createDocumentFragment();
+	var srcDoc = provider.srcDocument;
+	var srcNode = provider.srcNode;
+	if (srcNode === srcDoc) srcNode = null;
+	if (!srcNode) srcNode = $('main', srcDoc);
+	if (!srcNode) srcNode = $('[role=main]', srcDoc);
+	if (!srcNode) srcNode = srcDoc.body;
+	var node;
+	while (node = srcNode.firstChild) frag.appendChild(node);
+	return frag;
+}
 	
+});
+
+return MainProcessor;
+})();
+
+framer.registerProcessor('main', MainProcessor);
+
+
+var HTemplateProcessor = (function() {
+
+var htNamespace = 'ht';
+var htAttrPrefix = htNamespace + ':';
+var exprNamespace = 'expr';
+var exprPrefix = exprNamespace + ':';
+var exprPrefixRegex = new RegExp('^' + exprPrefix, 'i');
+var textAttr = '.text';
+var htmlAttr = '.html';
+var exprTextAttr = exprPrefix + textAttr;
+var exprHtmlAttr = exprPrefix + htmlAttr;
+
+function htAttr(el, attr) {
+	var htAttrName = htAttrPrefix + attr;
+	if (!el.hasAttribute(htAttrName)) return false;
+	var value = el.getAttribute(htAttrName);
+	el.removeAttribute(htAttrName);
+	return value;
+}
+
+function HTemplateProcessor() {}
+
+extend(HTemplateProcessor.prototype, {
+	
+loadTemplate: function(template) {
+	this.template = template;
 },
 
-evaluate: function(path, context, variables, type) {
-	var pathParts = path.split('.');
-	
-	var value = context;
-	_.forEach(pathParts, function(relPath, i) {
-	  if (i === 0 && relPath.charAt(0) === '$') value = variables[relPath.substr(1)];
-	  else value = value.properties.namedItem(relPath)[0].value;
-	});
-	
-	return value;
+transform: function(provider) {
+	var clone = this.template.cloneNode(true);
+	return transform(clone, provider, null, {});
 }
 
 });
 
-return MicrodataDecoder;
+function transform(el, provider, context, variables) {
+	
+	var ht_if = htAttr(el, 'if');
+	var ht_forEach = htAttr(el, 'for-each');
+	var ht_var = htAttr(el, 'var');
+	
+	if (ht_forEach === false) {
+
+		if (ht_if !== false) {
+			var keep = provider.evaluate(ht_if, context, variables, 'boolean');
+			if (!keep) return null;
+		}
+	
+		var newEl = transformNode(el, provider, context, variables); // NOTE newEl === el
+		return newEl;
+	}
+	
+	// handle for-each
+	var subVars = extend({}, variables);
+	var subContexts = provider.evaluate(ht_forEach, context, variables, 'array');
+	var result = document.createDocumentFragment(); // FIXME which is the right doc to create this frag in??
+	
+	_.forEach(subContexts, function(subContext) {
+		if (ht_var) subVars[ht_var] = subContext;
+		if (ht_if !== false) {
+			var keep = provider.evaluate(ht_if, subContext, subVars, 'boolean');
+			if (!keep) return;
+		}
+		var srcEl = el.cloneNode(true);
+		var newEl = transformNode(srcEl, provider, subContext, subVars); // NOTE newEl === srcEl
+		result.appendChild(newEl);
+	});
+	
+	return result;
+}
+
+function transformNode(node, provider, context, variables) {
+	var nodeType = node.nodeType;
+	if (!nodeType) return node;
+	if (nodeType !== 1 && nodeType !== 11) return node;
+	var deep = true;
+	if (nodeType === 1 && (node.hasAttribute(exprTextAttr) || node.hasAttribute(exprHtmlAttr))) deep = false;
+	expandAttributes(node, provider, context, variables);
+	if (!deep) return node;
+
+	for (var current=node.firstChild, next=current&&current.nextSibling; current; current=next, next=current&&current.nextSibling) {
+		if (current.nodeType !== 1) continue;
+		var newChild = transform(current, provider, context, variables);
+		if (newChild !== current) {
+			if (newChild.nodeType) el.replaceChild(newChild, current);
+			else node.removeChild(current); // FIXME warning if newChild not empty
+		}
+	}
+	return node;
+}
+
+function expandAttributes(el, provider, context, variables) {
+	_.forEach(el.attributes, function(attr) {
+	  if (!attr.specified) return;
+	  var name = attr.name.replace(exprPrefixRegex, '');
+	  if (name === attr.name) return;
+	  var expr = attr.value;
+	  el.removeAttribute(attr.name);
+	  
+	  var exprParts = expr.split('|');
+	  var type = (name === htmlAttr) ? 'node' : 'text';
+	  var value = provider.evaluate(exprParts.shift(), context, variables, type);
+
+	  switch (name) {
+	  case textAttr:
+		if (value && value.nodeType) value = value.textContent;
+		break;
+	  case htmlAttr:
+		var frag = document.createDocumentFragment();
+		if (value && value.nodeType) frag.appendChild(value.cloneNode(true));
+		else {
+			var div = document.createElement('div');
+			div.innerHTML = value;
+			var node;
+			while (node = div.firstChild) frag.appendChild(node);
+		}
+		value = frag;
+		break;
+	  default:
+		if (value && value.nodeType) value = value.textContent;
+		break;
+	  }
+
+	  _.forEach(exprParts, function(expression) {
+		var fn = Function('value', 'return (' + expression + ');');
+		value = fn(value);
+	  });
+
+	  switch (name) {
+	  case textAttr:
+		el.textContent = value;
+		break;
+	  case htmlAttr:
+		el.innerHTML = '';
+		if (value && value.nodeType) el.appendChild(value);
+		else el.innerHTML = value;
+		break;
+	  default:
+		switch (typeof value) {
+		case 'boolean':
+		  if (value) el.removeAttribute(name);
+		  else el.setAttribute(name, '');
+		  break;
+		default:
+		  el.setAttribute(name, value.toString());
+		  break;
+		}
+	  }
+	});
+}
+
+return HTemplateProcessor;	
 })();
 
-framer.registerDecoder('microdata', MicrodataDecoder);
+framer.registerProcessor('ht', HTemplateProcessor);
 
 
 var CSSDecoder = (function() {
@@ -2714,162 +2875,36 @@ return CSSDecoder;
 framer.registerDecoder('css', CSSDecoder);
 
 
-var HTemplate = (function() {
+var MicrodataDecoder = (function() {
 
-var htNamespace = 'ht';
-var htAttrPrefix = htNamespace + ':';
-var exprNamespace = 'expr';
-var exprPrefix = exprNamespace + ':';
-var exprPrefixRegex = new RegExp('^' + exprPrefix, 'i');
-var textAttr = '.text';
-var htmlAttr = '.html';
-var exprTextAttr = exprPrefix + textAttr;
-var exprHtmlAttr = exprPrefix + htmlAttr;
+function MicrodataDecoder() {}
 
-function htAttr(el, attr) {
-	var htAttrName = htAttrPrefix + attr;
-	if (!el.hasAttribute(htAttrName)) return false;
-	var value = el.getAttribute(htAttrName);
-	el.removeAttribute(htAttrName);
-	return value;
-}
+extend(MicrodataDecoder.prototype, {
 
-
-function HTemplate() {}
-
-extend(HTemplate.prototype, {
+init: function(doc) {
+	this.srcDocument = doc;
 	
-loadTemplate: function(template) {
-	this.template = template;
 },
 
-transform: function(decoder) {
-	var clone = this.template.cloneNode(true);
-	return transform(clone, decoder, null, {});
+evaluate: function(path, context, variables, type) {
+	var pathParts = path.split('.');
+	
+	var value = context;
+	_.forEach(pathParts, function(relPath, i) {
+	  if (i === 0 && relPath.charAt(0) === '$') value = variables[relPath.substr(1)];
+	  else value = value.properties.namedItem(relPath)[0].value;
+	});
+	
+	return value;
 }
 
 });
 
-function transform(el, decoder, context, variables) {
-	
-	var ht_if = htAttr(el, 'if');
-	var ht_forEach = htAttr(el, 'for-each');
-	var ht_var = htAttr(el, 'var');
-	
-	if (ht_forEach === false) {
-
-		if (ht_if !== false) {
-			var keep = decoder.evaluate(ht_if, context, variables, 'boolean');
-			if (!keep) return null;
-		}
-	
-		var newEl = transformNode(el, decoder, context, variables); // NOTE newEl === el
-		return newEl;
-	}
-	
-	// handle for-each
-	var subVars = extend({}, variables);
-	var subContexts = decoder.evaluate(ht_forEach, context, variables, 'array');
-	var result = document.createDocumentFragment(); // FIXME which is the right doc to create this frag in??
-	
-	_.forEach(subContexts, function(subContext) {
-		if (ht_var) subVars[ht_var] = subContext;
-		if (ht_if !== false) {
-			var keep = decoder.evaluate(ht_if, subContext, subVars, 'boolean');
-			if (!keep) return;
-		}
-		var srcEl = el.cloneNode(true);
-		var newEl = transformNode(srcEl, decoder, subContext, subVars); // NOTE newEl === srcEl
-		result.appendChild(newEl);
-	});
-	
-	return result;
-}
-
-function transformNode(node, decoder, context, variables) {
-	var nodeType = node.nodeType;
-	if (!nodeType) return node;
-	if (nodeType !== 1 && nodeType !== 11) return node;
-	var deep = true;
-	if (nodeType === 1 && (node.hasAttribute(exprTextAttr) || node.hasAttribute(exprHtmlAttr))) deep = false;
-	expandAttributes(node, decoder, context, variables);
-	if (!deep) return node;
-
-	for (var current=node.firstChild, next=current&&current.nextSibling; current; current=next, next=current&&current.nextSibling) {
-		if (current.nodeType !== 1) continue;
-		var newChild = transform(current, decoder, context, variables);
-		if (newChild !== current) {
-			if (newChild.nodeType) el.replaceChild(newChild, current);
-			else node.removeChild(current); // FIXME warning if newChild not empty
-		}
-	}
-	return node;
-}
-
-function expandAttributes(el, decoder, context, variables) {
-	_.forEach(el.attributes, function(attr) {
-	  if (!attr.specified) return;
-	  var name = attr.name.replace(exprPrefixRegex, '');
-	  if (name === attr.name) return;
-	  var expr = attr.value;
-	  el.removeAttribute(attr.name);
-	  
-	  var exprParts = expr.split('|');
-	  var type = (name === htmlAttr) ? 'node' : 'text';
-	  var value = decoder.evaluate(exprParts.shift(), context, variables, type);
-
-	  switch (name) {
-	  case textAttr:
-		if (value && value.nodeType) value = value.textContent;
-		break;
-	  case htmlAttr:
-		var frag = document.createDocumentFragment();
-		if (value && value.nodeType) frag.appendChild(value.cloneNode(true));
-		else {
-			var div = document.createElement('div');
-			div.innerHTML = value;
-			var node;
-			while (node = div.firstChild) frag.appendChild(node);
-		}
-		value = frag;
-		break;
-	  default:
-		if (value && value.nodeType) value = value.textContent;
-		break;
-	  }
-
-	  _.forEach(exprParts, function(expression) {
-		var fn = Function('value', 'return (' + expression + ');');
-		value = fn(value);
-	  });
-
-	  switch (name) {
-	  case textAttr:
-		el.textContent = value;
-		break;
-	  case htmlAttr:
-		el.innerHTML = '';
-		if (value && value.nodeType) el.appendChild(value);
-		else el.innerHTML = value;
-		break;
-	  default:
-		switch (typeof value) {
-		case 'boolean':
-		  if (value) el.removeAttribute(name);
-		  else el.setAttribute(name, '');
-		  break;
-		default:
-		  el.setAttribute(name, value.toString());
-		  break;
-		}
-	  }
-	});
-}
-
-return HTemplate;	
+return MicrodataDecoder;
 })();
 
-framer.registerProcessor('ht', HTemplate);
+framer.registerDecoder('microdata', MicrodataDecoder);
+
 
 // end framer defn
 
