@@ -37,7 +37,7 @@ Meeko.framer.configFrame({
 <div hf:role="frame" name="hf_top" hf:src="scope:./index.html" hf:type="html" hf:transform="ht" hf:format="css">
 	<div hf:role="body">
 	
-		<div expr:.html=".title"><h1>{{title}}</h1></div>
+		<h1 expr:.text=".title {.text}">{{title}}</h1>
 		
 		<nav expr:.html=".nav">
 		</nav>

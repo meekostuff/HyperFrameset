@@ -2649,6 +2649,9 @@ return MainProcessor;
 
 framer.registerProcessor('main', MainProcessor);
 
+// NOTE textAttr & htmlAttr used in HTemplateProcessor & CSSDecoder
+var textAttr = '.text';
+var htmlAttr = '.html';
 
 var HTemplateProcessor = (function() {
 
@@ -2657,8 +2660,6 @@ var htAttrPrefix = htNamespace + ':';
 var exprNamespace = 'expr';
 var exprPrefix = exprNamespace + ':';
 var exprPrefixRegex = new RegExp('^' + exprPrefix, 'i');
-var textAttr = '.text';
-var htmlAttr = '.html';
 var exprTextAttr = exprPrefix + textAttr;
 var exprHtmlAttr = exprPrefix + htmlAttr;
 
@@ -2813,19 +2814,46 @@ function CSSDecoder() {}
 
 extend(CSSDecoder.prototype, {
 
-init: function(doc) {
-	this.srcDocument = doc;
+init: function(node) {
+	this.srcNode = node;
 },
 
-evaluate: function(path, context, variables, type) {
-	if (!context) context = this.srcDocument;
-	if (type === 'array') return findAll(context, path, variables);
-	var node = find(context, path, variables);
+evaluate: function(query, context, variables, type) {
+	if (!context) context = this.srcNode;
+	var queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
+	var selector = queryParts[1];
+	var attr = queryParts[2];
+	if (type === 'array') { // ht:for-each
+		if (attr) logger.warn('Ignoring attribute selector because evaluate() requested array');
+		return findAll(context, selector, variables);
+	}
+	var node = find(context, selector, variables);
+	if (attr) {
+		if (attr.charAt(0) === '@') attr = attr.substr(1);
+	}
+
 	switch(type) {
-	case 'text': return node.textContent || node.innerText; // FIXME legacy
-	case 'boolean': return !!node;
-	case 'node': return node;
-	default: return node;
+	case 'text': // expr:attr or expr:.text
+		if (!node) return '';
+		switch(attr) {
+		case null: case undefined: case '': case textAttr: return node.textContent || node.innerText; // FIXME legacy
+		case htmlAttr: return node.innerHTML;
+		default: return node.getAttribute(attr);
+		}
+	case 'boolean': // ht:if
+		if (!node) return false;
+		switch(attr) {
+		case null: case undefined: case '': return true;
+		case textAttr: case htmlAttr: return !/^\s*$/.test(node.textContent || node.innerText); // FIXME isEmptyNode()
+		default: return node.hasAttribute(attr);
+		}
+	case 'node': // expr:.html
+		switch(attr) {
+		case null: case undefined: case '': case htmlAttr: return node;
+		case textAttr: return node.textContent || node.innerText;
+		default: return node.getAttribute(attr);
+		}
+	default: return node; // TODO shouldn't this be an error / warning??
 	}
 }
 
