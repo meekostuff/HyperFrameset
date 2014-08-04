@@ -2875,37 +2875,6 @@ return CSSDecoder;
 framer.registerDecoder('css', CSSDecoder);
 
 
-var MicrodataDecoder = (function() {
-
-function MicrodataDecoder() {}
-
-extend(MicrodataDecoder.prototype, {
-
-init: function(doc) {
-	this.srcDocument = doc;
-	
-},
-
-evaluate: function(path, context, variables, type) {
-	var pathParts = path.split('.');
-	
-	var value = context;
-	_.forEach(pathParts, function(relPath, i) {
-	  if (i === 0 && relPath.charAt(0) === '$') value = variables[relPath.substr(1)];
-	  else value = value.properties.namedItem(relPath)[0].value;
-	});
-	
-	return value;
-}
-
-});
-
-return MicrodataDecoder;
-})();
-
-framer.registerDecoder('microdata', MicrodataDecoder);
-
-
 // end framer defn
 
 }).call(window);
