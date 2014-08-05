@@ -2,6 +2,7 @@ HyperFrameset
 =============
 
 **WARNING: This project is pre-alpha software. DO NOT USE**
+
 **WARNING: This documentation is out of date - most of it is probably wrong.**
 
 > HyperFrameset provides **full** separation of content from presentation.
@@ -33,9 +34,9 @@ and `history.pushState()` updates the browser URL.
 
 HyperFrameset.js is around 15kB when minified and gzipped.
 
-To see it in action visit my [blog](http://meekostuff.net/blog/).
-Make sure you view the page source and check that it is just raw content.
-The navbar and contact popup are all in the [site-frameset page](http://meekostuff.net/blog/frameset.html). 
+To see it in action visit:
+
+- FIXME demos, etc
 
 For more info on the concept of HyperFrameset and its affinity with pushState assisted navigation, read  
 
