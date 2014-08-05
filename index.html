@@ -2,6 +2,10 @@
 
 <div id="__main__" role="main"><h1>HyperFrameset</h1>
 
+<p><strong>WARNING: This project is pre-alpha software. DO NOT USE</strong></p>
+
+<p><strong>WARNING: This documentation is out of date - most of it is probably wrong.</strong></p>
+
 <blockquote>
   <p>HyperFrameset provides <strong>full</strong> separation of content from presentation.
 With CSS you can change the styling of a whole site with one stylesheet.
@@ -32,11 +36,13 @@ When someone viewing your page clicks on a link to another page that uses the sa
 then AJAX updates the real content
 and <code>history.pushState()</code> updates the browser URL. </p>
 
-<p>HyperFrameset.js is around 10kB when minified and gzipped.</p>
+<p>HyperFrameset.js is around 15kB when minified and gzipped.</p>
 
-<p>To see it in action visit my <a href="http://meekostuff.net/blog/">blog</a>.
-Make sure you view the page source and check that it is just raw content.
-The navbar and contact popup are all in the <a href="http://meekostuff.net/blog/frameset.html">site-frameset page</a>. </p>
+<p>To see it in action visit:</p>
+
+<ul>
+<li>FIXME demos, etc</li>
+</ul>
 
 <p>For more info on the concept of HyperFrameset and its affinity with pushState assisted navigation, read  </p>
 
@@ -80,12 +86,11 @@ The navbar and contact popup are all in the <a href="http://meekostuff.net/blog/
 
 <h2>Quick Start</h2>
 
-<p><strong>This is no longer the preferred way of specifying the hyperframeset, but is conceptually easiest to understand.</strong>
+<p><strong>Although this is no longer the preferred way of specifying the hyperframeset, it is still the default and is conceptually easiest to understand.</strong>
 <strong>If you are new to HyperFrameset then read this documentation straight through.</strong>
 <strong>Otherwise feel free to skip to the <a href="#configuration">Configuration</a> section first.</strong></p>
 
-<p>Create a HTML document (page.html) with some page specific content -
-elements that are children of <code>&lt;body&gt;</code> and have <code>@id</code>. 
+<p>Create a HTML document (page.html) with some page specific content. 
 Any page specific scripts, styles or meta-data should go in <code>&lt;head&gt;</code>. 
 The <code>&lt;body&gt;</code> may also contain fallback content, which is
 only displayed if HyperFrameset is NOT enabled.</p>
