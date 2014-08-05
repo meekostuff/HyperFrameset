@@ -2659,7 +2659,8 @@ var htNamespace = 'ht';
 var htAttrPrefix = htNamespace + ':';
 var exprNamespace = 'expr';
 var exprPrefix = exprNamespace + ':';
-var exprPrefixRegex = new RegExp('^' + exprPrefix, 'i');
+var mexprNamespace = 'mexpr';
+var mexprPrefix = mexprNamespace + ':';
 var exprTextAttr = exprPrefix + textAttr;
 var exprHtmlAttr = exprPrefix + htmlAttr;
 
@@ -2728,7 +2729,7 @@ function transformNode(node, provider, context, variables) {
 	if (nodeType !== 1 && nodeType !== 11) return node;
 	var deep = true;
 	if (nodeType === 1 && (node.hasAttribute(exprTextAttr) || node.hasAttribute(exprHtmlAttr))) deep = false;
-	expandAttributes(node, provider, context, variables);
+	transformSingleElement(node, provider, context, variables);
 	if (!deep) return node;
 
 	for (var current=node.firstChild, next=current&&current.nextSibling; current; current=next, next=current&&current.nextSibling) {
@@ -2742,23 +2743,66 @@ function transformNode(node, provider, context, variables) {
 	return node;
 }
 
-function expandAttributes(el, provider, context, variables) {
+function transformSingleElement(el, provider, context, variables) {
 	_.forEach(el.attributes, function(attr) {
-	  if (!attr.specified) return;
-	  var name = attr.name.replace(exprPrefixRegex, '');
-	  if (name === attr.name) return;
-	  var expr = attr.value;
-	  el.removeAttribute(attr.name);
-	  
-	  var exprParts = expr.split('|');
-	  var type = (name === htmlAttr) ? 'node' : 'text';
-	  var value = provider.evaluate(exprParts.shift(), context, variables, type);
+		if (!attr.specified) return;
+		var attrName;
+		var prefix = false;
+		_.some([ exprPrefix, mexprPrefix ], function(prefixText) {
+			if (attr.name.indexOf(prefixText) !== 0) return false;
+			prefix = prefixText;
+			attrName = attr.name.substr(prefixText.length);
+			return true;
+		});
+		if (!prefix) return;
+		el.removeAttribute(attr.name);
+		var expr = attr.value;
+		var type = (attrName === htmlAttr) ? 'node' : 'text';
+		var value = (prefix === mexprPrefix) ?
+			evalMExpression(expr, provider, context, variables, type) :
+			evalExpression(expr, provider, context, variables, type);
+		setAttribute(el, attrName, value);
+	});
+}
 
-	  switch (name) {
-	  case textAttr:
+function setAttribute(el, attrName, value) {	
+	switch (attrName) {
+	case textAttr:
+		el.textContent = value;
+		break;
+	case htmlAttr:
+		el.innerHTML = '';
+		if (value && value.nodeType) el.appendChild(value);
+		else el.innerHTML = value;
+		break;
+	default:
+		switch (typeof value) {
+		case 'boolean':
+			if (value) el.removeAttribute(attrName);
+			else el.setAttribute(attrName, '');
+			break;
+		default:
+			el.setAttribute(attrName, value.toString());
+			break;
+		}
+	}
+}
+
+function evalMExpression(mexpr, provider, context, variables, type) { // FIXME mexpr not compatible with type === 'node'
+	return mexpr.replace(/\{\{((?:[^}]|\}(?=\}\})|\}(?!\}))*)\}\}/g, function(all, expr) {
+		return evalExpression(expr, provider, context, variables, type);
+	});
+}
+
+function evalExpression(expr, provider, context, variables, type) { // FIXME robustness
+	var exprParts = expr.split('|');
+	var value = provider.evaluate(exprParts.shift(), context, variables, type);
+
+	switch (type) {
+	case 'text':
 		if (value && value.nodeType) value = value.textContent;
 		break;
-	  case htmlAttr:
+	case 'node':
 		var frag = document.createDocumentFragment();
 		if (value && value.nodeType) frag.appendChild(value.cloneNode(true));
 		else {
@@ -2769,37 +2813,17 @@ function expandAttributes(el, provider, context, variables) {
 		}
 		value = frag;
 		break;
-	  default:
+	default: // FIXME should never occur. logger.warn !?
 		if (value && value.nodeType) value = value.textContent;
 		break;
-	  }
+	}
 
-	  _.forEach(exprParts, function(expression) {
-		var fn = Function('value', 'return (' + expression + ');');
+	_.forEach(exprParts, function(scriptText) {
+		var fn = Function('value', 'return (' + scriptText + ');');
 		value = fn(value);
-	  });
-
-	  switch (name) {
-	  case textAttr:
-		el.textContent = value;
-		break;
-	  case htmlAttr:
-		el.innerHTML = '';
-		if (value && value.nodeType) el.appendChild(value);
-		else el.innerHTML = value;
-		break;
-	  default:
-		switch (typeof value) {
-		case 'boolean':
-		  if (value) el.removeAttribute(name);
-		  else el.setAttribute(name, '');
-		  break;
-		default:
-		  el.setAttribute(name, value.toString());
-		  break;
-		}
-	  }
 	});
+
+	return value;
 }
 
 return HTemplateProcessor;	
@@ -2844,7 +2868,7 @@ evaluate: function(query, context, variables, type) {
 		if (!node) return false;
 		switch(attr) {
 		case null: case undefined: case '': return true;
-		case textAttr: case htmlAttr: return !/^\s*$/.test(node.textContent || node.innerText); // FIXME isEmptyNode()
+		case textAttr: case htmlAttr: return !/^\s*$/.test(node.textContent || node.innerText); // FIXME potentially heavy. Implement as a DOM utility isEmptyNode()
 		default: return node.hasAttribute(attr);
 		}
 	case 'node': // expr:.html
