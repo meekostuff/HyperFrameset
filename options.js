@@ -10,9 +10,10 @@ Source this file into the page before sourcing the boot-script (to simplify reco
 
 var Meeko = window.Meeko || {};
 Meeko.options = { // these are the default values
-	"no_boot": false, // use feature / browser detection to set this true
-	"autostart": true,
-	"capturing": true,
+	"no_boot": false, // a debugging option. Abandon boot immediately. 
+	"no_frameset": false, // use feature / browser detection to set this true. Disables capturing. 
+	"no_style": false, // a demo option. `no_frameset` plus remove all stylesheets. 
+	"capturing": true, // true, "strict"
 	"log_level": "warn", // debug, info, warn, error, none
 	"ignore_cookie_options": false,
 	"hidden_timeout": 3000,

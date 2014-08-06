@@ -6,10 +6,9 @@
 (function() { // NOTE throwing an error or returning from this wrapper function prematurely aborts booting
 
 var defaults = { // NOTE defaults also define the type of the associated config option
-	"no_boot": false, // WARN don't remove or change this line, otherwise no_boot when reloading after capture error won't be detected - infinite reload
-	"no_style": false, // FIXME this demo option hasn't been implemented yet
-	"autostart": true,
-	"no_frameset": false, // FIXME this will replace autostart
+	"no_boot": false, 
+	"no_frameset": false,
+	"no_style": false,
 	"capturing": true, // FIXME this must be true for now
 	"log_level": "warn",
 	"hidden_timeout": 0, // 3000, FIXME 
@@ -100,14 +99,12 @@ getItem: function(sKey) { // See https://developer.mozilla.org/en-US/docs/DOM/St
 
 }
 
-var reloadOptions = Meeko.reloadOptions = window.sessionStorage && window.JSON && (function() {
+var sessionOptions = window.sessionStorage && window.JSON && (function() {
 
-var optionsKey = 'Meeko.reloadOptions';
+var optionsKey = 'Meeko.options';
 var text = sessionStorage.getItem(optionsKey);
-sessionStorage.removeItem(optionsKey);
 var options = parseJSON(text);
 if (typeof options !== 'object' || options === null) options = {};
-var saveOptions = {};
 
 return {
 
@@ -116,11 +113,8 @@ getItem: function(key) {
 },
 
 setItem: function(key, name) {
-	saveOptions[key] = name;
-},
-
-save: function() {
-	sessionStorage.setItem(optionsKey, JSON.stringify(saveOptions));
+	options[key] = name;
+	sessionStorage.setItem(optionsKey, JSON.stringify(options));
 }
 
 }
@@ -142,7 +136,6 @@ function addDataSource(name, key) {
 	}
 }
 
-if (reloadOptions) dataSources.push( function(name) { return reloadOptions.getItem(name); } );
 addDataSource('sessionStorage');
 if (!Meeko.options || !Meeko.options['ignore_cookie_options']) addDataSource('cookieStorage');
 addDataSource('localStorage');
@@ -179,22 +172,35 @@ var bootOptions = Meeko.bootOptions = (function() {
 	return options;
 })();
 
-if (no_boot()) return;
 
-function no_boot() {
+var searchParams = (function() {
+	var search = location.search,
+		options = {}; 
+	if (search) search.substr(1)
+		.replace(/(?:^|&)([^&=]+)=?([^&]*)/g, function(m, key, val) {
+			val = (val) ? decodeURIComponent(val) : true;
+			options[key] = val;
+		});
+	return options;
+})();
 
-	// Don't even load HyperFrameset if "noboot" is one of the search options (or true in Meeko.options)
-	if (/(^\?|&)(no_?boot)($|&)/.test(location.search)) return true;
-	if (bootOptions['no_boot']) return true;
-	
+function isSet(option) {
+	if (searchParams[option] || bootOptions[option]) return true;
 }
 
+// Don't even load HyperFrameset if "noboot" is one of the search options (or true in Meeko.options)
+if (isSet('no_boot')) return;
 
 /*
  ### DOM utilities
  */
 
-function $$(selector, context) { context = context || document; return context.getElementsByTagName(selector); }
+function $$(selector, context) {
+	context = context || document;
+	var nodeList = [];
+	forEach(context.getElementsByTagName(selector), function(el) { nodeList.push(el); });
+	return nodeList;
+}
 
 document.head = $$('head')[0];
 if (!document.head) throw 'ABORT: <head> not found. This implies a legacy browser.';
@@ -531,12 +537,11 @@ var capturedHTML = '';
 
 var Capture = {
 
-start: function() {
-	if (document.body) throw 'When capturing, boot-script MUST be in - or before - <head>';
-	var errMsg = Capture.test();
-	if (errMsg) {
-		if (bootOptions['capturing'] === 'strict') throw errMsg;
-		else logger.warn(errMsg);
+start: function(strict) {
+	var warnMsg = Capture.test(); // NOTE test() can also throw
+	if (warnMsg) {
+		if (strict) throw warnMsg;
+		else logger.warn(warnMsg);
 	}
 	capturedHTML += getDocTypeTag(document); // WARN relies on document.doctype
 	capturedHTML += toStartTag(document.documentElement); // WARN relies on element.outerHTML
@@ -545,6 +550,7 @@ start: function() {
 },
 
 test: function() { // return `false` for strict, otherwise warning message
+	if (document.body) throw 'When capturing, boot-script MUST be in - or before - <head>';
 	if ($$('script').length > 1) return 'When capturing, boot-script SHOULD be first <script>';
 	if (some($$('*', document.head), function(node) { // return true if invalid node
 		if (node.nodeType !== 1) return false; // comments and text-nodes are ok
@@ -552,7 +558,7 @@ test: function() { // return `false` for strict, otherwise warning message
 		if (node.tagName === 'TITLE' && node.firstChild === null) return false; // IE6 adds a dummy <title>
 		if (node.tagName !== 'META') return true; 
 		if (node.httpEquiv || node.getAttribute('charset')) return false; // <meta http-equiv> are ok
-		return true; // WARN should never reach here
+		return true;
 	})) return 'When capturing, only <meta http-equiv> or <meta charset> nodes may precede boot-script';
 	return false; 
 },
@@ -621,11 +627,25 @@ if (Meeko.bootConfig) Meeko.bootConfig(); // TODO try / catch ??
  ## Startup
 */
 
-if (bootOptions['capturing']) {
-	if (!reloadOptions) throw 'Capturing depends on sessionStorage and JSON'; 
-	if (!bootOptions['autostart']) throw 'Capturing is not compatible with autostart: false';
-	Capture.start(); // NOTE this can also throw
+if (isSet('no_style')) {
+	domReady(function() {
+		forEach($$('style'), function(el) { el.parentNode.removeChild(el); });
+		forEach($$('link'), function(el) { if (/\bSTYLESHEET\b/i.test(el.rel)) el.parentNode.removeChild(el); });
+	});
+	return;	
 }
+
+if (isSet('no_frameset')) {
+	html5prepare(); // no doc arg means use document and add block element styles
+	return;
+}
+
+if (bootOptions['capturing']) {
+	if (!sessionOptions) throw 'Capturing depends on sessionStorage and JSON'; 
+	Capture.start(bootOptions['capturing'] === 'strict');
+}
+
+html5prepare(); // no doc arg means use document and add block element styles
 
 // Capturing uses document.write, but after this point document.write, etc is forbidden
 document.write = document.writeln = document.open = document.close = function()  { throw 'document.write(), etc is incompatible with HyperFrameset'; }
@@ -654,8 +674,6 @@ if (hidden_timeout > 0) {
 var log_index = logger.levels[bootOptions["log_level"]];
 if (log_index != null) logger.LOG_LEVEL = log_index;
 
-html5prepare(); // no doc arg means use document and add block element styles
-
 function config() {
 	Meeko.DOM.ready = domReady;
 	Meeko.HTMLParser.prototype.prepare = html5prepare;
@@ -666,11 +684,6 @@ function config() {
 }
 
 function start() {
-	if (!bootOptions["autostart"]) {
-		Viewport.unhide();
-		return;
-	}
-
 	if (bootOptions['capturing']) Meeko.framer.start({
 		contentDocument: Capture.getDocument()
 	});
@@ -708,8 +721,7 @@ var startupSequence = [].concat(
 function startup() {
 	taskQueue.queue(startupSequence, null, function() {
 		if (bootOptions['capturing']) domReady(function() { // TODO would it be better to do this with document.write()?
-			reloadOptions.setItem('no_boot', true); // TODO should this just be in sessionOptions?
-			reloadOptions.save();
+			sessionOptions.setItem('no_boot', true);
 			location.reload();
 		});
 		else Viewport.unhide();
