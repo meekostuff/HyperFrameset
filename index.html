@@ -7,6 +7,17 @@
 <p><strong>WARNING: This documentation is out of date - most of it is probably wrong.</strong></p>
 
 <blockquote>
+  <p>HyperFramesets are how HTMLFramesets should have been designed. 
+They might even be the way web-sites were meant to work. </p>
+</blockquote>
+
+<p>HyperFrameset is a Javascript <a href="http://en.wikipedia.org/wiki/Transclusion">transclusion</a>
+and layout engine which runs in the browser.
+It evolves the HTMLFrameset concept of independently loadable frames for HTMLDocuments
+but because it is implemented with AJAX on a single-page it is far more flexible. <br />
+And because it uses <code>history.pushState</code> the address-bar URL matches the primary content of the page. </p>
+
+<blockquote>
   <p>HyperFrameset provides <strong>full</strong> separation of content from presentation.
 With CSS you can change the styling of a whole site with one stylesheet.
 With HyperFrameset you can change everything -
@@ -16,25 +27,13 @@ simple, robust and low-bandwidth,
 plus "pushState assisted navigation" comes for free.</p>
 </blockquote>
 
-<p>HyperFrameset is a Javascript page decoration engine which runs in the browser.
-It allows your site to deliver real page content first and fast
-(think API-first with HTML-payloads).
-Your site frameset can be placed in its own page and merged in the browser instead of on the server.
-Auxiliary content could also be conditionally loaded with AJAX
-(think inside-out iframes).</p>
-
 <p>A site frameset page is similar to an external stylesheet in that it can be shared between several pages.
-Originally it was even referenced with a resource link, just like stylesheets:</p>
+It may even be referenced with a resource link, just like stylesheets:</p>
 
 <pre><code>&lt;link rel="frameset" type="text/html" href="frameset.html" /&gt;
 </code></pre>
 
-<p><small><strong>(This referencing method has been superceded by external configuration, which is less limiting.)</strong></small></p>
-
-<p>As a bonus, when your site uses HyperFrameset "pushState assisted navigation" requires no additional setup. 
-When someone viewing your page clicks on a link to another page that uses the same frameset
-then AJAX updates the real content
-and <code>history.pushState()</code> updates the browser URL. </p>
+<p><small><strong>(This referencing method depends on the configuration. Scripted frameset lookup is preferred.)</strong></small></p>
 
 <p>HyperFrameset.js is around 15kB when minified and gzipped.</p>
 
@@ -98,30 +97,33 @@ only displayed if HyperFrameset is NOT enabled.</p>
 <pre><code>&lt;!DOCTYPE html&gt;
 &lt;html&gt;
 &lt;head&gt;
+    &lt;title&gt;Content&lt;/title&gt;
     &lt;!-- source the HyperFrameset boot-script --&gt;
     &lt;script src="/path/to/HyperFrameset/boot.js"&gt;&lt;/script&gt;
     &lt;!-- create a link to the frameset page. All attributes are needed --&gt;
     &lt;link rel="frameset" type="text/html" href="frameset.html" /&gt;
     &lt;!-- include fallback stylesheets for when HyperFrameset doesn't run. --&gt;
-    &lt;link rel="stylesheet" href="noframeset.css" /&gt;
+    &lt;style&gt;
+    .styled-from-page { background-color: red; color: white; }
+    &lt;/style&gt;
 &lt;/head&gt;
 &lt;body&gt;
     &lt;header&gt;
-    This fallback content will be removed from the page
+    This fallback header will be removed from the page
     &lt;/header&gt;
 
-    &lt;article id="mk_content"&gt;&lt;!-- Page specific content, identified by @id --&gt;
-    #mk_content in page
+    &lt;main&gt;&lt;!-- Primary content --&gt;
+        &lt;h1&gt;Page One&lt;h1&gt;
         &lt;div class="styled-from-frameset"&gt;
         This content is styled by the frameset stylesheet
         &lt;/div&gt;  
         &lt;div class="styled-from-page"&gt;
-        This content is styled by the page stylesheet
+        This content is styled by the page stylesheet which will not apply in the frameset view. 
         &lt;/div&gt;  
-    &lt;/article&gt;
+    &lt;/main&gt;
 
     &lt;footer&gt;
-    This fallback content will be removed from the page
+    This fallback footer will be removed from the page
     &lt;/footer&gt;
 &lt;/body&gt;
 &lt;/html&gt;
@@ -143,12 +145,19 @@ will appear as the final page without the page specific content. </p>
     #header in frameset
     &lt;/header&gt;
 
-    &lt;div id="mk_main"&gt;
-        #mk_main in frameset
-        &lt;article id="mk_content"&gt;
-        #mk_content in frameset: This will be replaced by #mk_content from the page
-        &lt;/article&gt;
-    &lt;/div&gt;
+    &lt;nav&gt;
+        &lt;label&gt;Navigation&lt;/label&gt;
+        &lt;div hf:role="frame" name="hf_nav" hf:type="html" hf:src="scope:./index.html" hf:main="nav"&gt;
+            &lt;div hf:role="body"&gt;&lt;/div&gt;
+        &lt;/div&gt;
+    &lt;/nav&gt;
+
+    &lt;main&gt;
+        &lt;label&gt;Primary Content&lt;/label&gt;
+        &lt;div hf:role="frame" name="hf_main" hf:type="html" hf:main="main"&gt;
+            &lt;div hf:role="body"&gt;&lt;/div&gt;
+        &lt;/div&gt;
+    &lt;/main&gt;
 
     &lt;footer&gt;
     #footer in frameset
@@ -162,55 +171,61 @@ will appear as the final page without the page specific content. </p>
 <ol>
 <li>Set the visibility of the page to "hidden". *</li>
 <li>Detect the first <code>&lt;link rel="frameset" href="..." /&gt;</code>, fully resolve the @href and use as the frameset URL.</li>
-<li>Load the frameset URL into an iframe.</li>
+<li>Load the frameset URL with XMLHttpRequest and parse into a HTMLDocument (possibly using an <code>&lt;iframe&gt;</code>)</li>
 <li>Fully resolve URLs for all scripts, images and links in the frameset page. </li>
 <li>Insert <code>&lt;script&gt;</code>, <code>&lt;style&gt;</code>, <code>&lt;link&gt;</code>, and conditionally <code>&lt;meta&gt;</code> and <code>&lt;title&gt;</code> 
 from the <code>&lt;head&gt;</code> of the frameset page into the <code>&lt;head&gt;</code> of the content page.</li>
 <li>Insert the child nodes of the <code>&lt;body&gt;</code> of the frameset page at the start of the <code>&lt;body&gt;</code> in the content page</li>
-<li>For each child node of the <code>&lt;body&gt;</code> in the content page, determine whether it should be deleted or moved into the frameset.
-If a child node is an element with an ID, and the ID matches an element in the frameset,
-then the element in the frameset is replaced with the element from the content.
-All other child nodes of the body in the content page are deleted.</li>
+<li>Move relevant content from content page into the frameset. Remove the irrelevant content.</li>
 <li>When all linked stylesheets for the document have loaded, set the visibility of the page to "visible".
 This step may occur at any time during or after step 7. *</li>
 </ol>
 
 <p>* Steps 1 &amp; 8 are handled by the boot-script.</p>
 
-<p>This process results in a DOM tree like this:</p>
+<p>This process results in a DOM tree something like this:</p>
 
 <pre><code>&lt;!DOCTYPE html&gt;
 &lt;html&gt;
 &lt;head&gt;
+    &lt;!-- source the HyperFrameset boot-script --&gt;
+    &lt;script src="/path/to/HyperFrameset/boot.js"&gt;&lt;/script&gt;
+    &lt;!-- create a link to the frameset page. All attributes are needed --&gt;
+    &lt;link rel="frameset" type="text/html" href="frameset.html" /&gt;
     &lt;style&gt;
     .styled-from-frameset { border: 2px solid blue; }
     &lt;/style&gt;
-    &lt;!-- create a link to the frameset page --&gt;
-    &lt;link rel="frameset" type="text/html" href="frameset.html" /&gt;
-    &lt;!-- and source the HyperFrameset boot-script --&gt;
-    &lt;script src="/path/to/HyperFrameset/boot.js"&gt;&lt;/script&gt;
-    &lt;!-- page specific style --&gt;
-    &lt;style&gt;
-    .styled-from-page { border: 2px dashed green; }
-    &lt;/style&gt;
+    &lt;!-- NOTE: no page specific style --&gt;
 &lt;/head&gt;
 &lt;body&gt;
     &lt;header&gt;
     #header in frameset
     &lt;/header&gt;
 
-    &lt;div id="mk_main"&gt;
-        #mk_main in frameset
-        &lt;article id="mk_content"&gt;
-        #mk_content in page
-            &lt;div class="styled-from-frameset"&gt;
-            This content is styled by the frameset stylesheet
-            &lt;/div&gt;  
-            &lt;div class="styled-from-page"&gt;
-            This content is styled by the page stylesheet
-            &lt;/div&gt;  
-        &lt;/article&gt;
-    &lt;/div&gt;
+    &lt;nav&gt;
+        &lt;label&gt;Navigation&lt;/label&gt;
+        &lt;div hf:role="frame" name="hf_nav" hf:type="html" hf:src="scope:./index.html" hf:main="nav"&gt;
+            &lt;div hf:role="body"&gt;
+                &lt;a href="./page.html"&gt;Page One&lt;/a&gt;&lt;br /&gt;
+                &lt;a href="./page2.html"&gt;Page Two&lt;/a&gt;
+            &lt;/div&gt;
+        &lt;/div&gt;
+    &lt;/nav&gt;
+
+    &lt;main&gt;
+        &lt;label&gt;Primary Content&lt;/label&gt;
+        &lt;div hf:role="frame" name="hf_main" hf:type="html" hf:main="main"&gt;
+            &lt;div hf:role="body"&gt;
+                &lt;h1&gt;Page One&lt;h1&gt;
+                &lt;div class="styled-from-frameset"&gt;
+                This content is styled by the frameset stylesheet
+                &lt;/div&gt;  
+                &lt;div class="styled-from-page"&gt;
+                This content is styled by the page stylesheet which will not apply in the frameset view. 
+                &lt;/div&gt;  
+            &lt;/div&gt;
+        &lt;/div&gt;
+    &lt;/main&gt;
 
     &lt;footer&gt;
     #footer in frameset
@@ -236,38 +251,13 @@ something that can be dispensed with when HyperFrameset runs.</p>
 
 <h3>Stylesheets</h3>
 
-<p>Any <code>&lt;link rel="stylesheet"&gt;</code> or <code>&lt;style&gt;</code> elements that have <code>@title="noframeset"</code>
-will be removed from the page before the frameset document is applied, e.g.</p>
-
-<pre><code>&lt;style title="noframeset"&gt;body { max-width: 72ex; }&lt;/style&gt;
-</code></pre>
-
-<p><strong>NOTE:</strong> this is done in the default <code>config.js</code>.
-If you want to remove or modify this behavior then do so in your site-specific <code>config.js</code>.</p>
+<p>All <code>&lt;link rel="stylesheet"&gt;</code> or <code>&lt;style&gt;</code> elements 
+will be removed from the page when the frameset document is applied.</p>
 
 <h3>Auxiliary content</h3>
 
-<p>Children of <code>&lt;body&gt;</code> which have no <code>@id</code>,
-or which have <code>@id</code> that cannot be found in the frameset document
-will be removed from the page before the frameset is applied, e.g.</p>
-
-<pre><code>&lt;body&gt;
-    &lt;div&gt;
-    This irrelevant content will be DEFINITELY REMOVED from the page
-    because it has no @id
-    &lt;/div&gt;
-
-    &lt;div id="mk_irrelevant"&gt;
-    This content will be REMOVED from the page
-    assuming the frameset has no element with matching @id
-    &lt;/div&gt;
-
-    &lt;div id="mk_content"&gt;
-    This content will be RETAINED in the page
-    assuming the frameset has an element with matching @id
-    &lt;/div&gt;
-&lt;/body&gt;
-</code></pre>
+<p>Any <code>&lt;body&gt;</code> content that isn't referenced by the frameset document
+will be removed from the page when the frameset is applied. </p>
 
 <h2>PushState Assisted Navigation</h2>
 
@@ -298,108 +288,6 @@ If it is the same as the current frameset then the page is downloaded and used t
 
 <p>"PushState Assisted Navigation" (PAN) may sometimes be referred to as panning, as in <a href="http://en.wikipedia.org/Panning_(camera)">camera panning</a>. </p>
 
-<h3>Page Transition Animation</h3>
-
-<p>To enable author supplied animation of page transitions, HyperFrameset provides the <code>Meeko.panner.config()</code> method.
-You could use it by placing something like the following in your <strong>frameset document</strong></p>
-
-<pre><code>Meeko.panner.config({
-    duration: 0, // minimum time (ms) between paging start and end. 
-    nodeRemoved: {
-        before: hide, // handler for before a content node leaves the page. Called at start of transition.
-        after: show // handler for after a content node leaves the page. Cannot be called before duration has expired. 
-    },
-    nodeInserted: {
-        before: hide, // handler for before a node enters the page, after the new url has been downloaded.
-        after: show // handler for after a node enters the page. Called after a delay to allow styles set by `before` to be applied. 
-    },
-    pageOut: {
-        before: noop,
-        after: noop
-    },
-    pageIn: {
-        before: noop, // indicates that the frameset is ready for content to be placed. This would allow frameset to be mutated in url dependent way
-        after: noop // the equivalent of `window.onload` in non-pushstate enabled environments.
-    }
-});
-
-function hide(msg) { msg.node.setAttribute("hidden", "hidden"); }
-function show(msg) { msg.node.removeAttribute("hidden"); }
-function noop() {}
-</code></pre>
-
-<p>These are actually the options set by the default <code>config.js</code>, so there's no need to repeat these settings.
-The method can be called at anytime. 
-Key / value pairs in the passed options object overwrite the matching previous settings.</p>
-
-<p><strong>NOTE</strong> There is not always a notification <strong>after</strong> <code>pageOut</code>.
-For instance, if the next page is ready before the transition duration has expired
-then the new nodes replace the old nodes directly, rather than transitioning through the frameset placeholders. </p>
-
-<p><strong>Example:</strong> A simple way to achieve a fade-out / fade-in effect on page transition is to use the following in the frameset document:</p>
-
-<pre><code>&lt;script&gt;
-Meeko.panner.config({
-    duration: 500 // allows our fade-out to complete
-});
-&lt;/script&gt;
-&lt;style&gt;
-#mk_content { /\* assuming #mk_content is the page-specific content \*/
-    -webkit-transition: opacity 0.5s linear;
-    -moz-transition: opacity 0.5s linear;
-    -ms-transition: opacity 0.5s linear;
-    -o-transition: opacity 0.5s linear;
-    transition: opacity 0.5s linear;
-}
-#mk_content[hidden] {
-    display: block;
-    visibility: visible;
-    opacity: 0;
-}
-&lt;/style&gt;
-</code></pre>
-
-<p><strong>Example:</strong> If your pages rely on <code>@class</code> on the <code>&lt;body&gt;</code> or <code>&lt;html&gt;</code> elements,
-the following will install them in the view-document when the page is panned in:</p>
-
-<pre><code>&lt;script&gt;
-Meeko.panner.config({
-    pageIn: {
-        before: function(msg) {
-            var doc = msg.node;
-            if (document == doc) return;
-            document.documentElement.className = doc.documentElement.className;
-            document.body.className = doc.body.className;
-        }
-    }
-});
-&lt;/script&gt;
-</code></pre>
-
-<h3>Waiting Indicators</h3>
-
-<p>If a new page takes longer than one second to load, the user may wonder if the loading has stalled.
-In this case a waiting indicator is typically used to reassure the user that the page is still loading.
-HyperFrameset provides a simple way to do this - when the <code>duration</code> has expired (and the next page still hasn't loaded)
-the frameset document is used as the waiting page. </p>
-
-<h3>Manual handling</h3>
-
-<p>You can stop HyperFrameset handling hyperlink clicks by calling <code>event.preventDefault()</code> in a click handler, e.g.</p>
-
-<pre><code>document.onclick = function(event) { event.preventDefault(); }
-</code></pre>
-
-<p>You can also request HyperFrameset to navigate manually to a new URL by the following: </p>
-
-<pre><code>Meeko.panner.assign(newURL)
-</code></pre>
-
-<p>or with <code>history.replaceState()</code> behavior: </p>
-
-<pre><code>Meeko.panner.replace(newURL)
-</code></pre>
-
 <h2><code>&lt;form&gt;</code> handling</h2>
 
 <p>HyperFrameset ONLY handles forms where <code>@method="GET"</code>.</p>
@@ -418,8 +306,8 @@ This mimics standard browser behavior.</p>
 <h2><code>&lt;script&gt;</code> handling</h2>
 
 <ul>
-<li><p>Scripts in content-pages are never run by HyperFrameset. 
-<strong>RECOMMENDATION:</strong> Content-pages do not need and SHOULD NOT have scripts - they SHOULD all be part of the frameset. </p></li>
+<li><p>Scripts in content-pages are NEVER run by HyperFrameset. 
+<strong>RECOMMENDATION:</strong> Content-pages do not need and SHOULD NOT have scripts, even for fallback.</p></li>
 <li><p>All scripts which are in the frameset document are executed via dynamic script insertion, 
 but behave <strong>like</strong> scripts that are part of a loading document.
 Content is not blocked, but earlier scripts block later scripts 
@@ -432,13 +320,12 @@ unless the earlier script has the <code>src</code> and <code>async</code> attrib
 
 <ul>
 <li><p>Scripts in the <code>&lt;head&gt;</code> of the frameset are <strong>enabled</strong> AFTER all the content in the <code>&lt;head&gt;</code> of the frameset is INSERTED INTO the page.</p></li>
-<li><p>Scripts in the <code>&lt;body&gt;</code> of the frameset are <strong>enabled</strong> AFTER all the content in the <code>&lt;body&gt;</code> of the frameset is INSERTED INTO the page,
-but BEFORE any page content is MERGED WITH the frameset.</p></li>
+<li><p>Scripts in the <code>&lt;body&gt;</code> of the frameset are <strong>enabled</strong> in a context dependent manner. FIXME currently not at all</p></li>
 </ul>
 
 <h2>Capturing</h2>
 
-<p><strong>NOTE</strong> this option MUST be used (for now)</p>
+<p><strong>NOTE</strong> this option MUST be enabled (for now)</p>
 
 <p>The <strong>capturing</strong> <a href="#boot-options">boot option</a> prevents normal browser parsing of the <em>landing page</em>. <br />
 This allows HyperFrameset to manage parsing in the same way that AJAXed pages are handled.
@@ -675,24 +562,6 @@ as can be seen in the default <code>config.js</code> script. </p>
 
 <p><strong>TODO:</strong> <code>request</code>, <code>normalize</code>, notifications</p>
 
-<h3>Panner engine</h3>
-
-<p>Options for the panner are stored in <code>Meeko.panner.options</code>,
-which can be accessed directly or by calling </p>
-
-<pre><code>Meeko.panner.config(options);
-</code></pre>
-
-<p>where <code>options</code> is an object containing key / value pairs
-that will overwrite current values.</p>
-
-<p>Typically you only want to configure panner animation options.
-These would be set in the frameset-document,
-as dealt with in <a href="#page-transition-animation">Page Transition Animation</a>.</p>
-
-<p>All other configuration should be done before HyperFrameset starts. 
-This can be achieved by editing the site-specific <code>config.js</code> created during <a href="#preparation">Preparation</a>.</p>
-
 <h4>Pre-decorated pages</h4>
 
 <p>Pages on your site may not be in the format that HyperFrameset and your frameset-document are expecting.
@@ -711,48 +580,6 @@ which will manipulate the DOM of <code>doc</code> into the appropriate format, e
 
 <p><strong>NOTE:</strong> configuring the <code>normalize</code> option prevents initial page decoration
 until the <code>DOMContentLoaded</code> event (or safest equivalent). FIXME only <strong>capturing</strong> is supported anyway.</p>
-
-<h4>Non-HTML payloads</h4>
-
-<p>You can also make your landing-page download as HTML 
-and thereafter request, say JSON, and build the primary-content HTML in the browser.
-Do this by providing a <code>request(url, data, details, callback)</code> function, where</p>
-
-<ul>
-<li><strong>method</strong> is the HTTP method for the request, which will be 'GET' or 'POST'. </li>
-<li><strong>url</strong> is the URL of the page to be panned in</li>
-<li><strong>data</strong> is any form data (<strong>WARNING</strong> not implemented yet)</li>
-<li><strong>details</strong> is an object containing at least the <code>URL</code> and <code>method</code></li>
-<li><strong>callback</strong> is an object with <code>complete(result)</code> and <code>error(err)</code> callback-methods</li>
-</ul>
-
-<p>An example of configuration might be</p>
-
-<pre><code>    Meeko.panner.config({
-        request: function(method, url, data, details, callback) { // assumes 'GET'
-            if (!/GET/i.test(method)) throw "Only supporting GET requests";
-            var rq = new XMLHttpRequest;
-            rq.open(method, url, true);
-            rq.setRequestHeader('Accept', 'application/json');
-            rq.onreadystatechange = onchange;
-            rq.send();
-            function onchange() {
-                if (rq.readyState != 4) return;
-                if (rq.status != 200) {
-                    callback.error(rq.status);
-                    return;
-                }
-                onload();
-            }
-            function onload() {
-                var json = JSON.parse(rq.responseText);
-                var doc = document.implementation.createHTMLDocument(json.title);
-                doc.body.innerHTML = processJSON(json); // your json-to-html converter
-                callback.complete(doc);
-            }
-        }
-    });
-</code></pre>
 
 <h3>Bonus APIs</h3>
 
