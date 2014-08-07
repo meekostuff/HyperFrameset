@@ -2001,9 +2001,12 @@ init: function(el) {
 		transform: hfAttr(el, 'transform') || 'main',
 		format: hfAttr(el, 'format')
     });
-	var processor = bodyDef.processor = framer.createProcessor(bodyDef.transform);
-	processor.loadTemplate(el);
 	if (bodyDef.transform === 'main') bodyDef.format = '';
+	var frag = document.createDocumentFragment(); // FIXME which doc??
+	var node;
+	while (node = el.firstChild) frag.appendChild(node);
+	var processor = bodyDef.processor = framer.createProcessor(bodyDef.transform);
+	processor.loadTemplate(frag);
 },
 
 render: function(doc, options) {
@@ -2021,16 +2024,21 @@ render: function(doc, options) {
 	}
 	var processor = bodyDef.processor;
 	var output = processor.transform(decoder);
-	var result;
+	var body = bodyDef.element.cloneNode(false);
 	if (output.nodeType) {
-		var fragment = document.createDocumentFragment();
-		fragment.appendChild(output);
+		body.appendChild(output);
 		result = {
-			fragment: fragment,
-			frames: $$(hfSelector, fragment)
+			element: body,
+			frames: $$(hfSelector, body)
 		}
 	}
-	else result = output;
+	else {
+		body.appendChild(output.fragment);
+		result = {
+			element: body,
+			frames: output.frames
+		}
+	}
 	return result;
 }
 
@@ -2141,6 +2149,12 @@ return HFramesetDefinition;
 var HFrame = (function() {
 
 function HFrame(el) {
+	this.init(el);
+}
+
+extend(HFrame.prototype, {
+	
+init: function(el) {
 	var hframe = this;
 	extend(hframe, {
       element: el,
@@ -2150,19 +2164,17 @@ function HFrame(el) {
 	var defId = hfAttr(el, 'def');
 	hframe.definition = framer.frameset.definition.frames[defId];
 	var src = hfAttr(el, 'src');
-	var framesetURL = URL(framer.frameset.src);
-	hframe.src = framesetURL.resolve(src); // FIXME need base-url: support
-}
+	if (src) hframe.src = URL(framer.frameset.src).resolve(src);
+},
 
-extend(HFrame.prototype, {
-	
 render: function() {
 	var hframe = this;
 	var src = hframe.src;
+	if (!src) return;
 	return framer.frameOptions.load('get', src, null, {})
 	.then(function(doc) {
 		var result = hframe.definition.render(doc);
-		hframe.element.appendChild(result.fragment);
+		hframe.element.appendChild(result.element);
 		renderFrames(result.frames);
 	});
 }
@@ -2738,7 +2750,7 @@ loadTemplate: function(template) {
 
 transform: function(provider) {
 	var clone = this.template.cloneNode(true);
-	return transform(clone, provider, null, {});
+	return transformNode(clone, provider, null, {});
 }
 
 });
@@ -2785,7 +2797,7 @@ function transformNode(node, provider, context, variables) {
 	if (nodeType !== 1 && nodeType !== 11) return node;
 	var deep = true;
 	if (nodeType === 1 && (node.hasAttribute(exprTextAttr) || node.hasAttribute(exprHtmlAttr))) deep = false;
-	transformSingleElement(node, provider, context, variables);
+	if (nodeType === 1) transformSingleElement(node, provider, context, variables);
 	if (!deep) return node;
 
 	for (var current=node.firstChild, next=current&&current.nextSibling; current; current=next, next=current&&current.nextSibling) {
