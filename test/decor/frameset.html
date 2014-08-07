@@ -34,13 +34,15 @@ Meeko.framer.configFrame({
 .style-in-body-fail { display: none; }
 </style>
 
-<div hf:role="frame" name="hf_top" hf:src="scope:./index.html" hf:type="html" hf:transform="ht" hf:format="css">
-	<div hf:role="body">
+<div hf:role="frame" name="hf_top" hf:src="scope:./index.html" hf:type="html">
+	<div hf:role="body" hf:transform="ht" hf:format="css">
 	
 		<h1 expr:.text=".title {.text}">{{title}}</h1>
 		
 		<nav expr:.html=".nav">
 		</nav>
+	</div>
+</div>
 		
 <hr />
 
@@ -56,8 +58,8 @@ If you can see this then &lt;style&gt; elements
 in the &lt;body&gt; of the frameset document aren't being imported.
 </div> 
 
-<div hf:role="frame" name="hf_main" hf:src="scope:./normal.html" hf:type="html" hf:transform="ht" hf:format="css">
-	<div hf:role="body">
+<div hf:role="frame" name="hf_main" hf:src="scope:./normal.html" hf:type="html">
+	<div hf:role="body" hf:transform="ht" hf:format="css">
 	
 		<div id="frameset-header" class="section">
 		#frameset-header

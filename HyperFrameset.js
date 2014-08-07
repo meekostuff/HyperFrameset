@@ -42,6 +42,11 @@ var Meeko = window.Meeko || (window.Meeko = {});
 var uc = function(str) { return str.toUpperCase(); }
 var lc = function(str) { return str.toLowerCase(); }
 
+var contains = function(a, item) {
+	for (var n=a.length, i=0; i<n; i++) if (a[i] === item) return true;
+	return false;
+}
+
 var remove = function(a, item) { // remove the first instance of `item` in `a`
 	for (var n=a.length, i=0; i<n; i++) {
 		if (a[i] !== item) continue;
@@ -83,7 +88,7 @@ function(str) { return str.replace(/^\s+/, '').replace(/\s+$/, ''); }
 
 var _ = Meeko.stuff = {};
 extend(_, {
-	uc: uc, lc: lc, forEach: forEach, some: some, every: every, words: words, each: each, extend: extend, config: config, trim: trim
+	uc: uc, lc: lc, contains: contains, forEach: forEach, some: some, every: every, words: words, each: each, extend: extend, config: config, trim: trim
 });
 
 
@@ -1929,41 +1934,92 @@ var hfAttr = function(el, attr, value) {
 	el.setAttribute(hfAttrName, value);
 }
 
+var headElements = words('title meta link style script');
+var bodyElements = words('div section article aside main header footer nav iframe');
+
 var HFrameDefinition = (function() {
 
 // <div id="id" hf-type="html" hf-format="css" hf-main="main" hf-transform="ht">...</div>
 function HFrameDefinition(el) {
-    var frameDef = this;
-	extend(frameDef, {
-      element: el,
-	  id: el.id,
-      type: hfAttr(el, 'type'),
-      mainSelector: hfAttr(el, 'main'), // TODO consider using a hash in `@src`
-	  transform: hfAttr(el, 'transform') || 'main',
-      format: hfAttr(el, 'format'),
-	  body: firstChild(el, 'div')
-    });
-	var processor = frameDef.processor = framer.createProcessor(frameDef.transform);
-	processor.loadTemplate(frameDef.body);
-	if (frameDef.transform === 'main') frameDef.format = '';
+	this.init(el);
 }
 
 extend(HFrameDefinition.prototype, {
 	
-render: function(doc) {
+init: function(el) {
+    var frameDef = this;
+	extend(frameDef, {
+		element: el,
+		id: el.id,
+		type: hfAttr(el, 'type'),
+		mainSelector: hfAttr(el, 'main') // TODO consider using a hash in `@src`
+    });
+	var bodies = frameDef.bodies = [];
+	forSiblings("starting", el.firstChild, function(node) {
+		var tag = tagName(node);
+		if (!tag) return;
+		if (contains(headElements, tag)) return; // ignore typical <head> elements
+		if (contains(bodyElements, tag)) {
+			bodies.push(new HBodyDefinition(node));
+			return;
+		}
+		logger.warn('Unexpected element in HFrame: ' + tag);
+		return;
+	});
+},
+
+render: function(doc, conditions) {
 	var frameDef = this;
+	var bodyDef = frameDef.bodies[0]; // FIXME use .condition
+	var options = {
+		mainSelector: frameDef.mainSelector,
+		type: frameDef.type
+	}
+	return bodyDef.render(doc, options);
+}
+	
+});
+
+return HFrameDefinition;
+})();
+
+
+var HBodyDefinition = (function() {
+	
+function HBodyDefinition(el) {
+	var bodyDef = this;
+	bodyDef.init(el);
+}
+
+extend(HBodyDefinition.prototype, {
+
+init: function(el) {
+	var bodyDef = this;
+	extend(bodyDef, {
+		element: el,
+		condition: hfAttr(el, 'condition') || 'success',
+		transform: hfAttr(el, 'transform') || 'main',
+		format: hfAttr(el, 'format')
+    });
+	var processor = bodyDef.processor = framer.createProcessor(bodyDef.transform);
+	processor.loadTemplate(el);
+	if (bodyDef.transform === 'main') bodyDef.format = '';
+},
+
+render: function(doc, options) {
+	var bodyDef = this;
 	var srcNode = doc;
-	if (frameDef.mainSelector) srcNode = $(frameDef.mainSelector, doc);
+	if (options.mainSelector) srcNode = $(options.mainSelector, doc);
 	var decoder;
-	if (frameDef.format) {
-		decoder = framer.createDecoder(frameDef.format);
+	if (bodyDef.format) {
+		decoder = framer.createDecoder(bodyDef.format);
 		decoder.init(srcNode);
 	}
 	else decoder = {
 		srcDocument: doc,
 		srcNode: srcNode
 	}
-	var processor = frameDef.processor;
+	var processor = bodyDef.processor;
 	var output = processor.transform(decoder);
 	var result;
 	if (output.nodeType) {
@@ -1977,12 +2033,11 @@ render: function(doc) {
 	else result = output;
 	return result;
 }
-	
+
 });
 
-return HFrameDefinition;
+return HBodyDefinition;
 })();
-
 
 var HFramesetDefinition = (function() {
 
