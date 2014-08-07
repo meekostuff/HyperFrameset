@@ -7,7 +7,7 @@
 
 var defaults = { // NOTE defaults also define the type of the associated config option
 	"no_boot": false, 
-	"no_frameset": false,
+	"no_frameset": !(window.XMLHttpRequest && window.sessionStorage && window.JSON), // NOTE this is enforced anyway
 	"no_style": false,
 	"capturing": true, // FIXME this must be true for now
 	"log_level": "warn",
@@ -90,14 +90,6 @@ this.LOG_LEVEL = levels[defaults['log_level']]; // DEFAULT. Options are read lat
 
  TODO It would be nice if all data sources had the same API
 */
-
-Meeko.cookieStorage = { // TODO should be under Meeko.DOM
-
-getItem: function(sKey) { // See https://developer.mozilla.org/en-US/docs/DOM/Storage
-	  return unescape(document.cookie.replace(new RegExp("(?:^|.*;\\s*)" + escape(sKey).replace(/[\-\.\+\*]/g, "\\$&") + "\\s*\\=\\s*((?:[^;](?!;))*[^;]?).*"), "$1")); // TODO decodeURIComponent??
-}
-
-}
 
 var sessionOptions = window.sessionStorage && window.JSON && (function() {
 

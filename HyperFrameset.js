@@ -23,6 +23,9 @@ var XMLHttpRequest = window.XMLHttpRequest;
 var window = this;
 var document = window.document;
 
+if (!window.XMLHttpRequest) throw "HyperFrameset requires native XMLHttpRequest";
+
+
 var defaults = { // NOTE defaults also define the type of the associated config option
 	"log_level": "warn",
 	"polling_interval": 50
@@ -1244,9 +1247,7 @@ normalize: function(doc, details) {}
 
 var doRequest = function(method, url, sendText, details) {
 return new Promise(function(resolve, reject) {
-	var xhr = window.XMLHttpRequest ?
-		new XMLHttpRequest :
-		new ActiveXObject("Microsoft.XMLHTTP"); // TODO stop supporting IE6
+	var xhr = new XMLHttpRequest;
 	xhr.onreadystatechange = onchange;
 	xhr.open(method, url, true);
 	if (HTML_IN_XHR) xhr.responseType = 'document';
