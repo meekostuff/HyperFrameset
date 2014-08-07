@@ -7,7 +7,7 @@
 
 var defaults = { // NOTE defaults also define the type of the associated config option
 	"no_boot": false, 
-	"no_frameset": !(window.XMLHttpRequest && window.sessionStorage && window.JSON), // NOTE this is enforced anyway
+	"no_frameset": false, // NOTE !(window.XMLHttpRequest && window.sessionStorage && window.JSON) is enforced anyway
 	"no_style": false,
 	"capturing": true, // FIXME this must be true for now
 	"log_level": "warn",
@@ -620,6 +620,7 @@ if (Meeko.bootConfig) Meeko.bootConfig(); // TODO try / catch ??
 */
 
 if (isSet('no_style')) {
+	html5prepare(document); // doc arg means use document but don't add block element styles
 	domReady(function() {
 		forEach($$('style'), function(el) { el.parentNode.removeChild(el); });
 		forEach($$('link'), function(el) { if (/\bSTYLESHEET\b/i.test(el.rel)) el.parentNode.removeChild(el); });
@@ -627,13 +628,20 @@ if (isSet('no_style')) {
 	return;	
 }
 
-if (isSet('no_frameset')) {
+var no_frameset = isSet('no_frameset');
+if (no_frameset || !(window.XMLHttpRequest && sessionOptions)) {
 	html5prepare(); // no doc arg means use document and add block element styles
+	if (!no_frameset) throw 'Capturing depends on native XMLHttpRequest and sessionStorage and JSON';
 	return;
 }
 
+/*
+	NOTE we don't want to call html5prepare() before Capture.start().
+	The preceding branches cancel the next stage of booting
+	which is why they call html5prepare() before exiting.
+*/
+
 if (bootOptions['capturing']) {
-	if (!sessionOptions) throw 'Capturing depends on sessionStorage and JSON'; 
 	Capture.start(bootOptions['capturing'] === 'strict');
 }
 
