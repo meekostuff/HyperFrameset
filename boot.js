@@ -318,10 +318,10 @@ function prepareScript(url, onload, onerror) { // create script (and insert if s
 		onload();
 	}
 	
-	function onError() { 
+	function onError(err) { 
 		script.onerror = null;
 		script.onload = null;
-		onerror();
+		onerror(err);
 	}	
 }
 
@@ -403,14 +403,16 @@ function abort() {
 	if (list.length) errorback();
 }
 
-function errorback() {
+function errorback(err) {
 	var fn;
 	while (fn = list.shift()) {
 		if (typeof fn == 'function') continue;
 		// NOTE the only other option is a prepared script
 		disableScript(fn);
 	}
-	if (onerror) onerror();
+	if (onerror) onerror(err);
+	else setTimeout(function() { throw err; });
+
 }
 
 function queueback() {
@@ -420,8 +422,7 @@ function queueback() {
 		if (typeof fn == "function") {
 			try { fn(); continue; }
 			catch(err) {
-				setTimeout(function() { throw err; });
-				errorback();
+				errorback(err);
 				return;
 			}
 		}
@@ -719,7 +720,8 @@ var startupSequence = [].concat(
 );
 
 function startup() {
-	taskQueue.queue(startupSequence, null, function() {
+	taskQueue.queue(startupSequence, null, function(err) {
+		setTimeout(function() { throw err; });
 		if (bootOptions['capturing']) domReady(function() { // TODO would it be better to do this with document.write()?
 			sessionOptions.setItem('no_boot', true);
 			location.reload();
