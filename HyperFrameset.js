@@ -1941,6 +1941,7 @@ var HFrameDefinition = (function() {
 
 // <div id="id" hf-type="html" hf-format="css" hf-main="main" hf-transform="ht">...</div>
 function HFrameDefinition(el) {
+	if (!el) return; // in case of inheritance
 	this.init(el);
 }
 
@@ -1987,6 +1988,7 @@ return HFrameDefinition;
 var HBodyDefinition = (function() {
 	
 function HBodyDefinition(el) {
+	if (!el) return; // in case of inheritance
 	var bodyDef = this;
 	bodyDef.init(el);
 }
@@ -2050,11 +2052,8 @@ return HBodyDefinition;
 var HFramesetDefinition = (function() {
 
 function HFramesetDefinition(doc, options) {
-	var framesetDef = this;
-	extend(framesetDef, {
-		frames: {} // all hyperframe definitions. Indexed by @id (which may be auto-generated)
-	});
-	framesetDef.init(doc, options);
+	if (!doc) return; // in case of inheritance
+	this.init(doc, options);
 }
 
 extend(HFramesetDefinition.prototype, {
@@ -2062,6 +2061,9 @@ extend(HFramesetDefinition.prototype, {
 init: function(doc, options) {
 	var framesetDef = this;
 
+	extend(framesetDef, {
+		frames: {} // all hyperframe definitions. Indexed by @id (which may be auto-generated)
+	});
 	// NOTE first rebase scope: urls
 	var scopeURL = URL(options.scope);
 	rebase(doc, scopeURL);
@@ -2149,6 +2151,7 @@ return HFramesetDefinition;
 var HFrame = (function() {
 
 function HFrame(el) {
+	if (!el) return; // in case of inheritance
 	this.init(el);
 }
 
@@ -2175,7 +2178,18 @@ render: function() {
 	.then(function(doc) {
 		var result = hframe.definition.render(doc);
 		hframe.element.appendChild(result.element);
-		renderFrames(result.frames);
+		hframe.renderFrames(result.frames);
+	});
+},
+
+renderFrames: function(frames) {
+	var hframe = this;
+	hframe.frames = [];
+	_.forEach(frames, function(frameEl) {
+		var childFrame = new HFrame(frameEl);
+		hframe.frames.push(childFrame);
+		if (childFrame.name === framer.currentTarget) childFrame.src = framer.currentURL;
+		childFrame.render(); // FIXME promisify
 	});
 }
 
@@ -2184,32 +2198,23 @@ render: function() {
 return HFrame;	
 })();
 
-var renderFrames = function(frames) {
-	_.forEach(frames, function(frameEl) {
-		var hframe = new HFrame(frameEl);
-		if (hframe.name === framer.currentTarget) hframe.src = framer.currentURL;
-		hframe.render(); // FIXME promisify
-	});
-}
-
 
 var HFrameset = (function() {
 	
 function HFrameset(dstDoc) {
-	var hframeset = this;
-	extend(hframeset, {
-		document: null,
-		src: null,
-		definition: null
-	});
-	hframeset.init(dstDoc);
+	if (!dstDoc) return; // in case of inheritance
+	this.init(dstDoc);
 }
 
 extend(HFrameset.prototype, {
 
 init: function(dstDoc) {
 	var hframeset = this;
-	hframeset.document = dstDoc;
+	extend(hframeset, {
+		document: dstDoc,
+		src: null,
+		definition: null
+	});
 },
 
 load: function(url, options) {
@@ -2222,6 +2227,8 @@ load: function(url, options) {
 		hframeset.definition = new HFramesetDefinition(framesetDoc, options);
 	});
 },
+
+renderFrames: HFrame.prototype.renderFrames,
 
 render: function() {
 
@@ -2270,7 +2277,7 @@ render: function() {
 		dstDoc.body.insertBefore(framesetEnd, contentStart);
 
  		frameset_insertBody(dstDoc, srcBody);
-		renderFrames(srcTree.frames); // FIXME promisify
+		hframeset.renderFrames(srcTree.frames); // FIXME promisify
 	},
 	function() {
 		return notify({
