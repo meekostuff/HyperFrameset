@@ -2170,14 +2170,17 @@ init: function(el) {
 	if (src) hframe.src = URL(framer.frameset.src).resolve(src);
 },
 
-render: function() {
+render: function() { // FIXME need a teardown method that releases child-frames
 	var hframe = this;
 	var src = hframe.src;
 	if (!src) return;
 	return framer.frameOptions.load('get', src, null, {})
 	.then(function(doc) {
 		var result = hframe.definition.render(doc);
-		hframe.element.appendChild(result.element);
+		// FIXME .bodyElement will probably become .bodies[] for transition animations.
+		if (hframe.bodyElement) hframe.element.removeChild(hframe.bodyElement);
+		hframe.bodyElement = result.element;
+		hframe.element.appendChild(hframe.bodyElement);
 		hframe.renderFrames(result.frames);
 	});
 },
