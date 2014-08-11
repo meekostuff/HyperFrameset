@@ -472,7 +472,8 @@ function html5prepare(doc) {
 		addStyles();
 	}
 	forEach(blockTags.concat(inlineTags), function(tag) {
-		doc.createElement(tag);
+		tag = tag.toUpperCase(); // NOTE https://github.com/aFarkas/html5shiv/issues/54
+		doc.createElement(tag); 
 	});
 }
 
