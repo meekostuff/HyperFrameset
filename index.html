@@ -147,16 +147,16 @@ will appear as the final page without the page specific content. </p>
 
     &lt;nav&gt;
         &lt;label&gt;Navigation&lt;/label&gt;
-        &lt;div hf:role="frame" name="hf_nav" hf:type="html" hf:src="scope:./index.html" hf:main="nav"&gt;
-            &lt;div hf:role="body"&gt;&lt;/div&gt;
-        &lt;/div&gt;
+        &lt;hf-frame name="hf_nav" type="html" src="scope:./index.html" main="nav"&gt;
+            &lt;hf-body&gt;&lt;/hf-body&gt;
+        &lt;/hf-frame&gt;
     &lt;/nav&gt;
 
     &lt;main&gt;
         &lt;label&gt;Primary Content&lt;/label&gt;
-        &lt;div hf:role="frame" name="hf_main" hf:type="html" hf:main="main"&gt;
-            &lt;div hf:role="body"&gt;&lt;/div&gt;
-        &lt;/div&gt;
+        &lt;hf-frame name="hf_main" type="html" main="main"&gt;
+            &lt;hf-body"&gt;&lt;/hf-body&gt;
+        &lt;/hf-frame&gt;
     &lt;/main&gt;
 
     &lt;footer&gt;
@@ -204,18 +204,18 @@ This step may occur at any time during or after step 7. *</li>
 
     &lt;nav&gt;
         &lt;label&gt;Navigation&lt;/label&gt;
-        &lt;div hf:role="frame" name="hf_nav" hf:type="html" hf:src="scope:./index.html" hf:main="nav"&gt;
-            &lt;div hf:role="body"&gt;
+        &lt;hf-frame name="hf_nav" type="html" src="scope:./index.html" main="nav"&gt;
+            &lt;hf-body&gt;
                 &lt;a href="./page.html"&gt;Page One&lt;/a&gt;&lt;br /&gt;
                 &lt;a href="./page2.html"&gt;Page Two&lt;/a&gt;
-            &lt;/div&gt;
-        &lt;/div&gt;
+            &lt;/hf-body&gt;
+        &lt;/hf-frame&gt;
     &lt;/nav&gt;
 
     &lt;main&gt;
         &lt;label&gt;Primary Content&lt;/label&gt;
-        &lt;div hf:role="frame" name="hf_main" hf:type="html" hf:main="main"&gt;
-            &lt;div hf:role="body"&gt;
+        &lt;hf-frame name="hf_main" type="html" main="main"&gt;
+            &lt;hf-body&gt;
                 &lt;h1&gt;Page One&lt;h1&gt;
                 &lt;div class="styled-from-frameset"&gt;
                 This content is styled by the frameset stylesheet
@@ -223,8 +223,8 @@ This step may occur at any time during or after step 7. *</li>
                 &lt;div class="styled-from-page"&gt;
                 This content is styled by the page stylesheet which will not apply in the frameset view. 
                 &lt;/div&gt;  
-            &lt;/div&gt;
-        &lt;/div&gt;
+            &lt;/hf-body&gt;
+        &lt;/hf-frame&gt;
     &lt;/main&gt;
 
     &lt;footer&gt;

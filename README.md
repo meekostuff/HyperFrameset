@@ -132,16 +132,16 @@ will appear as the final page without the page specific content.
 		
 		<nav>
 			<label>Navigation</label>
-			<div hf:role="frame" name="hf_nav" hf:type="html" hf:src="scope:./index.html" hf:main="nav">
-				<div hf:role="body"></div>
-			</div>
+			<hf-frame name="hf_nav" type="html" src="scope:./index.html" main="nav">
+				<hf-body></hf-body>
+			</hf-frame>
 		</nav>
 		
 		<main>
 			<label>Primary Content</label>
-			<div hf:role="frame" name="hf_main" hf:type="html" hf:main="main">
-				<div hf:role="body"></div>
-			</div>
+			<hf-frame name="hf_main" type="html" main="main">
+				<hf-body"></hf-body>
+			</hf-frame>
 		</main>
 		
 		<footer>
@@ -186,18 +186,18 @@ This process results in a DOM tree something like this:
 		
 		<nav>
 			<label>Navigation</label>
-			<div hf:role="frame" name="hf_nav" hf:type="html" hf:src="scope:./index.html" hf:main="nav">
-				<div hf:role="body">
+			<hf-frame name="hf_nav" type="html" src="scope:./index.html" main="nav">
+				<hf-body>
 					<a href="./page.html">Page One</a><br />
 					<a href="./page2.html">Page Two</a>
-				</div>
-			</div>
+				</hf-body>
+			</hf-frame>
 		</nav>
 		
 		<main>
 			<label>Primary Content</label>
-			<div hf:role="frame" name="hf_main" hf:type="html" hf:main="main">
-				<div hf:role="body">
+			<hf-frame name="hf_main" type="html" main="main">
+				<hf-body>
 					<h1>Page One<h1>
 					<div class="styled-from-frameset">
 					This content is styled by the frameset stylesheet
@@ -205,8 +205,8 @@ This process results in a DOM tree something like this:
 					<div class="styled-from-page">
 					This content is styled by the page stylesheet which will not apply in the frameset view. 
 					</div>	
-				</div>
-			</div>
+				</hf-body>
+			</hf-frame>
 		</main>
 		
 		<footer>

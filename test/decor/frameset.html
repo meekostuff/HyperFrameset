@@ -34,8 +34,8 @@ Meeko.framer.configFrame({
 .style-in-body-fail { display: none; }
 </style>
 
-<div hf:role="frame" name="hf_top" hf:src="scope:./index.html" hf:type="html">
-	<div hf:role="body" hf:transform="ht" hf:format="css">
+<hf-frame name="hf_top" src="scope:./index.html" type="html">
+	<hf-body transform="ht" format="css">
 	
 		<h1 expr:.text=".title {.text}">{{title}}</h1>
 		
@@ -57,54 +57,38 @@ If you can see this then &lt;style&gt; elements
 in the &lt;body&gt; of the frameset document aren't being imported.
 </div> 
 
-<div hf:role="frame" name="hf_main" hf:src="scope:./normal.html" hf:type="html">
-	<div hf:role="body" hf:transform="ht" hf:format="css">
+<hf-frame name="hf_main" src="scope:./normal.html" type="html">
+	<hf-body transform="ht" format="css">
 	
 		<div id="frameset-header" class="section">
 		#frameset-header
-		<div expr:.html="#page-header">
-		<div id="page-header" class="remove">
-		#page-header in frameset: You should NOT be able to see this.
-		</div>
-		</div>
+			<div expr:.html="#page-header">
+				<div id="page-header" class="remove">
+				#page-header in frameset: You should NOT be able to see this.
+				</div>
+			</div>
 		</div #frameset-header>
 		
 		<div expr:.html="#page-main">
-		<div id="page-main" class="remove">
-		#page-main in frameset: You should NOT be able to see this.
-		</div>
+			<div id="page-main" class="remove">
+			#page-main in frameset: You should NOT be able to see this.
+			</div>
 		</div>
 		
 		<div id="frameset-footer" class="section">
 		#frameset-footer
-		<div expr:.html="#page-footer">
-		<div id="page-footer" class="remove">
-		#page-footer in frameset: You should NOT be able to see this.
-		</div>
-		</div>
+			<div expr:.html="#page-footer">
+				<div id="page-footer" class="remove">
+				#page-footer in frameset: You should NOT be able to see this.
+				</div>
+			</div>
 		</div #frameset-footer>
 	
-	</div>
-</div #hf_main>
+	</hf-body>
+</hf-frame #hf_main>
 
-	</div>
-</div #hf_top>
-
-<div id="remove" class="remove">
-#remove in frameset: You should NOT be able to see this - 
-it is removed by a script.
-</div>
-<script type="text/javascript">
-if (window.name != "meeko-parser") (function() { 
-	var el = document.getElementById("remove");
-	el.parentNode.removeChild(el);
-})();
-else alert("Error: script was executed in " + window.name + " document context");
-</script>
-
-<script type="text/plain">
-alert('Error: script with type "text/plain" was treated as Javascript');
-</script>
+	</hf-body>
+</hf-frame #hf_top>
 
 </body>
 </html>

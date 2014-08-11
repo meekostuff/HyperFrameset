@@ -1926,16 +1926,42 @@ polyfill();
 var framer = Meeko.framer = (function(classNamespace) {
 
 var hfNamespace = 'hf';
-var hfPrefix = hfNamespace + ':';
-var hfSelector = '[' + hfPrefix.replace(':', '\\:') + 'role=frame' + ']';
+var hfTagNamespacing = 'custom'; // NOTE set this manually to 'custom' or 'xml' or ''
+var hfAttrNamespacing = ''; // NOTE optionally set this manually to 'custom' or 'xml' or ''
+
+if (!hfAttrNamespacing) hfAttrNamespacing = (function(hfTagNamespacing) {
+	switch (hfTagNamespacing) {
+	case 'custom': return '';
+	case 'xml': return '';
+	case '': return 'custom';
+	}
+})(hfTagNamespacing);
+
+var hfTagPrefix = getPrefix(hfTagNamespacing);
+var hfAttrPrefix = getPrefix(hfAttrNamespacing);
+
+function getPrefix(namespacing) {
+	switch(namespacing) {
+	case 'custom': return hfNamespace + '-';
+	case 'xml': return hfNamespace + ':';
+	case '': default: return '';
+	}
+}
+
+hfFrameTag = hfTagNamespacing ? (hfTagPrefix + 'frame') : '';
+var hfFrameSelector = hfTagNamespacing ? hfTagPrefix.replace(':', '\\:') + 'frame' :
+	'[' + hfAttrPrefix.replace(':', '\\:') + 'role=frame' + ']';
+
+hfBodyTag = hfTagNamespacing ? (hfTagPrefix + 'body') : '';
+
 var hfAttr = function(el, attr, value) {
-	var hfAttrName = hfPrefix + attr;
+	var hfAttrName = hfAttrPrefix + attr;
 	if (typeof value === 'undefined') return el.getAttribute(hfAttrName);
 	el.setAttribute(hfAttrName, value);
 }
 
 var headElements = words('title meta link style script');
-var bodyElements = words('div section article aside main header footer nav iframe');
+var bodyElements = hfBodyTag ? [ hfBodyTag ] : words('div section article aside main header footer nav iframe');
 
 var HFrameDefinition = (function() {
 
@@ -1989,8 +2015,7 @@ var HBodyDefinition = (function() {
 	
 function HBodyDefinition(el) {
 	if (!el) return; // in case of inheritance
-	var bodyDef = this;
-	bodyDef.init(el);
+	this.init(el);
 }
 
 extend(HBodyDefinition.prototype, {
@@ -2031,7 +2056,7 @@ render: function(doc, options) {
 		body.appendChild(output);
 		result = {
 			element: body,
-			frames: $$(hfSelector, body)
+			frames: $$(hfFrameSelector, body)
 		}
 	}
 	else {
@@ -2048,6 +2073,7 @@ render: function(doc, options) {
 
 return HBodyDefinition;
 })();
+
 
 var HFramesetDefinition = (function() {
 
@@ -2068,8 +2094,16 @@ init: function(doc, options) {
 	var scopeURL = URL(options.scope);
 	rebase(doc, scopeURL);
 
+	_.forEach($$('script', doc.body), function(script) {
+		if (script.type && lc(script.type) !== 'text/javascript') return;
+		if (tagName(script.parentNode) === hfFrameTag) return;
+		logger.warn('<script> in frameset <body> is not child of <' + hfFrameTag + '>');
+		script.parentNode.removeChild(script);
+	});
+	
+	
 	framesetDef.document = doc;
-	var frameElts = $$(hfSelector, doc);
+	var frameElts = $$(hfFrameSelector, doc);
 	var frameRefElts = [];
 	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
 		// NOTE first rebase @hf:src with scope: urls
@@ -2112,7 +2146,7 @@ render: function() { // FIXME assuming empty document.body
 	var srcDoc = framesetDef.document.cloneNode(true);
 	var result = {
 		document: srcDoc,
-		frames: $$(hfSelector, srcDoc)
+		frames: $$(hfFrameSelector, srcDoc)
 	};
 	return result;
 }
@@ -2170,7 +2204,7 @@ init: function(el) {
 	if (src) hframe.src = URL(framer.frameset.src).resolve(src);
 },
 
-render: function() { // FIXME need a teardown method that releases child-frames
+render: function() { // FIXME need a teardown method that releases child-frames	
 	var hframe = this;
 	var src = hframe.src;
 	if (!src) return;
@@ -2389,14 +2423,6 @@ function frameset_insertBody(dstDoc, srcBody) {
 		srcBody.removeChild(node);
 		dstBody.insertBefore(node, content);
 	});
-
-	forSiblings ("before", content, enableScripts);
-	
-	function enableScripts(node) {
-		if (node.nodeType !== 1) return;
-		if ("script" === tagName(node)) scriptQueue.push(node);
-		else forEach($$("script", node), function(script) { scriptQueue.push(script); });
-	}
 }
 
 
