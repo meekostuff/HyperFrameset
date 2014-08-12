@@ -180,7 +180,7 @@ function isSet(option) {
 	if (searchParams[option] || bootOptions[option]) return true;
 }
 
-// Don't even load HyperFrameset if "noboot" is one of the search options (or true in Meeko.options)
+// Don't even load HyperFrameset if "no_boot" is one of the search options (or true in Meeko.options)
 if (isSet('no_boot')) return;
 
 /*
@@ -724,7 +724,8 @@ function startup() {
 	taskQueue.queue(startupSequence, null, function(err) {
 		setTimeout(function() { throw err; });
 		if (bootOptions['capturing']) domReady(function() { // TODO would it be better to do this with document.write()?
-			sessionOptions.setItem('no_boot', true);
+			if (sessionOptions.getItem('no_frameset') === false) return; // ignore failure if `no_frameset` is *explicitly* `false` in sessionOptions
+			sessionOptions.setItem('no_frameset', true);
 			location.reload();
 		});
 		else Viewport.unhide();
