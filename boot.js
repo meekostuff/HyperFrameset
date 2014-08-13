@@ -187,10 +187,24 @@ if (isSet('no_boot')) return;
  ### DOM utilities
  */
 
+function tagName(el) { return el && el.nodeType === 1 ? el.tagName.toLowerCase() : ""; }
+
 function $$(selector, context) {
 	context = context || document;
 	var nodeList = [];
 	forEach(context.getElementsByTagName(selector), function(el) { nodeList.push(el); });
+	return nodeList;
+}
+
+function empty(el) {
+	var node;
+	while (node = el.firstChild) el.removeChild(node);
+}
+
+function nextSiblings(el, callback) {
+	var nodeList = [];
+	for (var node=el.nextSibling; node; node=node.nextSibling) nodeList.push(node);
+	if (callback) forEach(nodeList, callback);
 	return nodeList;
 }
 
@@ -293,7 +307,6 @@ return domReady;
 var taskQueue = (function() {
 
 var head = document.head;
-var marker = head.firstChild;
 var testScript = document.createElement('script');
 var supportsOnLoad = (testScript.setAttribute('onload', ';'), typeof testScript.onload === 'function');
 var supportsSync = (testScript.async === true);
@@ -307,7 +320,7 @@ function prepareScript(url, onload, onerror) { // create script (and insert if s
 	script.src = url;
 	if (supportsSync) {
 		script.async = false;
-		marker.parentNode.insertBefore(script, marker);
+		head.appendChild(script);
 	}
 	return script;
 
@@ -330,7 +343,7 @@ function enableScript(script) { // insert script (if not already done). Insertio
 	if (supportsSync) return;
 
 	if (supportsOnLoad) {
-		marker.parentNode.insertBefore(script, marker);
+		head.appendChild(script);
 		return;
 	}
 
@@ -348,7 +361,7 @@ function enableScript(script) { // insert script (if not already done). Insertio
 	function onChange() {
 		var readyState = script.readyState;
 		if (!script.parentNode) {
-			if (readyState === 'loaded') marker.parentNode.insertBefore(script, marker);
+			if (readyState === 'loaded') head.appendChild(script);
 			return;
 		}
 		switch (readyState) {
@@ -499,7 +512,7 @@ if (style.styleSheet) style.styleSheet.cssText = cssText;
 else style.textContent = cssText;
 
 function hide() {
-	head.insertBefore(style, head.firstChild);
+	head.insertBefore(style, selfMarker);
 }
 
 function unhide() {
@@ -546,11 +559,13 @@ start: function(strict) {
 test: function() { // return `false` for strict, otherwise warning message
 	if (document.body) throw 'When capturing, boot-script MUST be in - or before - <head>';
 	if ($$('script').length > 1) return 'When capturing, boot-script SHOULD be first <script>';
-	if (some($$('*', document.head), function(node) { // return true if invalid node
+	var nodeList = nextSiblings(selfMarker);
+	if (some(nodeList, function(node) { // return true if invalid node
 		if (node.nodeType !== 1) return false; // comments and text-nodes are ok
 		if (node === bootScript) return false; // boot-script is ok. TODO should be last node in <head>
-		if (node.tagName === 'TITLE' && node.firstChild === null) return false; // IE6 adds a dummy <title>
-		if (node.tagName !== 'META') return true; 
+		var tag = tagName(node);
+		if (tag === 'title' && node.firstChild === null) return false; // IE6 adds a dummy <title>
+		if (tag !== 'meta') return true; 
 		if (node.httpEquiv || node.getAttribute('charset')) return false; // <meta http-equiv> are ok
 		return true;
 	})) return 'When capturing, only <meta http-equiv> or <meta charset> nodes may precede boot-script';
@@ -618,53 +633,62 @@ var urlParams = Meeko.bootParams = { // WARN this dictionary can be modified dur
 if (Meeko.bootConfig) Meeko.bootConfig(); // TODO try / catch ??
 
 /*
+        The self-marker is inserted by HyperFrameset (if not already present)
+        to mark the head elements associated with the content document
+        as opposed to frameset elements or others.
+        This boot-script inserts one which means <style>, etc inserted above
+        are protected from HyperFrameset
+        WARN The self-marker is used extensively by this boot-script
+*/
+
+var selfMarker = document.createElement('link');
+selfMarker.rel = 'self';
+selfMarker.href = document.URL;
+// FIXME should be inserted after <meta http-equiv>, before anything else
+document.head.insertBefore(selfMarker, document.head.firstChild);
+
+
+/*
  ## Startup
 */
 
+html5prepare(); // no doc arg means use document and add block element styles
+
+
 if (isSet('no_style')) {
-	html5prepare(document); // doc arg means use document but don't add block element styles
 	domReady(function() {
-		forEach($$('style'), function(el) { el.parentNode.removeChild(el); });
-		forEach($$('link'), function(el) { if (/\bSTYLESHEET\b/i.test(el.rel)) el.parentNode.removeChild(el); });
+		var parent = selfMarker.parentNode;
+		nextSiblings(selfMarker, function(node) {
+			switch (tagName(node)) {
+			case 'style': break;
+			case 'link':
+				if (/\bSTYLESHEET\b/i.test(node.rel))  break;
+				return;
+			default: return;
+			}
+			parent.removeChild(node);
+		});
 	});
 	return;	
 }
 
 var no_frameset = isSet('no_frameset');
 if (no_frameset || !(window.XMLHttpRequest && sessionOptions)) {
-	html5prepare(); // no doc arg means use document and add block element styles
 	if (!no_frameset) throw 'Capturing depends on native XMLHttpRequest and sessionStorage and JSON';
 	return;
 }
 
-/*
-	NOTE we don't want to call html5prepare() before Capture.start().
-	The preceding branches cancel the next stage of booting
-	which is why they call html5prepare() before exiting.
-*/
 
-if (bootOptions['capturing']) {
-	Capture.start(bootOptions['capturing'] === 'strict');
+var capturing = bootOptions['capturing'];
+if (capturing === 'auto') capturing = !document.body;
+
+if (capturing) {
+	Capture.start(capturing === 'strict');
 }
 
-html5prepare(); // no doc arg means use document and add block element styles
 
 // Capturing uses document.write, but after this point document.write, etc is forbidden
 document.write = document.writeln = document.open = document.close = function()  { throw 'document.write(), etc is incompatible with HyperFrameset'; }
-
-
-/*
-	The self-marker is inserted by HyperFrameset (if not already present)
-	to mark the head elements associated with the content document
-	as opposed to frameset elements or others.
-	The boot-script inserts one which means <style>, etc inserted above
-	are protected from HyperFrameset
-*/
-   
-var selfMarker = document.createElement('link');
-selfMarker.rel = 'self';
-selfMarker.href = document.URL;
-document.head.insertBefore(selfMarker, bootScript.parentNode === document.head ? bootScript : document.head.firstChild);
 
 
 var hidden_timeout = bootOptions["hidden_timeout"];
@@ -686,10 +710,32 @@ function config() {
 }
 
 function start() {
-	if (bootOptions['capturing']) Meeko.framer.start({
+	if (capturing) Meeko.framer.start({
 		contentDocument: Capture.getDocument()
 	});
-	else Meeko.framer.start();
+	else Meeko.framer.start({
+		contentDocument: new Meeko.Promise(function(resolve, reject) { // FIXME this is bound to have cross-browser failures
+			var dstDoc = document.cloneNode(true);
+			var dstHead = dstDoc.head;
+			empty(dstHead);
+			nextSiblings(selfMarker, function(srcNode) {
+				var node = srcNode.cloneNode(true);
+				switch (tagName(srcNode)) {
+				case '':
+					break;
+				case 'script':
+					if (srcNode.type || /^text\/javascript$/i.test(srcNode.type)) break;
+					// else fall-thru
+				default:
+					srcNode.parentNode.removeChild(srcNode);
+					break;
+				}
+				dstHead.appendChild(node);
+			});
+			empty(document.body);
+			resolve(dstDoc);
+		}) 
+	});
 }
 
 function resolveScript(script) {
@@ -713,17 +759,16 @@ else {
 	bootOptions['config_script'] = config_script;
 }
 
-var startupSequence = [].concat(
+var initSequence = [].concat(
 	main_script,
 	config,
-	config_script,
-	start
+	config_script
 );
 
-function startup() {
-	taskQueue.queue(startupSequence, null, function(err) {
+function init(callback) {
+	taskQueue.queue(initSequence, callback, function(err) {
 		setTimeout(function() { throw err; });
-		if (bootOptions['capturing']) domReady(function() { // TODO would it be better to do this with document.write()?
+		if (capturing) domReady(function() { // TODO would it be better to do this with document.write()?
 			if (sessionOptions.getItem('no_frameset') === false) return; // ignore failure if `no_frameset` is *explicitly* `false` in sessionOptions
 			sessionOptions.setItem('no_frameset', true);
 			location.reload();
@@ -732,13 +777,19 @@ function startup() {
 	});
 }
 
-if (bootOptions['capturing']) {
+if (capturing) { // wait for DOMReady then do init and start
 	domReady(function() {
 		if (window.stop) window.stop();
-		setTimeout(startup);
+		setTimeout(function() {
+			init(start);
+		});
 	});
 }
-else setTimeout(startup);
+else setTimeout(function() { // init immediately but wait for DOMReady before start
+	init(function() {
+		domReady(start);
+	});
+});
 
 var startup_timeout = bootOptions["startup_timeout"];
 if (startup_timeout > 0) {
