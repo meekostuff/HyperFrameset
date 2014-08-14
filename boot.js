@@ -7,7 +7,7 @@
 
 var defaults = { // NOTE defaults also define the type of the associated config option
 	"no_boot": false, 
-	"no_frameset": false, // NOTE !(window.XMLHttpRequest && window.sessionStorage && window.JSON) is enforced anyway
+	"no_frameset": false, // NOTE !(window.XMLHttpRequest && window.sessionStorage && window.JSON && 'readyState' in document) is enforced anyway
 	"no_style": false,
 	"capturing": true, // FIXME this must be true for now
 	"log_level": "warn",
@@ -129,7 +129,6 @@ function addDataSource(name, key) {
 }
 
 addDataSource('sessionStorage');
-if (!Meeko.options || !Meeko.options['ignore_cookie_options']) addDataSource('cookieStorage');
 addDataSource('localStorage');
 if (Meeko.options) dataSources.push( function(name) { return Meeko.options[name]; } )
 
@@ -139,7 +138,8 @@ var getData = function(name, type) {
 		var val = fn(name);
 		if (val == null) return false;
 		switch (type) {
-		case "string": data = '' + val; break;
+		case "string": data = val; // WARN this DOES NOT convert to String
+			break;
 		case "number":
 			if (!isNaN(val)) data = 1 * val;
 			// TODO else logger.warn("incorrect config option " + val + " for " + name); 
@@ -249,7 +249,7 @@ var removeEvent =
 	function(node, event, fn) { if (node["on" + event] == fn) node["on" + event] = null; };
 
 var domReady = (function() {
-// WARN this function assumes the script is included in the page markup so it will run before DOMContentLoaded, etc
+// WARN this function assumes document.readyState is available
 
 var loaded = false;
 var queue = [];
@@ -271,7 +271,10 @@ var events = {
 	'load': window
 }
 
-addListeners(events, onChange);
+if (document.readyState === 'complete') loaded = true;
+else addListeners(events, onChange);
+
+return domReady;
 
 function onChange(e) {
 	switch(e.type) {
@@ -294,8 +297,6 @@ function addListeners(events, handler) {
 function removeListeners(node, types, handler) {
 	each(events, function(type, node) { removeEvent(node, type, handler); });
 }
-
-return domReady;
 
 })();
 
@@ -673,7 +674,7 @@ if (isSet('no_style')) {
 }
 
 var no_frameset = isSet('no_frameset');
-if (no_frameset || !(window.XMLHttpRequest && sessionOptions)) {
+if (no_frameset || !(window.XMLHttpRequest && sessionOptions && 'readyState' in document)) {
 	if (!no_frameset) throw 'Capturing depends on native XMLHttpRequest and sessionStorage and JSON';
 	return;
 }
@@ -752,7 +753,7 @@ main_script = bootOptions['main_script'] = resolveURL(main_script, urlParams);
 
 var config_script = bootOptions['config_script'];
 if (config_script instanceof Array) forEach(config_script, function(script, i, list) {
-	list[i] = resolveScript(script, urlParams);
+	list[i] = resolveScript(script);
 });
 else {
 	config_script = [ resolveScript(config_script) ];
