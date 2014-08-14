@@ -1925,6 +1925,8 @@ polyfill();
 
 var framer = Meeko.framer = (function(classNamespace) {
 
+// FIXME make hyperframeset element / attr namespacing configurable at run-time
+// FIXME need `display: block` style declaration for hyperframeset elements
 var hfNamespace = 'hf';
 var hfTagNamespacing = 'custom'; // NOTE set this manually to 'custom' or 'xml' or ''
 var hfAttrNamespacing = ''; // NOTE optionally set this manually to 'custom' or 'xml' or ''
@@ -2106,7 +2108,7 @@ init: function(doc, options) {
 	var frameElts = $$(hfFrameSelector, doc);
 	var frameRefElts = [];
 	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
-		// NOTE first rebase @hf:src with scope: urls
+		// NOTE first rebase @src with scope: urls
 		var src = hfAttr(el, 'src');
 		if (src) {
 			var newSrc = rebaseURL(src, scopeURL);
@@ -2300,10 +2302,43 @@ render: function() {
 		mergeElement(dstDoc.documentElement, srcDoc.documentElement);
 		mergeElement(dstDoc.head, srcDoc.head);
 		mergeHead(dstDoc, srcDoc.head, true);
+		// allow scripts to run FIXME scripts should always be appended to document.head
+		forEach($$("script", dstDoc.head), function(script) {
+			var forAttr = script.getAttribute('for');
+			if (!forAttr) {
+				scriptQueue.push(script);
+				return;
+			}
+			if (script.src) {
+				logger.warn('<script> with @for MUST NOT have @src');
+				return;
+			}
+			var forOptions;
+			try {
+				forOptions = (Function('return (' + script.text + ');'))(); // FIXME is script.text cross-platform??
+			}
+			catch(err) { return; }
+			switch(forAttr) {
+			case 'frameset':
+				framer.configFrameset(forOptions);
+				break;
+			case 'frame':
+				framer.configFrame(forOptions);
+				break;
+			default:
+				logger.warn('Unsupported value of @for on <script>: ' + forAttr);
+			}
+		}); // FIXME this breaks if a script inserts other scripts
+		return scriptQueue.empty();
 	},
 
-	function() { return scriptQueue.empty(); }, // FIXME this should be in mergeHead
-
+	function() {
+		var url = framer.currentURL = document.URL;
+		if (framer.framesetOptions.getTarget) {
+			framer.currentTarget = framer.framesetOptions.getTarget(url);
+		}
+	},
+	
 	function() {
 		var srcBody = srcDoc.body;
 		mergeElement(dstDoc.body, srcBody);
@@ -2412,8 +2447,6 @@ function mergeHead(dstDoc, srcHead, isFrameset, afterRemove) { // FIXME more cal
 		else insertNode('beforeend', dstHead, srcNode);
 		if (tagName(srcNode) == "link") srcNode.href = srcNode.getAttribute("href"); // Otherwise <link title="..." /> stylesheets don't work on Chrome
 	});
-	// allow scripts to run
-	forEach($$("script", dstHead), function(script) { scriptQueue.push(script); }); // FIXME this breaks if a script inserts other scripts
 }
 
 function frameset_insertBody(dstDoc, srcBody) {
@@ -2538,11 +2571,13 @@ return bfScheduler.now(function() {
 	function() { resolveURLs(); },
 	
 	function() {
-		var url = framer.currentURL = document.URL;
-		if (framer.framesetOptions.target) {
-			framer.currentTarget = framer.framesetOptions.target(url);
-		}
 		return framer.frameset.render(); // FIXME what if render fails??
+	},
+	
+	function() {
+		// NOTE fortuitously all the browsers that support pushState() also support addEventListener() and dispatchEvent()
+		window.addEventListener("click", function(e) { framer.onClick(e); }, true);
+		window.addEventListener("submit", function(e) { framer.onSubmit(e); }, true);
 	}
 	
 	]);
@@ -2579,6 +2614,129 @@ return bfScheduler.now(function() {
 		});
 	}
 
+},
+
+onClick: function(e) {
+	var framer = this;
+	// NOTE only pushState enabled browsers use this
+	// We want panning to be the default behavior for clicks on hyperlinks - <a href>
+	// Before panning to the next page, have to work out if that is appropriate
+	// `return` means ignore the click
+
+	if (!framer.framesetOptions.lookup) return; // no panning if can't lookup frameset of next page
+	
+	if (e.button != 0) return; // FIXME what is the value for button in IE's W3C events model??
+	if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return; // FIXME do these always trigger modified click behavior??
+
+	// Find closest <a> to e.target
+	for (var target=e.target; target!=document; target=target.parentNode) if (tagName(target) == "a") break;
+	if (tagName(target) != "a") return; // only handling hyperlink clicks
+	var href = target.getAttribute("href");
+	if (!href) return; // not really a hyperlink
+
+	// test hyperlinks
+	if (target.target) return; // no iframe
+	var baseURL = URL(document.URL);
+	var url = baseURL.resolve(href); // TODO probably don't need to resolve on browsers that support pushstate
+	var oURL = URL(url);
+	if (oURL.origin != baseURL.origin) return; // no external urls
+
+	var details = { element: target }; // TODO more details?? event??
+	
+	// TODO perhaps should test same-site and same-page links
+	var isPageLink = (oURL.nohash == baseURL.nohash); // TODO what about page-links that match the current hash?
+	// From here on we effectively take over the default-action of the event
+	overrideDefaultAction(e, function(event) {
+		if (isPageLink) framer.onPageLink(url, details);
+		else framer.onSiteLink(url, details);
+	});
+},
+
+onPageLink: function(url, details) {	// TODO Need to handle anchor links. The following just replicates browser behavior
+	var framer = this;
+	alert('ignoring on-same-page links for now.'); // FIXME
+},
+
+onSiteLink: function(url, details) {	// Now attempt to pan
+	var framer = this;
+	var target = framer.framesetOptions.getTarget(url, details);
+	framer.assign(url, {
+		target: target
+	});
+},
+
+assign: function(url, details) {
+	var framer = this;
+	var frameset = framer.frameset;
+	var frames = [];
+	var target = details.target;
+	walkFrames(frameset, function(frame) { if (frame.name === target) frames.push(frame); });
+	// FIXME warning if more than one frame??
+	_.forEach(frames, function(frame) {
+		frame.src = url;
+		frame.render();
+	});
+	return; // FIXME promisify
+
+	function walkFrames(current, callback) {
+		_.forEach(current.frames, function(frame) { callback(frame); walkFrames(frame, callback); });
+	}
+},
+
+onSubmit: function(e) {
+	var framer = this;
+	// NOTE only pushState enabled browsers use this
+	// We want panning to be the default behavior for <form> submission
+	// Before panning to the next page, have to work out if that is appropriate
+	// `return` means ignore the submit
+
+	if (!framer.framesetOptions.lookup) return; // no panning if can't lookup frameset of next page
+	
+	// test submit
+	var form = e.target;
+	if (form.target) return; // no iframe
+	var baseURL = URL(document.URL);
+	var url = baseURL.resolve(form.action); // TODO probably don't need to resolve on browsers that support pushstate
+	var oURL = URL(url);
+	if (oURL.origin != baseURL.origin) return; // no external urls
+	
+	var method = lc(form.method);
+	switch(method) {
+	case 'get': break;
+	default: return; // TODO handle POST
+	}
+	
+	// From here on we effectively take over the default-action of the event
+	overrideDefaultAction(e, function() {
+		framer.onForm(form);
+	});
+},
+
+onForm: function(form) {
+	var framer = this;
+	var method = lc(form.method);
+	switch(method) {
+	case 'get':
+		var baseURL = URL(document.URL);
+		var action = baseURL.resolve(form.action); // TODO probably not needed on browsers that support pushState
+		var oURL = URL(action);
+		var query = encode(form);
+		var url = oURL.nosearch + (oURL.search || '?') + query + oURL.hash;
+		framer.onSiteLink(url, {
+			element: form
+		});
+		break;
+	default: return; // TODO handle POST
+	}	
+
+	function encode(form) {
+		var data = [];
+		forEach(form.elements, function(el) {
+			if (!el.name) return;
+			data.push(el.name + '=' + encodeURIComponent(el.value));
+		});
+		return data.join('&');
+	}
 }
 
 });
@@ -2648,7 +2806,7 @@ extend(framer, {
 framesetOptions: {
 	lookup: function(url) {},
 	detect: function(document) {},
-	target: function(url, details) {},
+	getTarget: function(url, details) {},
 	load: function(method, url, data, details) {
 		var framesetOptions = this;
 		var loader = new HTMLLoader(framesetOptions);
@@ -2732,6 +2890,10 @@ var MainProcessor = (function() {
 function MainProcessor() {}
 
 extend(MainProcessor.prototype, {
+
+loadTemplate: function(template) {
+	if (/\S+/.test(template.textContent)) logger.warn('"main" transforms do not use templates');
+},
 
 transform: function(provider) {
 	var frag = document.createDocumentFragment();
@@ -2840,7 +3002,7 @@ function transformNode(node, provider, context, variables) {
 		if (current.nodeType !== 1) continue;
 		var newChild = transform(current, provider, context, variables);
 		if (newChild !== current) {
-			if (newChild.nodeType) el.replaceChild(newChild, current);
+			if (newChild && newChild.nodeType) node.replaceChild(newChild, current);
 			else node.removeChild(current); // FIXME warning if newChild not empty
 		}
 	}
@@ -2848,7 +3010,8 @@ function transformNode(node, provider, context, variables) {
 }
 
 function transformSingleElement(el, provider, context, variables) {
-	_.forEach(el.attributes, function(attr) {
+	var attrs = [].slice.call(el.attributes, 0);
+	_.forEach(attrs, function(attr) {
 		if (!attr.specified) return;
 		var attrName;
 		var prefix = false;
