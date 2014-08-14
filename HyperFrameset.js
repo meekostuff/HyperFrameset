@@ -1509,7 +1509,7 @@ function prenormalize(doc, details) {
 	});
 
 	var baseURL = URL(details.url);
-	var mustResolve = !(details.mustResolve === false); // WARN mustResolve is true unless explicitly false
+	var mustResolve = true; // formerly !(details.mustResolve === false);
 	resolveAll(mustResolve ? doc : doc.head, baseURL, false, mustResolve);
 
 	return doc;	
@@ -1614,7 +1614,8 @@ function iframeParser(html, details) {
 			doc.head.appendChild(node);
 		});
 
-		details.isNeutralized = resolveAll(doc, baseURL, true, details.mustResolve);
+		var mustResolve = true; // formerly details.mustResolve
+		details.isNeutralized = resolveAll(doc, baseURL, true, mustResolve);
 		return doc;
 	}
 
