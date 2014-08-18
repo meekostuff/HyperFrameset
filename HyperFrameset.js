@@ -24,7 +24,7 @@ var window = this;
 var document = window.document;
 
 if (!window.XMLHttpRequest) throw "HyperFrameset requires native XMLHttpRequest";
-
+if (!document.documentElement) throw "HyperFrameset requires Element#hasAttribute()";
 
 var defaults = { // NOTE defaults also define the type of the associated config option
 	"log_level": "warn",
@@ -680,9 +680,9 @@ var composeNode = function(srcNode) { // document.importNode() NOT available on 
 	return node;
 }
 
-var hasAttribute = document.documentElement.hasAttribute ?
-function(node, attrName) { return node.hasAttribute(attrName); } :
-function(node, attrName) { var attr = node.getAttributeNode(attrName); return (attr == null) ? false : attr.specified; }; // IE <= 7
+var hasAttribute = function(node, attrName) { // WARN needs to be more complex for IE <= 7
+	return node.hasAttribute(attrName);
+}
 
 var copyAttributes = function(node, srcNode) { // helper for composeNode()
 	var attrs = srcNode.attributes;
@@ -690,32 +690,14 @@ var copyAttributes = function(node, srcNode) { // helper for composeNode()
 	return node;
 }
 
-var copyAttributeNode = (function() { 
-// WARN the function returned here must be called with the dest element as `this`
-
-function standard(attrNode) {
+var copyAttributeNode = function(attrNode) { // WARN needs to be more complex for IE <= 7
 	this.setAttribute(attrNode.name, attrNode.value);
 }
-
-// IE <= 7 messes with @class
-function legacy(attrNode) { // FIXME do other attrs need fixing??
-	if (!attrNode.specified) return;
-	var name = attrNode.name;
-	if (name === 'class') name = 'className';
-	this.setAttribute(name, attrNode.value);
-}
-
-var div = document.createElement('div');
-div.className = 'dummy';
-
-return (div.getAttribute('class') == 'dummy') ? standard : legacy;
-
-})();
 
 var removeAttributes = function(node) {
 	var attrs = [];
 	forEach(node.attributes, function(attr) {
-		if (attr.specified) attrs.push(attr.name);
+		attrs.push(attr.name);
 	});
 	forEach(attrs, function(attrName) {
 		node.removeAttribute(attrName); // FIXME does this work for @class?
@@ -3018,7 +3000,7 @@ function transformNode(node, provider, context, variables) {
 	if (!nodeType) return node;
 	if (nodeType !== 1 && nodeType !== 11) return node;
 	var deep = true;
-	if (nodeType === 1 && (node.hasAttribute(exprTextAttr) || node.hasAttribute(exprHtmlAttr))) deep = false;
+	if (nodeType === 1 && (hasAttribute(node, exprTextAttr) || hasAttribute(node, exprHtmlAttr))) deep = false;
 	if (nodeType === 1) transformSingleElement(node, provider, context, variables);
 	if (!deep) return node;
 
@@ -3160,7 +3142,7 @@ evaluate: function(query, context, variables, type) {
 		switch(attr) {
 		case null: case undefined: case '': return true;
 		case textAttr: case htmlAttr: return !/^\s*$/.test(node.textContent || node.innerText); // FIXME potentially heavy. Implement as a DOM utility isEmptyNode()
-		default: return node.hasAttribute(attr);
+		default: return hasAttribute(node, nodeattr);
 		}
 	case 'node': // expr:.html
 		switch(attr) {
