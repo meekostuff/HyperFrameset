@@ -7,7 +7,7 @@
 .remove { background-color: red; color: white; }
 .noframeset { border: 2px solid blue; }
 *[id] { margin: 0.5em; border: 1px dashed black; }
-*[hf\:role=frame] { margin: 0.5em; border: 2px dotted black; }
+hf-frame, hf\:frame { display: block; margin: 0.5em; border: 2px dotted black; }
 </style>
 <style>
 .style-fail { display: none; }
@@ -18,15 +18,15 @@ nav li { display: inline; list-style: outside none; margin: 0.1em; padding: 0.25
 #panner { background-color: #77ff77; color: #ffffff; text-align: center; }
 .hidden { display: none; }
 </style>
-<script>
-Meeko.framer.configFrame({
-	duration: 250,
-	entering: function(msg) { document.getElementById('panner').className = ''; },
-	leaving: {
-		before: function(msg) { },
-		after: function(msg) { }
-	}
-});
+<script for="frameset">
+({
+	getTarget: function(url, details) { return 'hf_main'; }
+})
+</script>
+<script for="frame">
+({
+	entering: function(msg) { document.getElementById('panner').className = ''; }
+})
 </script>
 </head>
 <body>

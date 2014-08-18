@@ -8,7 +8,7 @@ function toArray(list) { var a = []; for (var n=list.length, i=0; i<n; i++) a[i]
 
 var framesetURL, scope;
 
-Meeko.framer.configFrameset({
+Meeko.framer.config({
 	/*
 	The framesetURL can be dependent on anything, for-instance
 	+ device / window dimensions
@@ -32,34 +32,6 @@ Meeko.framer.configFrameset({
 		scope = URL(document.URL).base;
 		return this.lookup(document.URL);
 	}
-});
-
-Meeko.framer.configFrame({
-	normalize: function(doc, details) { // details contains the request `url` and `method`
-		
-		// This removes fallback <style>, <link rel="stylesheet"> and <script> from <head>
-		var srcHead = doc.head;
-		_.forEach(toArray(srcHead.childNodes), function(node) { // remove nodes that do not match specified conditions
-			switch(DOM.tagName(node)) { 
-			case "style":
-				break;
-			case "link":
-				if (!/\bstylesheet\b/i.test(node.rel)) return;
-				break;
-			case "script":
-				break;
-			default: return;
-			}
-			srcHead.removeChild(node);
-		});
-		
-		// YOUR NORMALIZE CODE GOES HERE
-	},
-	
-	// These SHOULD be set by your frameset-document(s). This is just for backwards compat
-	duration: 0,
-	entering: { before: hide, after: show },
-	leaving: { before: hide, after: show }
 });
 
 function getFramesetURL(doc) {
@@ -94,8 +66,16 @@ function getFramesetLink(doc) {
 	return link;
 }
 
+_.config(Meeko.HFrameDefinition.options, {
+	// These SHOULD be set by your frameset-document(s). This is just for backwards compat
+	duration: 0,
+	entering: { before: hide, after: show },
+	leaving: { before: hide, after: show }
+});
+
 function hide(msg) { msg.node.setAttribute("hidden", "hidden"); }
 function show(msg) { msg.node.removeAttribute("hidden"); }
 function noop(msg) { }
+
 
 })();

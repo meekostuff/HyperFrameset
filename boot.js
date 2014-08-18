@@ -544,7 +544,7 @@ var Capture = (function() {
 var capturedHTML = '';
 
 var Capture = {
-
+// TODO might be better to clone the partially loaded document at the start of booting so boot modifications don't get captured
 start: function(strict) {
 	var warnMsg = Capture.test(); // NOTE test() can also throw
 	if (warnMsg) {
@@ -705,7 +705,7 @@ function config() {
 	Meeko.DOM.ready = domReady;
 	Meeko.HTMLParser.prototype.prepare = html5prepare;
 	Meeko.Promise.pollingInterval = bootOptions["polling_interval"];
-	Meeko.framer.configFrameset({
+	Meeko.framer.config({
 		ready: Viewport.unhide
 	});
 }

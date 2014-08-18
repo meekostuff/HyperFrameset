@@ -1968,17 +1968,45 @@ var bodyElements = hfBodyTag ? [ hfBodyTag ] : words('div section article aside 
 
 var HFrameDefinition = (function() {
 
-// <div id="id" hf-type="html" hf-format="css" hf-main="main" hf-transform="ht">...</div>
 function HFrameDefinition(el) {
 	if (!el) return; // in case of inheritance
 	this.init(el);
 }
 
+extend(HFrameDefinition, {
+
+/*
+ Paging handlers are either a function, or an object with `before` and / or `after` listeners. 
+ This means that before and after listeners are registered as a pair, which is desirable.
+*/
+options: { 
+	duration: 0,
+	load: function(method, url, data, details) {
+		var frameOptions = this;
+		var loader = new HTMLLoader(frameOptions);
+		details.mustResolve = false;
+		return loader.load(method, url, data, details);
+	}
+
+	/* The following options are also available *
+	entering: { before: hide, after: show },
+	leaving: { before: hide, after: show }
+	/**/
+}
+
+});
+
 extend(HFrameDefinition.prototype, {
-	
+
+config: function(options) {
+	var frameDef = this;
+	config(frameDef.options, options);
+},
+
 init: function(el) {
     var frameDef = this;
 	extend(frameDef, {
+		options: extend({}, HFrameDefinition.options),
 		element: el,
 		id: el.id,
 		type: hfAttr(el, 'type'),
@@ -2080,21 +2108,35 @@ return HBodyDefinition;
 
 var HFramesetDefinition = (function() {
 
-function HFramesetDefinition(doc, options) {
+function HFramesetDefinition(doc, settings) {
 	if (!doc) return; // in case of inheritance
-	this.init(doc, options);
+	this.init(doc, settings);
 }
+
+extend(HFramesetDefinition, {
+
+options: {
+	getTarget: function(url, details) {}	
+}
+
+});
 
 extend(HFramesetDefinition.prototype, {
 
-init: function(doc, options) {
+config: function(options) {
+	var framesetDef = this;
+	config(framesetDef.options, options);
+},
+
+init: function(doc, settings) {
 	var framesetDef = this;
 
 	extend(framesetDef, {
+		options: extend({}, HFramesetDefinition.options),
 		frames: {} // all hyperframe definitions. Indexed by @id (which may be auto-generated)
 	});
 	// NOTE first rebase scope: urls
-	var scopeURL = URL(options.scope);
+	var scopeURL = URL(settings.scope);
 	rebase(doc, scopeURL);
 
 	_.forEach($$('script', doc.body), function(script) {
@@ -2211,7 +2253,7 @@ render: function() { // FIXME need a teardown method that releases child-frames
 	var hframe = this;
 	var src = hframe.src;
 	if (!src) return;
-	return framer.frameOptions.load('get', src, null, {})
+	return hframe.definition.options.load('get', src, null, {})
 	.then(function(doc) {
 		var result = hframe.definition.render(doc);
 		// FIXME .bodyElement will probably become .bodies[] for transition animations.
@@ -2262,7 +2304,7 @@ load: function(url, options) {
 	hframeset.src = url;
 	hframeset.scope = options.scope;
 	var method = 'get';
-	return framer.framesetOptions.load(method, url, null, { method: method, url: url })
+	return framer.options.load(method, url, null, { method: method, url: url })
 	.then(function(framesetDoc) {
 		hframeset.definition = new HFramesetDefinition(framesetDoc, options);
 	});
@@ -2321,10 +2363,10 @@ render: function() {
 			catch(err) { return; }
 			switch(forAttr) {
 			case 'frameset':
-				framer.configFrameset(forOptions);
+				framer.frameset.definition.config(forOptions);
 				break;
 			case 'frame':
-				framer.configFrame(forOptions);
+				config(HFrameDefinition.options, forOptions);
 				break;
 			default:
 				logger.warn('Unsupported value of @for on <script>: ' + forAttr);
@@ -2335,8 +2377,9 @@ render: function() {
 
 	function() {
 		var url = framer.currentURL = document.URL;
-		if (framer.framesetOptions.getTarget) {
-			framer.currentTarget = framer.framesetOptions.getTarget(url);
+		var framesetOptions = framer.frameset.definition.options;
+		if (framesetOptions.getTarget) {
+			framer.currentTarget = framesetOptions.getTarget(url);
 		}
 	},
 	
@@ -2489,7 +2532,12 @@ return HFrameset;
 
 
 var notify = function(msg) {
-	var module = framer[msg.module + 'Options'];
+	var module;
+	switch (msg.module) {
+	case 'frameset': module = framer.frameset.definition.options; break;
+	case 'frame': module = HFrameDefinition.options; break;
+	default: return Promise.resolve();
+	}
 	var handler = module[msg.type];
 	if (!handler) return Promise.resolve();
 	var listener;
@@ -2541,7 +2589,7 @@ return bfScheduler.now(function() {
 	
 	startOptions.contentDocument
 	.then(function(doc) {
-		if (framer.frameOptions.normalize) framer.frameOptions.normalize(doc, { url: document.URL });
+		if (HFrameDefinition.options.normalize) HFrameDefinition.options.normalize(doc, { url: document.URL });
 		if (!STAGING_DOCUMENT_IS_INERT) deneutralizeAll(doc);
 		return doc;
 	})
@@ -2624,7 +2672,7 @@ onClick: function(e) {
 	// Before panning to the next page, have to work out if that is appropriate
 	// `return` means ignore the click
 
-	if (!framer.framesetOptions.lookup) return; // no panning if can't lookup frameset of next page
+	if (!framer.options.lookup) return; // no panning if can't lookup frameset of next page
 	
 	if (e.button != 0) return; // FIXME what is the value for button in IE's W3C events model??
 	if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return; // FIXME do these always trigger modified click behavior??
@@ -2660,7 +2708,8 @@ onPageLink: function(url, details) {	// TODO Need to handle anchor links. The fo
 
 onSiteLink: function(url, details) {	// Now attempt to pan
 	var framer = this;
-	var target = framer.framesetOptions.getTarget(url, details);
+	var framesetOptions = framer.frameset.definition.options;
+	var target = framesetOptions.getTarget(url, details);
 	framer.assign(url, {
 		target: target
 	});
@@ -2691,7 +2740,7 @@ onSubmit: function(e) {
 	// Before panning to the next page, have to work out if that is appropriate
 	// `return` means ignore the submit
 
-	if (!framer.framesetOptions.lookup) return; // no panning if can't lookup frameset of next page
+	if (!framer.options.lookup) return; // no panning if can't lookup frameset of next page
 	
 	// test submit
 	var form = e.target;
@@ -2747,8 +2796,8 @@ extend(framer, {
 
 lookup: function(docURL) {
 	var framer = this;
-	if (!framer.framesetOptions.lookup) return;
-	var result = framer.framesetOptions.lookup(docURL);
+	if (!framer.options.lookup) return;
+	var result = framer.options.lookup(docURL);
 	if (result == null) return null;
 
 	// FIXME error if `result` is a relative URL
@@ -2759,8 +2808,8 @@ lookup: function(docURL) {
 
 detect: function(srcDoc) {
 	var framer = this;
-	if (!framer.framesetOptions.detect) return;
-	var result = framer.framesetOptions.detect(srcDoc);
+	if (!framer.options.detect) return;
+	var result = framer.options.detect(srcDoc);
 	if (result == null) return null;
 
 	// FIXME error if `result` is a relative URL
@@ -2798,16 +2847,11 @@ function implyScope(framesetSrc, docSrc) {
 }
 
 
-/*
- Paging handlers are either a function, or an object with `before` and / or `after` listeners. 
- This means that before and after listeners are registered as a pair, which is desirable.
-*/
-
 extend(framer, {
-framesetOptions: {
+
+options: {
 	lookup: function(url) {},
 	detect: function(document) {},
-	getTarget: function(url, details) {},
 	load: function(method, url, data, details) {
 		var framesetOptions = this;
 		var loader = new HTMLLoader(framesetOptions);
@@ -2820,29 +2864,9 @@ framesetOptions: {
 	/**/
 },
 
-frameOptions: { 
-	duration: 0,
-	load: function(method, url, data, details) {
-		var frameOptions = this;
-		var loader = new HTMLLoader(frameOptions);
-		details.mustResolve = false;
-		return loader.load(method, url, data, details);
-	}
-
-	/* The following options are also available *
-	entering: { before: hide, after: show },
-	leaving: { before: hide, after: show }
-	/**/
-},
-
-configFrameset: function(options) {
+config: function(options) {
 	var framer = this;
-	config(framer.framesetOptions, options);
-},
-
-configFrame: function(options) {
-	var framer = this;
-	config(framer.frameOptions, options);
+	config(framer.options, options);
 }
 
 });
