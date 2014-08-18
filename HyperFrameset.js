@@ -14,9 +14,8 @@
  */
 
 // WARN for IE7, IE8 sometimes XMLHttpRequest is in a detectable but not callable state
-// This is usually fixed by refreshing, or by the following work-around.
-// OTOH, maybe my IE installation is bad
-var XMLHttpRequest = window.XMLHttpRequest; 
+// This is usually fixed by refreshing, or by the following DISABLED work-around.
+// var XMLHttpRequest = window.XMLHttpRequest; 
 
 (function() {
 
