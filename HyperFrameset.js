@@ -2497,8 +2497,7 @@ function frameset_insertBody(dstDoc, srcBody) {
 	var dstBody = dstDoc.body;
 	var content = dstBody.firstChild;
 	forSiblings ("starting", srcBody.firstChild, function(node) {
-		srcBody.removeChild(node);
-		dstBody.insertBefore(node, content);
+		insertNode("beforebegin", content, node);
 	});
 }
 
