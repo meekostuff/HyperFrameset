@@ -59,6 +59,21 @@ var some = function(a, fn, context) { for (var n=a.length, i=0; i<n; i++) { if (
 
 var every = function(a, fn, context) { for (var n=a.length, i=0; i<n; i++) { if (!fn.call(context, a[i], i, a)) return false; } return true; }
 
+var map = function(a, fn, context) {
+	var output = [];
+	for (var n=a.length, i=0; i<n; i++) output[i] = fn.call(context, a[i], i, a);
+	return output;
+}
+
+var filter = function(a, fn, context) {
+	var output = [];
+	for (var n=a.length, i=0; i<n; i++) {
+		var success = fn.call(context, a[i], i, a);
+		if (success) output.push(a[i]);
+	}
+	return output;
+}
+
 var words = function(text) { return text.split(/\s+/); }
 
 var each = (Object.keys) ? // TODO is this feature detection worth-while?
@@ -87,7 +102,7 @@ function(str) { return str.replace(/^\s+/, '').replace(/\s+$/, ''); }
 
 var _ = Meeko.stuff = {};
 extend(_, {
-	uc: uc, lc: lc, contains: contains, forEach: forEach, some: some, every: every, words: words, each: each, extend: extend, config: config, trim: trim
+	uc: uc, lc: lc, contains: contains, forEach: forEach, some: some, every: every, map: map, filter: filter, words: words, each: each, extend: extend, config: config, trim: trim
 });
 
 
@@ -1944,6 +1959,16 @@ var hfAttr = function(el, attr, value) {
 	el.setAttribute(hfAttrName, value);
 }
 
+var hfTagName = !document.documentElement.scopeName || hfTagNamespacing !== 'xml' ? tagName :
+function(el) { // IE8, IE9
+	var tag = tagName(el);
+	if (!tag) return tag;
+	var ns = lc(el.scopeName);
+	if (!ns || ns === 'html') return tag;
+	if (tag.indexOf(ns + ':') === 0) return tag; // IE9
+	return ns + ':' + tag; // IE8
+}
+
 var headElements = words('title meta link style script');
 var bodyElements = hfBodyTag ? [ hfBodyTag ] : words('div section article aside main header footer nav iframe');
 
@@ -1995,7 +2020,7 @@ init: function(el) {
     });
 	var bodies = frameDef.bodies = [];
 	forSiblings("starting", el.firstChild, function(node) {
-		var tag = tagName(node);
+		var tag = hfTagName(node);
 		if (!tag) return;
 		if (contains(headElements, tag)) return; // ignore typical <head> elements
 		if (contains(bodyElements, tag)) {
@@ -2122,7 +2147,7 @@ init: function(doc, settings) {
 
 	_.forEach($$('script', doc.body), function(script) {
 		if (script.type && lc(script.type) !== 'text/javascript') return;
-		if (tagName(script.parentNode) === hfFrameTag) return;
+		if (hfTagName(script.parentNode) === hfFrameTag) return;
 		logger.warn('<script> in frameset <body> is not child of <' + hfFrameTag + '>');
 		script.parentNode.removeChild(script);
 	});
@@ -2170,6 +2195,7 @@ init: function(doc, settings) {
 render: function() { // FIXME assuming empty document.body
 	var framesetDef = this;
 	var srcDoc = framesetDef.document.cloneNode(true);
+	polyfill(srcDoc);
 	var result = {
 		document: srcDoc,
 		frames: $$(hfFrameSelector, srcDoc)
@@ -2604,6 +2630,8 @@ return bfScheduler.now(function() {
 	},
 	
 	function() {
+		if (!historyProxy.pushState) return;
+	
 		// NOTE fortuitously all the browsers that support pushState() also support addEventListener() and dispatchEvent()
 		window.addEventListener("click", function(e) { framer.onClick(e); }, true);
 		window.addEventListener("submit", function(e) { framer.onSubmit(e); }, true);
@@ -3015,9 +3043,9 @@ function transformNode(node, provider, context, variables) {
 }
 
 function transformSingleElement(el, provider, context, variables) {
-	var attrs = [].slice.call(el.attributes, 0);
+	var attrs = [];
+	_.forEach(el.attributes, function(attr) { attrs.push(attr); });
 	_.forEach(attrs, function(attr) {
-		if (!attr.specified) return;
 		var attrName;
 		var prefix = false;
 		_.some([ exprPrefix, mexprPrefix ], function(prefixText) {
@@ -3176,17 +3204,16 @@ function expandSelector(context, selectorGroup, variables) { // FIXME currently 
 			context.id = id;
 		}
 	}
-	var selectors =
-		selectorGroup.split(',')
-		.map(function(s) { return s.trim(); })
-		.filter(function(s) {
+	var selectors =	selectorGroup.split(',');
+	selectors = _.map(selectors, function(s) { return trim(s); });
+	selectors = _.filter(selectors, function(s) {
 			switch(s.charAt(0)) {
 			case '+': case '~': return false; // FIXME warning or error
 			case '>': return (isRoot) ? false : true; // FIXME probably should be allowed even if isRoot
-			default: return true;	
+			default: return true;
 			}
-		})
-		.map(function(s) {
+		});
+	selectors = _.map(selectors, function(s) {
 			return (isRoot) ? s : '#' + id + ' ' + s;
 		});
 	
