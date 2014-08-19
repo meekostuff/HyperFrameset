@@ -1949,11 +1949,13 @@ function(el) { // IE8, IE9
 }
 
 var hfCustomElements = _.map(hfElements, function(name) { return hfNamespace + '-' + name; }); // only for custom elements, not xml
+var hfXmlElements = _.map(hfElements, function(name) { return hfNamespace + ':' + name; }); // only for xml elements, not custom
 var headElements = words('title meta link style script');
 var bodyElements = hfBodyTag ? [ hfBodyTag ] : words('div section article aside main header footer nav iframe');
 
-function hfCustomElementsPrepare(doc) {
+function hfParserPrepare(doc) {
 	forEach(hfCustomElements, function(tag) { doc.createElement(uc(tag)); });
+	forEach(hfXmlElements, function(tag) { doc.createElement(uc(tag)); });
 }
 
 var HFrameDefinition = (function() {
@@ -2294,7 +2296,7 @@ load: function(url, options) {
 	hframeset.src = url;
 	hframeset.scope = options.scope;
 	var method = 'get';
-	return framer.options.load(method, url, null, { method: method, url: url, prepare: hfCustomElementsPrepare })
+	return framer.options.load(method, url, null, { method: method, url: url, prepare: hfParserPrepare })
 	.then(function(framesetDoc) {
 		hframeset.definition = new HFramesetDefinition(framesetDoc, options);
 	});
