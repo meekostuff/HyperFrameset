@@ -1283,37 +1283,14 @@ return HTMLLoader;
 
 var urlAttributes = URL.attributes = (function() {
 	
-var testURL = 'test.html';
-/*
-  IE <= 7 auto resolves some URL attributes.
-  After setting the attribute to a relative URL you might only be able to read the absolute URL.
-  Because HTMLParser writes into an iframe where contentDocument.URL is about:blank or document.URL
-  relative URLs can be resolved to the wrong URL.
-  canResolve() helps to detect this auto resolve behavior.
-  FIXME: this can be reduced if not supporting IE <= 7
-*/
-var canResolve = (function() { 
-	var a;
-	try {
-		a = document.createElement('<a href="' + testURL +'">');
-		return !!a && a.tagName === 'A';
-	}
-	catch(err) { return false; }
-})();
-
 var AttributeDescriptor = function(tagName, attrName, loads, compound) {
 	var testEl = document.createElement(tagName);
 	var supported = attrName in testEl;
 	var lcAttr = lc(attrName); // NOTE for longDesc, etc
-	var resolves = false;
-	if (supported && canResolve) {
-		testEl = document.createElement('<' + tagName + ' ' + lcAttr + '="' + testURL + '">');
-		resolves = testEl.getAttribute(lcAttr) !== testURL;
-	}
-	var neutralize = !supported ? 0 :
-		!loads && !resolves ? 0 :
+	var neutralize = // 0 is no, -1 is yes, 1 is yes and stay-neutral
+		!supported ? 0 :
+		!loads ? 0 :
 		STAGING_DOCUMENT_IS_INERT ? -1 :
-		!loads ? -1 :
 		1;
 	extend(this, { // attrDesc
 		tagName: tagName,
@@ -1321,30 +1298,28 @@ var AttributeDescriptor = function(tagName, attrName, loads, compound) {
 		loads: loads,
 		compound: compound,
 		supported: supported,
-		resolves: resolves,
-		mustResolve: false,
 		neutralize: neutralize
 	});
 }
 
 extend(AttributeDescriptor.prototype, {
 
-resolve: function(el, baseURL, force, neutralized, stayNeutral) {
+resolve: function(el, baseURL, neutralized, stayNeutral) {
 	var attrName = this.attrName;
 	var url = el.getAttribute(attrName);
 	if (url == null) return;
-	var finalURL = this.resolveURL(url, baseURL, force, neutralized, stayNeutral)
+	var finalURL = this.resolveURL(url, baseURL, neutralized, stayNeutral)
 	if (finalURL !== url) el.setAttribute(attrName, finalURL);
 },
 
-resolveURL: function(url, baseURL, force, neutralized, stayNeutral) {
+resolveURL: function(url, baseURL, neutralized, stayNeutral) {
 	var relURL = trim(url);
 	if (neutralized) {
 		relURL = deneutralizeURL(url);
 		if (relURL === url) logger.warn('Expected neutralized attribute: ' + this.tagName + '@' + this.attrName);
 	}
 	var finalURL = relURL;
-	if (force) switch (relURL.charAt(0)) {
+	switch (relURL.charAt(0)) {
 		case '': // empty, but not null
 		case '#': // NOTE anchor hrefs aren't normalized
 		case '?': // NOTE query hrefs aren't normalized
@@ -1382,10 +1357,7 @@ forEach(words("link@<href script@<src img@<longDesc,<src,+srcset iframe@<longDes
 	});
 });
 
-urlAttributes['script']['src'].mustResolve = true;
-
-function resolveSrcset(urlSet, baseURL, force) { // img@srcset will never be neutralized
-	if (!force) return urlSet;
+function resolveSrcset(urlSet, baseURL) { // img@srcset will never be neutralized
 	var urlList = urlSet.split(/\s*,\s*/); // WARN this assumes URLs don't contain ','
 	forEach(urlList, function(urlDesc, i) {
 		urlList[i] = urlDesc.replace(/^\s*(\S+)(?=\s|$)/, function(all, url) { return baseURL.resolve(url); });
@@ -1396,8 +1368,7 @@ function resolveSrcset(urlSet, baseURL, force) { // img@srcset will never be neu
 urlAttributes['img']['srcset'].resolveURL = resolveSrcset;
 urlAttributes['source']['srcset'].resolveURL = resolveSrcset;
 
-urlAttributes['a']['ping'].resolveURL = function(urlSet, baseURL, force) { // a@ping will never be neutralized
-	if (!force) return urlSet;
+urlAttributes['a']['ping'].resolveURL = function(urlSet, baseURL) { // a@ping will never be neutralized
 	var urlList = urlSet.split(/\s+/);
 	forEach(urlList, function(url, i) {
 		urlList[i] = baseURL.resolve(url);
@@ -1410,11 +1381,9 @@ return urlAttributes;
 })();
 
 /*
-	resolveAll() resolves all URL attributes that *need* to be resolved.
-	It also conditionally deneutralizes URL attributes.
+	resolveAll() resolves all URL attributes and conditionally deneutralizes URL attributes.
 */
-var resolveAll = function(doc, baseURL, isNeutralized, mustResolve) { // NOTE mustResolve is true unless explicitly `false`
-	mustResolve = !(mustResolve === false); 
+var resolveAll = function(doc, baseURL, isNeutralized) {
 
 	each(urlAttributes, function(tag, attrList) {
 		var elts;
@@ -1424,14 +1393,11 @@ var resolveAll = function(doc, baseURL, isNeutralized, mustResolve) { // NOTE mu
 		}
 
 		each(attrList, function(attrName, attrDesc) {
-			var force = !!mustResolve || attrDesc.mustResolve; // WARN scripts MUST be resolved because they stay in the page after panning
 			var neutralized = isNeutralized && !!attrDesc.neutralize;
 			var stayNeutral = isNeutralized && attrDesc.neutralize > 0;
 
-			if (!force && (!neutralized || neutralized && stayNeutral)) return; // if don't have to resolve and neutralization doesn't change then skip
-
 			forEach(getElts(), function(el) {
-				attrDesc.resolve(el, baseURL, force, neutralized, stayNeutral);
+				attrDesc.resolve(el, baseURL, neutralized, stayNeutral);
 			});
 		});
 	});
@@ -1505,8 +1471,7 @@ function prenormalize(doc, details) {
 	});
 
 	var baseURL = URL(details.url);
-	var mustResolve = true; // formerly !(details.mustResolve === false);
-	resolveAll(mustResolve ? doc : doc.head, baseURL, false, mustResolve);
+	resolveAll(doc, baseURL, false);
 
 	return doc;	
 }
@@ -1610,8 +1575,7 @@ function iframeParser(html, details) {
 			doc.head.appendChild(node);
 		});
 
-		var mustResolve = true; // formerly details.mustResolve
-		details.isNeutralized = resolveAll(doc, baseURL, true, mustResolve);
+		details.isNeutralized = resolveAll(doc, baseURL, true);
 		return doc;
 	}
 
@@ -1990,7 +1954,6 @@ options: {
 	load: function(method, url, data, details) {
 		var frameOptions = this;
 		var loader = new HTMLLoader(frameOptions);
-		details.mustResolve = false;
 		return loader.load(method, url, data, details);
 	}
 
