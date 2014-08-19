@@ -725,8 +725,16 @@ document.implementation.createHTMLDocument && function() { // modern browsers
 	doc.removeChild(doc.documentElement);
 	return doc;
 } ||
-document.createDocumentFragment().getElementById && function() { return document.createDocumentFragment(); } || // IE <= 8 
-function() { return document.cloneNode(false); }  // old IE
+document.createDocumentFragment().getElementById && function(options) { // IE <= 8 
+	var doc = document.createDocumentFragment();
+	if (options && options.prepare) options.prepare(doc);
+	return doc;
+} ||
+function(options) {  // old IE
+	var doc = document.cloneNode(false);
+	if (options && options.prepare) options.prepare(doc);
+	return doc;
+}
 
 var createHTMLDocument = document.implementation.createHTMLDocument && function(title) {
 	return document.implementation.createHTMLDocument(title);
@@ -755,9 +763,9 @@ function(titleText) {
 	return doc;
 };
 
-var importDocument = document.importNode ?
-function(srcDoc) {
-	var doc = createDocument();
+var cloneDocument = document.importNode ?
+function(srcDoc, options) {
+	var doc = createDocument(options);
 	var docEl = document.importNode(srcDoc.documentElement, true);
 	doc.appendChild(docEl);
 	polyfill(doc);
@@ -769,8 +777,8 @@ function(srcDoc) {
 	
 	return doc;
 } :
-function(srcDoc) {
-	var doc = createDocument();
+function(srcDoc, options) {
+	var doc = createDocument(options);
 
 	var docEl = importSingleNode(srcDoc.documentElement),
 		docHead = importSingleNode(srcDoc.head),
@@ -793,9 +801,8 @@ function(srcDoc) {
 	 * Work-around this by prepending some benign element to the src <body>
 	 * and removing it from the dest <body> after the copy is done
 	 */
-	// NOTE we can't just use srcBody.cloneNode(true) because html5shiv doesn't work
-	if (HTMLParser.prototype.prepare) HTMLParser.prototype.prepare(doc); // TODO maybe this should be in createDocument
 
+	// NOTE we can't just use srcBody.cloneNode(true) because html5shiv doesn't work
 	var srcBody = srcDoc.body;
 	srcBody.insertBefore(srcDoc.createElement('wbr'), srcBody.firstChild);
 
@@ -1000,7 +1007,7 @@ var DOM = Meeko.DOM || (Meeko.DOM = {});
 extend(DOM, {
 	$id: $id, $$: $$, tagName: tagName, hasAttribute: hasAttribute, forSiblings: forSiblings, matchesElement: matchesElement, firstChild: firstChild,
 	insertNode: insertNode, copyAttributes: copyAttributes, scrollToId: scrollToId, createDocument: createDocument, createHTMLDocument: createHTMLDocument,
-	importDocument: importDocument, importSingleNode: importSingleNode,
+	cloneDocument: cloneDocument, importSingleNode: importSingleNode,
 	addEvent: addEvent, removeEvent: removeEvent, ready: domReady, overrideDefaultAction: overrideDefaultAction,
 	polyfill: polyfill
 });
@@ -1047,6 +1054,7 @@ var HTML_IN_XHR = (function() { // FIXME more testing, especially Webkit. Probab
 
 /*
 	HTML_IN_DOMPARSER indicates if DOMParser supports 'text/html' parsing. Historically only Firefox did.
+	Cross-browser support coming? https://developer.mozilla.org/en-US/docs/Web/API/DOMParser#Browser_compatibility
 */
 var HTML_IN_DOMPARSER = (function() {
 
@@ -1507,6 +1515,12 @@ function iframeParser(html, details) {
 	iframe.name = "meeko-parser";
 	var iframeHTML = '';
 
+	function prepare(doc) { 
+		if (parser.prepare) parser.prepare(doc); // FIXME need a guard on this external call
+		if (details.prepare) details.prepare(doc);
+		return doc;
+	}
+	
 	return pipe(null, [
 	
 	function() {
@@ -1525,8 +1539,7 @@ function iframeParser(html, details) {
 	},
 	
 	function(iframeDoc) {
-		if (parser.prepare) parser.prepare(iframeDoc); // FIXME need a guard on this external call
-		return iframeDoc;
+		return prepare(iframeDoc);
 	},		
 
 	function(iframeDoc) {
@@ -1564,7 +1577,7 @@ function iframeParser(html, details) {
 		});
 		if (baseHref) baseURL = URL(baseURL.resolve(baseHref));
 
-		var doc = importDocument(iframeDoc);
+		var doc = cloneDocument(iframeDoc, { prepare: prepare });
 	
 		document.head.removeChild(iframe);
 
@@ -1886,6 +1899,8 @@ polyfill();
 
 var framer = Meeko.framer = (function(classNamespace) {
 
+var hfElements = words('frame body transform');
+
 // FIXME make hyperframeset element / attr namespacing configurable at run-time
 // FIXME need `display: block` style declaration for hyperframeset elements
 var hfNamespace = 'hf';
@@ -1933,8 +1948,13 @@ function(el) { // IE8, IE9
 	return ns + ':' + tag; // IE8
 }
 
+var hfCustomElements = _.map(hfElements, function(name) { return hfNamespace + '-' + name; }); // only for custom elements, not xml
 var headElements = words('title meta link style script');
 var bodyElements = hfBodyTag ? [ hfBodyTag ] : words('div section article aside main header footer nav iframe');
+
+function hfCustomElementsPrepare(doc) {
+	forEach(hfCustomElements, function(tag) { doc.createElement(uc(tag)); });
+}
 
 var HFrameDefinition = (function() {
 
@@ -2274,7 +2294,7 @@ load: function(url, options) {
 	hframeset.src = url;
 	hframeset.scope = options.scope;
 	var method = 'get';
-	return framer.options.load(method, url, null, { method: method, url: url })
+	return framer.options.load(method, url, null, { method: method, url: url, prepare: hfCustomElementsPrepare })
 	.then(function(framesetDoc) {
 		hframeset.definition = new HFramesetDefinition(framesetDoc, options);
 	});
