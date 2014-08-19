@@ -23,7 +23,7 @@ var window = this;
 var document = window.document;
 
 if (!window.XMLHttpRequest) throw "HyperFrameset requires native XMLHttpRequest";
-if (!document.documentElement) throw "HyperFrameset requires Element#hasAttribute()";
+if (!document.documentElement.hasAttribute) throw "HyperFrameset requires Element#hasAttribute()";
 
 var defaults = { // NOTE defaults also define the type of the associated config option
 	"log_level": "warn",
