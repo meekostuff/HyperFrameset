@@ -553,7 +553,7 @@ extend(Promise, {
 /*
  ### DOM utility functions
  */
-var tagName = function(el) { return el && el.nodeType === 1 ? lc(el.tagName) : ""; }
+var getTagName = function(el) { return el && el.nodeType === 1 ? lc(el.tagName) : ""; }
 
 var $id = function(id, doc) {
 	if (!id) return;
@@ -641,7 +641,7 @@ var forSiblings = function(conf, refNode, conf2, refNode2, fn) {
 var matchesElement = function(selector, node) { // WARN only matches by tagName
 	var tag = lc(selector);
 	var matcher = function(el) {
-		return (el.nodeType == 1 && tagName(el) == tag);
+		return (el.nodeType == 1 && getTagName(el) == tag);
 	}
 	return (node) ? matcher(node) : matcher;
 }
@@ -670,12 +670,12 @@ var insertNode = function(conf, refNode, node) { // like imsertAdjacentHTML but 
 
 var composeNode = function(srcNode) { // document.importNode() NOT available on IE <= 8
 	if (srcNode.nodeType != 1) return;
-	var tag = tagName(srcNode);
+	var tag = getTagName(srcNode);
 	var node = document.createElement(tag);
 	copyAttributes(node, srcNode);
 	switch(tag) {
 	case "title":
-		if (tagName(node) == "title" && node.innerHTML == "") node = null;
+		if (getTagName(node) == "title" && node.innerHTML == "") node = null;
 		else node.innerText = srcNode.innerHTML;
 		break;
 	case "style":
@@ -1005,7 +1005,7 @@ var polyfill = function(doc) { // NOTE more stuff could be added here if *necess
 
 var DOM = Meeko.DOM || (Meeko.DOM = {});
 extend(DOM, {
-	$id: $id, $$: $$, tagName: tagName, hasAttribute: hasAttribute, forSiblings: forSiblings, matchesElement: matchesElement, firstChild: firstChild,
+	$id: $id, $$: $$, getTagName: getTagName, hasAttribute: hasAttribute, forSiblings: forSiblings, matchesElement: matchesElement, firstChild: firstChild,
 	insertNode: insertNode, copyAttributes: copyAttributes, scrollToId: scrollToId, createDocument: createDocument, createHTMLDocument: createHTMLDocument,
 	cloneDocument: cloneDocument, importSingleNode: importSingleNode,
 	addEvent: addEvent, removeEvent: removeEvent, ready: domReady, overrideDefaultAction: overrideDefaultAction,
@@ -1104,7 +1104,7 @@ var IE9_SOURCE_ELEMENT_BUG = (function() {
 	var div = doc.createElement('div');
 	frag.appendChild(div);
 	div.innerHTML = '<div><source /><div>';
-	return 'source' !== tagName(div.firstChild.firstChild);
+	return 'source' !== getTagName(div.firstChild.firstChild);
 })();
 
 
@@ -1938,9 +1938,9 @@ var hfAttr = function(el, attr, value) {
 	el.setAttribute(hfAttrName, value);
 }
 
-var hfTagName = !document.documentElement.scopeName || hfTagNamespacing !== 'xml' ? tagName :
+var hfTagName = !document.documentElement.scopeName || hfTagNamespacing !== 'xml' ? getTagName :
 function(el) { // IE8, IE9
-	var tag = tagName(el);
+	var tag = getTagName(el);
 	if (!tag) return tag;
 	var ns = lc(el.scopeName);
 	if (!ns || ns === 'html') return tag;
@@ -2430,7 +2430,7 @@ function separateHead(dstDoc, isFrameset, afterRemove) { // FIXME more callback 
 	else forSiblings("after", selfMarker, remove);
 	
 	function remove(node) {
-		if (tagName(node) == "script" && (!node.type || node.type.match(/^text\/javascript/i))) return;
+		if (getTagName(node) == "script" && (!node.type || node.type.match(/^text\/javascript/i))) return;
 		dstHead.removeChild(node);
 		if (afterRemove) afterRemove(node);
 	}
@@ -2447,7 +2447,7 @@ function mergeHead(dstDoc, srcHead, isFrameset, afterRemove) { // FIXME more cal
 
 	// remove duplicate scripts from srcHead
 	forSiblings ("starting", srcHead.firstChild, function(node) {
-		switch(tagName(node)) {
+		switch(getTagName(node)) {
 		case "script":
 			if (every($$("script", dstHead), function(el) {
 				return baseURL.resolve(el.src) != node.src; // FIXME @src should already be resolved to absURL
@@ -2461,7 +2461,7 @@ function mergeHead(dstDoc, srcHead, isFrameset, afterRemove) { // FIXME more cal
 	forSiblings ("starting", srcHead.firstChild, function(srcNode) {
 		srcHead.removeChild(srcNode);
 		if (srcNode.nodeType != 1) return;
-		switch (tagName(srcNode)) {
+		switch (getTagName(srcNode)) {
 		case "title":
 			if (!srcNode.innerHTML) return; // IE will add a title even if non-existant
 			if (isFrameset) return; // ignore <title> in frameset. FIXME what if topic content has no <title>?
@@ -2479,7 +2479,7 @@ function mergeHead(dstDoc, srcHead, isFrameset, afterRemove) { // FIXME more cal
 		}
 		if (isFrameset) insertNode('beforebegin', selfMarker, srcNode);
 		else insertNode('beforeend', dstHead, srcNode);
-		if (tagName(srcNode) == "link") srcNode.href = srcNode.getAttribute("href"); // Otherwise <link title="..." /> stylesheets don't work on Chrome
+		if (getTagName(srcNode) == "link") srcNode.href = srcNode.getAttribute("href"); // Otherwise <link title="..." /> stylesheets don't work on Chrome
 	});
 }
 
@@ -2499,7 +2499,7 @@ function getFramesetMarker(doc) {
 	if (!doc) doc = document;
 	var marker = firstChild(doc.head, function(el) {
 		return el.nodeType == 1 &&
-			tagName(el) == "link" &&
+			getTagName(el) == "link" &&
 			framesetRelRegex.test(el.rel);
 	});
 	return marker;
@@ -2510,7 +2510,7 @@ function getSelfMarker(doc) {
 	if (!doc) doc = document;
 	var marker = firstChild(doc.head, function(el) {
 		return el.nodeType == 1 &&
-			tagName(el) == "link" &&
+			getTagName(el) == "link" &&
 			selfRelRegex.test(el.rel);
 	});
 	return marker;
@@ -2635,7 +2635,7 @@ return bfScheduler.now(function() {
 		}
 		
 		function resolveAttr(el, attrName) {
-			if (tagName(el) != 'script') return _resolveAttr(el, attrName);		
+			if (getTagName(el) != 'script') return _resolveAttr(el, attrName);		
 			var scriptType = el.type;
 			var isJS = (!scriptType || /^text\/javascript/i.test(scriptType));
 			if (isJS) el.type = "text/javascript?complete"; // FIXME not needed any more - IE6 and IE7 will re-execute script if @src is modified (even to same path)
@@ -2643,7 +2643,7 @@ return bfScheduler.now(function() {
 		}
 		
 		forSiblings("starting", document.head.firstChild, function(node) {
-			switch (tagName(node)) {
+			switch (getTagName(node)) {
 			case 'script':
 				resolveAttr(node, 'src');
 				break;
@@ -2669,8 +2669,8 @@ onClick: function(e) {
 	if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return; // FIXME do these always trigger modified click behavior??
 
 	// Find closest <a> to e.target
-	for (var target=e.target; target!=document; target=target.parentNode) if (tagName(target) == "a") break;
-	if (tagName(target) != "a") return; // only handling hyperlink clicks
+	for (var target=e.target; target!=document; target=target.parentNode) if (getTagName(target) == "a") break;
+	if (getTagName(target) != "a") return; // only handling hyperlink clicks
 	var href = target.getAttribute("href");
 	if (!href) return; // not really a hyperlink
 

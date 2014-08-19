@@ -187,7 +187,7 @@ if (isSet('no_boot')) return;
  ### DOM utilities
  */
 
-function tagName(el) { return el && el.nodeType === 1 ? el.tagName.toLowerCase() : ""; }
+function getTagName(el) { return el && el.nodeType === 1 ? el.tagName.toLowerCase() : ""; }
 
 function $$(selector, context) {
 	context = context || document;
@@ -564,7 +564,7 @@ test: function() { // return `false` for strict, otherwise warning message
 	if (some(nodeList, function(node) { // return true if invalid node
 		if (node.nodeType !== 1) return false; // comments and text-nodes are ok
 		if (node === bootScript) return false; // boot-script is ok. TODO should be last node in <head>
-		var tag = tagName(node);
+		var tag = getTagName(node);
 		if (tag === 'title' && node.firstChild === null) return false; // IE6 adds a dummy <title>
 		if (tag !== 'meta') return true; 
 		if (node.httpEquiv || node.getAttribute('charset')) return false; // <meta http-equiv> are ok
@@ -660,7 +660,7 @@ if (isSet('no_style')) {
 	domReady(function() {
 		var parent = selfMarker.parentNode;
 		nextSiblings(selfMarker, function(node) {
-			switch (tagName(node)) {
+			switch (getTagName(node)) {
 			case 'style': break;
 			case 'link':
 				if (/\bSTYLESHEET\b/i.test(node.rel))  break;
@@ -721,7 +721,7 @@ function start() {
 			empty(dstHead);
 			nextSiblings(selfMarker, function(srcNode) {
 				var node = srcNode.cloneNode(true);
-				switch (tagName(srcNode)) {
+				switch (getTagName(srcNode)) {
 				case '':
 					break;
 				case 'script':
