@@ -1926,11 +1926,11 @@ function getPrefix(namespacing) {
 	}
 }
 
-hfFrameTag = hfTagNamespacing ? (hfTagPrefix + 'frame') : '';
+var hfFrameTag = hfTagNamespacing ? (hfTagPrefix + 'frame') : '';
 var hfFrameSelector = hfTagNamespacing ? hfTagPrefix.replace(':', '\\:') + 'frame' :
 	'[' + hfAttrPrefix.replace(':', '\\:') + 'role=frame' + ']';
 
-hfBodyTag = hfTagNamespacing ? (hfTagPrefix + 'body') : '';
+var hfBodyTag = hfTagNamespacing ? (hfTagPrefix + 'body') : '';
 
 var hfAttr = function(el, attr, value) {
 	var hfAttrName = hfAttrPrefix + attr;
