@@ -38,8 +38,8 @@ var Meeko = window.Meeko || (window.Meeko = {});
  ### Utility functions
  */
 
-var uc = function(str) { return str.toUpperCase(); }
-var lc = function(str) { return str.toLowerCase(); }
+var uc = function(str) { return str ? str.toUpperCase() : ''; }
+var lc = function(str) { return str ? str.toLowerCase() : ''; }
 
 var contains = function(a, item) {
 	for (var n=a.length, i=0; i<n; i++) if (a[i] === item) return true;
@@ -102,7 +102,9 @@ function(str) { return str.replace(/^\s+/, '').replace(/\s+$/, ''); }
 
 var _ = Meeko.stuff = {};
 extend(_, {
-	uc: uc, lc: lc, contains: contains, forEach: forEach, some: some, every: every, map: map, filter: filter, words: words, each: each, extend: extend, config: config, trim: trim
+	uc: uc, lc: lc, trim: trim, words: words, // string
+	contains: contains, remove: remove, forEach: forEach, some: some, every: every, map: map, filter: filter, // array
+	each: each, extend: extend, config: config // object
 });
 
 
@@ -570,73 +572,47 @@ var $id = function(id, doc) {
 	}
 }
 
-var $ = document.querySelector ?
-function(selector, context) {
+var $ = function(selector, context) { // WARN assumes document.querySelector
 	context = context || document;
 	return context.querySelector(selector);
-} :
-function(selector, context) { // WARN only selects by tagName
-	context = context || document;
-	try { 
-		var coll = context.getElementsByTagName(selector);
-		return coll[0];
-	}
-	catch (error) {
-		throw (selector + " can only be a tagName selector in $()");
-	}
 }
 
-var $$ = document.querySelectorAll ?
-function(selector, context) {
+var $$ = function(selector, context) { // WARN assumes document.querySelectorAll
 	context = context || document;
 	var nodeList = [];
 	var coll = context.querySelectorAll(selector);
 	for (var i=0, n=coll.length; i<n; i++) nodeList[i] = coll[i];
 	return nodeList;
-} :
-function(selector, context) { // WARN only selects by tagName
-	context = context || document;
-	var nodeList = [];
-	try { 
-		var coll = context.getElementsByTagName(selector);
-		for (var i=0, n=coll.length; i<n; i++) nodeList[i] = coll[i];
-	}
-	catch (error) {
-		throw (selector + " can only be a tagName selector in $$()");
-	}
-	return nodeList;
 }
 
-var forSiblings = function(conf, refNode, conf2, refNode2, fn) {
-	if (!refNode || !refNode.parentNode) return;
-	if (typeof conf2 === 'function') {
-		fn = conf2;
-		conf2 = null;
-		refNode2 = null;
-	}
-	var node, stopNode, first = refNode.parentNode.firstChild;
+var siblings = function(conf, refNode, conf2, refNode2) {
 	
 	conf = lc(conf);
 	if (conf2) {
 		conf2 = lc(conf2);
-		if (conf === 'ending' || conf === 'before') throw 'forSiblings startNode looks like stopNode';
-		if (conf2 === 'starting' || conf2 === 'after') throw 'forSiblings stopNode looks like startNode';
+		if (conf === 'ending' || conf === 'before') throw 'siblings() startNode looks like stopNode';
+		if (conf2 === 'starting' || conf2 === 'after') throw 'siblings() stopNode looks like startNode';
 	}
 	
+	var nodeList = [];
+	if (!refNode || !refNode.parentNode) return nodeList;
+	var node, stopNode, first = refNode.parentNode.firstChild;
+
 	switch (conf) {
 	case "starting": node = refNode; break;
 	case "after": node = refNode.nextSibling; break;
 	case "ending": node = first; stopNode = refNode.nextSibling; break;
 	case "before": node = first; stopNode = refNode; break;
-	default: throw conf + " is not a valid configuration in forSiblings";
+	default: throw conf + " is not a valid configuration in siblings()";
 	}
 	if (conf2) switch (conf2) {
 	case "ending": stopNode = refNode2.nextSibling; break;
 	case "before": stopNode = refNode2; break;
 	}
 	
-	if (!node) return;
-	for (var next; next=node && node.nextSibling, node && node!=stopNode; node=next) fn(node);
+	if (!node) return nodeList; // FIXME is this an error??
+	for (;node && node!==stopNode; node=node.nextSibling) nodeList.push(node);
+	return nodeList;
 }
 var matchesElement = function(selector, node) { // WARN only matches by tagName
 	var tag = lc(selector);
@@ -668,10 +644,12 @@ var insertNode = function(conf, refNode, node) { // like imsertAdjacentHTML but 
 	return refNode;
 }
 
-var composeNode = function(srcNode) { // document.importNode() NOT available on IE <= 8
+var composeNode = function(srcNode, context) { // document.importNode() NOT available on IE <= 8
+	if (!context) context = document;
+	if (context.nodeType !== 9 && context.nodeType !== 11) throw 'Non-document context in composeNode()';
 	if (srcNode.nodeType != 1) return;
 	var tag = getTagName(srcNode);
-	var node = document.createElement(tag);
+	var node = context.createElement(tag);
 	copyAttributes(node, srcNode);
 	switch(tag) {
 	case "title":
@@ -679,7 +657,7 @@ var composeNode = function(srcNode) { // document.importNode() NOT available on 
 		else node.innerText = srcNode.innerHTML;
 		break;
 	case "style":
-		var frag = document.createDocumentFragment();
+		var frag = context.createDocumentFragment();
 		frag.appendChild(node);
 		node.styleSheet.cssText = srcNode.styleSheet.cssText;
 		frag.removeChild(node);
@@ -714,7 +692,7 @@ var removeAttributes = function(node) {
 		attrs.push(attr.name);
 	});
 	forEach(attrs, function(attrName) {
-		node.removeAttribute(attrName); // FIXME does this work for @class?
+		node.removeAttribute(attrName); // WARN might not work for @class on IE <= 7
 	});
 	return node;
 }
@@ -780,14 +758,14 @@ function(srcDoc, options) {
 function(srcDoc, options) {
 	var doc = createDocument(options);
 
-	var docEl = importSingleNode(srcDoc.documentElement),
-		docHead = importSingleNode(srcDoc.head),
-		docBody = importSingleNode(srcDoc.body);
+	var docEl = importSingleNode(srcDoc.documentElement, doc),
+		docHead = importSingleNode(srcDoc.head, doc),
+		docBody = importSingleNode(srcDoc.body, doc);
 
 	docEl.appendChild(docHead);
 	for (var srcNode=srcDoc.head.firstChild; srcNode; srcNode=srcNode.nextSibling) {
 		if (srcNode.nodeType != 1) continue;
-		var node = importSingleNode(srcNode);
+		var node = importSingleNode(srcNode, doc);
 		if (node) docHead.appendChild(node);
 	}
 
@@ -815,8 +793,10 @@ function(srcDoc, options) {
 }
 
 var importSingleNode = document.importNode ? // NOTE only for single nodes, especially elements in <head>. 
-function(srcNode) { 
-	return document.importNode(srcNode, false);
+function(srcNode, context) {
+	if (!context) context = document;
+	if (context.nodeType !== 9 && context.nodeType !== 11) throw 'Non-document context for importSingleNode()';
+	return context.importNode(srcNode, false);
 } :
 composeNode; 
 
@@ -1005,10 +985,13 @@ var polyfill = function(doc) { // NOTE more stuff could be added here if *necess
 
 var DOM = Meeko.DOM || (Meeko.DOM = {});
 extend(DOM, {
-	$id: $id, $$: $$, getTagName: getTagName, hasAttribute: hasAttribute, forSiblings: forSiblings, matchesElement: matchesElement, firstChild: firstChild,
-	insertNode: insertNode, copyAttributes: copyAttributes, scrollToId: scrollToId, createDocument: createDocument, createHTMLDocument: createHTMLDocument,
-	cloneDocument: cloneDocument, importSingleNode: importSingleNode,
-	addEvent: addEvent, removeEvent: removeEvent, ready: domReady, overrideDefaultAction: overrideDefaultAction,
+	getTagName: getTagName, hasAttribute: hasAttribute, matchesElement: matchesElement, // properties
+	$id: $id, $: $, $$: $$, siblings: siblings, firstChild: firstChild, // selections
+	copyAttributes: copyAttributes, removeAttributes: removeAttributes, // attrs
+	composeNode: composeNode, importSingleNode: importSingleNode, insertNode: insertNode, // nodes
+	ready: domReady, addEvent: addEvent, removeEvent: removeEvent, overrideDefaultAction: overrideDefaultAction, // events
+	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
+	scrollToId: scrollToId,
 	polyfill: polyfill
 });
 
@@ -1087,7 +1070,12 @@ var STAGING_DOCUMENT_IS_INERT = (function() {
 	if (img.complete) return false; // paranoia
 	img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=';
 	if (img.width) return false; // IE9, Opera-12 will have width == 1 / height == 1 
-	if (img.complete) return false; // Opera-12 sets this immediately. IE9 sets it after a delay. 
+	if (img.complete) return false; // Opera-12 sets this immediately. IE9 sets it after a delay.
+	// Sometimes the img check isn't ready on IE9, so one more check
+	var script = doc.createElement('script');
+	script.text = ';'
+	doc.head.appendChild(script);
+	if (script.readyState === 'complete') return false; // IE9
 	return true; // Presumably IE10
 
 })();
@@ -1418,17 +1406,13 @@ if (IE9_SOURCE_ELEMENT_BUG) {
 var _resolveAll = resolveAll;
 resolveAll = function(doc) {
 	
-	var elts = $$('img', doc);
-	for (var i=elts.length-1; i>=0; i--) {
-		var el = elts[i];
+	forEach($$('img[meeko-tag]', doc), function(el) {
 		var realTag = el.getAttribute('meeko-tag');
-		if (realTag) {
-			el.removeAttribute('meeko-tag');
-			var realEl = doc.createElement(realTag);
-			copyAttributes(realEl, el);
-			el.parentNode.replaceChild(realEl, el);
-		}
-	}
+		el.removeAttribute('meeko-tag');
+		var realEl = doc.createElement(realTag);
+		copyAttributes(realEl, el);
+		el.parentNode.replaceChild(realEl, el);
+	});
 	
 	return _resolveAll.apply(null, arguments);
 }
@@ -2004,7 +1988,7 @@ init: function(el) {
 		mainSelector: hfAttr(el, 'main') // TODO consider using a hash in `@src`
     });
 	var bodies = frameDef.bodies = [];
-	forSiblings("starting", el.firstChild, function(node) {
+	forEach(siblings("starting", el.firstChild), function(node) {
 		var tag = hfTagName(node);
 		if (!tag) return;
 		if (contains(headElements, tag)) return; // ignore typical <head> elements
@@ -2428,8 +2412,8 @@ function separateHead(dstDoc, isFrameset, afterRemove) { // FIXME more callback 
 
 	var selfMarker = getSelfMarker(dstDoc);
 	// remove frameset / page elements except for <script type=text/javascript>
-	if (isFrameset) forSiblings("after", framesetMarker, "before", selfMarker, remove);
-	else forSiblings("after", selfMarker, remove);
+	if (isFrameset) forEach(siblings("after", framesetMarker, "before", selfMarker), remove);
+	else forEach(siblings("after", selfMarker), remove);
 	
 	function remove(node) {
 		if (getTagName(node) == "script" && (!node.type || node.type.match(/^text\/javascript/i))) return;
@@ -2448,7 +2432,7 @@ function mergeHead(dstDoc, srcHead, isFrameset, afterRemove) { // FIXME more cal
 	separateHead(dstDoc, isFrameset, afterRemove);
 
 	// remove duplicate scripts from srcHead
-	forSiblings ("starting", srcHead.firstChild, function(node) {
+	forEach(siblings("starting", srcHead.firstChild), function(node) {
 		switch(getTagName(node)) {
 		case "script":
 			if (every($$("script", dstHead), function(el) {
@@ -2460,7 +2444,7 @@ function mergeHead(dstDoc, srcHead, isFrameset, afterRemove) { // FIXME more cal
 		srcHead.removeChild(node);
 	});
 
-	forSiblings ("starting", srcHead.firstChild, function(srcNode) {
+	forEach(siblings("starting", srcHead.firstChild), function(srcNode) {
 		srcHead.removeChild(srcNode);
 		if (srcNode.nodeType != 1) return;
 		switch (getTagName(srcNode)) {
@@ -2488,7 +2472,7 @@ function mergeHead(dstDoc, srcHead, isFrameset, afterRemove) { // FIXME more cal
 function frameset_insertBody(dstDoc, srcBody) {
 	var dstBody = dstDoc.body;
 	var content = dstBody.firstChild;
-	forSiblings ("starting", srcBody.firstChild, function(node) {
+	forEach(siblings("starting", srcBody.firstChild), function(node) {
 		insertNode("beforebegin", content, node);
 	});
 }
@@ -2644,7 +2628,7 @@ return bfScheduler.now(function() {
 			_resolveAttr(el, attrName);
 		}
 		
-		forSiblings("starting", document.head.firstChild, function(node) {
+		forEach(siblings("starting", document.head.firstChild), function(node) {
 			switch (getTagName(node)) {
 			case 'script':
 				resolveAttr(node, 'src');
@@ -3016,14 +3000,14 @@ function transformNode(node, provider, context, variables) {
 	if (nodeType === 1) transformSingleElement(node, provider, context, variables);
 	if (!deep) return node;
 
-	for (var current=node.firstChild, next=current&&current.nextSibling; current; current=next, next=current&&current.nextSibling) {
-		if (current.nodeType !== 1) continue;
+	forEach(siblings("starting", node.firstChild), function(current) {
+		if (current.nodeType !== 1) return;
 		var newChild = transform(current, provider, context, variables);
 		if (newChild !== current) {
 			if (newChild && newChild.nodeType) node.replaceChild(newChild, current);
 			else node.removeChild(current); // FIXME warning if newChild not empty
 		}
-	}
+	});
 	return node;
 }
 

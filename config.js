@@ -4,7 +4,6 @@ var logger = Meeko.logger;
 var _ = Meeko.stuff;
 var DOM = Meeko.DOM, $id = DOM.$id, $$ = DOM.$$;
 var URL = Meeko.URL, baseURL = URL(document.URL);
-function toArray(list) { var a = []; for (var n=list.length, i=0; i<n; i++) a[i] = list[i]; return a; }
 
 var framesetURL, scope;
 
@@ -15,7 +14,7 @@ Meeko.framer.config({
 		- to provide optimal layout
 	+ browser
 		- to give minimal support to old browsers
-	+ a theme setting from cookie or localStorage
+	+ a theme setting from localStorage
 		- allows you to test a frameset-document on the live site
 	 */
 	
@@ -42,7 +41,6 @@ function getFramesetURL(doc) {
 }
 
 function getFramesetLink(doc) {
-	var matchingLinks = [];
 	var link, specificity = 0;
 	_.forEach($$("link", doc.head), function(el) {
 		var tmp, sp = 0;
