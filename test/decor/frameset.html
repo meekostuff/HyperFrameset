@@ -18,12 +18,12 @@ nav li { display: inline; list-style: outside none; margin: 0.1em; padding: 0.25
 #panner { background-color: #77ff77; color: #ffffff; text-align: center; }
 .hidden { display: none; }
 </style>
-<script for="frameset">
+<script for="hf:frameset">
 ({
 	getTarget: function(url, details) { return 'hf_main'; }
 })
 </script>
-<script for="frame">
+<script for="hf:frame">
 ({
 	entering: function(msg) { document.getElementById('panner').className = ''; }
 })

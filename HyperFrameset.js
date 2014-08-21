@@ -2410,12 +2410,14 @@ render: function() {
 			try {
 				forOptions = (Function('return (' + script.text + ');'))(); // FIXME is script.text cross-platform??
 			}
-			catch(err) { return; }
+			catch(err) { return; } // FIXME log a warning
+			
+			var nsPrefix = hframeset.definition.cdom.prefix;
 			switch(forAttr) {
-			case 'frameset':
+			case nsPrefix + 'frameset':
 				framer.frameset.definition.config(forOptions);
 				break;
-			case 'frame':
+			case nsPrefix + 'frame':
 				config(HFrameDefinition.options, forOptions);
 				break;
 			default:
