@@ -745,6 +745,11 @@ var cloneDocument = document.importNode ?
 function(srcDoc, options) {
 	var doc = createDocument(options);
 	var docEl = document.importNode(srcDoc.documentElement, true);
+	if (srcDoc.namespaces) { // IE8, IE9
+		forEach(srcDoc.namespaces, function(ns) {
+			docEl.setAttribute('xmlns:' + ns.name, ns.urn);
+		});
+	}
 	doc.appendChild(docEl);
 	polyfill(doc);
 
@@ -761,6 +766,12 @@ function(srcDoc, options) {
 	var docEl = importSingleNode(srcDoc.documentElement, doc),
 		docHead = importSingleNode(srcDoc.head, doc),
 		docBody = importSingleNode(srcDoc.body, doc);
+
+	if (srcDoc.namespaces) { // IE8, IE9
+		forEach(srcDoc.namespaces, function(ns) {
+			docEl.setAttribute('xmlns:' + ns.name, ns.urn);
+		});
+	}
 
 	docEl.appendChild(docHead);
 	for (var srcNode=srcDoc.head.firstChild; srcNode; srcNode=srcNode.nextSibling) {
@@ -1883,69 +1894,99 @@ polyfill();
 
 var framer = Meeko.framer = (function(classNamespace) {
 
-var hfElements = words('frame body transform');
+var CustomDOM = (function() {
 
-// FIXME make hyperframeset element / attr namespacing configurable at run-time
-// FIXME need `display: block` style declaration for hyperframeset elements
-var hfNamespace = 'hf';
-var hfTagNamespacing = 'custom'; // NOTE set this manually to 'custom' or 'xml' or ''
-var hfAttrNamespacing = ''; // NOTE optionally set this manually to 'custom' or 'xml' or ''
-
-if (!hfAttrNamespacing) hfAttrNamespacing = (function(hfTagNamespacing) {
-	switch (hfTagNamespacing) {
-	case 'custom': return '';
-	case 'xml': return '';
-	case '': return 'custom';
-	}
-})(hfTagNamespacing);
-
-var hfTagPrefix = getPrefix(hfTagNamespacing);
-var hfAttrPrefix = getPrefix(hfAttrNamespacing);
-
-function getPrefix(namespacing) {
-	switch(namespacing) {
-	case 'custom': return hfNamespace + '-';
-	case 'xml': return hfNamespace + ':';
-	case '': default: return '';
-	}
+function CustomDOM(options) {
+	var style = options.namespaceStyle = lc(options.namespaceStyle);
+	if (!CustomDOM.separator[style]) throw 'Unexpected namespaceStyle: ' + style;
+	var ns = options.namespace = lc(options.namespace);
+	if (!ns) throw 'Unexpected namespace: ' + ns;
+	this.init(options);
 }
 
-var hfFrameTag = hfTagNamespacing ? (hfTagPrefix + 'frame') : '';
-var hfFrameSelector = hfTagNamespacing ? hfTagPrefix.replace(':', '\\:') + 'frame' :
-	'[' + hfAttrPrefix.replace(':', '\\:') + 'role=frame' + ']';
+CustomDOM.separator = {
+	'vendor': '-',
+	'xml': ':'
+};
 
-var hfBodyTag = hfTagNamespacing ? (hfTagPrefix + 'body') : '';
-
-var hfAttr = function(el, attr, value) {
-	var hfAttrName = hfAttrPrefix + attr;
-	if (typeof value === 'undefined') return el.getAttribute(hfAttrName);
-	el.setAttribute(hfAttrName, value);
+CustomDOM.getNamespaces = function(doc) { // NOTE modelled on IE8, IE9 document.namespaces interface
+	var namespaces = [];
+	var xmlnsPrefix = 'xmlns:';
+	var xmlnsLength = xmlnsPrefix.length;
+	forEach(doc.documentElement.attributes, function(attr) {
+		var fullName = lc(attr.name);
+		if (fullName.indexOf(xmlnsPrefix) !== 0) return;
+		var name = fullName.substr(xmlnsLength);
+		namespaces.push({
+			name: name,
+			urn: attr.value
+		});
+	});
+	return namespaces;
 }
 
-var hfTagName = !document.documentElement.scopeName || hfTagNamespacing !== 'xml' ? getTagName :
-function(el) { // IE8, IE9
+extend(CustomDOM.prototype, {
+	
+init: function(options) {
+	var cdom = this;
+	if (options) config(cdom, options);
+	var separator = CustomDOM.separator[cdom.namespaceStyle];
+	cdom.prefix = cdom.namespace + separator;
+	cdom.selectorPrefix = cdom.namespace + (separator === ':' ? '\\:' : separator);
+},
+
+attr: function(el, attrName, value) {
+	if (typeof value === 'undefined') return el.getAttribute(attrName);
+	el.setAttribute(attrName, value);
+},
+
+match$: function(el, selector) {
+	var cdom = this;
 	var tag = getTagName(el);
-	if (!tag) return tag;
-	var ns = lc(el.scopeName);
-	if (!ns || ns === 'html') return tag;
-	if (tag.indexOf(ns + ':') === 0) return tag; // IE9
-	return ns + ':' + tag; // IE8
+	if (!tag) return false;
+	selector = lc(selector);
+	var fullSelector = cdom.prefix + selector;
+	if (tag === fullSelector) return true; // modern browsers
+	if (cdom.namespaceStyle !== 'xml') return false;
+	var scopeName = el.scopeName; // IE8 xml
+	if (!scopeName) return false;
+	scopeName = lc(scopeName);
+	if (scopeName === cdom.namespace) return true;
+	return false;
+},
+
+$$: function(selector, context) {
+	var cdom = this;
+	selector = cdom.selectorPrefix + selector;
+	return DOM.$$(selector, context);
 }
 
-var hfCustomElements = _.map(hfElements, function(name) { return hfNamespace + '-' + name; }); // only for custom elements, not xml
-var hfXmlElements = _.map(hfElements, function(name) { return hfNamespace + ':' + name; }); // only for xml elements, not custom
-var headElements = words('title meta link style script');
-var bodyElements = hfBodyTag ? [ hfBodyTag ] : words('div section article aside main header footer nav iframe');
+});
+
+return CustomDOM;
+
+})();
+
+var hfTags = words('frame body transform');
+var hfDefaults = {
+	namespace: 'hf',
+	namespaceStyle: 'vendor'
+}
+
+var hfVendorStyleTags = _.map(hfTags, function(tag) { return hfDefaults.namespace + '-' + tag; }); // only for vendor-style elements
+var hfXmlStyleTags = _.map(hfTags, function(tag) { return hfDefaults.namespace + ':' + tag; }); // only for xml-style elements
+var hfHeadTags = words('title meta link style script');
 
 function hfParserPrepare(doc) {
-	forEach(hfCustomElements, function(tag) { doc.createElement(uc(tag)); });
-	forEach(hfXmlElements, function(tag) { doc.createElement(uc(tag)); });
+	forEach(hfVendorStyleTags, function(tag) { doc.createElement(uc(tag)); });
+	forEach(hfXmlStyleTags, function(tag) { doc.createElement(uc(tag)); });
 }
 
 var HFrameDefinition = (function() {
 
-function HFrameDefinition(el) {
+function HFrameDefinition(el, frameset) {
 	if (!el) return; // in case of inheritance
+	this.frameset = frameset;
 	this.init(el);
 }
 
@@ -1980,20 +2021,22 @@ config: function(options) {
 
 init: function(el) {
     var frameDef = this;
+	var frameset = frameDef.frameset;
+	var cdom = frameset.cdom;
 	extend(frameDef, {
 		options: extend({}, HFrameDefinition.options),
 		element: el,
 		id: el.id,
-		type: hfAttr(el, 'type'),
-		mainSelector: hfAttr(el, 'main') // TODO consider using a hash in `@src`
+		type: cdom.attr(el, 'type'),
+		mainSelector: cdom.attr(el, 'main') // TODO consider using a hash in `@src`
     });
 	var bodies = frameDef.bodies = [];
 	forEach(siblings("starting", el.firstChild), function(node) {
-		var tag = hfTagName(node);
+		var tag = getTagName(node);
 		if (!tag) return;
-		if (contains(headElements, tag)) return; // ignore typical <head> elements
-		if (contains(bodyElements, tag)) {
-			bodies.push(new HBodyDefinition(node));
+		if (contains(hfHeadTags, tag)) return; // ignore typical <head> elements
+		if (cdom.match$(node, 'body')) {
+			bodies.push(new HBodyDefinition(node, frameset));
 			return;
 		}
 		logger.warn('Unexpected element in HFrame: ' + tag);
@@ -2003,6 +2046,8 @@ init: function(el) {
 
 render: function(doc, conditions) {
 	var frameDef = this;
+	var frameset = frameDef.frameset;
+	var cdom = frameset.cdom;
 	var bodyDef = frameDef.bodies[0]; // FIXME use .condition
 	var options = {
 		mainSelector: frameDef.mainSelector,
@@ -2019,8 +2064,9 @@ return HFrameDefinition;
 
 var HBodyDefinition = (function() {
 	
-function HBodyDefinition(el) {
+function HBodyDefinition(el, frameset) {
 	if (!el) return; // in case of inheritance
+	this.frameset = frameset;
 	this.init(el);
 }
 
@@ -2028,11 +2074,13 @@ extend(HBodyDefinition.prototype, {
 
 init: function(el) {
 	var bodyDef = this;
+	var frameset = bodyDef.frameset;
+	var cdom = frameset.cdom;
 	extend(bodyDef, {
 		element: el,
-		condition: hfAttr(el, 'condition') || 'success',
-		transform: hfAttr(el, 'transform') || 'main',
-		format: hfAttr(el, 'format')
+		condition: cdom.attr(el, 'condition') || 'success',
+		transform: cdom.attr(el, 'transform') || 'main',
+		format: cdom.attr(el, 'format')
     });
 	if (bodyDef.transform === 'main') bodyDef.format = '';
 	var frag = document.createDocumentFragment(); // FIXME which doc??
@@ -2044,6 +2092,8 @@ init: function(el) {
 
 render: function(doc, options) {
 	var bodyDef = this;
+	var frameset = bodyDef.frameset;
+	var cdom = frameset.cdom;
 	var srcNode = doc;
 	if (options.mainSelector) srcNode = $(options.mainSelector, doc);
 	var decoder;
@@ -2062,7 +2112,7 @@ render: function(doc, options) {
 		body.appendChild(output);
 		result = {
 			element: body,
-			frames: $$(hfFrameSelector, body)
+			frames: cdom.$$('frame', body)
 		}
 	}
 	else {
@@ -2105,36 +2155,44 @@ config: function(options) {
 
 init: function(doc, settings) {
 	var framesetDef = this;
-
 	extend(framesetDef, {
 		options: extend({}, HFramesetDefinition.options),
 		frames: {} // all hyperframe definitions. Indexed by @id (which may be auto-generated)
 	});
+
+	var cdom;
+	var xmlns;
+	var namespaces = CustomDOM.getNamespaces(doc);
+	_.some(namespaces, function(ns) {
+		if (lc(ns.urn) !== 'hyperframeset') return false;
+		xmlns = ns.name;
+		return true;
+	});
+	
+	if (xmlns) cdom = new CustomDOM({
+		namespace: xmlns,
+		namespaceStyle: 'xml'
+	});
+	else cdom = new CustomDOM(hfDefaults);
+	framesetDef.cdom = cdom;
+	
 	// NOTE first rebase scope: urls
 	var scopeURL = URL(settings.scope);
 	rebase(doc, scopeURL);
-
-	_.forEach($$('script', doc.body), function(script) {
-		if (script.type && lc(script.type) !== 'text/javascript') return;
-		if (hfTagName(script.parentNode) === hfFrameTag) return;
-		logger.warn('<script> in frameset <body> is not child of <' + hfFrameTag + '>');
-		script.parentNode.removeChild(script);
-	});
-	
 	
 	framesetDef.document = doc;
-	var frameElts = $$(hfFrameSelector, doc);
+	var frameElts = cdom.$$('frame', doc);
 	var frameRefElts = [];
 	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
 		// NOTE first rebase @src with scope: urls
-		var src = hfAttr(el, 'src');
+		var src = cdom.attr(el, 'src');
 		if (src) {
 			var newSrc = rebaseURL(src, scopeURL);
-			if (newSrc != src) hfAttr(el, 'src', newSrc);
+			if (newSrc != src) cdom.attr(el, 'src', newSrc);
 		}
 		
 		var id = el.getAttribute('id');
-		var defId = hfAttr(el, 'def');
+		var defId = cdom.attr(el, 'def');
 		if (defId && defId !== id) {
 			frameRefElts.push(el);
 			return;
@@ -2147,12 +2205,12 @@ init: function(doc, settings) {
 		}
 		if (!defId) {
 			defId = id;
-			hfAttr(placeholder, 'def', defId);
+			cdom.attr(placeholder, 'def', defId);
 		}
-		framesetDef.frames[id] = new HFrameDefinition(el);
+		framesetDef.frames[id] = new HFrameDefinition(el, framesetDef);
 	});
 	_.forEach(frameRefElts, function(el) {
-		var defId = hfAttr(el, 'def');
+		var defId = cdom.attr(el, 'def');
 		if (!framesetDef.frames[defId]) {
 			throw "Hyperframe references non-existant frame #" + defId;
 		}
@@ -2163,11 +2221,12 @@ init: function(doc, settings) {
 
 render: function() { // FIXME assuming empty document.body
 	var framesetDef = this;
-	var srcDoc = framesetDef.document.cloneNode(true);
+	var cdom = framesetDef.cdom;
+	var srcDoc = cloneDocument(framesetDef.document);
 	polyfill(srcDoc);
 	var result = {
 		document: srcDoc,
-		frames: $$(hfFrameSelector, srcDoc)
+		frames: cdom.$$('frame', srcDoc)
 	};
 	return result;
 }
@@ -2205,8 +2264,9 @@ return HFramesetDefinition;
 
 var HFrame = (function() {
 
-function HFrame(el) {
+function HFrame(el, frameset) {
 	if (!el) return; // in case of inheritance
+	this.frameset = frameset;
 	this.init(el);
 }
 
@@ -2214,14 +2274,16 @@ extend(HFrame.prototype, {
 	
 init: function(el) {
 	var hframe = this;
+	var hframeset = hframe.frameset;
+	var cdom = hframeset.definition.cdom;
 	extend(hframe, {
       element: el,
 	  id: el.id,
 	  name: el.getAttribute('name')
     });
-	var defId = hfAttr(el, 'def');
-	hframe.definition = framer.frameset.definition.frames[defId];
-	var src = hfAttr(el, 'src');
+	var defId = cdom.attr(el, 'def');
+	hframe.definition = hframeset.definition.frames[defId];
+	var src = cdom.attr(el, 'src');
 	if (src) hframe.src = URL(framer.frameset.src).resolve(src);
 },
 
@@ -2242,9 +2304,10 @@ render: function() { // FIXME need a teardown method that releases child-frames
 
 renderFrames: function(frames) {
 	var hframe = this;
+	var hframeset = hframe.frameset;
 	hframe.frames = [];
 	_.forEach(frames, function(frameEl) {
-		var childFrame = new HFrame(frameEl);
+		var childFrame = new HFrame(frameEl, hframeset);
 		hframe.frames.push(childFrame);
 		if (childFrame.name === framer.currentTarget) childFrame.src = framer.currentURL;
 		childFrame.render(); // FIXME promisify
@@ -2269,6 +2332,7 @@ extend(HFrameset.prototype, {
 init: function(dstDoc) {
 	var hframeset = this;
 	extend(hframeset, {
+		frameset: hframeset,
 		document: dstDoc,
 		src: null,
 		definition: null
@@ -2875,6 +2939,7 @@ createProcessor: function(type) {
 
 extend(classNamespace, {
 
+	CustomDOM: CustomDOM,
 	HFrameDefinition: HFrameDefinition,
 	HFramesetDefinition: HFramesetDefinition,
 	HFrame: HFrame,
