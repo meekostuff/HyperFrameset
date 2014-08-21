@@ -555,7 +555,19 @@ extend(Promise, {
 /*
  ### DOM utility functions
  */
-var getTagName = function(el) { return el && el.nodeType === 1 ? lc(el.tagName) : ""; }
+var getTagName = (typeof document.documentElement.scopeName !== 'string') ?
+function(el) {
+	return el && el.nodeType === 1 ? lc(el.tagName) : "";
+} :
+function(el) {
+	if (!el || el.nodeType !== 1) return '';
+	var tag = lc(el.tagName);
+	var scopeName = lc(el.scopeName); // IE8, IE9
+	if (!scopeName || scopeName === 'html') return tag;
+	var prefix = scopeName + ':';
+	if (tag.indexOf(prefix) === 0) return tag;
+	return prefix + tag;
+}
 
 var $id = function(id, doc) {
 	if (!id) return;
@@ -2072,6 +2084,35 @@ return HFrameDefinition;
 })();
 
 
+var HFrameDeclaration = (function() {
+
+function HFrameDeclaration(el, frameset) {
+	this.frameset = frameset;
+	this.init(el);
+}
+
+extend(HFrameDeclaration.prototype, {
+
+init: function(el) {
+    var frame = this;
+	var frameset = frame.frameset;
+	var cdom = frameset.cdom;
+	extend(frame, {
+		element: el,
+		name: cdom.attr(el, 'name'),
+		src: cdom.attr(el, 'src'),
+		mainSelector: cdom.attr(el, 'main') // TODO consider using a hash in `@src`
+    });
+	var defId = cdom.attr(el, 'def');
+	frame.definition = frameset.frames[defId];
+}
+	
+});
+
+return HFrameDeclaration;
+})();
+
+
 var HBodyDefinition = (function() {
 	
 function HBodyDefinition(el, frameset) {
@@ -2117,27 +2158,60 @@ render: function(doc, options) {
 	}
 	var processor = bodyDef.processor;
 	var output = processor.transform(decoder);
-	var body = bodyDef.element.cloneNode(false);
-	if (output.nodeType) {
-		body.appendChild(output);
-		result = {
-			element: body,
-			frames: cdom.$$('frame', body)
-		}
-	}
-	else {
-		body.appendChild(output.fragment);
-		result = {
-			element: body,
-			frames: output.frames
-		}
-	}
+	var el = bodyDef.element.cloneNode(false);
+	var result = new HBodyResult(el, frameset);
+	result.compose(output);
 	return result;
 }
 
 });
 
 return HBodyDefinition;
+})();
+
+
+var HBodyResult = (function() {
+	
+function HBodyResult(el, frameset) {
+	if (!el) return; // in case of inheritance
+	this.frameset = frameset;
+	this.init(el);
+}
+
+extend(HBodyResult.prototype, {
+
+init: function(el) {
+	var result = this;
+	var frameset = result.frameset;
+	var cdom = frameset.cdom;
+	extend(result, {
+		element: el,
+		condition: cdom.attr(el, 'condition')
+    });
+},
+
+compose: function(output) {
+	var result = this;
+	var frameset = result.frameset;
+	var cdom = frameset.cdom;
+	var el = result.element;
+	var frames;
+	if (output.nodeType) {
+		el.appendChild(output);
+		frames = cdom.$$('frame', el);
+	}
+	else {
+		el.appendChild(output.fragment);
+		frames = output.frames;
+	}
+	result.frames = _.map(frames, function(el) {
+		return new HFrameDeclaration(el, frameset);
+	});
+}
+
+});
+
+return HBodyResult;
 })();
 
 
@@ -2159,13 +2233,13 @@ options: {
 extend(HFramesetDefinition.prototype, {
 
 config: function(options) {
-	var framesetDef = this;
-	config(framesetDef.options, options);
+	var frameset = this;
+	config(frameset.options, options);
 },
 
 init: function(doc, settings) {
-	var framesetDef = this;
-	extend(framesetDef, {
+	var frameset = this;
+	extend(frameset, {
 		options: extend({}, HFramesetDefinition.options),
 		frames: {} // all hyperframe definitions. Indexed by @id (which may be auto-generated)
 	});
@@ -2184,13 +2258,13 @@ init: function(doc, settings) {
 		namespaceStyle: 'xml'
 	});
 	else cdom = new CustomDOM(hfDefaults);
-	framesetDef.cdom = cdom;
+	frameset.cdom = cdom;
 	
 	// NOTE first rebase scope: urls
 	var scopeURL = URL(settings.scope);
 	rebase(doc, scopeURL);
 	
-	framesetDef.document = doc;
+	frameset.document = doc;
 	var frameElts = cdom.$$('frame', doc);
 	var frameRefElts = [];
 	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
@@ -2217,11 +2291,11 @@ init: function(doc, settings) {
 			defId = id;
 			cdom.attr(placeholder, 'def', defId);
 		}
-		framesetDef.frames[id] = new HFrameDefinition(el, framesetDef);
+		frameset.frames[id] = new HFrameDefinition(el, frameset);
 	});
 	_.forEach(frameRefElts, function(el) {
 		var defId = cdom.attr(el, 'def');
-		if (!framesetDef.frames[defId]) {
+		if (!frameset.frames[defId]) {
 			throw "Hyperframe references non-existant frame #" + defId;
 		}
 		var placeholder = el.cloneNode(false);
@@ -2230,14 +2304,10 @@ init: function(doc, settings) {
 },
 
 render: function() { // FIXME assuming empty document.body
-	var framesetDef = this;
-	var cdom = framesetDef.cdom;
-	var srcDoc = cloneDocument(framesetDef.document);
-	polyfill(srcDoc);
-	var result = {
-		document: srcDoc,
-		frames: cdom.$$('frame', srcDoc)
-	};
+	var frameset = this;
+	var cdom = frameset.cdom;
+	var srcDoc = cloneDocument(frameset.document);
+	var result = new HFramesetResult(srcDoc, frameset);
 	return result;
 }
 
@@ -2272,53 +2342,85 @@ return HFramesetDefinition;
 })();
 
 
+var HFramesetResult = (function() {
+
+function HFramesetResult(doc, frameset) {
+	this.frameset = frameset;
+	this.init(doc);
+}
+
+extend(HFramesetResult.prototype, {
+
+init: function(doc) {
+	var result = this;
+	var frameset = result.frameset;
+	var cdom = frameset.cdom;
+	polyfill(doc);
+	var frames = cdom.$$('frame', doc);
+	frames = _.map(frames, function(el) {
+		return new HFrameDeclaration(el, frameset);
+	});
+	extend(result, {
+		document: doc,
+		frames: frames
+	});
+}
+
+});
+
+return HFramesetResult;	
+})();
+
+
 var HFrame = (function() {
 
-function HFrame(el, frameset) {
-	if (!el) return; // in case of inheritance
+function HFrame(declaration, frameset) {
 	this.frameset = frameset;
-	this.init(el);
+	this.init(declaration);
 }
 
 extend(HFrame.prototype, {
 	
-init: function(el) {
-	var hframe = this;
-	var hframeset = hframe.frameset;
-	var cdom = hframeset.definition.cdom;
-	extend(hframe, {
-      element: el,
-	  id: el.id,
-	  name: el.getAttribute('name')
-    });
-	var defId = cdom.attr(el, 'def');
-	hframe.definition = hframeset.definition.frames[defId];
-	var src = cdom.attr(el, 'src');
-	if (src) hframe.src = URL(framer.frameset.src).resolve(src);
+init: function(declaration) {
+	var frame = this;
+	var frameset = frame.frameset;
+	var srcEl = declaration.element;
+	var el = frameset.document.createElement('div');
+	el.setAttribute('is', getTagName(srcEl));
+	insertNode("replace", srcEl, el);
+	extend(frame, declaration);
+	frame.element = el;
+	frame.bodyElement = null;
+	// NOTE now we drop declaration, including declaration.element
 },
 
 render: function() { // FIXME need a teardown method that releases child-frames	
-	var hframe = this;
-	var src = hframe.src;
+	var frame = this;
+	var frameset = frame.frameset;
+	var src = frame.src;
 	if (!src) return;
-	return hframe.definition.options.load('get', src, null, {})
+	return frame.definition.options.load('get', src, null, {})
 	.then(function(doc) {
-		var result = hframe.definition.render(doc);
+		var result = frame.definition.render(doc);
 		// FIXME .bodyElement will probably become .bodies[] for transition animations.
-		if (hframe.bodyElement) hframe.element.removeChild(hframe.bodyElement);
-		hframe.bodyElement = result.element;
-		hframe.element.appendChild(hframe.bodyElement);
-		hframe.renderFrames(result.frames);
+		if (frame.bodyElement) frame.element.removeChild(frame.bodyElement);
+		var bodyEl = frameset.document.createElement('div');
+		bodyEl.setAttribute('is', getTagName(result.element));
+		var node;
+		while (node = result.element.firstChild) bodyEl.appendChild(node);
+		frame.bodyElement = bodyEl;
+		frame.element.appendChild(bodyEl);
+		frame.renderFrames(result.frames);
 	});
 },
 
 renderFrames: function(frames) {
-	var hframe = this;
-	var hframeset = hframe.frameset;
-	hframe.frames = [];
-	_.forEach(frames, function(frameEl) {
-		var childFrame = new HFrame(frameEl, hframeset);
-		hframe.frames.push(childFrame);
+	var frame = this;
+	var hframeset = frame.frameset;
+	frame.frames = [];
+	_.forEach(frames, function(declaration) {
+		var childFrame = new HFrame(declaration, hframeset);
+		frame.frames.push(childFrame);
 		if (childFrame.name === framer.currentTarget) childFrame.src = framer.currentURL;
 		childFrame.render(); // FIXME promisify
 	});
