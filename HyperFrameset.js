@@ -767,11 +767,6 @@ var cloneDocument = document.importNode ?
 function(srcDoc, options) {
 	var doc = createDocument(options);
 	var docEl = document.importNode(srcDoc.documentElement, true);
-	if (srcDoc.namespaces) { // IE8, IE9
-		forEach(srcDoc.namespaces, function(ns) {
-			docEl.setAttribute('xmlns:' + ns.name, ns.urn);
-		});
-	}
 	doc.appendChild(docEl);
 	polyfill(doc);
 
@@ -788,12 +783,6 @@ function(srcDoc, options) {
 	var docEl = importSingleNode(srcDoc.documentElement, doc),
 		docHead = importSingleNode(srcDoc.head, doc),
 		docBody = importSingleNode(srcDoc.body, doc);
-
-	if (srcDoc.namespaces) { // IE8, IE9
-		forEach(srcDoc.namespaces, function(ns) {
-			docEl.setAttribute('xmlns:' + ns.name, ns.urn);
-		});
-	}
 
 	docEl.appendChild(docHead);
 	for (var srcNode=srcDoc.head.firstChild; srcNode; srcNode=srcNode.nextSibling) {
@@ -1579,6 +1568,11 @@ function iframeParser(html, details) {
 	function(iframeDoc) {
 
 		polyfill(iframeDoc);
+		if (iframeDoc.namespaces) { // IE8, IE9
+			forEach(iframeDoc.namespaces, function(ns) {
+				iframeDoc.documentElement.setAttribute('xmlns:' + ns.name, ns.urn);
+			});
+		}
 
 		var baseURL = URL(details.url);
 		
@@ -2246,8 +2240,8 @@ init: function(doc, settings) {
 
 	var cdom;
 	var xmlns;
-	var namespaces = CustomDOM.getNamespaces(doc);
-	_.some(namespaces, function(ns) {
+	frameset.namespaces = CustomDOM.getNamespaces(doc);
+	_.some(frameset.namespaces, function(ns) {
 		if (lc(ns.urn) !== 'hyperframeset') return false;
 		xmlns = ns.name;
 		return true;
