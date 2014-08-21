@@ -672,6 +672,16 @@ var composeNode = function(srcNode, context) { // document.importNode() NOT avai
 	return node;
 }
 
+var textContent = document.documentElement.textContent ?
+function(el, text) { // NOTE https://developer.mozilla.org/en-US/docs/Web/API/Node.textContent#Differences_from_innerText
+	if (typeof text === "undefined") return el.textContent;
+	el.textContent = text;
+} :
+function(el, text) {
+	if (typeof text === "undefined") return el.innerText;
+	el.innerText = text;
+}
+
 var hasAttribute = function(node, attrName) { // WARN needs to be more complex for IE <= 7
 	return node.hasAttribute(attrName);
 }
@@ -998,7 +1008,7 @@ var DOM = Meeko.DOM || (Meeko.DOM = {});
 extend(DOM, {
 	getTagName: getTagName, hasAttribute: hasAttribute, matchesElement: matchesElement, // properties
 	$id: $id, $: $, $$: $$, siblings: siblings, firstChild: firstChild, // selections
-	copyAttributes: copyAttributes, removeAttributes: removeAttributes, // attrs
+	copyAttributes: copyAttributes, removeAttributes: removeAttributes, textContent: textContent, // attrs
 	composeNode: composeNode, importSingleNode: importSingleNode, insertNode: insertNode, // nodes
 	ready: domReady, addEvent: addEvent, removeEvent: removeEvent, overrideDefaultAction: overrideDefaultAction, // events
 	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
@@ -2959,7 +2969,7 @@ function MainProcessor() {}
 extend(MainProcessor.prototype, {
 
 loadTemplate: function(template) {
-	if (/\S+/.test(template.textContent)) logger.warn('"main" transforms do not use templates');
+	if (/\S+/.test(textContent(template))) logger.warn('"main" transforms do not use templates');
 },
 
 transform: function(provider) {
@@ -3102,7 +3112,7 @@ function transformSingleElement(el, provider, context, variables) {
 function setAttribute(el, attrName, value) {	
 	switch (attrName) {
 	case textAttr:
-		el.textContent = value;
+		textContent(el, value);
 		break;
 	case htmlAttr:
 		el.innerHTML = '';
@@ -3134,7 +3144,7 @@ function evalExpression(expr, provider, context, variables, type) { // FIXME rob
 
 	switch (type) {
 	case 'text':
-		if (value && value.nodeType) value = value.textContent;
+		if (value && value.nodeType) value = textContent(value);
 		break;
 	case 'node':
 		var frag = document.createDocumentFragment();
@@ -3148,7 +3158,7 @@ function evalExpression(expr, provider, context, variables, type) { // FIXME rob
 		value = frag;
 		break;
 	default: // FIXME should never occur. logger.warn !?
-		if (value && value.nodeType) value = value.textContent;
+		if (value && value.nodeType) value = textContent(value);
 		break;
 	}
 
@@ -3194,7 +3204,7 @@ evaluate: function(query, context, variables, type) {
 	case 'text': // expr:attr or expr:.text
 		if (!node) return '';
 		switch(attr) {
-		case null: case undefined: case '': case textAttr: return node.textContent || node.innerText; // FIXME legacy
+		case null: case undefined: case '': case textAttr: return textContent(node);
 		case htmlAttr: return node.innerHTML;
 		default: return node.getAttribute(attr);
 		}
@@ -3202,13 +3212,13 @@ evaluate: function(query, context, variables, type) {
 		if (!node) return false;
 		switch(attr) {
 		case null: case undefined: case '': return true;
-		case textAttr: case htmlAttr: return !/^\s*$/.test(node.textContent || node.innerText); // FIXME potentially heavy. Implement as a DOM utility isEmptyNode()
+		case textAttr: case htmlAttr: return !/^\s*$/.test(textContent(node)); // FIXME potentially heavy. Implement as a DOM utility isEmptyNode()
 		default: return hasAttribute(node, nodeattr);
 		}
 	case 'node': // expr:.html
 		switch(attr) {
 		case null: case undefined: case '': case htmlAttr: return node;
-		case textAttr: return node.textContent || node.innerText;
+		case textAttr: return textContent(node);
 		default: return node.getAttribute(attr);
 		}
 	default: return node; // TODO shouldn't this be an error / warning??
