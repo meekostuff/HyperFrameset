@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html xmlns:hf="HyperFrameset">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <link rel="stylesheet" href="frameset.css" />
@@ -7,7 +7,7 @@
 .remove { background-color: red; color: white; }
 .noframeset { border: 2px solid blue; }
 *[id] { margin: 0.5em; border: 1px dashed black; }
-hf-frame, hf\:frame { display: block; margin: 0.5em; border: 2px dotted black; }
+hf\:frame { display: block; margin: 0.5em; border: 2px dotted black; }
 </style>
 <style>
 .style-fail { display: none; }
@@ -34,8 +34,8 @@ nav li { display: inline; list-style: outside none; margin: 0.1em; padding: 0.25
 .style-in-body-fail { display: none; }
 </style>
 
-<hf-frame name="hf_top" src="scope:./index.html" type="html">
-	<hf-body transform="ht" format="css">
+<hf:frame name="hf_top" src="scope:./index.html" type="html">
+	<hf:body transform="ht" format="css">
 	
 		<h1 expr:.text=".title {.text}">{{title}}</h1>
 		
@@ -57,8 +57,8 @@ If you can see this then &lt;style&gt; elements
 in the &lt;body&gt; of the frameset document aren't being imported.
 </div> 
 
-<hf-frame name="hf_main" src="scope:./normal.html" type="html">
-	<hf-body transform="ht" format="css">
+<hf:frame name="hf_main" src="scope:./normal.html" type="html">
+	<hf:body transform="ht" format="css">
 	
 		<div id="frameset-header" class="section">
 		#frameset-header
@@ -84,11 +84,11 @@ in the &lt;body&gt; of the frameset document aren't being imported.
 			</div>
 		</div #frameset-footer>
 	
-	</hf-body>
-</hf-frame #hf_main>
+	</hf:body>
+</hf:frame #hf_main>
 
-	</hf-body>
-</hf-frame #hf_top>
+	</hf:body>
+</hf:frame #hf_top>
 
 </body>
 </html>
