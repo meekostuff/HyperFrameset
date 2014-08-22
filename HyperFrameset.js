@@ -695,6 +695,35 @@ function(el, text) {
 	el.innerText = text;
 }
 
+var scriptText = (function() {
+
+var script = document.createElement('script');
+return ('text' in script) ? standard :
+	('textContent' in script) ? alternate :
+	legacy;
+
+function standard(el, val) { // all IE, current non-IE
+	if (val === null) val = '';
+	if (typeof val === 'undefined') return el.text;
+	el.text = val;
+}
+
+function alternate(el, val) { // old non-IE
+	if (val === null) val = '';
+	if (typeof val === 'undefined') return el.textContent;
+	el.textContent = val;
+}
+
+function legacy(el, val) { // really old non-IE
+	if (val === null) val = '';
+	var textNode = el.firstChild;
+	if (typeof val === 'undefined') return textNode ? textNode.nodeValue : '';
+	if (textNode) el.removeChild(textNode);
+	el.appendChild(document.createTextNode(val));
+}
+
+})();
+	
 var hasAttribute = function(node, attrName) { // WARN needs to be more complex for IE <= 7
 	return node.hasAttribute(attrName);
 }
@@ -1010,7 +1039,7 @@ var DOM = Meeko.DOM || (Meeko.DOM = {});
 extend(DOM, {
 	getTagName: getTagName, hasAttribute: hasAttribute, matchesElement: matchesElement, // properties
 	$id: $id, $: $, $$: $$, siblings: siblings, firstChild: firstChild, // selections
-	copyAttributes: copyAttributes, removeAttributes: removeAttributes, textContent: textContent, // attrs
+	copyAttributes: copyAttributes, removeAttributes: removeAttributes, textContent: textContent, scriptText: scriptText, // attrs
 	composeNode: composeNode, importSingleNode: importSingleNode, insertNode: insertNode, // nodes
 	ready: domReady, addEvent: addEvent, removeEvent: removeEvent, overrideDefaultAction: overrideDefaultAction, // events
 	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
@@ -1096,7 +1125,7 @@ var STAGING_DOCUMENT_IS_INERT = (function() {
 	if (img.complete) return false; // Opera-12 sets this immediately. IE9 sets it after a delay.
 	// Sometimes the img check isn't ready on IE9, so one more check
 	var script = doc.createElement('script');
-	script.text = ';'
+	scriptText(script, ';');
 	doc.head.appendChild(script);
 	if (script.readyState === 'complete') return false; // IE9
 	return true; // Presumably IE10
@@ -1790,10 +1819,7 @@ this.push = function(node) {
 	
 	copyAttributes(script, node); 
 
-	// FIXME is this comprehensive?
-	if ('text' in node) script.text = node.text; // all IE, current non-IE
-	else if ('textContent' in node) script.textContent = node.textContent; // old non-IE
-	else if (node.firstChild) script.appendChild(document.createTextNode(node.firstChild.nodeValue)); // really old non-IE
+	scriptText(script, scriptText(node));
 
 	if (script.getAttribute('defer')) { // @defer is not appropriate. Implement as @async
 		script.removeAttribute('defer');
@@ -2507,7 +2533,7 @@ render: function() {
 			}
 			var forOptions;
 			try {
-				forOptions = (Function('return (' + script.text + ');'))(); // FIXME is script.text cross-platform??
+				forOptions = (Function('return (' + scriptText(script) + ');'))();
 			}
 			catch(err) { return; } // FIXME log a warning
 			
@@ -3263,8 +3289,8 @@ function evalExpression(expr, provider, context, variables, type) { // FIXME rob
 		break;
 	}
 
-	_.forEach(exprParts, function(scriptText) {
-		var fn = Function('value', 'return (' + scriptText + ');');
+	_.forEach(exprParts, function(scriptBody) {
+		var fn = Function('value', 'return (' + scriptBody + ');');
 		value = fn(value);
 	});
 
