@@ -604,6 +604,7 @@ var siblings = function(conf, refNode, conf2, refNode2) {
 		conf2 = lc(conf2);
 		if (conf === 'ending' || conf === 'before') throw 'siblings() startNode looks like stopNode';
 		if (conf2 === 'starting' || conf2 === 'after') throw 'siblings() stopNode looks like startNode';
+		if (!refNode2 || refNode2.parentNode !== refNode.parentNode) throw 'siblings() startNode and stopNode are not siblings';
 	}
 	
 	var nodeList = [];
@@ -893,7 +894,7 @@ var overrideDefaultAction = function(e, fn) {
 	e.preventDefault = function(event) { defaultPrevented = true; this._preventDefault(); } // TODO maybe we can just use defaultPrevented?
 	e._stopPropagation = e.stopPropagation;
 	e.stopPropagation = function() { // WARNING this will fail to detect event.defaultPrevented if event.preventDefault() is called afterwards
-		if (this.defaultPrevented) defaultPrevented = true; // FIXME is defaultPrevented supported on pushState enabled browsers?
+		if (this.defaultPrevented) defaultPrevented = true; // FIXME is defaultPrevented supported on pushState enabled browsers? https://developer.mozilla.org/en-US/docs/Web/API/event.defaultPrevented
 		this._preventDefault();
 		this._stopPropagation();
 	}
@@ -1034,7 +1035,7 @@ var parseHTML = function(html, details) {
 /*
 	HTML_IN_XHR indicates if XMLHttpRequest supports HTML parsing
 */
-var HTML_IN_XHR = (function() { // FIXME more testing, especially Webkit. Probably should use data-uri testing
+var HTML_IN_XHR = (function() { // FIXME more testing, especially Webkit
 	if (!window.XMLHttpRequest) return false;
 	var xhr = new XMLHttpRequest;
 	if (!('responseType' in xhr)) return false;
@@ -1756,6 +1757,8 @@ var scriptQueue = new function() {
 	http://wiki.whatwg.org/wiki/Dynamic_Script_Execution_Order#My_Solution
  Script preloading is always initiated, even if the browser doesn't support it. See
 	http://wiki.whatwg.org/wiki/Dynamic_Script_Execution_Order#readyState_.22preloading.22
+	
+ FIXME scriptQueue.push should also accept functions
 */
 var queue = [],
 	emptying = false;
@@ -2128,7 +2131,7 @@ init: function(el) {
 		format: cdom.attr(el, 'format')
     });
 	if (bodyDef.transform === 'main') bodyDef.format = '';
-	var frag = document.createDocumentFragment(); // FIXME which doc??
+	var frag = frameset.document.createDocumentFragment();
 	var node;
 	while (node = el.firstChild) frag.appendChild(node);
 	var processor = bodyDef.processor = framer.createProcessor(bodyDef.transform);
@@ -2297,7 +2300,7 @@ init: function(doc, settings) {
 	});
 },
 
-render: function() { // FIXME assuming empty document.body
+render: function() {
 	var frameset = this;
 	var cdom = frameset.cdom;
 	var srcDoc = cloneDocument(frameset.document);
@@ -2491,7 +2494,7 @@ render: function() {
 		mergeElement(dstDoc.documentElement, srcDoc.documentElement);
 		mergeElement(dstDoc.head, srcDoc.head);
 		mergeHead(dstDoc, srcDoc.head, true);
-		// allow scripts to run FIXME scripts should always be appended to document.head
+		// allow scripts to run. FIXME scripts should always be appended to document.head
 		forEach($$("script", dstDoc.head), function(script) {
 			var forAttr = script.getAttribute('for');
 			if (!forAttr) {
