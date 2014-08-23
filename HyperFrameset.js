@@ -1103,8 +1103,8 @@ var HTML_IN_DOMPARSER = (function() {
 
 /*
 	STAGING_DOCUMENT_IS_INERT indicates whether resource URLs - like img@src -
-	need to be neutralized so they don't start downloading until after the document is normalized. 
-	The normalize function might discard them in which case downloading is a waste. 
+	need to be neutralized so they don't start downloading until after transforms have been applied. 
+	The transforms  might discard them in which case downloading is a waste. 
 */
 
 var STAGING_DOCUMENT_IS_INERT = (function() {
@@ -1254,22 +1254,16 @@ var HTMLLoader = function(options) {
 
 extend(HTMLLoader.prototype, {
 
-load: function(method, url, data, details) {
+load: function(method, url, data, extras) {
 	var htmlLoader = this;
-	
+	var details = {};
+	if (typeof extras === 'object') extend(details, extras);
+
 	if (!details) details = {};
-	if (!details.url) details.method = method;	
+	if (!details.method) details.method = method;	
 	if (!details.url) details.url = url;
 	
-	return htmlLoader.request(method, url, data, details) // NOTE this returns the promise that .then returns
-		.then(
-			function(doc) {
-				if (htmlLoader.normalize) htmlLoader.normalize(doc, details);
-				if (details.isNeutralized) deneutralizeAll(doc);
-				return doc;
-			},
-			function(err) { logger.error(err); throw (err); } // FIXME proper error handling
-		);
+	return htmlLoader.request(method, url, data, details);
 },
 
 serialize: function(data, details) { return ""; },  // WARN unused / untested
@@ -1288,9 +1282,7 @@ request: function(method, url, data, details) {
 		throw uc(method) + ' not supported';
 	}
 	return doRequest(method, url, sendText, details);
-},
-
-normalize: function(doc, details) {}
+}
 
 });
 
@@ -1313,7 +1305,7 @@ return new Promise(function(resolve, reject) {
 		var doc;
 		if (HTML_IN_XHR) {
 			var doc = xhr.response;
-			prenormalize(doc, details);
+			normalize(doc, details);
 			resolve(doc);
 		}
 		else {
@@ -1368,9 +1360,7 @@ resolveURL: function(url, baseURL, neutralized, stayNeutral) {
 	}
 	var finalURL = relURL;
 	switch (relURL.charAt(0)) {
-		case '': // empty, but not null
-		case '#': // NOTE anchor hrefs aren't normalized
-		case '?': // NOTE query hrefs aren't normalized
+		case '': // empty, but not null. TODO should this be a warning??
 			break;
 		
 		default:
@@ -1442,7 +1432,7 @@ var resolveAll = function(doc, baseURL, isNeutralized) {
 
 		each(attrList, function(attrName, attrDesc) {
 			var neutralized = isNeutralized && !!attrDesc.neutralize;
-			var stayNeutral = isNeutralized && attrDesc.neutralize > 0;
+			var stayNeutral = !STAGING_DOCUMENT_IS_INERT && attrDesc.neutralize > 0;
 
 			forEach(getElts(), function(el) {
 				attrDesc.resolve(el, baseURL, neutralized, stayNeutral);
@@ -1450,7 +1440,7 @@ var resolveAll = function(doc, baseURL, isNeutralized) {
 		});
 	});
 	
-	return isNeutralized && !STAGING_DOCUMENT_IS_INERT;
+	return !STAGING_DOCUMENT_IS_INERT;
 }
 
 if (IE9_SOURCE_ELEMENT_BUG) {
@@ -1476,17 +1466,14 @@ var deneutralizeAll = function(doc) {
 
 	each(urlAttributes, function(tag, attrList) {
 		var elts;
-		function getElts() {
-			if (!elts) elts = $$(tag, doc);
-			return elts;
-		}
 
 		each(attrList, function(attrName, attrDesc) {
 			var neutralized = attrDesc.neutralize > 0;
 
 			if (!neutralized) return;
 
-			forEach(getElts(), function(el) {
+			if (!elts) elts = $$(tag, doc);
+			forEach(elts, function(el) {
 				var url = el.getAttribute(attrName);
 				if (url == null) return;
 				var finalURL = deneutralizeURL(url, tag, attrName);
@@ -1497,13 +1484,13 @@ var deneutralizeAll = function(doc) {
 }
 
 /*
-	prenormalize() is called between html-parsing (internal) and document normalising (external function).
+	normalize() is called between html-parsing (internal) and document normalising (external function).
 	It is called after using the native parser:
 	- with DOMParser#parseFromString(), see HTMLParser#nativeParser()
 	- with XMLHttpRequest & xhr.responseType='document', see HTMLLoader#request()
 	The iframe parser implements similar functionality
 */
-function prenormalize(doc, details) { 
+function normalize(doc, details) { 
 	polyfill(doc);
 
 	forEach($$('script', doc), function(node) {
@@ -1536,7 +1523,7 @@ function nativeParser(html, details) {
 		
 	function() {
 		var doc = (new DOMParser).parseFromString(html, 'text/html');
-		prenormalize(doc, details);
+		normalize(doc, details);
 		return doc;		
 	}
 	
@@ -2343,15 +2330,14 @@ render: function() {
  */
 
 function rebase(doc, scopeURL) {
-	function normalize(tag, attrName) {
+	each(urlAttributes, function(tag, attrName) {
 		forEach($$(tag, doc), function(el) {
 			var relURL = el.getAttribute(attrName);
 			if (relURL == null) return;
 			var url = rebaseURL(relURL, baseURL);
 			if (url != relURL) el[attrName] = url;
 		});
-	}
-	each(urlAttributes, normalize);
+	});
 }
 
 function rebaseURL(url, baseURL) {
@@ -2425,6 +2411,8 @@ render: function() { // FIXME need a teardown method that releases child-frames
 	return frame.definition.options.load('get', src, null, {})
 	.then(function(doc) {
 		var result = frame.definition.render(doc);
+		if (!STAGING_DOCUMENT_IS_INERT) deneutralizeAll(result);
+		
 		// FIXME .bodyElement will probably become .bodies[] for transition animations.
 		if (frame.bodyElement) frame.element.removeChild(frame.bodyElement);
 		var bodyEl = frameset.document.createElement('div');
@@ -2497,6 +2485,7 @@ render: function() {
 	var selfMarker;
 	var srcTree = definition.render();
 	var srcDoc = srcTree.document;
+	if (!STAGING_DOCUMENT_IS_INERT) deneutralizeAll(srcDoc);
 	
 	return pipe(null, [
 
@@ -2764,11 +2753,6 @@ return bfScheduler.now(function() {
 	framer.started = true;
 	
 	startOptions.contentDocument
-	.then(function(doc) {
-		if (HFrameDefinition.options.normalize) HFrameDefinition.options.normalize(doc, { url: document.URL });
-		if (!STAGING_DOCUMENT_IS_INERT) deneutralizeAll(doc);
-		return doc;
-	})
 	.then(function(doc) {
 		framer.landingDocument = doc;
 	});
