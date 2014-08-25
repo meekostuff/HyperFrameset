@@ -2140,43 +2140,87 @@ init: function(el) {
 	extend(bodyDef, {
 		element: el,
 		condition: cdom.attr(el, 'condition') || 'success',
-		transform: cdom.attr(el, 'transform') || 'main',
-		format: cdom.attr(el, 'format')
-    });
-	if (bodyDef.transform === 'main') bodyDef.format = '';
-	var frag = frameset.document.createDocumentFragment();
-	var node;
-	while (node = el.firstChild) frag.appendChild(node);
-	var processor = bodyDef.processor = framer.createProcessor(bodyDef.transform);
-	processor.loadTemplate(frag);
+		transforms: []
+	});
+	forEach(siblings("starting", el.firstChild), function(node) {
+		var tagName = getTagName(node);
+		if (!tagName) return;
+		if (!cdom.match$(node, 'transform')) {
+			logger.warn('Unexpected element in HBody: ' + tagName);
+			return;
+		}
+		bodyDef.transforms.push(new HTransformDefinition(node, frameset));
+	});
 },
 
 render: function(doc, options) {
 	var bodyDef = this;
 	var frameset = bodyDef.frameset;
 	var cdom = frameset.cdom;
-	var srcNode = doc;
-	if (options.mainSelector) srcNode = $(options.mainSelector, doc);
-	var decoder;
-	if (bodyDef.format) {
-		decoder = framer.createDecoder(bodyDef.format);
-		decoder.init(srcNode);
-	}
-	else decoder = {
-		srcDocument: doc,
-		srcNode: srcNode
-	}
-	var processor = bodyDef.processor;
-	var output = processor.transform(decoder);
+	var fragment = doc;
+	if (options.mainSelector) fragment = $(options.mainSelector, doc);
+	forEach(bodyDef.transforms, function(transform) {
+		fragment = transform.process(fragment);
+	});
 	var el = bodyDef.element.cloneNode(false);
 	var result = new HBodyResult(el, frameset);
-	result.compose(output);
+	result.compose(fragment);
 	return result;
 }
 
 });
 
 return HBodyDefinition;
+})();
+
+
+var HTransformDefinition = (function() {
+	
+function HTransformDefinition(el, frameset) {
+	if (!el) return; // in case of inheritance
+	this.frameset = frameset;
+	this.init(el);
+}
+
+extend(HTransformDefinition.prototype, {
+
+init: function(el) {
+	var transform = this;
+	var frameset = transform.frameset;
+	var cdom = frameset.cdom;
+	extend(transform, {
+		element: el,
+		type: cdom.attr(el, 'type') || 'main',
+		format: cdom.attr(el, 'format')
+    });
+	if (transform.type === 'main') transform.format = '';
+	var frag = frameset.document.createDocumentFragment();
+	var node;
+	while (node = el.firstChild) frag.appendChild(node);
+	var processor = transform.processor = framer.createProcessor(transform.type);
+	processor.loadTemplate(frag);
+},
+
+process: function(srcNode) {
+	var transform = this;
+	var frameset = transform.frameset;
+	var cdom = frameset.cdom;
+	var decoder;
+	if (transform.format) {
+		decoder = framer.createDecoder(transform.format);
+		decoder.init(srcNode);
+	}
+	else decoder = {
+		srcNode: srcNode
+	}
+	var processor = transform.processor;
+	var output = processor.transform(decoder);
+	return output;
+}
+
+});
+
+return HTransformDefinition;
 })();
 
 
@@ -2411,7 +2455,7 @@ render: function() { // FIXME need a teardown method that releases child-frames
 	return frame.definition.options.load('get', src, null, {})
 	.then(function(doc) {
 		var result = frame.definition.render(doc);
-		if (!STAGING_DOCUMENT_IS_INERT) deneutralizeAll(result);
+		if (!STAGING_DOCUMENT_IS_INERT) deneutralizeAll(result.element);
 		
 		// FIXME .bodyElement will probably become .bodies[] for transition animations.
 		if (frame.bodyElement) frame.element.removeChild(frame.bodyElement);
@@ -2751,7 +2795,6 @@ return bfScheduler.now(function() {
 	if (!startOptions || !startOptions.contentDocument) throw "No contentDocument passed to start()";
 
 	framer.started = true;
-	
 	startOptions.contentDocument
 	.then(function(doc) {
 		framer.landingDocument = doc;
@@ -3085,11 +3128,10 @@ loadTemplate: function(template) {
 
 transform: function(provider) {
 	var frag = document.createDocumentFragment();
-	var srcDoc = provider.srcDocument;
-	var srcNode = provider.srcNode;
-	if (srcNode === srcDoc) srcNode = null;
-	if (!srcNode) srcNode = $('main', srcDoc);
-	if (!srcNode) srcNode = $('[role=main]', srcDoc);
+	var srcDoc = provider.srcNode;
+	var srcNode;
+	if (!srcDoc.body) srcNode = srcDoc;
+	if (!srcNode) srcNode = $('main, [role=main]', srcDoc);
 	if (!srcNode) srcNode = srcDoc.body;
 	var node;
 	while (node = srcNode.firstChild) frag.appendChild(node);

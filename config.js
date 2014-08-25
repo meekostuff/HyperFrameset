@@ -28,7 +28,7 @@ Meeko.framer.config({
 	
 	detect: function(doc) {
 		framesetURL = getFramesetURL(doc);
-		scope = URL(document.URL).base;
+		scope = baseURL.base;
 		return this.lookup(document.URL);
 	}
 });
@@ -36,7 +36,7 @@ Meeko.framer.config({
 function getFramesetURL(doc) {
 	var link = getFramesetLink(doc);
 	if (!link) return null; // FIXME warning message
-	var href = link.getAttribute("href");
+	var href = URL.deneutralize(link.getAttribute('href'));
 	return baseURL.resolve(href); // FIXME href should already be absolute
 }
 

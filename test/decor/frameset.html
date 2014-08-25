@@ -35,12 +35,12 @@ nav li { display: inline; list-style: outside none; margin: 0.1em; padding: 0.25
 </style>
 
 <hf:frame name="hf_top" src="scope:./index.html" type="html">
-	<hf:body transform="ht" format="css">
-	
-		<h1 expr:.text=".title {.text}">{{title}}</h1>
-		
-		<nav expr:.html=".nav">
-		</nav>
+	<hf:body>
+		<hf:transform type="ht" format="css">
+			<h1 expr:.text=".title {.text}">{{title}}</h1>
+			
+			<nav expr:.html=".nav">
+			</nav>
 
 <!-- #hf_top encapsulates #hf_main -->		
 <hr />
@@ -58,35 +58,38 @@ in the &lt;body&gt; of the frameset document aren't being imported.
 </div> 
 
 <hf:frame name="hf_main" src="scope:./normal.html" type="html">
-	<hf:body transform="ht" format="css">
-	
-		<div id="frameset-header" class="section">
-		#frameset-header
-			<div expr:.html="#page-header">
-				<div id="page-header" class="remove">
-				#page-header in frameset: You should NOT be able to see this.
+	<hf:body>
+		<hf:transform type="ht" format="css">
+		
+			<div id="frameset-header" class="section">
+			#frameset-header
+				<div expr:.html="#page-header">
+					<div id="page-header" class="remove">
+					#page-header in frameset: You should NOT be able to see this.
+					</div>
 				</div>
 			</div>
-		</div>
-		
-		<div expr:.html="#page-main">
-			<div id="page-main" class="remove">
-			#page-main in frameset: You should NOT be able to see this.
-			</div>
-		</div>
-		
-		<div id="frameset-footer" class="section">
-		#frameset-footer
-			<div expr:.html="#page-footer">
-				<div id="page-footer" class="remove">
-				#page-footer in frameset: You should NOT be able to see this.
+			
+			<div expr:.html="#page-main">
+				<div id="page-main" class="remove">
+				#page-main in frameset: You should NOT be able to see this.
 				</div>
 			</div>
-		</div>
-	
+			
+			<div id="frameset-footer" class="section">
+			#frameset-footer
+				<div expr:.html="#page-footer">
+					<div id="page-footer" class="remove">
+					#page-footer in frameset: You should NOT be able to see this.
+					</div>
+				</div>
+			</div>
+		
+		</hf:transform>
 	</hf:body>
 </hf:frame>
 
+		</hf:transform>
 	</hf:body>
 </hf:frame>
 
