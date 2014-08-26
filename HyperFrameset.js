@@ -25,7 +25,7 @@ var document = window.document;
 if (!window.XMLHttpRequest) throw "HyperFrameset requires native XMLHttpRequest";
 if (!document.documentElement.hasAttribute) throw "HyperFrameset requires Element#hasAttribute()";
 
-var defaults = { // NOTE defaults also define the type of the associated config option
+var defaultOptions = { // NOTE defaults also define the type of the associated config option
 	"log_level": "warn",
 	"polling_interval": 50
 }
@@ -82,12 +82,12 @@ function(object, fn, context) { // WARN won't work on native objects in old IE
 	}
 }
 
-var extend = function(dest, src) {
-	forOwn(src, function(val, key) { if (dest[key] == null) dest[key] = val; });
+var defaults = function(dest, src) {
+	forOwn(src, function(val, key) { if (typeof dest[key] === 'undefined') dest[key] = val; });
 	return dest;
 }
 
-var config = function(dest, src) {
+var assign = function(dest, src) {
 	forOwn(src, function(val, key) { dest[key] = val; });
 	return dest;
 }
@@ -97,10 +97,10 @@ function(str) { return str.trim(); } :
 function(str) { return str.replace(/^\s+/, '').replace(/\s+$/, ''); }
 
 var _ = Meeko.stuff = {};
-extend(_, {
+defaults(_, {
 	uc: uc, lc: lc, trim: trim, words: words, // string
 	contains: contains, toArray: toArray, forEach: forEach, some: some, every: every, map: map, filter: filter, // array
-	forOwn: forOwn, extend: extend, config: config // object
+	forOwn: forOwn, defaults: defaults, assign: assign, extend: assign // object
 });
 
 
@@ -120,7 +120,7 @@ this[name] = !window.console && function() {} ||
 
 }, this);
 
-this.LOG_LEVEL = levels[defaults['log_level']]; // DEFAULT
+this.LOG_LEVEL = levels[defaultOptions['log_level']]; // DEFAULT
 
 }); // end logger defn
 
@@ -263,7 +263,7 @@ var Promise = Meeko.Promise = function(init) { // `init` is called as init(resol
 	// NOTE promise is returned by `new` invocation
 }
 
-_.extend(Promise.prototype, {
+_.defaults(Promise.prototype, {
 
 _initialize: function() {
 	var promise = this;
@@ -393,7 +393,7 @@ function wrapResolve(callback, resolve, reject) {
 }
 
 
-_.extend(Promise, {
+_.defaults(Promise, {
 
 resolve: function(value) {
 return new Promise(function(resolve, reject) {
@@ -540,9 +540,9 @@ return new Promise(function(resolve, reject) {
 });
 }
 
-Promise.pollingInterval = defaults['polling_interval'];
+Promise.pollingInterval = defaultOptions['polling_interval'];
 
-_.extend(Promise, {
+_.defaults(Promise, {
 	asap: asap, delay: delay, wait: wait, pipe: pipe
 });
 
@@ -982,7 +982,7 @@ var historyProxy = {};
 
 if (!history.pushState) return historyProxy;
 
-_.extend(historyProxy, {
+_.defaults(historyProxy, {
 
 state: undefined,
 
@@ -1005,7 +1005,7 @@ window.addEventListener('popstate', function(e) { updateState(e.state); });
 function updateState(src) {
 	if (typeof src === 'object' && src !== null) {
 		historyProxy.state = {};
-		_.config(historyProxy.state, src);
+		_.assign(historyProxy.state, src);
 	}
 	else historyProxy.state = src;
 }
@@ -1022,7 +1022,7 @@ var polyfill = function(doc) { // NOTE more stuff could be added here if *necess
 
 
 var DOM = Meeko.DOM || (Meeko.DOM = {});
-_.extend(DOM, {
+_.defaults(DOM, {
 	getTagName: getTagName, hasAttribute: hasAttribute, matchesElement: matchesElement, // properties
 	$id: $id, $: $, $$: $$, siblings: siblings, firstChild: firstChild, // selections
 	copyAttributes: copyAttributes, removeAttributes: removeAttributes, textContent: textContent, scriptText: scriptText, // attrs
@@ -1135,7 +1135,7 @@ var IE9_SOURCE_ELEMENT_BUG = (function() {
 
 
 
-_.extend(DOM, {
+_.defaults(DOM, {
 	loadHTML: loadHTML, parseHTML: parseHTML,
 	HTML_IN_XHR: HTML_IN_XHR, HTML_IN_DOMPARSER: HTML_IN_DOMPARSER,
 	STAGING_DOCUMENT_IS_INERT: STAGING_DOCUMENT_IS_INERT, IE9_SOURCE_ELEMENT_BUG: IE9_SOURCE_ELEMENT_BUG
@@ -1218,7 +1218,7 @@ function deneutralizeURL(url) {
 	return url;
 }
 
-_.extend(URL, {
+_.defaults(URL, {
 	neutralProtocol: neutralProtocol,
 	neutralize: neutralizeURL,
 	deneutralize: deneutralizeURL
@@ -1238,12 +1238,12 @@ var HTMLLoader = function(options) {
 	});
 }
 
-_.extend(HTMLLoader.prototype, {
+_.defaults(HTMLLoader.prototype, {
 
 load: function(method, url, data, extras) {
 	var htmlLoader = this;
 	var details = {};
-	if (typeof extras === 'object') _.extend(details, extras);
+	if (typeof extras === 'object') _.defaults(details, extras);
 
 	if (!details) details = {};
 	if (!details.method) details.method = method;	
@@ -1318,7 +1318,7 @@ var AttributeDescriptor = function(tagName, attrName, loads, compound) {
 		!loads ? 0 :
 		STAGING_DOCUMENT_IS_INERT ? -1 :
 		1;
-	_.extend(this, { // attrDesc
+	_.defaults(this, { // attrDesc
 		tagName: tagName,
 		attrName: attrName,
 		loads: loads,
@@ -1328,7 +1328,7 @@ var AttributeDescriptor = function(tagName, attrName, loads, compound) {
 	});
 }
 
-_.extend(AttributeDescriptor.prototype, {
+_.defaults(AttributeDescriptor.prototype, {
 
 resolve: function(el, baseURL, neutralized, stayNeutral) {
 	var attrName = this.attrName;
@@ -1614,7 +1614,7 @@ _.forOwn(urlAttributes, function(attrList, tagName) {
 	var neutralized = false;
 	_.forOwn(attrList, function(attrDesc, attrName) {
 		if (attrDesc.neutralize) neutralized = true;
-		_.extend(attrDesc, {
+		_.defaults(attrDesc, {
 			regex: new RegExp('(\\s)(' + attrName + ')\\s*=\\s*([\'"])?\\s*(?=\\S)', 'ig') // captures preSpace, attrName, quote. discards other space
 		});
 	});
@@ -1678,7 +1678,7 @@ return preparse;
 })();
 
 
-_.extend(HTMLParser.prototype, {
+_.defaults(HTMLParser.prototype, {
 	parse: HTML_IN_DOMPARSER ? nativeParser : iframeParser
 });
 
@@ -1947,11 +1947,11 @@ CustomDOM.getNamespaces = function(doc) { // NOTE modelled on IE8, IE9 document.
 	return namespaces;
 }
 
-_.extend(CustomDOM.prototype, {
+_.defaults(CustomDOM.prototype, {
 	
 init: function(options) {
 	var cdom = this;
-	if (options) _.config(cdom, options);
+	if (options) _.assign(cdom, options);
 	var separator = CustomDOM.separator[cdom.namespaceStyle];
 	cdom.prefix = cdom.namespace + separator;
 	cdom.selectorPrefix = cdom.namespace + (separator === ':' ? '\\:' : separator);
@@ -2012,7 +2012,7 @@ function HFrameDefinition(el, frameset) {
 	this.init(el);
 }
 
-_.extend(HFrameDefinition, {
+_.defaults(HFrameDefinition, {
 
 /*
  Paging handlers are either a function, or an object with `before` and / or `after` listeners. 
@@ -2034,19 +2034,19 @@ options: {
 
 });
 
-_.extend(HFrameDefinition.prototype, {
+_.defaults(HFrameDefinition.prototype, {
 
 config: function(options) {
 	var frameDef = this;
-	_.config(frameDef.options, options);
+	_.assign(frameDef.options, options);
 },
 
 init: function(el) {
     var frameDef = this;
 	var frameset = frameDef.frameset;
 	var cdom = frameset.cdom;
-	_.extend(frameDef, {
-		options: _.extend({}, HFrameDefinition.options),
+	_.defaults(frameDef, {
+		options: _.defaults({}, HFrameDefinition.options),
 		element: el,
 		id: el.id,
 		type: cdom.attr(el, 'type'),
@@ -2091,13 +2091,13 @@ function HFrameDeclaration(el, frameset) {
 	this.init(el);
 }
 
-_.extend(HFrameDeclaration.prototype, {
+_.defaults(HFrameDeclaration.prototype, {
 
 init: function(el) {
     var frame = this;
 	var frameset = frame.frameset;
 	var cdom = frameset.cdom;
-	_.extend(frame, {
+	_.defaults(frame, {
 		element: el,
 		name: cdom.attr(el, 'name'),
 		src: cdom.attr(el, 'src'),
@@ -2121,13 +2121,13 @@ function HBodyDefinition(el, frameset) {
 	this.init(el);
 }
 
-_.extend(HBodyDefinition.prototype, {
+_.defaults(HBodyDefinition.prototype, {
 
 init: function(el) {
 	var bodyDef = this;
 	var frameset = bodyDef.frameset;
 	var cdom = frameset.cdom;
-	_.extend(bodyDef, {
+	_.defaults(bodyDef, {
 		element: el,
 		condition: cdom.attr(el, 'condition') || 'success',
 		transforms: []
@@ -2172,13 +2172,13 @@ function HTransformDefinition(el, frameset) {
 	this.init(el);
 }
 
-_.extend(HTransformDefinition.prototype, {
+_.defaults(HTransformDefinition.prototype, {
 
 init: function(el) {
 	var transform = this;
 	var frameset = transform.frameset;
 	var cdom = frameset.cdom;
-	_.extend(transform, {
+	_.defaults(transform, {
 		element: el,
 		type: cdom.attr(el, 'type') || 'main',
 		format: cdom.attr(el, 'format')
@@ -2222,13 +2222,13 @@ function HBodyResult(el, frameset) {
 	this.init(el);
 }
 
-_.extend(HBodyResult.prototype, {
+_.defaults(HBodyResult.prototype, {
 
 init: function(el) {
 	var result = this;
 	var frameset = result.frameset;
 	var cdom = frameset.cdom;
-	_.extend(result, {
+	_.defaults(result, {
 		element: el,
 		condition: cdom.attr(el, 'condition')
     });
@@ -2266,7 +2266,7 @@ function HFramesetDefinition(doc, settings) {
 	this.init(doc, settings);
 }
 
-_.extend(HFramesetDefinition, {
+_.defaults(HFramesetDefinition, {
 
 options: {
 	getTarget: function(url, details) {}	
@@ -2274,17 +2274,17 @@ options: {
 
 });
 
-_.extend(HFramesetDefinition.prototype, {
+_.defaults(HFramesetDefinition.prototype, {
 
 config: function(options) {
 	var frameset = this;
-	_.config(frameset.options, options);
+	_.assign(frameset.options, options);
 },
 
 init: function(doc, settings) {
 	var frameset = this;
-	_.extend(frameset, {
-		options: _.extend({}, HFramesetDefinition.options),
+	_.defaults(frameset, {
+		options: _.defaults({}, HFramesetDefinition.options),
 		frames: {} // all hyperframe definitions. Indexed by @id (which may be auto-generated)
 	});
 
@@ -2392,7 +2392,7 @@ function HFramesetResult(doc, frameset) {
 	this.init(doc);
 }
 
-_.extend(HFramesetResult.prototype, {
+_.defaults(HFramesetResult.prototype, {
 
 init: function(doc) {
 	var result = this;
@@ -2403,7 +2403,7 @@ init: function(doc) {
 	frames = _.map(frames, function(el) {
 		return new HFrameDeclaration(el, frameset);
 	});
-	_.extend(result, {
+	_.defaults(result, {
 		document: doc,
 		frames: frames
 	});
@@ -2422,7 +2422,7 @@ function HFrame(declaration, frameset) {
 	this.init(declaration);
 }
 
-_.extend(HFrame.prototype, {
+_.defaults(HFrame.prototype, {
 	
 init: function(declaration) {
 	var frame = this;
@@ -2431,7 +2431,7 @@ init: function(declaration) {
 	var el = frameset.document.createElement('div');
 	el.setAttribute('is', getTagName(srcEl));
 	insertNode("replace", srcEl, el);
-	_.extend(frame, declaration);
+	_.defaults(frame, declaration);
 	frame.element = el;
 	frame.bodyElement = null;
 	// NOTE now we drop declaration, including declaration.element
@@ -2484,11 +2484,11 @@ function HFrameset(dstDoc) {
 	this.init(dstDoc);
 }
 
-_.extend(HFrameset.prototype, {
+_.defaults(HFrameset.prototype, {
 
 init: function(dstDoc) {
 	var hframeset = this;
-	_.extend(hframeset, {
+	_.defaults(hframeset, {
 		frameset: hframeset,
 		document: dstDoc,
 		src: null,
@@ -2566,7 +2566,7 @@ render: function() {
 				framer.frameset.definition.config(forOptions);
 				break;
 			case nsPrefix + 'frame':
-				_.config(HFrameDefinition.options, forOptions);
+				_.assign(HFrameDefinition.options, forOptions);
 				break;
 			default:
 				logger.warn('Unsupported value of @for on <script>: ' + forAttr);
@@ -2769,7 +2769,7 @@ var notify = function(msg) {
 
 var framer = {};
 
-_.extend(framer, {
+_.defaults(framer, {
 
 frameset: new HFrameset(document),
 
@@ -2986,7 +2986,7 @@ onForm: function(form) {
 });
 
 
-_.extend(framer, {
+_.defaults(framer, {
 
 lookup: function(docURL) {
 	var framer = this;
@@ -3041,7 +3041,7 @@ function implyScope(framesetSrc, docSrc) {
 }
 
 
-_.extend(framer, {
+_.defaults(framer, {
 
 options: {
 	lookup: function(url) {},
@@ -3060,13 +3060,13 @@ options: {
 
 config: function(options) {
 	var framer = this;
-	_.config(framer.options, options);
+	_.assign(framer.options, options);
 }
 
 });
 
 
-_.extend(framer, {
+_.defaults(framer, {
 
 decoders: {},
 
@@ -3090,7 +3090,7 @@ createProcessor: function(type) {
 
 });
 
-_.extend(classNamespace, {
+_.defaults(classNamespace, {
 
 	CustomDOM: CustomDOM,
 	HFrameDefinition: HFrameDefinition,
@@ -3109,7 +3109,7 @@ var MainProcessor = (function() {
 
 function MainProcessor() {}
 
-_.extend(MainProcessor.prototype, {
+_.defaults(MainProcessor.prototype, {
 
 loadTemplate: function(template) {
 	if (/\S+/.test(textContent(template))) logger.warn('"main" transforms do not use templates');
@@ -3139,7 +3139,7 @@ var ScriptProcessor = (function() {
 
 function ScriptProcessor() {}
 
-_.extend(ScriptProcessor.prototype, {
+_.defaults(ScriptProcessor.prototype, {
 
 loadTemplate: function(template) {
 	var script;
@@ -3229,7 +3229,7 @@ function htAttr(el, attr) {
 
 function HTemplateProcessor() {}
 
-_.extend(HTemplateProcessor.prototype, {
+_.defaults(HTemplateProcessor.prototype, {
 	
 loadTemplate: function(template) {
 	this.template = template;
@@ -3260,7 +3260,7 @@ function transform(el, provider, context, variables) {
 	}
 	
 	// handle for-each
-	var subVars = _.extend({}, variables);
+	var subVars = _.defaults({}, variables);
 	var subContexts = provider.evaluate(ht_forEach, context, variables, 'array');
 	var result = document.createDocumentFragment(); // FIXME which is the right doc to create this frag in??
 	
@@ -3390,7 +3390,7 @@ var CSSDecoder = (function() {
 
 function CSSDecoder() {}
 
-_.extend(CSSDecoder.prototype, {
+_.defaults(CSSDecoder.prototype, {
 
 init: function(node) {
 	this.srcNode = node;

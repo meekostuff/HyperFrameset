@@ -63,7 +63,7 @@ function getFramesetLink(doc) {
 	return link;
 }
 
-_.config(Meeko.HFrameDefinition.options, {
+_.assign(Meeko.HFrameDefinition.options, {
 	// These SHOULD be set by your frameset-document(s). This is just for backwards compat
 	duration: 0,
 	entering: { before: hide, after: show },
