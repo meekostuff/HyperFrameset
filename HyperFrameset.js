@@ -3145,6 +3145,76 @@ return MainProcessor;
 
 framer.registerProcessor('main', MainProcessor);
 
+
+var ScriptProcessor = (function() {
+
+function ScriptProcessor() {}
+
+extend(ScriptProcessor.prototype, {
+
+loadTemplate: function(template) {
+	var script;
+	forEach(siblings("starting", template.firstChild), function(node) {
+		switch (node.nodeType) {
+		case 1: // Element
+			switch (getTagName(node)) {
+			case "script":
+				if (script) logger.warn('Ignoring secondary <script> in "script" transform template');
+				else script = node;
+				return;
+			default:
+				logger.warn('Ignoring unexpected non-<script> element in "script" transform template');
+				return;
+			}
+			break; // should never reach here
+		case 3: // Text
+			if (/\S+/.test(node.nodeValue)) logger.warn('"script" transforms should not have non-empty text-nodes');
+			return;
+		case 8: // Comment
+			return;
+		default:
+			logger.warn('Unexpected node in "script" transform template');
+			return;
+		}
+	});
+	if (!script) {
+		logger.warn('No <script> found in "script" transform template');
+		return;
+	}
+	try { this.processor = (Function('return (' + scriptText(script) + ')'))(); }
+	catch(err) { }
+	
+	if (!this.processor || !this.processor.transform) {
+		logger.warn('"script" transform template did not produce valid transform object');
+		return;
+	}
+},
+
+transform: function(provider) {
+	var srcNode = provider.srcNode;
+	var processor = this.processor;
+	if (!this.processor || !this.processor.transform) {
+		logger.warn('"script" transform template did not produce valid transform object');
+		return;
+	}
+	try {
+		return this.processor.transform(srcNode);
+	}
+	catch(err) { // FIXME should trigger a fallback rendering
+		logger.warn(err); 
+		return srcNode;
+	}
+}
+	
+});
+
+
+return ScriptProcessor;
+})();
+
+framer.registerProcessor('script', ScriptProcessor);
+
+
 // NOTE textAttr & htmlAttr used in HTemplateProcessor & CSSDecoder
 var textAttr = '.text';
 var htmlAttr = '.html';
