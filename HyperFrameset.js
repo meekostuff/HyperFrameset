@@ -569,15 +569,8 @@ var $id = function(id, doc) {
 	if (!id) return;
 	if (!doc) doc = document;
 	if (!doc.getElementById) throw 'Context for $id must be a Document node';
-	var node = doc.getElementById(id);
-	if (!node) return;
-	if (node.id === id) return node;
-	// work around for broken getElementById in old IE
-	var nodeList = doc.getElementsByName(id);
-	for (var n=nodeList.length, i=0; i<n; i++) {
-		node = nodeList[i];
-		if (node.id == id) return node;
-	}
+	return doc.getElementById(id);
+	// WARN would need a work around for broken getElementById in IE <= 7
 }
 
 var $ = function(selector, context) { // WARN assumes document.querySelector
