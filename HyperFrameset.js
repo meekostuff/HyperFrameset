@@ -2629,7 +2629,7 @@ render: function() {
 	
 });
 
-function separateHead(dstDoc, isFrameset, afterRemove) { // FIXME more callback than just afterRemove?
+function separateHead(dstDoc, isFrameset) {
 	var dstHead = dstDoc.head;
 	var framesetMarker = getFramesetMarker(dstDoc);
 	if (!framesetMarker) throw 'No ' + framesetRel + ' marker found. ';
@@ -2642,18 +2642,17 @@ function separateHead(dstDoc, isFrameset, afterRemove) { // FIXME more callback 
 	function remove(node) {
 		if (getTagName(node) == "script" && (!node.type || node.type.match(/^text\/javascript/i))) return;
 		dstHead.removeChild(node);
-		if (afterRemove) afterRemove(node);
 	}
 }
 
-function mergeHead(dstDoc, srcHead, isFrameset, afterRemove) { // FIXME more callback than just afterRemove?
+function mergeHead(dstDoc, srcHead, isFrameset) {
 	var baseURL = URL(dstDoc.URL);
 	var dstHead = dstDoc.head;
 	var framesetMarker = getFramesetMarker();
 	if (!framesetMarker) throw 'No ' + framesetRel + ' marker found. ';
 	var selfMarker = getSelfMarker();
 
-	separateHead(dstDoc, isFrameset, afterRemove);
+	separateHead(dstDoc, isFrameset);
 
 	// remove duplicate scripts from srcHead
 	_.forEach(_.toArray(srcHead.childNodes), function(node) {
