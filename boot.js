@@ -32,15 +32,15 @@ var Meeko = window.Meeko || (window.Meeko = {});
  */
 var document = window.document;
 
-function each(object, fn, context) { // WARN doesn't check hasOwnProperty()
-	for (var slot in object) fn.call(context, slot, object[slot], object);
+function forOwn(object, fn, context) { // WARN doesn't check hasOwnProperty()
+	for (var slot in object) fn.call(context, object[slot], slot, object);
 }
 
 function some(a, fn, context) { 
 	for (var n=a.length, i=0; i<n; i++) if (fn.call(context, a[i], i, a)) return true;
 	return false;
 }
-var forEach = some; // WARN some() is forEach() ONLY IF fn() always returns falsish (including nothing)
+function forEach(a, fn, context) { for (var n=a.length, i=0; i<n; i++) fn.call(context, a[i], i, a); }
 
 function words(text) { return text.split(/\s+/); }
 
@@ -291,11 +291,11 @@ function onChange(e) {
 }
 
 function addListeners(events, handler) {
-	each(events, function(type, node) { addEvent(node, type, handler); });
+	forOwn(events, function(node, type) { addEvent(node, type, handler); });
 }
 
 function removeListeners(node, types, handler) {
-	each(events, function(type, node) { removeEvent(node, type, handler); });
+	forOwn(events, function(node, type) { removeEvent(node, type, handler); });
 }
 
 })();
