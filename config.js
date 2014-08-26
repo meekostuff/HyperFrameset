@@ -44,9 +44,8 @@ function getFramesetLink(doc) {
 	var link, specificity = 0;
 	_.forEach($$("link", doc.head), function(el) {
 		var tmp, sp = 0;
-		if (el.nodeType != 1) return;
+		if (!/^\bFRAMESET\b/i.test(el.rel)) return;
 		var type = el.type.toLowerCase();
-		if (!/^\s*FRAMESET\s*$/i.test(el.rel)) return;
 		if (type == "text/html" || type == "") sp += 1;
 		else {
 			logger.warn("Invalid frameset document type: " + type);
