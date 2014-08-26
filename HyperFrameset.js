@@ -1824,20 +1824,20 @@ this.push = function(node) {
 		insertNode('replace', node, script);
 		enabledRe.resolve(); 
 		if (!script.src) {
-			remove(queue, current);
+			spliceItem(queue, current);
 			completeRe.resolve();
 		}
 	}
 	
 	function onLoad(e) {
 		removeListeners();
-		remove(queue, current);
+		spliceItem(queue, current);
 		completeRe.resolve();
 	}
 
 	function onError(e) {
 		removeListeners();
-		remove(queue, current);
+		spliceItem(queue, current);
 		completeRe.reject('NetworkError'); // FIXME throw DOMError()
 	}
 
@@ -1874,7 +1874,7 @@ this.push = function(node) {
 		}	
 	}
 
-	function remove(a, item) {
+	function spliceItem(a, item) {
 		for (var n=a.length, i=0; i<n; i++) {
 			if (a[i] !== item) continue;
 			a.splice(i, 1);
