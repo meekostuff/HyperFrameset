@@ -53,6 +53,8 @@ var remove = function(a, item) { // remove the first instance of `item` in `a`
 		return;
 	}	
 }
+var toArray = function(coll) { var a = []; for (var n=coll.length, i=0; i<n; i++) a[i] = coll[i]; return a; }
+
 var forEach = function(a, fn, context) { for (var n=a.length, i=0; i<n; i++) fn.call(context, a[i], i, a); }
 
 var some = function(a, fn, context) { for (var n=a.length, i=0; i<n; i++) { if (fn.call(context, a[i], i, a)) return true; } return false; }
@@ -103,7 +105,7 @@ function(str) { return str.replace(/^\s+/, '').replace(/\s+$/, ''); }
 var _ = Meeko.stuff = {};
 extend(_, {
 	uc: uc, lc: lc, trim: trim, words: words, // string
-	contains: contains, remove: remove, forEach: forEach, some: some, every: every, map: map, filter: filter, // array
+	contains: contains, remove: remove, toArray: toArray, forEach: forEach, some: some, every: every, map: map, filter: filter, // array
 	each: each, extend: extend, config: config // object
 });
 
@@ -591,10 +593,7 @@ var $ = function(selector, context) { // WARN assumes document.querySelector
 
 var $$ = function(selector, context) { // WARN assumes document.querySelectorAll
 	context = context || document;
-	var nodeList = [];
-	var coll = context.querySelectorAll(selector);
-	for (var i=0, n=coll.length; i<n; i++) nodeList[i] = coll[i];
-	return nodeList;
+	return toArray(context.querySelectorAll(selector));
 }
 
 var siblings = function(conf, refNode, conf2, refNode2) {
@@ -666,7 +665,7 @@ var composeNode = function(srcNode, context) { // document.importNode() NOT avai
 	copyAttributes(node, srcNode);
 	switch(tag) {
 	case "title":
-		if (getTagName(node) == "title" && node.innerHTML == "") node = null;
+		if (srcNode.innerHTML === "") node = null;
 		else node.innerText = srcNode.innerHTML;
 		break;
 	case "style":
@@ -729,21 +728,14 @@ var hasAttribute = function(node, attrName) { // WARN needs to be more complex f
 }
 
 var copyAttributes = function(node, srcNode) { // helper for composeNode()
-	var attrs = srcNode.attributes;
-	forEach(attrs, copyAttributeNode, node);
+	forEach(toArray(srcNode.attributes), function(attr) {
+		node.setAttribute(attr.name, attr.value); // WARN needs to be more complex for IE <= 7
+	});
 	return node;
 }
 
-var copyAttributeNode = function(attrNode) { // WARN needs to be more complex for IE <= 7
-	this.setAttribute(attrNode.name, attrNode.value);
-}
-
 var removeAttributes = function(node) {
-	var attrs = [];
-	forEach(node.attributes, function(attr) {
-		attrs.push(attr.name);
-	});
-	forEach(attrs, function(attrName) {
+	forEach(toArray(node.attributes), function(attrName) {
 		node.removeAttribute(attrName); // WARN might not work for @class on IE <= 7
 	});
 	return node;
@@ -815,11 +807,11 @@ function(srcDoc, options) {
 		docBody = importSingleNode(srcDoc.body, doc);
 
 	docEl.appendChild(docHead);
-	for (var srcNode=srcDoc.head.firstChild; srcNode; srcNode=srcNode.nextSibling) {
-		if (srcNode.nodeType != 1) continue;
+	forEach (toArray(srcDoc.head.childNodes), function(srcNode) {
+		if (srcNode.nodeType !== 1) return;
 		var node = importSingleNode(srcNode, doc);
 		if (node) docHead.appendChild(node);
-	}
+	});
 
 	docEl.appendChild(docBody);
 	
@@ -1425,16 +1417,12 @@ var resolveAll = function(doc, baseURL, isNeutralized) {
 
 	each(urlAttributes, function(tag, attrList) {
 		var elts;
-		function getElts() {
-			if (!elts) elts = $$(tag, doc);
-			return elts;
-		}
-
 		each(attrList, function(attrName, attrDesc) {
 			var neutralized = isNeutralized && !!attrDesc.neutralize;
 			var stayNeutral = !STAGING_DOCUMENT_IS_INERT && attrDesc.neutralize > 0;
 
-			forEach(getElts(), function(el) {
+			if (!elts) elts = $$(tag, doc);
+			forEach(elts, function(el) {
 				attrDesc.resolve(el, baseURL, neutralized, stayNeutral);
 			});
 		});
@@ -1606,7 +1594,7 @@ function iframeParser(html, details) {
 		if (baseHref) baseURL = URL(baseURL.resolve(baseHref));
 
 		var doc = cloneDocument(iframeDoc, { prepare: prepare });
-	
+
 		document.head.removeChild(iframe);
 
 		doc.body.innerHTML = '<wbr />' + html; // one simple trick to get IE <= 8 to behave
@@ -1945,7 +1933,7 @@ CustomDOM.getNamespaces = function(doc) { // NOTE modelled on IE8, IE9 document.
 	var namespaces = [];
 	var xmlnsPrefix = 'xmlns:';
 	var xmlnsLength = xmlnsPrefix.length;
-	forEach(doc.documentElement.attributes, function(attr) {
+	forEach(toArray(doc.documentElement.attributes), function(attr) {
 		var fullName = lc(attr.name);
 		if (fullName.indexOf(xmlnsPrefix) !== 0) return;
 		var name = fullName.substr(xmlnsLength);
@@ -2063,7 +2051,7 @@ init: function(el) {
 		mainSelector: cdom.attr(el, 'main') // TODO consider using a hash in `@src`
     });
 	var bodies = frameDef.bodies = [];
-	forEach(siblings("starting", el.firstChild), function(node) {
+	forEach(toArray(el.childNodes), function(node) {
 		var tag = getTagName(node);
 		if (!tag) return;
 		if (contains(hfHeadTags, tag)) return; // ignore typical <head> elements
@@ -2142,7 +2130,7 @@ init: function(el) {
 		condition: cdom.attr(el, 'condition') || 'success',
 		transforms: []
 	});
-	forEach(siblings("starting", el.firstChild), function(node) {
+	forEach(toArray(el.childNodes), function(node) {
 		var tagName = getTagName(node);
 		if (!tagName) return;
 		if (!cdom.match$(node, 'transform')) {
@@ -2666,7 +2654,7 @@ function mergeHead(dstDoc, srcHead, isFrameset, afterRemove) { // FIXME more cal
 	separateHead(dstDoc, isFrameset, afterRemove);
 
 	// remove duplicate scripts from srcHead
-	forEach(siblings("starting", srcHead.firstChild), function(node) {
+	forEach(toArray(srcHead.childNodes), function(node) {
 		switch(getTagName(node)) {
 		case "script":
 			if (every($$("script", dstHead), function(el) {
@@ -2678,7 +2666,7 @@ function mergeHead(dstDoc, srcHead, isFrameset, afterRemove) { // FIXME more cal
 		srcHead.removeChild(node);
 	});
 
-	forEach(siblings("starting", srcHead.firstChild), function(srcNode) {
+	forEach(toArray(srcHead.childNodes), function(srcNode) {
 		srcHead.removeChild(srcNode);
 		if (srcNode.nodeType != 1) return;
 		switch (getTagName(srcNode)) {
@@ -2706,7 +2694,7 @@ function mergeHead(dstDoc, srcHead, isFrameset, afterRemove) { // FIXME more cal
 function frameset_insertBody(dstDoc, srcBody) {
 	var dstBody = dstDoc.body;
 	var content = dstBody.firstChild;
-	forEach(siblings("starting", srcBody.firstChild), function(node) {
+	forEach(toArray(srcBody.childNodes), function(node) {
 		insertNode("beforebegin", content, node);
 	});
 }
@@ -2856,7 +2844,7 @@ return bfScheduler.now(function() {
 			_resolveAttr(el, attrName);
 		}
 		
-		forEach(siblings("starting", document.head.firstChild), function(node) {
+		forEach(toArray(document.head.childNodes), function(node) {
 			switch (getTagName(node)) {
 			case 'script':
 				resolveAttr(node, 'src');
@@ -2986,7 +2974,7 @@ onForm: function(form) {
 
 	function encode(form) {
 		var data = [];
-		forEach(form.elements, function(el) {
+		forEach(toArray(form.elements), function(el) {
 			if (!el.name) return;
 			data.push(el.name + '=' + encodeURIComponent(el.value));
 		});
@@ -3154,7 +3142,7 @@ extend(ScriptProcessor.prototype, {
 
 loadTemplate: function(template) {
 	var script;
-	forEach(siblings("starting", template.firstChild), function(node) {
+	forEach(toArray(template.childNodes), function(node) {
 		switch (node.nodeType) {
 		case 1: // Element
 			switch (getTagName(node)) {
@@ -3298,7 +3286,7 @@ function transformNode(node, provider, context, variables) {
 	if (nodeType === 1) transformSingleElement(node, provider, context, variables);
 	if (!deep) return node;
 
-	forEach(siblings("starting", node.firstChild), function(current) {
+	forEach(toArray(node.childNodes), function(current) {
 		if (current.nodeType !== 1) return;
 		var newChild = transform(current, provider, context, variables);
 		if (newChild !== current) {
@@ -3310,9 +3298,7 @@ function transformNode(node, provider, context, variables) {
 }
 
 function transformSingleElement(el, provider, context, variables) {
-	var attrs = [];
-	_.forEach(el.attributes, function(attr) { attrs.push(attr); });
-	_.forEach(attrs, function(attr) {
+	_.forEach(toArray(el.attributes), function(attr) {
 		var attrName;
 		var prefix = false;
 		_.some([ exprPrefix, mexprPrefix ], function(prefixText) {
