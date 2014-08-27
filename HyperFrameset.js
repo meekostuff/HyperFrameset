@@ -3198,8 +3198,8 @@ framer.registerProcessor('script', ScriptProcessor);
 
 
 // NOTE textAttr & htmlAttr used in HTemplateProcessor & CSSDecoder
-var textAttr = '.text';
-var htmlAttr = '.html';
+var textAttr = '_text';
+var htmlAttr = '_html';
 
 var HTemplateProcessor = (function() {
 
