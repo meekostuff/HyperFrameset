@@ -1823,28 +1823,27 @@ _.defaults(historyManager, {
 
 onPopState: null,
 
-pushState: function(object, title, url, callback) {
+newState: function(object, title, url, useReplace, callback) {
 return scheduler.now(function() {
 	if (title == null) title = currentState.title;
 	if (!url) url = currentState.url;
 	var newState = createState(object, title, url);
 	var oldState = currentState;
-	if (history.pushState) history.pushState(newState, title, url);
+	if (history.pushState) {
+		if (useReplace) history.replaceState(newState, title, url);
+		else history.pushState(newState, title, url);
+	}
 	currentState = newState;
 	if (callback) return callback(newState.data);
 });
 },
 
 replaceState: function(object, title, url, callback) {
-return scheduler.now(function() {
-	if (title == null) title = currentState.title;
-	if (!url) url = currentState.url;
-	var newState = createState(object, title, url);
-	var oldState = currentState;
-	if (history.replaceState) history.replaceState(newState, title, url);
-	currentState = newState;
-	if (callback) return callback(newState.data);
-});
+	return this.newState(object, title, url, true, callback);
+},
+
+pushState: function(object, title, url, callback) {
+	return this.newState(object, title, url, false, callback);
 },
 
 updateState: function(object) {
