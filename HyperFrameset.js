@@ -968,46 +968,6 @@ var checkStyleSheets = function() { // TODO would be nice if this didn't need to
 	});
 }
 
-// proxy for `history` especially to guarantee `history.state` for older Webkit browsers that DO support `history.pushState`
-var historyProxy = (function() {
-
-var historyProxy = {};
-
-if (!history.pushState) return historyProxy;
-
-_.defaults(historyProxy, {
-
-state: undefined,
-
-pushState: function(object, title, url) {
-	updateState(object);
-	if (typeof url === "undefined") history.pushState(object, title);
-	else history.pushState(object, title, url);
-},
-
-replaceState: function(object, title, url) {
-	updateState(object);
-	if (typeof url === "undefined") history.replaceState(object, title);
-	else history.replaceState(object, title, url);
-}
-
-});
-
-window.addEventListener('popstate', function(e) { updateState(e.state); });
-
-function updateState(src) {
-	if (typeof src === 'object' && src !== null) {
-		historyProxy.state = {};
-		_.assign(historyProxy.state, src);
-	}
-	else historyProxy.state = src;
-}
-
-return historyProxy;
-
-})();
-
-
 var polyfill = function(doc) { // NOTE more stuff could be added here if *necessary*
 	if (!doc) doc = document;
 	if (!doc.head) doc.head = firstChild(doc.documentElement, "head");
@@ -1680,57 +1640,6 @@ return HTMLParser;
 })();
 
 
-var bfScheduler = (function() {
-	
-var queue = [];
-var maxSize = 1;
-var processing = false;
-
-function bump() {
-	if (processing) return;
-	processing = true;
-	process();
-}
-
-function process() {
-	if (queue.length <= 0) {
-		processing = false;
-		return;
-	}
-	var task = queue.shift();
-	var promise = asap(task.fn);
-	promise.then(process, process);
-	promise.then(task.resolve, task.reject);
-}
-
-var bfScheduler = {
-	
-now: function(fn, fail) {
-	return this.whenever(fn, fail, 0);
-},
-
-whenever: function(fn, fail, max) {
-return new Promise(function(resolve, reject) {
-
-	if (max == null) max = maxSize;
-	if (queue.length > max || (queue.length === max && processing)) {
-		if (fail) asap(fail).then(resolve, reject);
-		else reject();
-		return;
-	}
-	queue.push({ fn: fn, resolve: resolve, reject: reject });
-
-	bump();
-});
-}
-
-}
-
-return bfScheduler;
-
-})();
-
-
 var scriptQueue = new function() {
 
 /*
@@ -1900,6 +1809,143 @@ return new Promise(function(resolve, reject) {
 }
 
 } // end scriptQueue
+
+
+// wrapper for `history` mostly to provide locking around state-updates and throttling of popstate events
+var historyManager = (function() {
+
+var historyManager = {};
+
+var currentState;
+var stateTag = "HyperFrameset";
+
+_.defaults(historyManager, {
+
+onPopState: null,
+
+pushState: function(object, title, url, callback) {
+return scheduler.now(function() {
+	if (title == null) title = currentState.title;
+	if (!url) url = currentState.url;
+	var newState = createState(object, title, url);
+	var oldState = currentState;
+	if (history.pushState) history.pushState(newState, title, url);
+	currentState = newState;
+	if (callback) return callback(newState.data);
+});
+},
+
+replaceState: function(object, title, url, callback) {
+return scheduler.now(function() {
+	if (title == null) title = currentState.title;
+	if (!url) url = currentState.url;
+	var newState = createState(object, title, url);
+	var oldState = currentState;
+	if (history.replaceState) history.replaceState(newState, title, url);
+	currentState = newState;
+	if (callback) return callback(newState.data);
+});
+},
+
+updateState: function(object) {
+return scheduler.now(function() {
+	var title = currentState.title;
+	var url = currentState.url;
+	var newState = createState(object, title, url);
+	if (history.replaceState) history.replaceState(newState, title, url);
+});
+}
+
+});
+
+window.addEventListener('popstate', function(e) {
+		if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+		else e.stopPropagation();
+		
+		var newState = e.state;
+		if (!newState[stateTag]) {
+			logger.warn('Ignoring invalid PopStateEvent');
+			return;
+		}
+		scheduler.reset(function() {
+			var oldState = currentState;
+			currentState = newState;
+			if (!historyManager.onPopState) return;
+			return historyManager.onPopState(newState.data);
+		});
+	}, true);
+
+function createState(data, title, url) {
+	var timeStamp = +(new Date);
+	var state = {
+		title: title,
+		url: url,
+		timeStamp: timeStamp,
+		data: data
+	};
+	state[stateTag] = true;
+	return state;
+}
+
+return historyManager;
+
+})();
+
+
+var scheduler = (function() { // NOTE only used in historyManager
+
+var queue = [];
+var maxSize = 1;
+var processing = false;
+
+function bump() {
+	if (processing) return;
+	processing = true;
+	process();
+}
+
+function process() {
+	if (queue.length <= 0) {
+		processing = false;
+		return;
+	}
+	var task = queue.shift();
+	var promise = asap(task.fn);
+	promise.then(process, process);
+	promise.then(task.resolve, task.reject);
+}
+
+var scheduler = {
+	
+now: function(fn, fail) {
+	return this.whenever(fn, fail, 0);
+},
+
+reset: function(fn) {
+	queue.length = 0;
+	return this.whenever(fn, null, 1);
+},
+
+whenever: function(fn, fail, max) {
+return new Promise(function(resolve, reject) {
+
+	if (max == null) max = maxSize;
+	if (queue.length > max || (queue.length === max && processing)) {
+		if (fail) asap(fail).then(resolve, reject);
+		else reject();
+		return;
+	}
+	queue.push({ fn: fn, resolve: resolve, reject: reject });
+
+	bump();
+});
+}
+
+}
+
+return scheduler;
+
+})();
 
 
 /* BEGIN HFrameset code */
@@ -2262,7 +2308,8 @@ function HFramesetDefinition(doc, settings) {
 _.defaults(HFramesetDefinition, {
 
 options: {
-	getTarget: function(url, details) {}	
+	// lookup: function(url, details) {},
+	// detect: function(doc, details) {}
 }
 
 });
@@ -2272,6 +2319,22 @@ _.defaults(HFramesetDefinition.prototype, {
 config: function(options) {
 	var frameset = this;
 	_.assign(frameset.options, options);
+},
+
+lookup: function(url, details) {
+	var frameset = this;
+	var options = frameset.options;
+	if (!options.lookup) return;
+	var partial = options.lookup(url, details);
+	return inferChangeset(url, partial);
+},
+
+detect: function(doc, details) {
+	var frameset = this;
+	var options = frameset.options;
+	if (!options.detect) return;
+	var partial = options.detect(doc, details);
+	return inferChangeset(details.url, partial);
 },
 
 init: function(doc, settings) {
@@ -2430,27 +2493,48 @@ init: function(declaration) {
 	// NOTE now we drop declaration, including declaration.element
 },
 
-render: function() { // FIXME need a teardown method that releases child-frames	
+navigate: function(src) { // FIXME need a teardown method that releases child-frames	
+	var frame = this;
+	var frameset = frame.frameset;
+	if (src) frame.src = src;
+	else src = frame.src;
+	frame.fetch(src)
+	.then(function(doc) { return frame.render(doc); })
+	.then(function(result) {
+		frame.insert(result);
+		return frame.renderFrames(result.frames);
+	});
+},
+
+fetch: function(src) {
+	var frame = this;
+	var frameset = frame.frameset;
+	return frame.definition.options.load('get', src, null, {});
+},
+
+render: function(doc) { // FIXME need a teardown method that releases child-frames	
+	var frame = this;
+	var frameset = frame.frameset;
+	return frame.definition.render(doc);
+},
+
+insert: function(result) { // FIXME need a teardown method that releases child-frames	
 	var frame = this;
 	var frameset = frame.frameset;
 	var src = frame.src;
 	if (!src) return;
-	return frame.definition.options.load('get', src, null, {})
-	.then(function(doc) {
-		var result = frame.definition.render(doc);
-		if (!STAGING_DOCUMENT_IS_INERT) deneutralizeAll(result.element);
-		
-		// FIXME .bodyElement will probably become .bodies[] for transition animations.
-		if (frame.bodyElement) frame.element.removeChild(frame.bodyElement);
-		var bodyEl = frameset.document.createElement('div');
-		bodyEl.setAttribute('is', getTagName(result.element));
-		var node;
-		while (node = result.element.firstChild) bodyEl.appendChild(node);
-		frame.bodyElement = bodyEl;
-		frame.element.appendChild(bodyEl);
-		frame.renderFrames(result.frames);
-	});
+	if (!STAGING_DOCUMENT_IS_INERT) deneutralizeAll(result.element);
+	
+	// FIXME .bodyElement will probably become .bodies[] for transition animations.
+	if (frame.bodyElement) frame.element.removeChild(frame.bodyElement);
+	var bodyEl = frameset.document.createElement('div');
+	bodyEl.setAttribute('is', getTagName(result.element));
+	var node;
+	while (node = result.element.firstChild) bodyEl.appendChild(node);
+	frame.bodyElement = bodyEl;
+	frame.element.appendChild(bodyEl);
 },
+
 
 renderFrames: function(frames) {
 	var frame = this;
@@ -2459,8 +2543,9 @@ renderFrames: function(frames) {
 	_.forEach(frames, function(declaration) {
 		var childFrame = new HFrame(declaration, hframeset);
 		frame.frames.push(childFrame);
-		if (childFrame.name === framer.currentTarget) childFrame.src = framer.currentURL;
-		childFrame.render(); // FIXME promisify
+		var src;
+		if (childFrame.name === framer.currentChangeset.target) src = framer.currentChangeset.url;
+		childFrame.navigate(src); // FIXME promisify
 	});
 }
 
@@ -2483,6 +2568,7 @@ init: function(dstDoc) {
 	var hframeset = this;
 	_.defaults(hframeset, {
 		frameset: hframeset,
+		srcTree: null, // NOTE temporary store between prepare() and render()
 		document: dstDoc,
 		src: null,
 		definition: null
@@ -2496,23 +2582,31 @@ load: function(url, options) {
 	var method = 'get';
 	return framer.options.load(method, url, null, { method: method, url: url, prepare: hfParserPrepare })
 	.then(function(framesetDoc) {
-		hframeset.definition = new HFramesetDefinition(framesetDoc, options);
+		return new HFramesetDefinition(framesetDoc, options);
+	})
+	.then(function(definition) {
+		hframeset.definition = definition;
+		return hframeset.prepare();
 	});
 },
 
-renderFrames: HFrame.prototype.renderFrames,
-
-render: function() {
-
+prepare: function() {
 	var hframeset = this;
 	var dstDoc = hframeset.document;
 	var definition = hframeset.definition;
+
+	var srcTree = hframeset.srcTree;
+	if (!srcTree) {
+		srcTree = definition.render();
+		if (!STAGING_DOCUMENT_IS_INERT) deneutralizeAll(srcTree.document);
+	}
+	var srcDoc = srcTree.document;
+
+	hframeset.srcTree = srcTree;
+	
 	if (getFramesetMarker(dstDoc)) throw "The HFrameset has already been applied";
 
 	var selfMarker;
-	var srcTree = definition.render();
-	var srcDoc = srcTree.document;
-	if (!STAGING_DOCUMENT_IS_INERT) deneutralizeAll(srcDoc);
 	
 	return pipe(null, [
 
@@ -2544,7 +2638,7 @@ render: function() {
 				return;
 			}
 			if (script.src) {
-				logger.warn('<script> with @for MUST NOT have @src');
+				logger.warn('Ignoring <script> declaration - @for not compatible with @src');
 				return;
 			}
 			var forOptions;
@@ -2566,16 +2660,26 @@ render: function() {
 			}
 		}); // FIXME this breaks if a script inserts other scripts
 		return scriptQueue.empty();
-	},
+	}
+	]);
 
-	function() {
-		var url = framer.currentURL = document.URL;
-		var framesetOptions = framer.frameset.definition.options;
-		if (framesetOptions.getTarget) {
-			framer.currentTarget = framesetOptions.getTarget(url);
-		}
-	},
 	
+},
+
+renderFrames: HFrame.prototype.renderFrames,
+
+render: function() {
+
+	var hframeset = this;
+	var dstDoc = hframeset.document;
+	var definition = hframeset.definition;
+
+	var srcTree = hframeset.srcTree;
+	var srcDoc = srcTree.document;
+	hframeset.srcTree = null;
+	
+	return pipe(null, [
+
 	function() {
 		var srcBody = srcDoc.body;
 		mergeElement(dstDoc.body, srcBody);
@@ -2610,14 +2714,6 @@ render: function() {
 
 	]);
 
-	// NOTE render() returns now. The following functions are hoisted
-	
-	function mergeElement(dst, src) { // NOTE this removes all dst (= landing page) attrs and imports all src (= frameset) attrs.
-		removeAttributes(dst);
-		copyAttributes(dst, src);
-		dst.removeAttribute('style'); // FIXME is this appropriate? There should at least be a warning
-	}
-
 }
 	
 });
@@ -2647,26 +2743,12 @@ function mergeHead(dstDoc, srcHead, isFrameset) {
 
 	separateHead(dstDoc, isFrameset);
 
-	// remove duplicate scripts from srcHead
-	_.forEach(_.toArray(srcHead.childNodes), function(node) {
-		switch(getTagName(node)) {
-		case "script":
-			if (_.every($$("script", dstHead), function(el) {
-				return baseURL.resolve(el.src) != node.src; // FIXME @src should already be resolved to absURL
-			})) return;
-			break;
-		default: return;
-		}
-		srcHead.removeChild(node);
-	});
-
 	_.forEach(_.toArray(srcHead.childNodes), function(srcNode) {
-		srcHead.removeChild(srcNode);
 		if (srcNode.nodeType != 1) return;
 		switch (getTagName(srcNode)) {
 		case "title":
-			if (!srcNode.innerHTML) return; // IE will add a title even if non-existant
 			if (isFrameset) return; // ignore <title> in frameset. FIXME what if topic content has no <title>?
+			if (!srcNode.innerHTML) return; // IE will add a title even if non-existant
 			break;
 		case "link": // FIXME no duplicates @rel, @href pairs
 			break;
@@ -2693,6 +2775,11 @@ function frameset_insertBody(dstDoc, srcBody) {
 	});
 }
 
+function mergeElement(dst, src) { // NOTE this removes all dst (= landing page) attrs and imports all src (= frameset) attrs.
+	removeAttributes(dst);
+	copyAttributes(dst, src);
+	dst.removeAttribute('style'); // FIXME is this appropriate? There should at least be a warning
+}
 
 var framesetRel = 'frameset'; // NOTE http://lists.w3.org/Archives/Public/www-html/1996Dec/0143.html
 var selfRel = 'self';
@@ -2771,8 +2858,8 @@ started: false,
 landingDocument: null,
 
 start: function(startOptions) {
-return bfScheduler.now(function() {
-
+	var framer = this;
+	
 	if (framer.started) throw "Already started";
 	if (!startOptions || !startOptions.contentDocument) throw "No contentDocument passed to start()";
 
@@ -2784,40 +2871,46 @@ return bfScheduler.now(function() {
 	
 	return pipe(null, [
 		
+	function() { // sanity check
+		return wait(function() { return !!document.body; });		
+	},
+
 	function() { // lookup or detect framesetURL
-		var framesetConf;
-		framesetConf = framer.lookup(document.URL);
-		if (framesetConf) return framesetConf;
+		var framerConfig;
+		framerConfig = framer.lookup(document.URL);
+		if (framerConfig) return framerConfig;
 		return startOptions.contentDocument
 			.then(function(doc) {
 				return framer.detect(doc);
 			});
 	},
-	function(framesetConf) { // initiate fetch of framesetURL
-		if (!framesetConf) throw "No frameset could be determined for this page";
-		return framer.frameset.load(framesetConf.framesetURL, framesetConf);
-	},
-	
-	function() {
-		return wait(function() { return !!document.body; });		
-	},
 
-	function() { resolveURLs(); },
+	function(framerConfig) { // initiate fetch of framesetURL
+		if (!framerConfig) throw "No frameset could be determined for this page";
+		return framer.frameset.load(framerConfig.framesetURL, framerConfig);
+	},
 	
-	function() {
-		return framer.frameset.render(); // FIXME what if render fails??
+	function() { resolveURLs(); }, // FIXME this assumes the landing document wasn't captured or cloned.
+	
+	function() { // FIXME this should in framer.start()
+		var url = document.URL;
+		var changeset = framer.currentChangeset = framer.frameset.definition.lookup(url, {
+			referrer: document.referrer
+		});
+		return historyManager.replaceState(changeset, '', document.URL, function() {
+			return framer.frameset.render(); // FIXME what if render fails??
+		});
 	},
 	
 	function() {
-		if (!historyProxy.pushState) return;
-	
 		// NOTE fortuitously all the browsers that support pushState() also support addEventListener() and dispatchEvent()
 		window.addEventListener("click", function(e) { framer.onClick(e); }, true);
 		window.addEventListener("submit", function(e) { framer.onSubmit(e); }, true);
+		historyManager.onPopState = function(state) { return framer.onPopState(state) };
 	}
 	
 	]);
-});
+
 	// start() returns now. The following are hoisted
 	
 	function resolveURLs() { // NOTE resolve URLs in landing page
@@ -2859,7 +2952,7 @@ onClick: function(e) {
 	// Before panning to the next page, have to work out if that is appropriate
 	// `return` means ignore the click
 
-	if (!framer.options.lookup) return; // no panning if can't lookup frameset of next page
+	if (!framer.options.lookup) return; // no panning if can't lookup frameset of next page. FIXME test result of framer.lookup(url)
 	
 	if (e.button != 0) return; // FIXME what is the value for button in IE's W3C events model??
 	if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return; // FIXME do these always trigger modified click behavior??
@@ -2888,36 +2981,15 @@ onClick: function(e) {
 	});
 },
 
-onPageLink: function(url, details) {	// TODO Need to handle anchor links. The following just replicates browser behavior
+onPageLink: function(url, details) {
 	var framer = this;
-	alert('ignoring on-same-page links for now.'); // FIXME
+	alert('Ignoring on-same-page links for now.'); // FIXME
 },
 
 onSiteLink: function(url, details) {	// Now attempt to pan
 	var framer = this;
-	var framesetOptions = framer.frameset.definition.options;
-	var target = framesetOptions.getTarget(url, details);
-	framer.assign(url, {
-		target: target
-	});
-},
-
-assign: function(url, details) {
-	var framer = this;
-	var frameset = framer.frameset;
-	var frames = [];
-	var target = details.target;
-	walkFrames(frameset, function(frame) { if (frame.name === target) frames.push(frame); });
-	// FIXME warning if more than one frame??
-	_.forEach(frames, function(frame) {
-		frame.src = url;
-		frame.render();
-	});
-	return; // FIXME promisify
-
-	function walkFrames(current, callback) {
-		_.forEach(current.frames, function(frame) { callback(frame); walkFrames(frame, callback); });
-	}
+	var changeset = framer.frameset.definition.lookup(url, details);
+	framer.assign(url, changeset);
 },
 
 onSubmit: function(e) {
@@ -2927,7 +2999,7 @@ onSubmit: function(e) {
 	// Before panning to the next page, have to work out if that is appropriate
 	// `return` means ignore the submit
 
-	if (!framer.options.lookup) return; // no panning if can't lookup frameset of next page
+	if (!framer.options.lookup) return; // no panning if can't lookup frameset of next page FIXME need to check return value of framer.lookup(action)
 	
 	// test submit
 	var form = e.target;
@@ -2973,6 +3045,52 @@ onForm: function(form) {
 			data.push(el.name + '=' + encodeURIComponent(el.value));
 		});
 		return data.join('&');
+	}
+},
+
+assign: function(url, changeset) {
+	// changeset.replace = false;
+	return this.navigate(url, changeset);
+},
+
+navigate: function(url, changeset) {
+
+	var framer = this;	
+	return historyManager.pushState(changeset, '', url, function(state) {
+		var frameset = framer.frameset;
+		var frames = [];
+		var target = changeset.target;
+		walkFrames(frameset, function(frame) { if (frame.name === target) frames.push(frame); });
+		// FIXME warning if more than one frame??
+		_.forEach(frames, function(frame) {
+			frame.navigate(url);
+		});
+	});
+
+	function walkFrames(current, callback) {
+		_.forEach(current.frames, function(frame) { callback(frame); walkFrames(frame, callback); });
+	}
+
+},
+
+onPopState: function(changeset) {
+	var framer = this;
+	var frameset = framer.frameset;
+	var frames = [];
+	var url = changeset.url;
+	if (url !== document.URL) {
+		logger.warn('Popped state URL does not match address-bar URL.');
+		// FIXME needs an optional error recovery, perhaps reloading document.URL
+	}
+	var target = changeset.target;
+	walkFrames(frameset, function(frame) { if (frame.name === target) frames.push(frame); });
+	// FIXME warning if more than one frame??
+	_.forEach(frames, function(frame) {
+		frame.navigate(url);
+	});
+
+	function walkFrames(current, callback) {
+		_.forEach(current.frames, function(frame) { callback(frame); walkFrames(frame, callback); });
 	}
 }
 
@@ -3033,18 +3151,43 @@ function implyScope(framesetSrc, docSrc) {
 	return scope;
 }
 
+function inferChangeset(url, partial) {
+	var inferred = {
+		url: url
+	}
+	
+	switch (typeof partial) {
+	case 'string':
+		inferred.target = partial;
+		break;
+	case 'object':
+		/*
+		if (partial instanceof Array) {
+			inferred.target = partial[0];
+			inferred.targets = partial.slice(0);
+			break;
+		}
+		*/
+	default:
+		throw 'Invalid changeset returned from lookup()';
+		break;
+	}
+	
+	return inferred;
+}
+
 
 _.defaults(framer, {
 
 options: {
-	lookup: function(url) {},
-	detect: function(document) {},
 	load: function(method, url, data, details) {
 		var framesetOptions = this;
 		var loader = new HTMLLoader(framesetOptions);
 		return loader.load(method, url, data, details);
 	}
 	/* The following options are also available (unless otherwise indicated) *
+	lookup: function(url) {},
+	detect: function(document) {},
 	entering: { before: noop, after: noop },
 	leaving: { before: noop, after: noop }, // TODO not called at all
 	ready: noop // TODO should this be entering:complete ??
