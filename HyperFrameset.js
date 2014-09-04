@@ -2671,12 +2671,21 @@ prepare: function() {
 		mergeElement(dstDoc.head, srcDoc.head);
 		mergeHead(dstDoc, srcDoc.head, true);
 		// allow scripts to run. FIXME scripts should always be appended to document.head
+		var forScripts = [];
 		_.forEach($$("script", dstDoc.head), function(script) {
 			var forAttr = script.getAttribute('for');
-			if (!forAttr) {
-				scriptQueue.push(script);
+			if (forAttr) { // TODO possibly we want to evaluate forScripts in document order
+				forScripts.push(script);
 				return;
 			}
+			scriptQueue.push(script);
+		});
+		return scriptQueue.empty().then(function() { return forScripts; });
+	},
+	
+	function(forScripts) {
+		_.forEach(forScripts, function(script) {
+			var forAttr = script.getAttribute('for');
 			if (script.src) {
 				logger.warn('Ignoring <script> declaration - @for not compatible with @src');
 				return;
@@ -2699,7 +2708,6 @@ prepare: function() {
 				logger.warn('Unsupported value of @for on <script>: ' + forAttr);
 			}
 		}); // FIXME this breaks if a script inserts other scripts
-		return scriptQueue.empty();
 	}
 	]);
 
