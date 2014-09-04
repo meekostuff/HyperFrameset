@@ -1816,43 +1816,49 @@ var historyManager = (function() {
 
 var historyManager = {};
 
-var currentState;
 var stateTag = "HyperFrameset";
+var currentState;
+var popStateHandler;
+var started = false;
 
 _.defaults(historyManager, {
 
-onPopState: null,
+getState: function() {
+	return currentState;
+},
 
-newState: function(object, title, url, useReplace, callback) {
+start: function(data, title, url, onNewState, onPopState) { // FIXME this should call onPopState if history.state is defined
 return scheduler.now(function() {
-	if (title == null) title = currentState.title;
-	if (!url) url = currentState.url;
-	var newState = createState(object, title, url);
-	var oldState = currentState;
-	if (history.pushState) {
-		if (useReplace) history.replaceState(newState, title, url);
-		else history.pushState(newState, title, url);
+	if (started) throw 'historyManager has already started';
+	started = true;
+	popStateHandler = onPopState;
+	var newState = State.create(data, title, url);
+	if (history.replaceState) {
+		history.replaceState(newState.settings, title, url);
 	}
 	currentState = newState;
-	if (callback) return callback(newState.data);
+	return onNewState(newState);
 });
 },
 
-replaceState: function(object, title, url, callback) {
-	return this.newState(object, title, url, true, callback);
-},
-
-pushState: function(object, title, url, callback) {
-	return this.newState(object, title, url, false, callback);
-},
-
-updateState: function(object) {
+newState: function(data, title, url, useReplace, callback) {
 return scheduler.now(function() {
-	var title = currentState.title;
-	var url = currentState.url;
-	var newState = createState(object, title, url);
-	if (history.replaceState) history.replaceState(newState, title, url);
+	var newState = State.create(data, title, url);
+	if (history.replaceState) {
+		if (useReplace) history.replaceState(newState.settings, title, url);
+		else history.pushState(newState.settings, title, url);
+	}
+	currentState = newState;
+	if (callback) return callback(newState);
 });
+},
+
+replaceState: function(data, title, url, callback) {
+	return this.newState(data, title, url, true, callback);
+},
+
+pushState: function(data, title, url, callback) {
+	return this.newState(data, title, url, false, callback);
 }
 
 });
@@ -1861,18 +1867,53 @@ window.addEventListener('popstate', function(e) {
 		if (e.stopImmediatePropagation) e.stopImmediatePropagation();
 		else e.stopPropagation();
 		
-		var newState = e.state;
-		if (!newState[stateTag]) {
+		var newSettings = e.state;
+		if (!newSettings[stateTag]) {
 			logger.warn('Ignoring invalid PopStateEvent');
 			return;
 		}
 		scheduler.reset(function() {
-			var oldState = currentState;
-			currentState = newState;
-			if (!historyManager.onPopState) return;
-			return historyManager.onPopState(newState.data);
+			currentState = new State(newSettings);
+			if (!popStateHandler) return;
+			return popStateHandler(currentState);
 		});
 	}, true);
+
+function State(settings) {
+	if (!settings[stateTag]) throw 'Invalid settings for new State';
+	this.settings = settings;
+}
+
+State.create = function(data, title, url) {
+	var timeStamp = +(new Date);
+	var settings = {
+		title: title,
+		url: url,
+		timeStamp: timeStamp,
+		data: data
+	};
+	settings[stateTag] = true;
+	return new State(settings);
+}
+
+_.defaults(State.prototype, {
+
+getData: function() {
+	return this.settings.data;
+},
+
+update: function(data, callback) {
+	var state = this;
+	return Promise.resolve(function() {
+		if (state !== currentState) throw 'Cannot update state: not current';
+		return scheduler.now(function() {
+			if (history.replaceState) history.replaceState(state.settings, title, url);
+			return callback(state);
+		});
+	});
+}
+
+});
 
 function createState(data, title, url) {
 	var timeStamp = +(new Date);
@@ -2896,16 +2937,16 @@ start: function(startOptions) {
 		var changeset = framer.currentChangeset = framer.frameset.definition.lookup(url, {
 			referrer: document.referrer
 		});
-		return historyManager.replaceState(changeset, '', document.URL, function() {
-			return framer.frameset.render(); // FIXME what if render fails??
-		});
+		return historyManager.start(changeset, '', document.URL,
+				function(state) { return framer.frameset.render(); }, // FIXME what if render fails??
+				function(state) { return framer.onPopState(state.getData()); }
+			);
 	},
 	
 	function() {
 		// NOTE fortuitously all the browsers that support pushState() also support addEventListener() and dispatchEvent()
 		window.addEventListener("click", function(e) { framer.onClick(e); }, true);
 		window.addEventListener("submit", function(e) { framer.onSubmit(e); }, true);
-		historyManager.onPopState = function(state) { return framer.onPopState(state) };
 	}
 	
 	]);
