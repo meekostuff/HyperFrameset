@@ -616,11 +616,11 @@ var siblings = function(conf, refNode, conf2, refNode2) {
 var matchesElement = function(selector, node) { // WARN only matches by tagName
 	var tag = _.lc(selector);
 	var matcher = function(el) {
-		return (el.nodeType == 1 && getTagName(el) == tag);
+		return (el.nodeType === 1 && getTagName(el) === tag);
 	}
 	return (node) ? matcher(node) : matcher;
 }
-var firstChild = function(parent, matcher) {
+var firstChild = function(parent, matcher) { // WARN only matches by tagName or matcher function
 	var fn = (typeof matcher == "function") ? 
 		matcher : 
 		matchesElement(matcher);
@@ -629,6 +629,12 @@ var firstChild = function(parent, matcher) {
 		var node = nodeList[i];
 		if (fn(node)) return node;
 	}
+}
+var closest = function(el, matcher) { // WARN only matches by tagName or matcher function
+	var fn = (typeof matcher == "function") ? 
+		matcher : 
+		matchesElement(matcher);
+	for (var node=el; node && node.nodeType===1; node=node.parentNode) if (fn(node)) return node;
 }
 var insertNode = function(conf, refNode, node) { // like imsertAdjacentHTML but with a node and auto-adoption
 	var doc = refNode.ownerDocument;
@@ -977,7 +983,7 @@ var polyfill = function(doc) { // NOTE more stuff could be added here if *necess
 var DOM = Meeko.DOM || (Meeko.DOM = {});
 _.defaults(DOM, {
 	getTagName: getTagName, hasAttribute: hasAttribute, matchesElement: matchesElement, // properties
-	$id: $id, $: $, $$: $$, siblings: siblings, firstChild: firstChild, // selections
+	$id: $id, $: $, $$: $$, siblings: siblings, firstChild: firstChild, closest: closest, // selections
 	copyAttributes: copyAttributes, removeAttributes: removeAttributes, textContent: textContent, scriptText: scriptText, // attrs
 	composeNode: composeNode, importSingleNode: importSingleNode, insertNode: insertNode, // nodes
 	ready: domReady, addEvent: addEvent, removeEvent: removeEvent, overrideDefaultAction: overrideDefaultAction, // events
@@ -3006,8 +3012,8 @@ onClick: function(e) {
 	if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return; // FIXME do these always trigger modified click behavior??
 
 	// Find closest <a> to e.target
-	for (var target=e.target; target!=document; target=target.parentNode) if (getTagName(target) == "a") break;
-	if (getTagName(target) != "a") return; // only handling hyperlink clicks
+	var target = closest(e.target, 'a');
+	if (!target) return; // only handling hyperlink clicks
 	var href = target.getAttribute("href");
 	if (!href) return; // not really a hyperlink
 
