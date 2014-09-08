@@ -1817,6 +1817,54 @@ return new Promise(function(resolve, reject) {
 } // end scriptQueue
 
 
+var nodeManager = (function() {
+	
+// TODO all this node manager stuff assumes that nodes are only released on unload
+// This might need revising
+
+var nodeIdProperty = vendorPrefix + 'ID';
+var nodeCount = 0; // used to generated node IDs
+var nodeTable = []; // list of nodes being managed
+var nodeStorage = {}; // hash of storage for nodes, keyed off `nodeIdProperty`
+
+var nodeManager = {
+
+setData: function(node, data) { // FIXME assert node is element
+	var nodeId = node[nodeIdProperty];
+	if (!nodeId) {
+		nodeId = '__' + vendorPrefix + '_' + nodeCount++;
+		node[nodeIdProperty] = new String(nodeId); // NOTE so that node cloning in IE doesn't copy the node ID property
+		nodeTable.push(node);
+	}
+	nodeStorage[nodeId] = data;
+},
+hasData: function(node) {
+	var nodeId = node[nodeIdProperty];
+	return !nodeId ? false : nodeId in nodeStorage;
+},
+getData: function(node, key) {
+	var nodeId = node[nodeIdProperty];
+	if (!nodeId) return;
+	return nodeStorage[nodeId];
+},
+releaseNodes: function(callback, context) {
+	for (var i=nodeTable.length-1; i>=0; i--) {
+		var node = nodeTable[i];
+		delete nodeTable[i];
+		if (callback) callback.call(context, node);
+		var nodeId = node[nodeIdProperty];
+		delete nodeStorage[nodeId];
+	}
+	nodeTable.length = 0;
+}
+
+}
+
+return nodeManager;
+
+})();
+
+
 // wrapper for `history` mostly to provide locking around state-updates and throttling of popstate events
 var historyManager = (function() {
 
@@ -2105,7 +2153,7 @@ _.defaults(HFrameDefinition, {
 */
 options: { 
 	duration: 0,
-	load: function(method, url, data, details) {
+	load: function(method, url, data, details) { // FIXME load() shouldn't be a HFrame option. It should be in something like a ServiceWorker cache module
 		var frameOptions = this;
 		var loader = new HTMLLoader(frameOptions);
 		return loader.load(method, url, data, details);
@@ -2126,6 +2174,24 @@ config: function(options) {
 	_.assign(frameDef.options, options);
 },
 
+lookup: function(url, details) {
+	var frameDef = this;
+	var options = frameDef.options;
+	if (!options.lookup) return;
+	var partial = options.lookup(url, details);
+	if (!partial) return;
+	return inferChangeset(url, partial);
+},
+
+detect: function(doc, details) {
+	var frameDef = this;
+	var options = frameDef.options;
+	if (!options.detect) return;
+	var partial = options.detect(doc, details);
+	if (!partial) return;
+	return inferChangeset(details.url, partial);
+},
+
 init: function(el) {
     var frameDef = this;
 	var frameset = frameDef.frameset;
@@ -2141,6 +2207,21 @@ init: function(el) {
 	_.forEach(_.toArray(el.childNodes), function(node) {
 		var tag = getTagName(node);
 		if (!tag) return;
+		if (tag === 'script') { // TODO factor out common code with <script for=""> evaluation in <head>
+			// FIXME only the first <script> should be eval'd. Latter scripts should produce warnings.
+			var script = node;
+			if (script.src) {
+				logger.warn('Ignoring <script> declaration - @src not compatible with HFrame options scripts');
+				return;
+			}
+			var options;
+			try {
+				options = (Function('return (' + scriptText(script) + ');'))();
+			}
+			catch(err) { return; } // FIXME log a warning
+			_.assign(frameDef.options, options);
+			return;
+		}
 		if (_.contains(hfHeadTags, tag)) return; // ignore typical <head> elements
 		if (cdom.match$(node, 'body')) {
 			bodies.push(new HBodyDefinition(node, frameset));
@@ -2372,6 +2453,7 @@ lookup: function(url, details) {
 	var options = frameset.options;
 	if (!options.lookup) return;
 	var partial = options.lookup(url, details);
+	if (!partial) return;
 	return inferChangeset(url, partial);
 },
 
@@ -2380,6 +2462,7 @@ detect: function(doc, details) {
 	var options = frameset.options;
 	if (!options.detect) return;
 	var partial = options.detect(doc, details);
+	if (!partial) return;
 	return inferChangeset(details.url, partial);
 },
 
@@ -2536,10 +2619,12 @@ init: function(declaration) {
 	_.defaults(frame, declaration);
 	frame.element = el;
 	frame.bodyElement = null;
+	
+	nodeManager.setData(el, frame);
 	// NOTE now we drop declaration, including declaration.element
 },
 
-navigate: function(src) { // FIXME need a teardown method that releases child-frames	
+load: function(src) { // FIXME need a teardown method that releases child-frames	
 	var frame = this;
 	var frameset = frame.frameset;
 	if (src) frame.src = src;
@@ -2591,8 +2676,18 @@ renderFrames: function(frames) {
 		frame.frames.push(childFrame);
 		var src;
 		if (childFrame.name === framer.currentChangeset.target) src = framer.currentChangeset.url;
-		childFrame.navigate(src); // FIXME promisify
+		childFrame.load(src); // FIXME promisify
 	});
+},
+
+onRequestNavigation: function(e) {
+	var frame = this;
+	var details = e.details;
+	var url = details.url;
+	var changeset = frame.definition.lookup(url, details);
+	if (!changeset) return true; // TODO traditional events use return-value to prevent-default
+	framer.load(url, changeset);
+	return false;
 }
 
 });
@@ -2768,8 +2863,18 @@ render: function() {
 
 	]);
 
+},
+
+onRequestNavigation: function(e) {
+	var hframeset = this;
+	var details = e.details;
+	var url = details.url;
+	var changeset = hframeset.definition.lookup(url, details);
+	if (!changeset) return true; // TODO traditional events use return-value to prevent-default
+	framer.navigate(url, changeset);
+	return false;
 }
-	
+
 });
 
 function separateHead(dstDoc, isFrameset) {
@@ -2951,6 +3056,7 @@ start: function(startOptions) {
 		var changeset = framer.currentChangeset = framer.frameset.definition.lookup(url, {
 			referrer: document.referrer
 		});
+		// FIXME what if no changeset is returned
 		return historyManager.start(changeset, '', document.URL,
 				function(state) { return framer.frameset.render(); }, // FIXME what if render fails??
 				function(state) { return framer.onPopState(state.getData()); }
@@ -3006,33 +3112,78 @@ onClick: function(e) {
 	// Before panning to the next page, have to work out if that is appropriate
 	// `return` means ignore the click
 
-	if (!framer.options.lookup) return; // no panning if can't lookup frameset of next page. FIXME test result of framer.lookup(url)
-	
 	if (e.button != 0) return; // FIXME what is the value for button in IE's W3C events model??
 	if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return; // FIXME do these always trigger modified click behavior??
 
-	// Find closest <a> to e.target
-	var target = closest(e.target, 'a');
-	if (!target) return; // only handling hyperlink clicks
-	var href = target.getAttribute("href");
+	// Find closest <a href> to e.target
+	var hyperlink = closest(e.target, 'a');
+	if (!hyperlink) return; // only handling hyperlink clicks
+	var href = hyperlink.getAttribute("href");
 	if (!href) return; // not really a hyperlink
 
-	// test hyperlinks
-	if (target.target) return; // no iframe
 	var baseURL = URL(document.URL);
 	var url = baseURL.resolve(href); // TODO probably don't need to resolve on browsers that support pushstate
+
+	// NOTE The following creates a pseudo-event and dispatches to frames in a bubbling order.
+	// FIXME May as well use a virtual event system, e.g. DOMSprockets
+	var details = {
+		url: url,
+		referrer: document.URL,
+		element: hyperlink
+	}; // TODO more details?? event??
+	
+	var requestNavigationEvent = {
+		type: "requestNavigation",
+		target: hyperlink,
+		details: details
+	};
+
+	if (someAncestorFrames(hyperlink, function(frame) {
+		requestNavigationEvent.currentTarget = frame.element;
+		if (!frame.onRequestNavigation(requestNavigationEvent)) { // TODO currently using traditional events which return false for preventDefault()
+			e.preventDefault();
+			return true;
+		}
+	})) return;
+	
+	// test hyperlinks
 	var oURL = URL(url);
 	if (oURL.origin != baseURL.origin) return; // no external urls
 
-	var details = { element: target }; // TODO more details?? event??
-	
 	// TODO perhaps should test same-site and same-page links
-	var isPageLink = (oURL.nohash == baseURL.nohash); // TODO what about page-links that match the current hash?
-	// From here on we effectively take over the default-action of the event
-	overrideDefaultAction(e, function(event) {
-		if (isPageLink) framer.onPageLink(url, details);
-		else framer.onSiteLink(url, details);
-	});
+	var isPageLink = (oURL.nohash === baseURL.nohash); // TODO what about page-links that match the current hash?
+	if (isPageLink) {
+		framer.onPageLink(url, details);
+		e.preventDefault();
+		return;
+	}
+
+	var frameset = framer.frameset;
+	var framesetScope = framer.lookup(url);
+	if (!framesetScope || framesetScope.framesetURL !== frameset.src || framesetScope.scope !== frameset.scope) {
+		e.preventDefault();
+		return;
+	}
+	
+	requestNavigationEvent.currentTarget = document; // FIXME or document.body??
+	if (!frameset.onRequestNavigation(requestNavigationEvent)) {
+		e.preventDefault();
+		return;
+	}
+
+	logger.error('There was a problem handling the url: ' + url + '\n' + 'Fallback to browser navigation');
+	return;
+	
+	function someAncestorFrames(el, callback) {
+		var frameTag = framer.frameset.definition.cdom.prefix + 'frame';
+		function matcher(node) { return node.getAttribute('is') === frameTag; } 
+		var node = el;
+		while (node = closest(node.parentNode, matcher)) {
+			var frame = nodeManager.getData(node);
+			if (frame && callback(frame)) return true;
+		}
+		return false;
+	}
 },
 
 onPageLink: function(url, details) {
@@ -3043,6 +3194,7 @@ onPageLink: function(url, details) {
 onSiteLink: function(url, details) {	// Now attempt to pan
 	var framer = this;
 	var changeset = framer.frameset.definition.lookup(url, details);
+	// FIXME what if no changeset is returned
 	framer.assign(url, changeset);
 },
 
@@ -3053,8 +3205,6 @@ onSubmit: function(e) {
 	// Before panning to the next page, have to work out if that is appropriate
 	// `return` means ignore the submit
 
-	if (!framer.options.lookup) return; // no panning if can't lookup frameset of next page FIXME need to check return value of framer.lookup(action)
-	
 	// test submit
 	var form = e.target;
 	if (form.target) return; // no iframe
@@ -3102,29 +3252,27 @@ onForm: function(form) {
 	}
 },
 
-assign: function(url, changeset) {
-	// changeset.replace = false;
-	return this.navigate(url, changeset);
-},
-
 navigate: function(url, changeset) {
-
 	var framer = this;	
 	return historyManager.pushState(changeset, '', url, function(state) {
-		var frameset = framer.frameset;
-		var frames = [];
-		var target = changeset.target;
-		walkFrames(frameset, function(frame) { if (frame.name === target) frames.push(frame); });
-		// FIXME warning if more than one frame??
-		_.forEach(frames, function(frame) {
-			frame.navigate(url);
-		});
+		framer.load(url, changeset);
+	});
+},
+
+load: function(url, changeset) {
+	var framer = this;	
+	var frameset = framer.frameset;
+	var frames = [];
+	var target = changeset.target;
+	walkFrames(frameset, function(frame) { if (frame.name === target) frames.push(frame); });
+	// FIXME warning if more than one frame??
+	_.forEach(frames, function(frame) {
+		frame.load(url);
 	});
 
 	function walkFrames(current, callback) {
 		_.forEach(current.frames, function(frame) { callback(frame); walkFrames(frame, callback); });
 	}
-
 },
 
 onPopState: function(changeset) {
@@ -3140,7 +3288,7 @@ onPopState: function(changeset) {
 	walkFrames(frameset, function(frame) { if (frame.name === target) frames.push(frame); });
 	// FIXME warning if more than one frame??
 	_.forEach(frames, function(frame) {
-		frame.navigate(url);
+		frame.load(url);
 	});
 
 	function walkFrames(current, callback) {
