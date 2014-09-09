@@ -5,11 +5,13 @@
 
 (function() { // NOTE throwing an error or returning from this wrapper function prematurely aborts booting
 
+var require_pushState = true; // NOTE being non-commital, otherwise this would be hard-wired, not over-rideable
+
 var defaults = { // NOTE defaults also define the type of the associated config option
 	"no_boot": false, 
-	"no_frameset": false, // NOTE !(window.XMLHttpRequest && window.sessionStorage && window.JSON && 'readyState' in document) is enforced anyway
+	"no_frameset": require_pushState ? !history.pushState : false, // NOTE !(window.XMLHttpRequest && window.sessionStorage && window.JSON && 'readyState' in document) is enforced anyway
 	"no_style": false,
-	"capturing": true, // FIXME this must be true for now
+	"capturing": true,
 	"log_level": "warn",
 	"hidden_timeout": 0, // 3000, FIXME 
 	"startup_timeout": 10000, // abort if startup takes longer than this
@@ -674,9 +676,9 @@ if (isSet('no_style')) {
 }
 
 var no_frameset = isSet('no_frameset');
-if (no_frameset || !(window.XMLHttpRequest && sessionOptions && 'readyState' in document)) {
-	if (!no_frameset) throw 'Capturing depends on native XMLHttpRequest and sessionStorage and JSON';
-	return;
+if (no_frameset) return; // TODO logger.info()
+if (!(window.XMLHttpRequest && sessionOptions && 'readyState' in document)) {
+	throw 'HyperFrameset depends on native XMLHttpRequest and sessionStorage and JSON';
 }
 
 
