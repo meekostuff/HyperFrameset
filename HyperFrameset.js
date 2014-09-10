@@ -70,6 +70,14 @@ var filter = function(a, fn, context) {
 	return output;
 }
 
+var find = function(a, fn, context) {
+	for (var n=a.length, i=0; i<n; i++) {
+		var item = a[i];
+		var success = fn.call(context, item, i, a);
+		if (success) return item;
+	}
+}
+
 var words = function(text) { return text.split(/\s+/); }
 
 var forOwn = (Object.keys) ? // TODO is this feature detection worth-while?
@@ -99,7 +107,7 @@ function(str) { return str.replace(/^\s+/, '').replace(/\s+$/, ''); }
 var _ = Meeko.stuff = {};
 defaults(_, {
 	uc: uc, lc: lc, trim: trim, words: words, // string
-	contains: contains, toArray: toArray, forEach: forEach, some: some, every: every, map: map, filter: filter, // array
+	contains: contains, toArray: toArray, forEach: forEach, some: some, every: every, map: map, filter: filter, find: find, // array
 	forOwn: forOwn, defaults: defaults, assign: assign, extend: assign // object
 });
 
@@ -2230,19 +2238,22 @@ init: function(el) {
 		logger.warn('Unexpected element in HFrame: ' + tag);
 		return;
 	});
+	// FIXME create fallback bodies
 },
 
-render: function(doc, conditions) {
+render: function(doc, condition) {
 	var frameDef = this;
 	var frameset = frameDef.frameset;
 	var cdom = frameset.cdom;
-	var bodyDef = frameDef.bodies[0]; // FIXME use .condition
 	var options = {
 		mainSelector: frameDef.mainSelector,
 		type: frameDef.type
 	}
+	var bodyDef = _.find(frameDef.bodies, function(body) { return body.condition === condition;});
+	if (!bodyDef) return; // FIXME what to do here??
 	return bodyDef.render(doc, options);
 }
+
 	
 });
 
@@ -2287,6 +2298,28 @@ function HBodyDefinition(el, frameset) {
 	this.init(el);
 }
 
+var conditions = words('uninitialized loading loaded error');
+
+var conditionAliases = {
+	'blank': 'uninitialized',
+	'waiting': 'loading',
+	'interactive': 'loaded',
+	'complete': 'loaded'
+}
+
+function normalizeCondition(condition) {
+	condition = _.lc(condition);
+	if (_.contains(conditions, condition)) return condition;
+	return conditionAliases[condition];
+}
+
+_.defaults(HBodyDefinition, {
+	
+conditions: conditions,
+conditionAliases: conditionAliases
+
+});
+
 _.defaults(HBodyDefinition.prototype, {
 
 init: function(el) {
@@ -2295,29 +2328,36 @@ init: function(el) {
 	var cdom = frameset.cdom;
 	_.defaults(bodyDef, {
 		element: el,
-		condition: cdom.attr(el, 'condition') || 'success',
+		condition: normalizeCondition(cdom.attr(el, 'condition')) || 'loaded',
+		fragment: frameset.document.createDocumentFragment(),
 		transforms: []
 	});
-	_.forEach(_.toArray(el.childNodes), function(node) {
-		var tagName = getTagName(node);
-		if (!tagName) return;
-		if (!cdom.match$(node, 'transform')) {
-			logger.warn('Unexpected element in HBody: ' + tagName);
-			return;
-		}
-		bodyDef.transforms.push(new HTransformDefinition(node, frameset));
-	});
+	var node;
+	while (node = el.firstChild) {
+		el.removeChild(node);
+		if (cdom.match$(node, 'transform')) bodyDef.transforms.push(new HTransformDefinition(node, frameset));
+		else bodyDef.fragment.appendChild(node);
+	}
+	if (!bodyDef.transforms.length && bodyDef.condition === 'loaded') {
+		logger.warn('HBody definition for loaded content contains no HTransform definitions');
+	}
 },
 
 render: function(doc, options) {
 	var bodyDef = this;
 	var frameset = bodyDef.frameset;
 	var cdom = frameset.cdom;
-	var fragment = doc;
-	if (options.mainSelector) fragment = $(options.mainSelector, doc);
-	_.forEach(bodyDef.transforms, function(transform) {
-		fragment = transform.process(fragment);
-	});
+	var fragment;
+	if (bodyDef.transforms.length) {
+		fragment = doc;
+		if (options.mainSelector) fragment = $(options.mainSelector, doc);
+		_.forEach(bodyDef.transforms, function(transform) {
+			fragment = transform.process(fragment);
+		});
+	}
+	else {
+		fragment = bodyDef.fragment.cloneNode(true);
+	}
 	var el = bodyDef.element.cloneNode(false);
 	var result = new HBodyResult(el, frameset);
 	result.compose(fragment);
@@ -2629,12 +2669,28 @@ load: function(src) { // FIXME need a teardown method that releases child-frames
 	var frameset = frame.frameset;
 	if (src) frame.src = src;
 	else src = frame.src;
-	frame.fetch(src)
-	.then(function(doc) { return frame.render(doc); })
-	.then(function(result) {
+	return pipe(null, [
+	
+	function() { return frame.preload(); },
+	function() { return frame.fetch(src); },
+	function(doc) { return frame.render(doc); },
+	function(result) {
 		frame.insert(result);
 		return frame.renderFrames(result.frames);
-	});
+	}
+
+	]);
+},
+
+preload: function() {
+	var frame = this;
+	var frameset = frame.frameset;
+	return pipe(null, [
+		
+	function() { return frame.definition.render(null, 'loading'); },
+	function(result) { if (result) frame.insert(result); }
+	
+	]);
 },
 
 fetch: function(src) {
@@ -2646,7 +2702,7 @@ fetch: function(src) {
 render: function(doc) { // FIXME need a teardown method that releases child-frames	
 	var frame = this;
 	var frameset = frame.frameset;
-	return frame.definition.render(doc);
+	return frame.definition.render(doc, 'loaded');
 },
 
 insert: function(result) { // FIXME need a teardown method that releases child-frames	
