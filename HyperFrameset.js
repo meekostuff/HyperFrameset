@@ -933,13 +933,7 @@ _.defaults(DOM, {
 	polyfill: polyfill
 });
 
-/* loadHTML & parseHTML are AJAX utilities */
-var loadHTML = function(url) { // WARN only performs GET
-	var htmlLoader = new HTMLLoader();
-	var method = 'get';
-	return htmlLoader.load(method, url, null, { method: method, url: url });
-}
-
+/* parseHTML are AJAX utilities */
 var parseHTML = function(html, details) {
 	var parser = new HTMLParser();
 	return parser.parse(html, details);
@@ -1036,7 +1030,7 @@ var IE9_SOURCE_ELEMENT_BUG = (function() {
 
 
 _.defaults(DOM, {
-	loadHTML: loadHTML, parseHTML: parseHTML,
+	parseHTML: parseHTML,
 	HTML_IN_XHR: HTML_IN_XHR, HTML_IN_DOMPARSER: HTML_IN_DOMPARSER,
 	STAGING_DOCUMENT_IS_INERT: STAGING_DOCUMENT_IS_INERT, IE9_SOURCE_ELEMENT_BUG: IE9_SOURCE_ELEMENT_BUG
 });
@@ -1124,60 +1118,57 @@ _.defaults(URL, {
 	deneutralize: deneutralizeURL
 });
 
+var httpProxy = Meeko.httpProxy = (function() {
 
-var HTMLLoader = Meeko.HTMLLoader = (function() {
-
-var HTMLLoader = function(options) {
-	if (!(this instanceof HTMLLoader)) return new HTMLLoader(options);
-	if (!options) return;
-	var htmlLoader = this;
-	_.forOwn(options, function(val, key) {
-		if (key === 'load') return;
-		if (!(key in htmlLoader)) return;
-		htmlLoader[key] = val;
-	});
+var methods = words('get'); // TODO words('get post put delete');
+var responseTypes = words('document'); // TODO words('document json text');
+var defaultInfo = {
+	method: 'get',
+	responseType: 'document'
 }
 
-_.defaults(HTMLLoader.prototype, {
+var httpProxy = {
 
-load: function(method, url, data, extras) {
-	var htmlLoader = this;
-	var details = {};
-	if (typeof extras === 'object') _.defaults(details, extras);
+load: function(url, requestInfo) {
+	var info = {
+		url: url
+	};
+	if (requestInfo) _.defaults(info, requestInfo);
+	_.defaults(info, defaultInfo);
+	if (!_.contains(methods, info.method)) throw 'method not supported: ' + info.method;
+	if (!_.contains(responseTypes, info.responseType)) throw 'responseType not supported: ' + info.responseType;
+	return request(info);
+}
 
-	if (!details) details = {};
-	if (!details.method) details.method = method;	
-	if (!details.url) details.url = url;
-	
-	return htmlLoader.request(method, url, data, details);
-},
+}
 
-serialize: function(data, details) { return ""; },  // WARN unused / untested
-
-request: function(method, url, data, details) {
+var request = function(info) {
 	var sendText = null;
-	method = _.lc(method);
-	if ('post' == method) {
+	method = _.lc(info.method);
+	switch (method) {
+	case 'post':
 		throw "POST not supported"; // FIXME proper error handling
-		sendText = this.serialize(data, details);
-	}
-	else if ('get' == method) {
+		info.body = serialize(info.body, info.type);
+		break;
+	case 'get':
 		// no-op
-	}
-	else {
+		break;
+	default:
 		throw _.uc(method) + ' not supported';
+		break;
 	}
-	return doRequest(method, url, sendText, details);
+	return doRequest(info);
 }
 
-});
-
-var doRequest = function(method, url, sendText, details) {
+var doRequest = function(info) {
 return new Promise(function(resolve, reject) {
+	var method = info.method;
+	var url = info.url;
+	var sendText = info.body; // FIXME not-implemented
 	var xhr = new XMLHttpRequest;
 	xhr.onreadystatechange = onchange;
 	xhr.open(method, url, true);
-	if (HTML_IN_XHR) xhr.responseType = 'document';
+	if (HTML_IN_XHR) xhr.responseType = info.responseType;
 	xhr.send(sendText);
 	function onchange() {
 		if (xhr.readyState != 4) return;
@@ -1188,21 +1179,25 @@ return new Promise(function(resolve, reject) {
 		asap(onload); // Use delay to stop the readystatechange event interrupting other event handlers (on IE). 
 	}
 	function onload() {
-		var doc;
-		if (HTML_IN_XHR) {
-			var doc = xhr.response;
-			normalize(doc, details);
-			resolve(doc);
-		}
-		else {
-			var parserFu = parseHTML(new String(xhr.responseText), details);
-			resolve(parserFu);
-		}
+		var result = handleResponse(xhr, info);
+		resolve(result);
 	}
 });
 }
 
-return HTMLLoader;
+function handleResponse(xhr, info) { // TODO handle info.responseType
+	var doc;
+	if (HTML_IN_XHR) {
+		var doc = xhr.response;
+		normalize(doc, info);
+		return doc;
+	}
+	else {
+		return parseHTML(new String(xhr.responseText), info);
+	}
+}
+
+return httpProxy;
 
 })();
 
@@ -1369,7 +1364,7 @@ var deneutralizeAll = function(doc) {
 	normalize() is called between html-parsing (internal) and document normalising (external function).
 	It is called after using the native parser:
 	- with DOMParser#parseFromString(), see HTMLParser#nativeParser()
-	- with XMLHttpRequest & xhr.responseType='document', see HTMLLoader#request()
+	- with XMLHttpRequest & xhr.responseType='document', see httpProxy's request()
 	The iframe parser implements similar functionality
 */
 function normalize(doc, details) { 
@@ -1394,7 +1389,7 @@ var HTMLParser = Meeko.HTMLParser = (function() {
 // This class allows external code to provide a `prepare(doc)` method for before content parsing.
 // The main reason to do this is the so called `html5shiv`. 
 
-var HTMLParser = function() { // TODO should this receive options like HTMLLoader??
+var HTMLParser = function() { // TODO should this receive options
 	if (this instanceof HTMLParser) return;
 	return new HTMLParser();
 }
@@ -1858,7 +1853,7 @@ pushState: function(data, title, url, callback) {
 
 });
 
-window.addEventListener('popstate', function(e) {
+if (history.replaceState) window.addEventListener('popstate', function(e) {
 		if (e.stopImmediatePropagation) e.stopImmediatePropagation();
 		else e.stopPropagation();
 		
@@ -2093,13 +2088,7 @@ _.defaults(HFrameDefinition, {
  This means that before and after listeners are registered as a pair, which is desirable.
 */
 options: { 
-	duration: 0,
-	load: function(method, url, data, details) { // FIXME load() shouldn't be a HFrame option. It should be in something like a ServiceWorker cache module
-		var frameOptions = this;
-		var loader = new HTMLLoader(frameOptions);
-		return loader.load(method, url, data, details);
-	}
-
+	duration: 0
 	/* The following options are also available *
 	entering: { before: hide, after: show },
 	leaving: { before: hide, after: show }
@@ -2629,7 +2618,7 @@ preload: function() {
 fetch: function(src) {
 	var frame = this;
 	var frameset = frame.frameset;
-	return frame.definition.options.load('get', src, null, {});
+	return httpProxy.load(src, { method: 'get', url: src, responseType: 'document' }); // TODO one day may support different response-type
 },
 
 render: function(doc) { // FIXME need a teardown method that releases child-frames	
@@ -2710,7 +2699,7 @@ load: function(url, options) {
 	hframeset.src = url;
 	hframeset.scope = options.scope;
 	var method = 'get';
-	return framer.options.load(method, url, null, { method: method, url: url, prepare: hfParserPrepare })
+	return httpProxy.load(url, { method: method, url: url, responseType: 'document', prepare: hfParserPrepare })
 	.then(function(framesetDoc) {
 		return new HFramesetDefinition(framesetDoc, options);
 	})
@@ -3053,6 +3042,7 @@ start: function(startOptions) {
 	},
 	
 	function() {
+		if (!history.replaceState) return;
 		// NOTE fortuitously all the browsers that support pushState() also support addEventListener() and dispatchEvent()
 		window.addEventListener("click", function(e) { framer.onClick(e); }, true);
 		window.addEventListener("submit", function(e) { framer.onSubmit(e); }, true);
@@ -3371,12 +3361,7 @@ function inferChangeset(url, partial) {
 _.defaults(framer, {
 
 options: {
-	load: function(method, url, data, details) {
-		var framesetOptions = this;
-		var loader = new HTMLLoader(framesetOptions);
-		return loader.load(method, url, data, details);
-	}
-	/* The following options are also available (unless otherwise indicated) *
+	/* The following options are available (unless otherwise indicated) *
 	lookup: function(url) {},
 	detect: function(document) {},
 	entering: { before: noop, after: noop },
