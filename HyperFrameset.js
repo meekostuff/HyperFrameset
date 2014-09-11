@@ -1186,14 +1186,22 @@ return new Promise(function(resolve, reject) {
 }
 
 function handleResponse(xhr, info) { // TODO handle info.responseType
-	var doc;
+	var response = {
+		url: info.url,
+		type: info.responseType,
+		status: xhr.status,
+		statusText: xhr.statusText
+	};
 	if (HTML_IN_XHR) {
-		var doc = xhr.response;
-		normalize(doc, info);
-		return doc;
+		response.document = normalize(xhr.response, info);
+		return response;
 	}
 	else {
-		return parseHTML(new String(xhr.responseText), info);
+		return parseHTML(new String(xhr.responseText), info)
+		.then(function(doc) {
+				response.document = doc;
+				return response;
+		});
 	}
 }
 
@@ -2163,7 +2171,7 @@ init: function(el) {
 	// FIXME create fallback bodies
 },
 
-render: function(doc, condition) {
+render: function(resource, condition) {
 	var frameDef = this;
 	var frameset = frameDef.frameset;
 	var cdom = frameset.cdom;
@@ -2173,7 +2181,7 @@ render: function(doc, condition) {
 	}
 	var bodyDef = _.find(frameDef.bodies, function(body) { return body.condition === condition;});
 	if (!bodyDef) return; // FIXME what to do here??
-	return bodyDef.render(doc, options);
+	return bodyDef.render(resource, options);
 }
 
 	
@@ -2265,12 +2273,13 @@ init: function(el) {
 	}
 },
 
-render: function(doc, options) {
+render: function(resource, options) {
 	var bodyDef = this;
 	var frameset = bodyDef.frameset;
 	var cdom = frameset.cdom;
 	var fragment;
 	if (bodyDef.transforms.length) {
+		var doc = resource.document; // FIXME what if resource is a Request?
 		fragment = doc;
 		if (options.mainSelector) fragment = $(options.mainSelector, doc);
 		_.forEach(bodyDef.transforms, function(transform) {
@@ -2586,6 +2595,17 @@ init: function(declaration) {
 	// NOTE now we drop declaration, including declaration.element
 },
 
+preload: function(request) {
+	var frame = this;
+	var frameset = frame.frameset;
+	return pipe(null, [
+		
+	function() { return frame.definition.render(request, 'loading'); },
+	function(result) { if (result) frame.insert(result); }
+	
+	]);
+},
+
 load: function(src) { // FIXME need a teardown method that releases child-frames	
 	var frame = this;
 	var frameset = frame.frameset;
@@ -2595,23 +2615,12 @@ load: function(src) { // FIXME need a teardown method that releases child-frames
 	
 	function() { return frame.preload(); },
 	function() { return frame.fetch(src); },
-	function(doc) { return frame.render(doc); },
+	function(response) { return frame.render(response); },
 	function(result) {
 		frame.insert(result);
 		return frame.renderFrames(result.frames);
 	}
 
-	]);
-},
-
-preload: function() {
-	var frame = this;
-	var frameset = frame.frameset;
-	return pipe(null, [
-		
-	function() { return frame.definition.render(null, 'loading'); },
-	function(result) { if (result) frame.insert(result); }
-	
 	]);
 },
 
@@ -2621,10 +2630,10 @@ fetch: function(src) {
 	return httpProxy.load(src, { method: 'get', url: src, responseType: 'document' }); // TODO one day may support different response-type
 },
 
-render: function(doc) { // FIXME need a teardown method that releases child-frames	
+render: function(response) { // FIXME need a teardown method that releases child-frames	
 	var frame = this;
 	var frameset = frame.frameset;
-	return frame.definition.render(doc, 'loaded');
+	return frame.definition.render(response, 'loaded');
 },
 
 insert: function(result) { // FIXME need a teardown method that releases child-frames	
@@ -2698,9 +2707,9 @@ load: function(url, options) {
 	var hframeset = this;
 	hframeset.src = url;
 	hframeset.scope = options.scope;
-	var method = 'get';
-	return httpProxy.load(url, { method: method, url: url, responseType: 'document', prepare: hfParserPrepare })
-	.then(function(framesetDoc) {
+	return httpProxy.load(url, { method: 'get', url: url, responseType: 'document', prepare: hfParserPrepare })
+	.then(function(response) {
+		var framesetDoc = response.document;
 		return new HFramesetDefinition(framesetDoc, options);
 	})
 	.then(function(definition) {
