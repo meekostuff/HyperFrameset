@@ -437,7 +437,7 @@ return new Promise(function(resolve, reject) {
 }
 
 function asapTest(test) {
-	return asap(test.fn)
+	asap(test.fn)
 	.then(function(done) {
 		if (done) test.resolve();
 		else deferTest(test);
@@ -456,9 +456,7 @@ function deferTest(test) {
 function poller() {
 	var currentTests = tests;
 	tests = [];
-	preach(currentTests, function(i, test) {
-		return asapTest(test);
-	});
+	_.forEach(currentTests, asapTest);
 }
 
 return wait;
@@ -481,71 +479,6 @@ function pipe(startValue, fnList) {
 		promise = promise.then(fn);
 	}
 	return promise;
-}
-
-function preach(src, fn) {
-return new Promise(function(resolve, reject) {
-
-	var mode =
-		(typeof src === 'function') ? 'function' :
-		(src == null) ? 'null' :
-		('length' in src) ? 'array' :
-		'object';
-	if (mode === 'null') throw 'src cannot be null in preach(src, fn)';
-	if (mode === 'object') {
-		var keys = [], n = 0;
-		_.forOwn(src, function(v, k) { keys[n++] = k; });
-	}
-
-	var i = 0;
-	next();
-	return;
-
-	function next() {
-		asap(callback)['catch'](errCallback);		
-	}
-	function callback() {
-		var key, value;
-		switch (mode) {
-		case 'function':
-			key = i;
-			value = src(key);
-			break;
-		case 'array':
-			if (i >= src.length) {
-				resolve();
-				return;
-			}
-			key = i;
-			value = src[key];
-			break;
-		case 'object':
-			if (i >= keys.length) {
-				resolve();
-				return;
-			}
-			key = keys[i];
-			value = src[key];
-			break;
-		}
-		i++;
-		var current = Promise.resolve(value)
-		.then(function(val) {
-			if (mode === 'function' && val == null) {
-				resolve();
-				return;
-			}
-			var result = fn(key, val, src);
-			current.then(next);
-			return result;
-		});
-		return current;
-	}
-	function errCallback(error) {
-		reject(error);
-	}
-	
-});
 }
 
 Promise.pollingInterval = defaultOptions['polling_interval'];
