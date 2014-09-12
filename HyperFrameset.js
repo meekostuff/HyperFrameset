@@ -2663,16 +2663,6 @@ renderFrames: function(frames) { // FIXME promisify
 
 		]);
 	});
-},
-
-onRequestNavigation: function(e) {
-	var frame = this;
-	var details = e.details;
-	var url = details.url;
-	var changeset = frame.definition.lookup(url, details);
-	if (!changeset) return true; // TODO traditional events use return-value to prevent-default
-	framer.load(url, changeset);
-	return false;
 }
 
 });
@@ -2848,16 +2838,6 @@ render: function() {
 
 	]);
 
-},
-
-onRequestNavigation: function(e) {
-	var hframeset = this;
-	var details = e.details;
-	var url = details.url;
-	var changeset = hframeset.definition.lookup(url, details);
-	if (!changeset) return true; // TODO traditional events use return-value to prevent-default
-	framer.navigate(url, changeset);
-	return false;
 }
 
 });
@@ -3118,15 +3098,8 @@ onClick: function(e) {
 		element: hyperlink
 	}; // TODO more details?? event??
 	
-	var requestNavigationEvent = {
-		type: "requestNavigation",
-		target: hyperlink,
-		details: details
-	};
-
 	if (someAncestorFrames(hyperlink, function(frame) {
-		requestNavigationEvent.currentTarget = frame.element;
-		if (!frame.onRequestNavigation(requestNavigationEvent)) { // TODO currently using traditional events which return false for preventDefault()
+		if (onRequestNavigation(frame, details, false)) {
 			e.preventDefault();
 			return true;
 		}
@@ -3151,8 +3124,7 @@ onClick: function(e) {
 		return;
 	}
 	
-	requestNavigationEvent.currentTarget = document; // FIXME or document.body??
-	if (!frameset.onRequestNavigation(requestNavigationEvent)) {
+	if (onRequestNavigation(frameset, details, true)) {
 		e.preventDefault();
 		return;
 	}
@@ -3170,6 +3142,15 @@ onClick: function(e) {
 		}
 		return false;
 	}
+	
+	function onRequestNavigation(frame, details, isFrameset) {
+		var url = details.url;
+		var changeset = frame.definition.lookup(url, details);
+		if (!changeset) return false;
+		framer.load(url, changeset, isFrameset);
+		return true;
+	}
+
 },
 
 onPageLink: function(url, details) {
