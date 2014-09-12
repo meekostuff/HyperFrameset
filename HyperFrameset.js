@@ -2181,7 +2181,7 @@ render: function(resource, condition) {
 	}
 	var bodyDef = _.find(frameDef.bodies, function(body) { return body.condition === condition;});
 	if (!bodyDef) return; // FIXME what to do here??
-	return bodyDef.render(resource, options);
+	return bodyDef.render(resource, condition, options);
 }
 
 	
@@ -2273,13 +2273,15 @@ init: function(el) {
 	}
 },
 
-render: function(resource, options) {
+render: function(resource, condition, options) {
 	var bodyDef = this;
 	var frameset = bodyDef.frameset;
 	var cdom = frameset.cdom;
 	var fragment;
 	if (bodyDef.transforms.length) {
+		if (!resource) return null;
 		var doc = resource.document; // FIXME what if resource is a Request?
+		if (!doc) return null;
 		fragment = doc;
 		if (options.mainSelector) fragment = $(options.mainSelector, doc);
 		_.forEach(bodyDef.transforms, function(transform) {
@@ -2598,25 +2600,27 @@ init: function(declaration) {
 preload: function(request) {
 	var frame = this;
 	var frameset = frame.frameset;
-	return pipe(null, [
+	return pipe(request, [
 		
-	function() { return frame.definition.render(request, 'loading'); },
-	function(result) { if (result) frame.insert(result); }
+	function(request) { return frame.definition.render(request, 'loading'); },
+	function(result) {
+		if (!result) return;
+		return frame.insert(result);
+		// FIXME what about descendent frames
+	}
 	
 	]);
 },
 
-load: function(src) { // FIXME need a teardown method that releases child-frames	
+load: function(response) { // FIXME need a teardown method that releases child-frames	
 	var frame = this;
 	var frameset = frame.frameset;
-	if (src) frame.src = src;
-	else src = frame.src;
-	return pipe(null, [
+	frame.src = response.url;
+	return pipe(response, [
 	
-	function() { return frame.preload(); },
-	function() { return frame.fetch(src); },
-	function(response) { return frame.render(response); },
+	function(response) { return frame.definition.render(response, 'loaded'); },
 	function(result) {
+		if (!result) return;
 		frame.insert(result);
 		return frame.renderFrames(result.frames);
 	}
@@ -2624,23 +2628,9 @@ load: function(src) { // FIXME need a teardown method that releases child-frames
 	]);
 },
 
-fetch: function(src) {
-	var frame = this;
-	var frameset = frame.frameset;
-	return httpProxy.load(src, { method: 'get', url: src, responseType: 'document' }); // TODO one day may support different response-type
-},
-
-render: function(response) { // FIXME need a teardown method that releases child-frames	
-	var frame = this;
-	var frameset = frame.frameset;
-	return frame.definition.render(response, 'loaded');
-},
-
 insert: function(result) { // FIXME need a teardown method that releases child-frames	
 	var frame = this;
 	var frameset = frame.frameset;
-	var src = frame.src;
-	if (!src) return;
 	if (!STAGING_DOCUMENT_IS_INERT) deneutralizeAll(result.element);
 	
 	// FIXME .bodyElement will probably become .bodies[] for transition animations.
@@ -2654,7 +2644,7 @@ insert: function(result) { // FIXME need a teardown method that releases child-f
 },
 
 
-renderFrames: function(frames) {
+renderFrames: function(frames) { // FIXME promisify
 	var frame = this;
 	var hframeset = frame.frameset;
 	frame.frames = [];
@@ -2662,8 +2652,16 @@ renderFrames: function(frames) {
 		var childFrame = new HFrame(declaration, hframeset);
 		frame.frames.push(childFrame);
 		var src;
-		if (childFrame.name === framer.currentChangeset.target) src = framer.currentChangeset.url;
-		childFrame.load(src); // FIXME promisify
+		if (childFrame.name === framer.currentChangeset.target) src = framer.currentChangeset.url; // FIXME should only be used at startup
+		else src = childFrame.src;
+		var request = { method: 'get', url: src, responseType: 'document'};
+		return pipe(null, [
+		
+		function() { return childFrame.preload(request); },
+		function() { return httpProxy.load(src, request); },
+		function(response) { return childFrame.load(response); }
+
+		]);
 	});
 },
 
@@ -3242,24 +3240,33 @@ onForm: function(form) {
 
 navigate: function(url, changeset) {
 	var framer = this;	
-	return historyManager.pushState(changeset, '', url, function(state) {
-		framer.load(url, changeset);
-	});
+	return framer.load(url, changeset, true);
 },
 
-load: function(url, changeset) {
+load: function(url, changeset, changeState) {
 	var framer = this;	
 	var frameset = framer.frameset;
-	var frames = [];
 	var target = changeset.target;
+	var frames = [];
 	walkFrames(frameset, function(frame) { if (frame.name === target) frames.push(frame); });
+	var request =  { method: 'get', url: url, responseType: 'document' }; // TODO one day may support different response-type
 	// FIXME warning if more than one frame??
 	_.forEach(frames, function(frame) {
-		frame.load(url);
+		frame.preload(request);
+	});
+	return httpProxy.load(url, request)
+	.then(function(response) {
+		if (changeState) return historyManager.pushState(changeset, '', url, function(state) {
+				loadFrames(frames, response)
+			});
+		else return loadFrames(frames, response);
 	});
 
 	function walkFrames(current, callback) {
 		_.forEach(current.frames, function(frame) { callback(frame); walkFrames(frame, callback); });
+	}
+	function loadFrames(frames, response) {
+		_.forEach(frames, function(frame) { frame.load(response); });
 	}
 },
 
@@ -3272,16 +3279,7 @@ onPopState: function(changeset) {
 		logger.warn('Popped state URL does not match address-bar URL.');
 		// FIXME needs an optional error recovery, perhaps reloading document.URL
 	}
-	var target = changeset.target;
-	walkFrames(frameset, function(frame) { if (frame.name === target) frames.push(frame); });
-	// FIXME warning if more than one frame??
-	_.forEach(frames, function(frame) {
-		frame.load(url);
-	});
-
-	function walkFrames(current, callback) {
-		_.forEach(current.frames, function(frame) { callback(frame); walkFrames(frame, callback); });
-	}
+	framer.load(url, changeset);
 }
 
 });
