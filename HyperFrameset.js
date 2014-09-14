@@ -2522,12 +2522,14 @@ render: function() {
  */
 
 function rebase(doc, scopeURL) {
-	_.forOwn(urlAttributes, function(attrName, tag) {
+	_.forOwn(urlAttributes, function(attrList, tag) {
 		_.forEach($$(tag, doc), function(el) {
-			var relURL = el.getAttribute(attrName);
-			if (relURL == null) return;
-			var url = rebaseURL(relURL, baseURL);
-			if (url != relURL) el[attrName] = url;
+			_.forOwn(attrList, function(attrDesc, attrName) {
+				var relURL = el.getAttribute(attrName);
+				if (relURL == null) return;
+				var url = rebaseURL(relURL, scopeURL);
+				if (url != relURL) el[attrName] = url;
+			});
 		});
 	});
 }
@@ -2622,7 +2624,7 @@ load: function(response) { // FIXME need a teardown method that releases child-f
 	function(result) {
 		if (!result) return;
 		frame.insert(result);
-		return frame.renderFrames(result.frames);
+		return frame.handleChildFrames(result.frames);
 	}
 
 	]);
@@ -2643,25 +2645,14 @@ insert: function(result) { // FIXME need a teardown method that releases child-f
 	frame.element.appendChild(bodyEl);
 },
 
-
-renderFrames: function(frames) { // FIXME promisify
+handleChildFrames: function(frames) { // FIXME promisify
 	var frame = this;
 	var hframeset = frame.frameset;
 	frame.frames = [];
 	_.forEach(frames, function(declaration) {
 		var childFrame = new HFrame(declaration, hframeset);
 		frame.frames.push(childFrame);
-		var src;
-		if (childFrame.name === framer.currentChangeset.target) src = framer.currentChangeset.url; // FIXME should only be used at startup
-		else src = childFrame.src;
-		var request = { method: 'get', url: src, responseType: 'document'};
-		return pipe(null, [
-		
-		function() { return childFrame.preload(request); },
-		function() { return httpProxy.load(src, request); },
-		function(response) { return childFrame.load(response); }
-
-		]);
+		return framer.handleFrame(childFrame);
 	});
 }
 
@@ -2790,7 +2781,7 @@ prepare: function() {
 	
 },
 
-renderFrames: HFrame.prototype.renderFrames,
+handleChildFrames: HFrame.prototype.handleChildFrames,
 
 render: function() {
 
@@ -2814,7 +2805,7 @@ render: function() {
 		dstDoc.body.insertBefore(framesetEnd, contentStart);
 
  		frameset_insertBody(dstDoc, srcBody);
-		hframeset.renderFrames(srcTree.frames); // FIXME promisify
+		hframeset.handleChildFrames(srcTree.frames); // FIXME promisify
 	},
 	function() {
 		return notify({
@@ -3249,6 +3240,20 @@ load: function(url, changeset, changeState) {
 	function loadFrames(frames, response) {
 		_.forEach(frames, function(frame) { frame.load(response); });
 	}
+},
+
+handleFrame: function(frame) {
+	var src;
+	if (frame.name === framer.currentChangeset.target) src = framer.currentChangeset.url; // FIXME should only be used at startup
+	else src = frame.src;
+	var request = { method: 'get', url: src, responseType: 'document'};
+	return pipe(null, [
+	
+	function() { return frame.preload(request); },
+	function() { return httpProxy.load(src, request); },
+	function(response) { return frame.load(response); }
+
+	]);
 },
 
 onPopState: function(changeset) {
