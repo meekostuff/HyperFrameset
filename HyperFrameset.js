@@ -1005,7 +1005,7 @@ attr: function(name, value) {
 	if (typeof value === 'undefined') return element.getAttribute(name);
 	element.setAttribute(name, value); // TODO DWIM
 },
-hasClass: function(token) {
+hasClass: function(token) { // FIXME use @class instead of .className
 	return _.contains(_.words(this.boundElement.className), token);
 },
 addClass: function(token) {
@@ -3367,16 +3367,14 @@ var HFrame = sprockets.Base.evolve({
 
 init: function() {
 	var frame = this;
-	var frameset = framer.frameset; // FIXME strong coupling
-	var cdom = frameset.definition.cdom;
-	var element = frame.boundElement;
 	_.defaults(frame, {
 		bodyElement: null,
-		name: cdom.attr(element, 'name'),
-		src: cdom.attr(element, 'src'),
-		mainSelector: cdom.attr(element, 'main') // TODO consider using a hash in `@src`
+		name: frame.attr('name'),
+		src: frame.attr('src'),
+		mainSelector: frame.attr('main') // TODO consider using a hash in `@src`
     });
-	var defId = cdom.attr(element, 'def');
+	var defId = frame.attr('def');
+	var frameset = framer.frameset; // FIXME strong coupling
 	frame.definition = frameset.definition.frames[defId];
 },
 
