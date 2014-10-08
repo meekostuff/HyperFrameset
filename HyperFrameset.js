@@ -985,12 +985,12 @@ function() {
 			_.forEach(record.removedNodes, sprockets.nodeRemoved, sprockets);
 		});
 	});
-	observer.observe(document.body, { childList: true, subtree: true });
+	observer.observe(document, { childList: true, subtree: true });
 	
 	// FIXME when to call observer.disconnect() ??
 } :
 function() { // otherwise assume MutationEvents. TODO is this assumption safe?
-	document.body.addEventListener('DOMNodeInserted', function(e) {
+	document.addEventListener('DOMNodeInserted', function(e) {
 		e.stopPropagation();
 		if (!started) return;
 		sprockets.nodeInserted(e.target);
@@ -3314,8 +3314,11 @@ init: function(doc, settings) {
 	var scopeURL = URL(settings.scope);
 	rebase(doc, scopeURL);
 	
+	var body = doc.body;
+	body.parentNode.removeChild(body);
 	frameset.document = doc;
-	var frameElts = cdom.$$('frame', doc);
+	frameset.element = body;
+	var frameElts = cdom.$$('frame', body);
 	var frameRefElts = [];
 	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
 		// NOTE first rebase @src with scope: urls
@@ -3356,7 +3359,7 @@ init: function(doc, settings) {
 render: function() {
 	var frameset = this;
 	var cdom = frameset.cdom;
-	return cloneDocument(frameset.document);
+	return frameset.element.cloneNode(true);
 }
 
 });
@@ -3447,30 +3450,6 @@ insert: function(bodyElement) { // FIXME need a teardown method that releases ch
 
 });
 
-_.defaults(HFrame, {
-	
-register: function(selector) {
-	sprockets.register(selector, HFrame, HFrame);
-},
-
-callbacks: {
-	
-	attached: function() {
-		this.init();
-	},
-	
-	enteredDocument: function() {
-		framer.frameEntered(this); // FIXME strong coupling
-	},
-	
-	leftDocument: function() {
-		// FIXME notify framer
-	}
-
-}
-
-});
-
 return HFrame;	
 })();
 
@@ -3479,31 +3458,26 @@ var HFrameset = (function() {
 	
 function HFrameset(dstDoc) {
 	if (!dstDoc) return; // in case of inheritance
-	this.onattach(dstDoc);
+	this.document = dstDoc;
 }
 
 _.defaults(HFrameset.prototype, {
 
-onattach: function(dstDoc) {
-	var hframeset = this;
-	_.defaults(hframeset, {
-		srcDocument: null, // NOTE temporary store between prepare() and render()
-		document: dstDoc,
-		src: null,
-		definition: null
-	});
-},
-
 init: function(definition) { // FIXME refactor to framer
 	var hframeset = this;
 	hframeset.definition = definition;
-	var dstDoc = hframeset.document;
+},
 
-	var srcDoc = definition.render();
-	if (!STAGING_DOCUMENT_IS_INERT) deneutralizeAll(srcDoc);
-	hframeset.srcDocument = srcDoc;
+prerender: function() {
+
+	var hframeset = this;
+	var dstDoc = hframeset.document;
+	var definition = hframeset.definition;
 
 	if (getFramesetMarker(dstDoc)) throw "The HFrameset has already been applied";
+
+	var srcDoc = cloneDocument(definition.document);
+	if (!STAGING_DOCUMENT_IS_INERT) deneutralizeAll(srcDoc);
 
 	var selfMarker;
 	
@@ -3558,7 +3532,7 @@ init: function(definition) { // FIXME refactor to framer
 			var nsPrefix = hframeset.definition.cdom.prefix;
 			switch(forAttr) {
 			case nsPrefix + 'frameset':
-				framer.frameset.definition.config(forOptions);
+				hframeset.definition.config(forOptions);
 				break;
 			case nsPrefix + 'frame':
 				_.assign(HFrameDefinition.options, forOptions);
@@ -3570,7 +3544,6 @@ init: function(definition) { // FIXME refactor to framer
 	}
 	]);
 
-	
 },
 
 render: function() {
@@ -3579,13 +3552,13 @@ render: function() {
 	var dstDoc = hframeset.document;
 	var definition = hframeset.definition;
 
-	var srcDoc = hframeset.srcDocument;
-	hframeset.srcDocument = null;
-	
+	var srcBody = definition.render();
+	if (!STAGING_DOCUMENT_IS_INERT) deneutralizeAll(srcBody);
+
+
 	return pipe(null, [
 
 	function() {
-		var srcBody = srcDoc.body;
 		mergeElement(dstDoc.body, srcBody);
 
 		var contentStart = dstDoc.body.firstChild;
@@ -3792,19 +3765,66 @@ start: function(startOptions) {
 		if (!framerConfig) throw "No frameset could be determined for this page";
 		framer.scope = framerConfig.scope; // FIXME shouldn't set this until loadFramesetDefinition() returns success
 		framer.framesetURL = framerConfig.framesetURL;
-		return framer.loadFramesetDefinition(framerConfig.framesetURL, framerConfig);
+		return httpProxy.load(framerConfig.framesetURL, { responseType: 'document', prepare: hfParserPrepare })
+		.then(function(response) {
+			var framesetDoc = response.document;
+			return new HFramesetDefinition(framesetDoc, framerConfig);
+		});
 	},
 
 	function(definition) {
 		var frameset = framer.frameset = new HFrameset(document);
-		return frameset.init(definition);
+		frameset.init(definition);
+		return frameset.prerender();
 	},
 	
 	function() { resolveURLs(); }, // FIXME this assumes the landing document wasn't captured or cloned.
 	
 	function() {
-		HFrame.register(framer.frameset.definition.cdom.selectorPrefix + 'frame'); // sprockets.register(selector, HFrame, HFrame)
-		sprockets.start(); // FIXME should be a promise
+		sprockets.register(framer.frameset.definition.cdom.selectorPrefix + 'frame', HFrame, {
+			callbacks: {
+				attached: function() {
+					this.init();
+				},
+				enteredDocument: function() {
+					framer.frameEntered(this); // FIXME strong coupling
+				},
+				leftDocument: function() {
+					// FIXME notify framer
+				}
+			},
+			
+			handlers: [
+			{
+				type: 'click',
+				action: function(e) {
+					if (e.defaultPrevented) return;
+					var acceptDefault = framer.onClick(e, this);
+					if (acceptDefault === false) e.preventDefault();
+				}
+			}
+			]
+			
+			});
+
+		sprockets.register('body', sprockets.Base, {			
+			handlers: [
+			{
+				type: 'click',
+				action: function(e) {
+					if (e.defaultPrevented) return;
+					var acceptDefault = framer.onClick(e);
+					if (acceptDefault === false) e.preventDefault();
+				}
+			}
+			]
+			
+			});
+
+		return sprockets.start(); // FIXME should be a promise
+	},
+	
+	function () {
 		var url = document.URL;
 		var changeset = framer.currentChangeset = framer.frameset.definition.lookup(url, {
 			referrer: document.referrer
@@ -3859,16 +3879,7 @@ start: function(startOptions) {
 
 },
 
-loadFramesetDefinition: function(url, options) {
-	var framer = this;
-	return httpProxy.load(url, { method: 'get', url: url, responseType: 'document', prepare: hfParserPrepare })
-	.then(function(response) {
-		var framesetDoc = response.document;
-		return new HFramesetDefinition(framesetDoc, options);
-	});
-},
-
-onClick: function(e) {
+onClick: function(e, frame) {
 	var framer = this;
 	// NOTE only pushState enabled browsers use this
 	// We want panning to be the default behavior for clicks on hyperlinks - <a href>
@@ -3895,12 +3906,10 @@ onClick: function(e) {
 		element: hyperlink
 	}; // TODO more details?? event??
 	
-	if (someAncestorFrames(hyperlink, function(frame) {
-		if (onRequestNavigation(frame, details, false)) {
-			e.preventDefault();
-			return true;
-		}
-	})) return;
+	if (frame) {
+		if (onRequestNavigation(frame, details, false))	return false;
+		return;
+	}
 	
 	// test hyperlinks
 	var oURL = URL(url);
@@ -3910,8 +3919,7 @@ onClick: function(e) {
 	var isPageLink = (oURL.nohash === baseURL.nohash); // TODO what about page-links that match the current hash?
 	if (isPageLink) {
 		framer.onPageLink(url, details);
-		e.preventDefault();
-		return;
+		return false;
 	}
 
 	var frameset = framer.frameset;
@@ -3921,23 +3929,12 @@ onClick: function(e) {
 	}
 	
 	if (onRequestNavigation(frameset, details, true)) {
-		e.preventDefault();
-		return;
+		return false;
 	}
 
 	logger.error('There was a problem handling the url: ' + url + '\n' + 'Fallback to browser navigation');
 	return;
-	
-	function someAncestorFrames(el, callback) {
-		var frameSelector = framer.frameset.definition.cdom.selectorPrefix + 'frame';
-		var node = el;
-		while (node = closest(node.parentNode, frameSelector)) {
-			var frame = HFrame(node);
-			if (frame && callback(frame)) return true;
-		}
-		return false;
-	}
-	
+
 	function onRequestNavigation(frame, details, isFrameset) {
 		var url = details.url;
 		var changeset = frame.definition.lookup(url, details);
