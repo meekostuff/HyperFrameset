@@ -3886,25 +3886,10 @@ onClick: function(e, frame) {
 	// Before panning to the next page, have to work out if that is appropriate
 	// `return` means ignore the click
 
-	if (e.button != 0) return; // FIXME what is the value for button in IE's W3C events model??
-	if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return; // FIXME do these always trigger modified click behavior??
+	var details = framer.getNavigationDetail(e);
+	if (!details) return;
 
-	// Find closest <a href> to e.target
-	var hyperlink = closest(e.target, 'a');
-	if (!hyperlink) return; // only handling hyperlink clicks
-	var href = hyperlink.getAttribute("href");
-	if (!href) return; // not really a hyperlink
-
-	var baseURL = URL(document.URL);
-	var url = baseURL.resolve(href); // TODO probably don't need to resolve on browsers that support pushstate
-
-	// NOTE The following creates a pseudo-event and dispatches to frames in a bubbling order.
-	// FIXME May as well use a virtual event system, e.g. DOMSprockets
-	var details = {
-		url: url,
-		referrer: document.URL,
-		element: hyperlink
-	}; // TODO more details?? event??
+	var url = details.url;
 	
 	if (frame) {
 		if (onRequestNavigation(frame, details, false))	return false;
@@ -3912,6 +3897,7 @@ onClick: function(e, frame) {
 	}
 	
 	// test hyperlinks
+	var baseURL = URL(document.URL);
 	var oURL = URL(url);
 	if (oURL.origin != baseURL.origin) return; // no external urls
 
@@ -3943,6 +3929,33 @@ onClick: function(e, frame) {
 		return true;
 	}
 
+},
+
+getNavigationDetail: function(e) {
+	if ('navigationDetail' in e) return e.navigationDetail;
+	e.navigationDetail = null;
+	
+	if (e.button != 0) return; // FIXME what is the value for button in IE's W3C events model??
+	if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return; // FIXME do these always trigger modified click behavior??
+
+	// Find closest <a href> to e.target
+	var hyperlink = closest(e.target, 'a');
+	if (!hyperlink) return; // only handling hyperlink clicks
+	var href = hyperlink.getAttribute("href");
+	if (!href) return; // not really a hyperlink
+
+	var baseURL = URL(document.URL);
+	var url = baseURL.resolve(href); // TODO probably don't need to resolve on browsers that support pushstate
+
+	// NOTE The following creates a pseudo-event and dispatches to frames in a bubbling order.
+	// FIXME May as well use a virtual event system, e.g. DOMSprockets
+	var detail = e.navigationDetail = {
+		url: url,
+		referrer: document.URL,
+		element: hyperlink
+	}; // TODO more details?? event??
+
+	return detail;
 },
 
 onPageLink: function(url, details) {
