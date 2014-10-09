@@ -379,16 +379,6 @@ function detachBinding(definition, element) {
 }
 
 
-var redirectedWindowEvents = _.words('scroll resize'); // FIXME would be nice not to have this hack
-var startStopTimeout = 500; // FIXME Config option
-var startStop = _.words('scroll resize');
-var startStopEvents = {};
-_.forEach(startStop, function(orgType) {
-	startStopEvents[orgType + 'start'] = { origin: orgType };
-	startStopEvents[orgType + 'stop'] = { origin: orgType };
-});
-
-
 var Binding = function(definition) {
 	var binding = this;
 	binding.definition = definition;
@@ -426,8 +416,8 @@ attach: function(element) {
 
 	implementation.boundElement = element;
 	_.forEach(definition.handlers, function(handler) {
-		var listener = binding.addHandler(handler);
-		binding.listeners.push(listener);
+		var listener = binding.addHandler(handler); // handler might be ignored ...
+		if (listener) binding.listeners.push(listener);// ... resulting in an undefined listener
 	});
 	
 	binding.attachedCallback();
@@ -498,38 +488,21 @@ addHandler: function(handler) {
 	var element = implementation.boundElement;
 	var type = handler.type;
 	var capture = (handler.eventPhase == 1); // Event.CAPTURING_PHASE
+	if (capture) {
+		logger.warn('Capturing events not supported');
+		return; // FIXME should this convert to bubbling instead??
+	}
 	var fn = function(event) {
 		if (fn.normalize) event = fn.normalize(event);
 		return handleEvent.call(implementation, event, handler);
 	}
 	fn.type = type;
 	fn.capture = capture;
-	var target = (element === document.documentElement && _.contains(redirectedWindowEvents, type)) ? window : element;
-	
-	var sim = startStopEvents[type];
-	if (sim) {
-		if (!binding[sim.origin]) (function(element, type) {
-			var binding = this;
-			binding[type] = true;
-			var target = (element === document.documentElement && _.contains(redirectedWindowEvents, type)) ? window : element;
-			var timerName = type + 'Timeout';
-			function listener(event) {
-				if (!binding[timerName]) binding.triggerHandlers({ type: type + 'start' });
-				else window.clearTimeout(binding[timerName]);
-				binding[timerName] = window.setTimeout(callback, startStopTimeout);
-			}
-			function callback() {
-				delete binding[timerName];
-				binding.triggerHandlers({ type: type + 'stop' });
-			}
-			DOM.addEventListener(target, type, listener, false);
-		}).call(binding, target, sim.origin);
-	}
-	else DOM.addEventListener(target, type, fn, capture);
+	DOM.addEventListener(element, type, fn, capture);
 	return fn;
 },
 
-removeListener: function(fn) { // FIXME doesn't handle simulated start/stop events 
+removeListener: function(fn) {
 	var binding = this;
 	var implementation = binding.implementation;
 	var element = implementation.boundElement;
@@ -538,15 +511,6 @@ removeListener: function(fn) { // FIXME doesn't handle simulated start/stop even
 	var target = (element === document.documentElement && _.contains(redirectedWindowEvents, type)) ? window : element; 
 	DOM.removeEventListener(target, type, fn, capture);	
 },
-
-triggerHandlers: function(event) {
-	var binding = this;
-	if (!binding || !binding.listeners) return;
-	_.forEach(binding.listeners, function(handler) {
-		if (handler.type !== event.type) return;
-		handler(event); // FIXME isolate
-	});
-}
 
 });
 
@@ -562,7 +526,7 @@ function handleEvent(event, handler) {
 		if (!el) return;
 		delegator = el;
 	}
-	switch (handler.eventPhase) {
+	switch (handler.eventPhase) { // FIXME DOMSprockets doesn't intend to support eventPhase
 	case 1:
 		throw "Capturing not supported";
 		break;
@@ -576,43 +540,20 @@ function handleEvent(event, handler) {
 		break;
 	}
 
-	if (handler.stopPropagation) { // FIXME
-		if (event.stopPropagation) event.stopPropagation();
-		else event.cancelBubble = true;
+	if (!event._stopPropagation) { // NOTE stopPropagation() prevents custom default-handlers from running. DOMSprockets nullifies it.
+		event._stopPropagation = event.stopPropagation;
+		event.stopPropagation = function() { logger.warn('event.stopPropagation() is a no-op'); }
 	}
-	if (handler.preventDefault) { // FIXME
-		if (event.preventDefault) event.preventDefault();
-		else event.returnValue = false;
+	if (!('defaultPrevented' in event)) { // NOTE ensure defaultPrevented works
+		event.defaultPrevented = false;
+		event._preventDefault = event.preventDefault;
+		event.preventDefault = function() { this.defaultPrevented = true; this._preventDefault(); }
 	}
 	if (handler.action) {
 		var result = handler.action.call(bindingImplementation, event, delegator);
 		if (result === false) event.preventDefault();
 	}
 	return;
-}
-
-function dispatchEvent(target, event) {
-	event.defaultPrevented = false;
-	event.preventDefault = function() { this.defaultPrevented = true; }
-	event.propagationStopped = true;
-	event.stopPropagation = function() { this.propagationStopped = true; }
-	event.target = target;
-	event.eventPhase = 2;
-	for (var current=target; current!=document; current=current.parentNode) {
-		event.currentTarget = current;
-		event.eventPhase = (current === target) ? 2 : 3;
-		var binding = Binding.getInterface(current);
-		if (binding) binding.triggerHandlers(event);
-/*		
-		if (!binding || !binding.listeners) continue;
-		_.forEach(binding.listeners, function(handler) {
-			if (handler.type !== event.type) return;
-			handler(event); // FIXME isolate
-		});
-*/
-		if (event.propagationStopped) break; 
-	}
-	return !event.defaultPrevented;	
 }
 
 
@@ -1006,7 +947,19 @@ function() { // otherwise assume MutationEvents. TODO is this assumption safe?
 var basePrototype = {};
 sprockets.Base = new SprocketDefinition(basePrototype); // NOTE now we can extend basePrototype
 
-sprockets.trigger = dispatchEvent;
+sprockets.trigger = function(target, type, params) { // NOTE every JS initiated event is a custom-event
+	if (typeof type === 'object') {
+		params = type;
+		type = params.type;
+	}
+	if (typeof type !== 'string') throw 'trigger() called with invalid event type';
+	var detail = params && params.detail;
+	var event = document.createEvent('CustomEvent');
+	event.initCustomEvent(type, true, true, detail);
+	if (params) _.defaults(event, params);
+	return target.dispatchEvent(event);
+}
+
 return sprockets;
 
 })(); // END sprockets
@@ -1072,8 +1025,8 @@ toggleClass: function(token, force) {
 	}
 },
 
-trigger: function(event) {
-	return sprockets.trigger(this.boundElement, event);
+trigger: function() {
+	return sprockets.trigger.apply(sprockets, this.boundElement, arguments);
 }
 
 
