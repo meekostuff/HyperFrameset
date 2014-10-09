@@ -29,7 +29,7 @@ It may even be referenced with a resource link, just like stylesheets:
 
 <small>**(This referencing method depends on the configuration. Scripted frameset lookup is preferred.)**</small>
 
-HyperFrameset.js is around 15kB when minified and gzipped.
+HyperFrameset.js is around 20kB when minified and gzipped.
 
 To see it in action visit:
 
