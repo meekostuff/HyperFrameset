@@ -3564,20 +3564,8 @@ prerender: function(dstDoc, definition) {
 				logger.warn('Unsupported value of @for on <script>: ' + forAttr);
 			}
 		}); // FIXME this breaks if a script inserts other scripts
-	},
-	
-	function() { // this doesn't stall the Promise returned by prerender() 
-		wait(function() { return checkStyleSheets(dstDoc); })
-		.then(function() {
-			return notify({
-				module: "frameset",
-				stage: "after",
-				type: "ready",
-				node: dstDoc
-			});
-		});
 	}
-
+	
 	]);
 
 }
@@ -3759,7 +3747,17 @@ start: function(startOptions) {
 		return HFrameset.prerender(document, definition);
 	},
 	
-	function() { resolveURLs(); }, // FIXME this assumes the landing document wasn't captured or cloned.
+	function () {
+		var url = document.URL;
+		var changeset = framer.currentChangeset = framer.definition.lookup(url, {
+			referrer: document.referrer
+		});
+		// FIXME what if no changeset is returned
+		return historyManager.start(changeset, '', document.URL,
+				function(state) { }, // FIXME need some sort of rendering status
+				function(state) { return framer.onPopState(state.getData()); }
+			);
+	},
 	
 	function() {
 		sprockets.register(framer.definition.cdom.selectorPrefix + 'frame', HFrame, {
@@ -3799,7 +3797,8 @@ start: function(startOptions) {
 					if (frameset.init) frameset.init();
 				},
 				enteredDocument: function() {
-					this.render();
+					var frameset = this;
+					frameset.render();
 				}
 			},
 			
@@ -3818,17 +3817,9 @@ start: function(startOptions) {
 
 		return sprockets.start(); // FIXME should be a promise
 	},
-	
-	function () {
-		var url = document.URL;
-		var changeset = framer.currentChangeset = framer.definition.lookup(url, {
-			referrer: document.referrer
-		});
-		// FIXME what if no changeset is returned
-		return historyManager.start(changeset, '', document.URL,
-				function(state) { }, // FIXME need some sort of rendering status
-				function(state) { return framer.onPopState(state.getData()); }
-			);
+
+	function() { // after this, startup has been completed
+		return wait(function() { return checkStyleSheets(dstDoc); })
 	}
 	
 	]);

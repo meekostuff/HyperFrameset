@@ -13,7 +13,7 @@ var defaults = { // NOTE defaults also define the type of the associated config 
 	"no_style": false,
 	"capturing": true,
 	"log_level": "warn",
-	"hidden_timeout": 0, // 3000, FIXME 
+	"hidden_timeout": 3000,
 	"startup_timeout": 10000, // abort if startup takes longer than this
 	"polling_interval": 50,
 	"html5_block_elements": 'article aside figcaption figure footer header hgroup main nav section',
@@ -707,16 +707,14 @@ function config() {
 	Meeko.DOM.ready = domReady;
 	Meeko.HTMLParser.prototype.prepare = html5prepare;
 	Meeko.Promise.pollingInterval = bootOptions["polling_interval"];
-	Meeko.framer.config({
-		ready: Viewport.unhide
-	});
 }
 
 function start() {
-	if (capturing) Meeko.framer.start({
+	var startFu;
+	if (capturing) startFu = Meeko.framer.start({
 		contentDocument: Capture.getDocument()
 	});
-	else Meeko.framer.start({
+	else startFu = Meeko.framer.start({
 		contentDocument: new Meeko.Promise(function(resolve, reject) { // FIXME this is bound to have cross-browser failures
 			var dstDoc = document.cloneNode(true);
 			var dstHead = dstDoc.head;
@@ -739,6 +737,7 @@ function start() {
 			resolve(dstDoc);
 		}) 
 	});
+	startFu.then(Viewport.unhide, Viewport.unhide);
 }
 
 function resolveScript(script) {
