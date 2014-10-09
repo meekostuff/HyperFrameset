@@ -3824,38 +3824,6 @@ start: function(startOptions) {
 	
 	]);
 
-	// start() returns now. The following are hoisted
-	
-	function resolveURLs() { // NOTE resolve URLs in landing page
-		// TODO could be merged with code in parseHTML
-		var baseURL = URL(document.URL);
-		function _resolveAttr(el, attrName) {
-			var relURL = el.getAttribute(attrName);
-			if (relURL == null) return;
-			var absURL = baseURL.resolve(relURL);
-			el.setAttribute(attrName, absURL);
-		}
-		
-		function resolveAttr(el, attrName) {
-			if (getTagName(el) != 'script') return _resolveAttr(el, attrName);		
-			var scriptType = el.type;
-			var isJS = (!scriptType || /^text\/javascript/i.test(scriptType));
-			if (isJS) el.type = "text/javascript?complete"; // FIXME not needed any more - IE6 and IE7 will re-execute script if @src is modified (even to same path)
-			_resolveAttr(el, attrName);
-		}
-		
-		_.forEach(_.toArray(document.head.childNodes), function(node) {
-			switch (getTagName(node)) {
-			case 'script':
-				resolveAttr(node, 'src');
-				break;
-			case 'link':
-				resolveAttr(node, 'href');
-				break;
-			}
-		});
-	}
-
 },
 
 onClick: function(e, frame) { // `return false` means success (so preventDefault)
