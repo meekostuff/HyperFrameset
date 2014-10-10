@@ -1935,27 +1935,10 @@ var STAGING_DOCUMENT_IS_INERT = (function() {
 
 })();
 
-/*
-	IE9 swallows <source> elements that aren't inside <video> or <audio>
-	See http://www.w3.org/community/respimg/2012/03/06/js-implementation-problem-with/
-	Safari-4 also has this issue
-*/
-var IE9_SOURCE_ELEMENT_BUG = (function() { 
-	var frag = document.createDocumentFragment();
-	var doc = frag.createElement ? frag : document;
-	doc.createElement('source'); // See html5shiv
-	var div = doc.createElement('div');
-	frag.appendChild(div);
-	div.innerHTML = '<div><source /><div>';
-	return 'source' !== getTagName(div.firstChild.firstChild);
-})();
-
-
-
 _.defaults(DOM, {
 	parseHTML: parseHTML,
 	HTML_IN_XHR: HTML_IN_XHR, HTML_IN_DOMPARSER: HTML_IN_DOMPARSER,
-	STAGING_DOCUMENT_IS_INERT: STAGING_DOCUMENT_IS_INERT, IE9_SOURCE_ELEMENT_BUG: IE9_SOURCE_ELEMENT_BUG
+	STAGING_DOCUMENT_IS_INERT: STAGING_DOCUMENT_IS_INERT
 });
 
 
@@ -2251,24 +2234,6 @@ var resolveAll = function(doc, baseURL, isNeutralized) {
 	return !STAGING_DOCUMENT_IS_INERT;
 }
 
-if (IE9_SOURCE_ELEMENT_BUG) {
-
-var _resolveAll = resolveAll;
-resolveAll = function(doc) {
-	
-	_.forEach($$('img[meeko-tag]', doc), function(el) {
-		var realTag = el.getAttribute('meeko-tag');
-		el.removeAttribute('meeko-tag');
-		var realEl = doc.createElement(realTag);
-		copyAttributes(realEl, el);
-		el.parentNode.replaceChild(realEl, el);
-	});
-	
-	return _resolveAll.apply(null, arguments);
-}
-
-} // end if IE9_SOURCE_ELEMENT_BUG
-
 
 var deneutralizeAll = function(doc) {
 
@@ -2469,9 +2434,6 @@ function preparse(html) { // neutralize URL attrs @src, @href, etc
 		if (tagName === 'style') {
 			mode = 'style';
 			return tagString;
-		}
-		if (IE9_SOURCE_ELEMENT_BUG && tagName === 'source') {
-			tag = 'img meeko-tag="source"';
 		}
 		_.forOwn(urlAttributes[tagName], function(attrDesc, attrName) {
 			if (attrDesc.neutralize) attrsString = attrsString.replace(attrDesc.regex, function(all, preSpace, attrName, quote) {
