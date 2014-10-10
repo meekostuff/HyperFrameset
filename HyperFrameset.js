@@ -1599,49 +1599,15 @@ var removeAttributes = function(node) {
 	return node;
 }
 
-var createDocument = // TODO this doesn't handle old non-IE browsers
-document.implementation.createHTMLDocument && function() { // modern browsers
+var createDocument = function() { // modern browsers. IE >= 9
 	var doc = document.implementation.createHTMLDocument("");
 	doc.removeChild(doc.documentElement);
 	return doc;
-} ||
-document.createDocumentFragment().getElementById && function(options) { // IE <= 8 
-	var doc = document.createDocumentFragment();
-	if (options && options.prepare) options.prepare(doc);
-	return doc;
-} ||
-function(options) {  // old IE
-	var doc = document.cloneNode(false);
-	if (options && options.prepare) options.prepare(doc);
-	return doc;
 }
 
-var createHTMLDocument = document.implementation.createHTMLDocument && function(title) {
+var createHTMLDocument = function(title) { // modern browsers. IE >= 9
 	return document.implementation.createHTMLDocument(title);
-} ||
-function(titleText) {
-	var doc = createDocument();
-	var parent = doc;
-	var docEl;
-	// the following is equivalent of `doc.innerHTML = '<html><head><title>' + titleText + '</title></head><body></body></html>';`
-	_.forEach(_.words('html head title body'), function(tagName) {
-		var el = doc.createElement(tagName);
-		parent.appendChild(el);
-		switch (tagName) {
-		case 'title':
-			el.appendChild(doc.createTextNode(titleText));
-			parent = docEl;
-			break;
-		case 'html':
-			docEl = el;
-			// fall-thru
-		default:
-			parent = el;
-			break;
-		}
-	});
-	return doc;
-};
+}
 
 var cloneDocument = function(srcDoc, options) {
 	var doc = createDocument(options);
