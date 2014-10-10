@@ -3366,14 +3366,7 @@ onClick: function(e) {
 	if (!details) return; // no hyperlink detected
 	
 	e.preventDefault();
-	asap(function() {
-		var event = document.createEvent('CustomEvent');
-		event.initCustomEvent('requestnavigation', true, true, details.url);
-		var acceptDefault = details.element.dispatchEvent(event);
-		if (acceptDefault !== false) {
-			location.replace(details.url);
-		}
-	});
+	framer.requestNavigation(details.url, details);
 },
 
 onSubmit: function(e) {
@@ -3399,14 +3392,7 @@ onSubmit: function(e) {
 	}
 	
 	e.preventDefault();
-	asap(function() {
-		var event = document.createEvent('CustomEvent');
-		event.initCustomEvent('requestnavigation', true, true, details.url);
-		var acceptDefault = details.element.dispatchEvent(event);
-		if (acceptDefault !== false) {
-			location.replace(details.url);
-		}
-	});
+	framer.requestNavigation(details.url, details);
 	
 	function encode(form) {
 		var data = [];
@@ -3416,6 +3402,17 @@ onSubmit: function(e) {
 		});
 		return data.join('&');
 	}
+},
+
+requestNavigation: function(url, details) {
+	asap(function() {
+		var event = document.createEvent('CustomEvent');
+		event.initCustomEvent('requestnavigation', true, true, details.url);
+		var acceptDefault = details.element.dispatchEvent(event);
+		if (acceptDefault !== false) {
+			location.assign(details.url);
+		}
+	});
 },
 
 onRequestNavigation: function(e, frame) { // `return false` means success (so preventDefault)
@@ -3447,6 +3444,7 @@ onRequestNavigation: function(e, frame) { // `return false` means success (so pr
 	if (isPageLink) {
 		framer.onPageLink(url, details);
 		e.preventDefault();
+		return;
 	}
 
 	var frameset = frame;
@@ -3460,7 +3458,6 @@ onRequestNavigation: function(e, frame) { // `return false` means success (so pr
 		return false;
 	}
 
-	logger.error('There was a problem handling the url: ' + url + '\n' + 'Fallback to browser navigation');
 	return;
 
 	function requestNavigation(frame, url, details) { // `return true` means success
@@ -3498,13 +3495,6 @@ getNavigationDetails: function(e) {
 onPageLink: function(url, details) {
 	var framer = this;
 	alert('Ignoring on-same-page links for now.'); // FIXME
-},
-
-onSiteLink: function(url, details) { // FIXME not used
-	var framer = this;
-	var changeset = framer.definition.lookup(url, details);
-	// FIXME what if no changeset is returned
-	framer.assign(url, changeset);
 },
 
 navigate: function(url, changeset) { // FIXME doesn't support replaceState
