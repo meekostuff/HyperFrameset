@@ -1643,8 +1643,7 @@ function(titleText) {
 	return doc;
 };
 
-var cloneDocument = document.importNode ?
-function(srcDoc, options) {
+var cloneDocument = function(srcDoc, options) {
 	var doc = createDocument(options);
 	var docEl = document.importNode(srcDoc.documentElement, true);
 	doc.appendChild(docEl);
@@ -1656,52 +1655,13 @@ function(srcDoc, options) {
 	});
 	
 	return doc;
-} :
-function(srcDoc, options) {
-	var doc = createDocument(options);
-
-	var docEl = importSingleNode(srcDoc.documentElement, doc),
-		docHead = importSingleNode(srcDoc.head, doc),
-		docBody = importSingleNode(srcDoc.body, doc);
-
-	docEl.appendChild(docHead);
-	_.forEach (_.toArray(srcDoc.head.childNodes), function(srcNode) {
-		if (srcNode.nodeType !== 1) return;
-		var node = importSingleNode(srcNode, doc);
-		if (node) docHead.appendChild(node);
-	});
-
-	docEl.appendChild(docBody);
-	
-	doc.appendChild(docEl);
-	polyfill(doc);
-
-	/*
-	 * WARN on IE6 `element.innerHTML = ...` will drop all leading <script> and <style>
-	 * Work-around this by prepending some benign element to the src <body>
-	 * and removing it from the dest <body> after the copy is done
-	 */
-
-	// NOTE we can't just use srcBody.cloneNode(true) because html5shiv doesn't work
-	var srcBody = srcDoc.body;
-	srcBody.insertBefore(srcDoc.createElement('wbr'), srcBody.firstChild);
-
-	var html = srcBody.innerHTML; // NOTE timing the innerHTML getter and setter showed that all the overhead is in the iframe
-	docBody.innerHTML = html; // setting innerHTML in the pseudoDoc has minimal overhead.
-
-	docBody.removeChild(docBody.firstChild); // TODO assert firstChild.tagName == 'wbr'
-
-	return doc;
 }
 
-var importSingleNode = document.importNode ? // NOTE only for single nodes, especially elements in <head>. 
-function(srcNode, context) {
+var importSingleNode = function(srcNode, context) {
 	if (!context) context = document;
 	if (context.nodeType !== 9 && context.nodeType !== 11) throw 'Non-document context for importSingleNode()';
 	return context.importNode(srcNode, false);
-} :
-composeNode; 
-
+}
 
 var scrollToId = function(id) {
 	if (id) {
