@@ -3533,60 +3533,6 @@ onSiteLink: function(url, details) { // FIXME not used
 	framer.assign(url, changeset);
 },
 
-onSubmit: function(e) { // FIXME not supported
-	var framer = this;
-	// NOTE only pushState enabled browsers use this
-	// We want panning to be the default behavior for <form> submission
-	// Before panning to the next page, have to work out if that is appropriate
-	// `return` means ignore the submit
-
-	// test submit
-	var form = e.target;
-	if (form.target) return; // no iframe
-	var baseURL = URL(document.URL);
-	var url = baseURL.resolve(form.action); // TODO probably don't need to resolve on browsers that support pushstate
-	var oURL = URL(url);
-	if (oURL.origin != baseURL.origin) return; // no external urls
-	
-	var method = _.lc(form.method);
-	switch(method) {
-	case 'get': break;
-	default: return; // TODO handle POST
-	}
-	
-	// From here on we effectively take over the default-action of the event
-	overrideDefaultAction(e, function() {
-		framer.onForm(form);
-	});
-},
-
-onForm: function(form) {
-	var framer = this;
-	var method = _.lc(form.method);
-	switch(method) {
-	case 'get':
-		var baseURL = URL(document.URL);
-		var action = baseURL.resolve(form.action); // TODO probably not needed on browsers that support pushState
-		var oURL = URL(action);
-		var query = encode(form);
-		var url = oURL.nosearch + (oURL.search || '?') + query + oURL.hash;
-		framer.onSiteLink(url, {
-			element: form
-		});
-		break;
-	default: return; // TODO handle POST
-	}	
-
-	function encode(form) {
-		var data = [];
-		_.forEach(_.toArray(form.elements), function(el) {
-			if (!el.name) return;
-			data.push(el.name + '=' + encodeURIComponent(el.value));
-		});
-		return data.join('&');
-	}
-},
-
 navigate: function(url, changeset) { // FIXME doesn't support replaceState
 	var framer = this;	
 	return framer.load(url, changeset, true);
