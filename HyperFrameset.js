@@ -1613,7 +1613,6 @@ var cloneDocument = function(srcDoc, options) {
 	var doc = createDocument(options);
 	var docEl = document.importNode(srcDoc.documentElement, true);
 	doc.appendChild(docEl);
-	polyfill(doc);
 
 	// WARN sometimes IE9 doesn't read the content of inserted <style>
 	_.forEach($$("style", doc), function(node) {
@@ -1731,12 +1730,6 @@ var checkStyleSheets = function() { // TODO would be nice if this didn't need to
 	});
 }
 
-var polyfill = function(doc) { // NOTE more stuff could be added here if *necessary*
-	if (!doc) doc = document;
-	if (!doc.head) doc.head = firstChild(doc.documentElement, "head");
-}
-
-
 _.defaults(DOM, {
 	getTagName: getTagName, hasAttribute: hasAttribute, matchesElement: matchesElement, // properties
 	siblings: siblings, firstChild: firstChild, // selections
@@ -1744,8 +1737,7 @@ _.defaults(DOM, {
 	composeNode: composeNode, importSingleNode: importSingleNode, insertNode: insertNode, // nodes
 	ready: domReady, addEvent: addEvent, removeEvent: removeEvent, // events
 	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
-	scrollToId: scrollToId,
-	polyfill: polyfill
+	scrollToId: scrollToId
 });
 
 /* parseHTML are AJAX utilities */
@@ -2071,7 +2063,6 @@ var resolveAll = function(doc, baseURL) {
 	The innerHTMLParser also uses this call
 */
 function normalize(doc, details) { 
-	polyfill(doc);
 
 	_.forEach($$('script', doc), function(node) {
 		if (!node.type || /^text\/javascript$/i.test(node.type)) node.type = "text/javascript?disabled";
@@ -2493,8 +2484,6 @@ return scheduler;
 
 
 /* BEGIN HFrameset code */
-
-polyfill();
 
 var sprockets = Meeko.sprockets;
 
