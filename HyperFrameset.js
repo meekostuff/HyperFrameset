@@ -916,7 +916,7 @@ nodeRemoved: function(node) { // NOTE called AFTER node removed document
 
 });
 
-var observe = (MutationObserver) ?
+var observe = (window.MutationObserver) ?
 function() {
 	var observer = new MutationObserver(function(mutations, observer) {
 		if (!started) return;
@@ -1904,41 +1904,9 @@ var HTML_IN_DOMPARSER = (function() {
 
 })();
 
-/*
-	STAGING_DOCUMENT_IS_INERT indicates whether resource URLs - like img@src -
-	need to be neutralized so they don't start downloading until after transforms have been applied. 
-	The transforms  might discard them in which case downloading is a waste. 
-*/
-
-var STAGING_DOCUMENT_IS_INERT = (function() {
-
-	try { var doc = document.implementation.createHTMLDocument(''); }
-	catch (error) { return false; } // IE <= 8
-	if (doc.URL !== document.URL) return true; // FF, Webkit, Chrome
-	/*
-		Use a data-uri image to see if browser will try to fetch.
-		The smallest such image might be a 1x1 white gif,
-		see http://proger.i-forge.net/The_smallest_transparent_pixel/eBQ
-	*/
-	var img = doc.createElement('img');
-	if (img.complete) img.src = 'data:'; // Opera-12
-	if (img.complete) return false; // paranoia
-	img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=';
-	if (img.width) return false; // IE9, Opera-12 will have width == 1 / height == 1 
-	if (img.complete) return false; // Opera-12 sets this immediately. IE9 sets it after a delay.
-	// Sometimes the img check isn't ready on IE9, so one more check
-	var script = doc.createElement('script');
-	scriptText(script, ';');
-	doc.head.appendChild(script);
-	if (script.readyState === 'complete') return false; // IE9
-	return true; // Presumably IE10
-
-})();
-
 _.defaults(DOM, {
 	parseHTML: parseHTML,
-	HTML_IN_XHR: HTML_IN_XHR, HTML_IN_DOMPARSER: HTML_IN_DOMPARSER,
-	STAGING_DOCUMENT_IS_INERT: STAGING_DOCUMENT_IS_INERT
+	HTML_IN_XHR: HTML_IN_XHR, HTML_IN_DOMPARSER: HTML_IN_DOMPARSER
 });
 
 
@@ -2006,23 +1974,6 @@ URL.prototype.resolve = function resolve(relURL) {
 return URL;
 
 })();
-
-var neutralProtocol = vendorPrefix + '-href:';
-var neutralProtocolLen = neutralProtocol.length;
-function neutralizeURL(url) {
-	return neutralProtocol + url;
-}
-function deneutralizeURL(url) {
-	var confirmed = url.indexOf(neutralProtocol) === 0;
-	if (confirmed) return url.substr(neutralProtocolLen);
-	return url;
-}
-
-_.defaults(URL, {
-	neutralProtocol: neutralProtocol,
-	neutralize: neutralizeURL,
-	deneutralize: deneutralizeURL
-});
 
 var httpProxy = Meeko.httpProxy = (function() {
 
@@ -2122,37 +2073,27 @@ var AttributeDescriptor = function(tagName, attrName, loads, compound) {
 	var testEl = document.createElement(tagName);
 	var supported = attrName in testEl;
 	var lcAttr = _.lc(attrName); // NOTE for longDesc, etc
-	var neutralize = // 0 is no, -1 is yes, 1 is yes and stay-neutral
-		!supported ? 0 :
-		!loads ? 0 :
-		STAGING_DOCUMENT_IS_INERT ? -1 :
-		1;
 	_.defaults(this, { // attrDesc
 		tagName: tagName,
 		attrName: attrName,
 		loads: loads,
 		compound: compound,
-		supported: supported,
-		neutralize: neutralize
+		supported: supported
 	});
 }
 
 _.defaults(AttributeDescriptor.prototype, {
 
-resolve: function(el, baseURL, neutralized, stayNeutral) {
+resolve: function(el, baseURL) {
 	var attrName = this.attrName;
 	var url = el.getAttribute(attrName);
 	if (url == null) return;
-	var finalURL = this.resolveURL(url, baseURL, neutralized, stayNeutral)
+	var finalURL = this.resolveURL(url, baseURL)
 	if (finalURL !== url) el.setAttribute(attrName, finalURL);
 },
 
-resolveURL: function(url, baseURL, neutralized, stayNeutral) {
+resolveURL: function(url, baseURL) {
 	var relURL = _.trim(url);
-	if (neutralized) {
-		relURL = deneutralizeURL(url);
-		if (relURL === url) logger.warn('Expected neutralized attribute: ' + this.tagName + '@' + this.attrName);
-	}
 	var finalURL = relURL;
 	switch (relURL.charAt(0)) {
 		case '': // empty, but not null. TODO should this be a warning??
@@ -2162,7 +2103,6 @@ resolveURL: function(url, baseURL, neutralized, stayNeutral) {
 			finalURL = baseURL.resolve(relURL);
 			break;
 	}
-	if (stayNeutral) finalURL = neutralizeURL(finalURL);
 	return finalURL;
 }
 
@@ -2190,7 +2130,7 @@ _.forEach(_.words("link@<href script@<src img@<longDesc,<src,+srcset iframe@<lon
 	});
 });
 
-function resolveSrcset(urlSet, baseURL) { // img@srcset will never be neutralized
+function resolveSrcset(urlSet, baseURL) {
 	var urlList = urlSet.split(/\s*,\s*/); // WARN this assumes URLs don't contain ','
 	_.forEach(urlList, function(urlDesc, i) {
 		urlList[i] = urlDesc.replace(/^\s*(\S+)(?=\s|$)/, function(all, url) { return baseURL.resolve(url); });
@@ -2201,7 +2141,7 @@ function resolveSrcset(urlSet, baseURL) { // img@srcset will never be neutralize
 urlAttributes['img']['srcset'].resolveURL = resolveSrcset;
 urlAttributes['source']['srcset'].resolveURL = resolveSrcset;
 
-urlAttributes['a']['ping'].resolveURL = function(urlSet, baseURL) { // a@ping will never be neutralized
+urlAttributes['a']['ping'].resolveURL = function(urlSet, baseURL) {
 	var urlList = urlSet.split(/\s+/);
 	_.forEach(urlList, function(url, i) {
 		urlList[i] = baseURL.resolve(url);
@@ -2214,54 +2154,29 @@ return urlAttributes;
 })();
 
 /*
-	resolveAll() resolves all URL attributes and conditionally deneutralizes URL attributes.
+	resolveAll() resolves all URL attributes
 */
-var resolveAll = function(doc, baseURL, isNeutralized) {
+var resolveAll = function(doc, baseURL) {
 
 	_.forOwn(urlAttributes, function(attrList, tag) {
 		var elts;
 		_.forOwn(attrList, function(attrDesc, attrName) {
-			var neutralized = isNeutralized && !!attrDesc.neutralize;
-			var stayNeutral = !STAGING_DOCUMENT_IS_INERT && attrDesc.neutralize > 0;
-
 			if (!elts) elts = $$(tag, doc);
 			_.forEach(elts, function(el) {
-				attrDesc.resolve(el, baseURL, neutralized, stayNeutral);
-			});
-		});
-	});
-	
-	return !STAGING_DOCUMENT_IS_INERT;
-}
-
-
-var deneutralizeAll = function(doc) {
-
-	_.forOwn(urlAttributes, function(attrList, tag) {
-		var elts;
-
-		_.forOwn(attrList, function(attrDesc, attrName) {
-			var neutralized = attrDesc.neutralize > 0;
-
-			if (!neutralized) return;
-
-			if (!elts) elts = $$(tag, doc);
-			_.forEach(elts, function(el) {
-				var url = el.getAttribute(attrName);
-				if (url == null) return;
-				var finalURL = deneutralizeURL(url, tag, attrName);
-				if (finalURL !== url) el.setAttribute(attrName, finalURL);
+				attrDesc.resolve(el, baseURL);
 			});
 		});
 	});
 }
+
+
 
 /*
 	normalize() is called between html-parsing (internal) and document normalising (external function).
 	It is called after using the native parser:
 	- with DOMParser#parseFromString(), see HTMLParser#nativeParser()
 	- with XMLHttpRequest & xhr.responseType='document', see httpProxy's request()
-	The iframe parser implements similar functionality
+	The innerHTMLParser also uses this call
 */
 function normalize(doc, details) { 
 	polyfill(doc);
@@ -2304,170 +2219,32 @@ function nativeParser(html, details) {
 
 }
 
-function iframeParser(html, details) {
-	var parser = this;
-	
-	var iframe = document.createElement("iframe");
-	iframe.name = "meeko-parser";
-	var iframeHTML = '';
-
-	function prepare(doc) { 
-		if (parser.prepare) parser.prepare(doc); // FIXME need a guard on this external call
-		if (details.prepare) details.prepare(doc);
-		return doc;
-	}
-	
+function innerHTMLParser(html, details) {
 	return pipe(null, [
-	
-	function() {
-		html = preparse(html);
-
-		var bodyIndex = html.search(/<body(?=\s|>)/); // FIXME assumes "<body" not in a script or style comment somewhere 
-		bodyIndex = html.indexOf('>', bodyIndex) + 1;
-		iframeHTML = html.substr(0, bodyIndex);
-		html = html.substr(bodyIndex);
-
-		var head = document.head;
-		head.insertBefore(iframe, head.firstChild);
-		var iframeDoc = iframe.contentWindow.document;
-		iframeDoc.open('text/html', 'replace');
-		return iframeDoc;
-	},
-	
-	function(iframeDoc) {
-		return prepare(iframeDoc);
-	},		
-
-	function(iframeDoc) {
-		return new Promise(function(resolve, reject) {
-			// NOTE need to wait for iframeWin.onload on Android 2.3, others??
-			var iframeWin = iframe.contentWindow, complete = false;
-			iframeWin.onload = iframeDoc.onreadystatechange = function() { // WARN sometimes `onload` doesn't fire on IE6
-				if (complete) return;
-				var readyState = iframeDoc.readyState;
-				if (readyState && readyState !== 'complete') return;
-				complete = true;
-				resolve(iframeDoc);
-			}
-
-			iframeDoc.write(iframeHTML);
-			iframeDoc.close();
-		});
-	},
-	
-	function(iframeDoc) {
-
-		polyfill(iframeDoc);
-		if (iframeDoc.namespaces) { // IE8, IE9
-			_.forEach(iframeDoc.namespaces, function(ns) {
-				iframeDoc.documentElement.setAttribute('xmlns:' + ns.name, ns.urn);
-			});
-		}
-
-		var baseURL = URL(details.url);
 		
-		// TODO not really sure how to handle <base href="..."> already in doc.
-		// For now just honor them if present
-		// TODO also not sure how to handle <base target="...">, etc
-		var baseHref;
-		_.forEach ($$("base", iframeDoc.head), function(node) {
-			var href = node.getAttribute("href");
-			if (!href) return;
-			baseHref = href;
-			node.removeAttribute('href');
-		});
-		if (baseHref) baseURL = URL(baseURL.resolve(baseHref));
-
-		var doc = cloneDocument(iframeDoc, { prepare: prepare });
-
-		document.head.removeChild(iframe);
-
-		doc.body.innerHTML = '<wbr />' + html; // one simple trick to get IE <= 8 to behave
-		doc.body.removeChild(doc.body.firstChild);
-
-		_.forEach($$("style", doc.body), function(node) { // TODO support <style scoped>
-			doc.head.appendChild(node);
-		});
-
-		details.isNeutralized = resolveAll(doc, baseURL, true);
+	function() {
+		var doc = createHTMLDocument('');
+		var docElement = doc.documentElement;
+		docElement.innerHTML = html;
+		var m = html.match(/<html(?=\s|>)(?:[^>]*)>/i); // WARN this assumes there are no comments containing "<html" and no attributes containing ">".
+		var div = document.createElement('div');
+		div.innerHTML = m[0].replace(/^<html/i, '<div');
+		var htmlElement = div.firstChild;
+		copyAttributes(docElement, htmlElement);
+		return doc;
+	},
+	
+	function(doc) {
+		normalize(doc, details);
 		return doc;
 	}
-
-	]);	
 	
+	]);
 }
-
-var preparse = (function() {
-
-var urlTags = [];
-
-_.forOwn(urlAttributes, function(attrList, tagName) {
-	var neutralized = false;
-	_.forOwn(attrList, function(attrDesc, attrName) {
-		if (attrDesc.neutralize) neutralized = true;
-		_.defaults(attrDesc, {
-			regex: new RegExp('(\\s)(' + attrName + ')\\s*=\\s*([\'"])?\\s*(?=\\S)', 'ig') // captures preSpace, attrName, quote. discards other space
-		});
-	});
-	if (neutralized) urlTags.push(tagName);
-});
-
-var preparseRegex = new RegExp('(<)(' + urlTags.join('|') + '|\\/script|style|\\/style)(?=\\s|\\/?>)([^>]+)?(>)', 'ig');
-
-function preparse(html) { // neutralize URL attrs @src, @href, etc
-
-	var mode = 'html';
-	html = html.replace(preparseRegex, function(tagString, lt, tag, attrsString, gt) {
-		var tagName = _.lc(tag);
-		if (!attrsString) attrsString = '';
-		if (tagName === '/script') {
-			if (mode === 'script') mode = 'html';
-			return tagString;
-		}
-		if (tagName === '/style') {
-			if (mode === 'style') mode = 'html';
-			return tagString;
-		}
-		if (mode === 'script' || mode === 'style') {
-			return tagString;
-		}
-		if (tagName === 'style') {
-			mode = 'style';
-			return tagString;
-		}
-		_.forOwn(urlAttributes[tagName], function(attrDesc, attrName) {
-			if (attrDesc.neutralize) attrsString = attrsString.replace(attrDesc.regex, function(all, preSpace, attrName, quote) {
-				return preSpace + attrName + '=' + (quote || '') + neutralProtocol;
-			});
-		});
-		if (tagName === 'script') {
-			mode = 'script';
-			attrsString = disableScript(attrsString);
-		}
-		return lt + tag + attrsString + gt;
-	});
-
-	return new String(html);
-	
-	function disableScript(attrsString) {
-		var hasType = false;
-		var attrs = attrsString.replace(/(\stype=)['"]?([^\s'"]*)['"]?(?=\s|$)/i, function(m, $1, $2) {
-			hasType = true;
-			var isJS = ($2 === '' || /^text\/javascript$/i.test($2));
-			return isJS ? $1 + '"text/javascript?disabled"' : m;
-		}); 
-		return hasType ? attrs : attrsString + ' type="text/javascript?disabled"';
-	}
-
-}
-
-return preparse;
-
-})();
 
 
 _.defaults(HTMLParser.prototype, {
-	parse: HTML_IN_DOMPARSER ? nativeParser : iframeParser
+	parse: HTML_IN_DOMPARSER ? nativeParser : innerHTMLParser
 });
 
 return HTMLParser;
@@ -3352,7 +3129,6 @@ load: function(response) { // FIXME need a teardown method that releases child-f
 
 insert: function(bodyElement) { // FIXME need a teardown method that releases child-frames	
 	var frame = this;
-	if (!STAGING_DOCUMENT_IS_INERT) deneutralizeAll(bodyElement);
 	
 	// FIXME .bodyElement will probably become .bodies[] for transition animations.
 	if (frame.bodyElement) frame.boundElement.removeChild(frame.bodyElement);
@@ -3384,7 +3160,6 @@ render: function() {
 	var dstBody = this.boundElement;
 
 	var srcBody = definition.render();
-	if (!STAGING_DOCUMENT_IS_INERT) deneutralizeAll(srcBody);
 	
 	return pipe(null, [
 
@@ -3409,7 +3184,6 @@ prerender: function(dstDoc, definition) {
 	if (getFramesetMarker(dstDoc)) throw "The HFrameset has already been applied";
 
 	var srcDoc = cloneDocument(definition.document);
-	if (!STAGING_DOCUMENT_IS_INERT) deneutralizeAll(srcDoc);
 
 	var selfMarker;
 	

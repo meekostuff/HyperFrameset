@@ -22,6 +22,8 @@ var defaults = { // NOTE defaults also define the type of the associated config 
 	"config_script": '{bootscriptdir}config.js'
 }
 
+var document = window.document;
+
 var vendorPrefix = "Meeko";
 
 var Meeko = window.Meeko || (window.Meeko = {});
@@ -30,10 +32,41 @@ var Meeko = window.Meeko || (window.Meeko = {});
 // e.g. where script.onload can't be used or faked
 
 /*
+	STAGING_DOCUMENT_IS_INERT indicates that resource URLs - like img@src -
+	WILL NOT start downloading when the document they are in is parsed.
+	If this is false then the `no_frameset` option applies.
+*/
+
+var STAGING_DOCUMENT_IS_INERT = (function() {
+
+	try { var doc = document.implementation.createHTMLDocument(''); }
+	catch (error) { return false; } // IE <= 8
+	if (doc.URL !== document.URL) return true; // FF, Webkit, Chrome
+	/*
+		Use a data-uri image to see if browser will try to fetch.
+		The smallest such image might be a 1x1 white gif,
+		see http://proger.i-forge.net/The_smallest_transparent_pixel/eBQ
+	*/
+	var img = doc.createElement('img');
+	if (img.complete) img.src = 'data:'; // Opera-12
+	if (img.complete) return false; // paranoia
+	img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=';
+	doc.body.appendChild(img);
+	if (img.width) return false; // IE9, Opera-12 will have width == 1 / height == 1 
+	if (img.complete) return false; // Opera-12 sets this immediately. IE9 sets it after a delay.
+	// Sometimes the img check isn't ready on IE9, so one more check
+	var script = doc.createElement('script');
+	script.text = ';';
+	doc.body.appendChild(script);
+	if (script.readyState === 'complete') return false; // IE9
+	return true; // Presumably IE10
+
+})();
+
+
+/*
  ### JS utilities
  */
-var document = window.document;
-
 function forOwn(object, fn, context) { // WARN doesn't check hasOwnProperty()
 	for (var slot in object) fn.call(context, object[slot], slot, object);
 }
@@ -677,7 +710,7 @@ if (isSet('no_style')) {
 
 var no_frameset = isSet('no_frameset');
 if (no_frameset) return; // TODO logger.info()
-if (!(window.XMLHttpRequest && sessionOptions && 'readyState' in document)) {
+if (!(window.XMLHttpRequest && sessionOptions && 'readyState' in document && STAGING_DOCUMENT_IS_INERT)) {
 	throw 'HyperFrameset depends on native XMLHttpRequest and sessionStorage and JSON';
 }
 

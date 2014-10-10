@@ -36,7 +36,7 @@ Meeko.framer.config({
 function getFramesetURL(doc) {
 	var link = getFramesetLink(doc);
 	if (!link) return null; // FIXME warning message
-	var href = URL.deneutralize(link.getAttribute('href'));
+	var href = link.getAttribute('href');
 	return baseURL.resolve(href); // FIXME href should already be absolute
 }
 
