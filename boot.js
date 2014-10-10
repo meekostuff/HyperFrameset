@@ -738,7 +738,6 @@ if (log_index != null) logger.LOG_LEVEL = log_index;
 
 function config() {
 	Meeko.DOM.ready = domReady;
-	Meeko.HTMLParser.prototype.prepare = html5prepare;
 	Meeko.Promise.pollingInterval = bootOptions["polling_interval"];
 }
 

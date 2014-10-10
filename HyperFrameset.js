@@ -2080,8 +2080,6 @@ function normalize(doc, details) {
 
 
 var HTMLParser = Meeko.HTMLParser = (function() {
-// This class allows external code to provide a `prepare(doc)` method for before content parsing.
-// The main reason to do this is the so called `html5shiv`. 
 
 var HTMLParser = function() { // TODO should this receive options
 	if (this instanceof HTMLParser) return;
@@ -2568,14 +2566,7 @@ var hfDefaults = {
 	namespaceStyle: 'vendor'
 }
 
-var hfVendorStyleTags = _.map(hfTags, function(tag) { return hfDefaults.namespace + '-' + tag; }); // only for vendor-style elements
-var hfXmlStyleTags = _.map(hfTags, function(tag) { return hfDefaults.namespace + ':' + tag; }); // only for xml-style elements
 var hfHeadTags = _.words('title meta link style script');
-
-function hfParserPrepare(doc) {
-	_.forEach(hfVendorStyleTags, function(tag) { doc.createElement(_.uc(tag)); });
-	_.forEach(hfXmlStyleTags, function(tag) { doc.createElement(_.uc(tag)); });
-}
 
 var HFrameDefinition = (function() {
 
@@ -3305,7 +3296,7 @@ start: function(startOptions) {
 		if (!framerConfig) throw "No frameset could be determined for this page";
 		framer.scope = framerConfig.scope; // FIXME shouldn't set this until loadFramesetDefinition() returns success
 		framer.framesetURL = framerConfig.framesetURL;
-		return httpProxy.load(framerConfig.framesetURL, { responseType: 'document', prepare: hfParserPrepare })
+		return httpProxy.load(framerConfig.framesetURL, { responseType: 'document' })
 		.then(function(response) {
 			var framesetDoc = response.document;
 			return new HFramesetDefinition(framesetDoc, framerConfig);
