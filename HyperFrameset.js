@@ -3291,7 +3291,7 @@ start: function(startOptions) {
 	
 	function() {
 		window.addEventListener('click', function(e) { framer.onClick(e); }, false); // onClick generates requestnavigation event
-		window.addEventListener('submit', function(e) { }, false);
+		window.addEventListener('submit', function(e) { framer.onSubmit(e); }, false);
 		
 		sprockets.register(framer.definition.cdom.selectorPrefix + 'frame', HFrame, {
 			callbacks: {
@@ -3374,6 +3374,48 @@ onClick: function(e) {
 			location.replace(details.url);
 		}
 	});
+},
+
+onSubmit: function(e) {
+	var framer = this;
+
+	// test submit
+	var form = e.target;
+	if (form.target) return; // no iframe
+	var baseURL = URL(document.URL);
+	var action = baseURL.resolve(form.action); // TODO probably don't need to resolve on browsers that support pushstate
+	
+	var details = {
+		element: form
+	};
+	var method = _.lc(form.method);
+	switch(method) {
+	case 'get':
+		var oURL = URL(action);
+		var query = encode(form);
+		details.url = oURL.nosearch + (oURL.search || '?') + query + oURL.hash;
+		break;
+	default: return; // TODO handle POST
+	}
+	
+	e.preventDefault();
+	asap(function() {
+		var event = document.createEvent('CustomEvent');
+		event.initCustomEvent('requestnavigation', true, true, details.url);
+		var acceptDefault = details.element.dispatchEvent(event);
+		if (acceptDefault !== false) {
+			location.replace(details.url);
+		}
+	});
+	
+	function encode(form) {
+		var data = [];
+		_.forEach(_.toArray(form.elements), function(el) {
+			if (!el.name) return;
+			data.push(el.name + '=' + encodeURIComponent(el.value));
+		});
+		return data.join('&');
+	}
 },
 
 onRequestNavigation: function(e, frame) { // `return false` means success (so preventDefault)
