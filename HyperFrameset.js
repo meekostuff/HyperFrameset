@@ -1691,40 +1691,6 @@ function onLoaded(e) {
 })();
 
 
-var overrideDefaultAction = function(e, fn) {
-	// Shim the event to detect if external code has called preventDefault(), and to make sure we call it (but late as possible);
-	e[vendorPrefix + '-event'] = true;
-	var defaultPrevented = false;
-	e._preventDefault = e.preventDefault;
-	e.preventDefault = function(event) { defaultPrevented = true; this._preventDefault(); } // TODO maybe we can just use defaultPrevented?
-	e._stopPropagation = e.stopPropagation;
-	e.stopPropagation = function() { // WARNING this will fail to detect event.defaultPrevented if event.preventDefault() is called afterwards
-		if (this.defaultPrevented) defaultPrevented = true; // FIXME is defaultPrevented supported on pushState enabled browsers? https://developer.mozilla.org/en-US/docs/Web/API/event.defaultPrevented
-		this._preventDefault();
-		this._stopPropagation();
-	}
-	if (e.stopImmediatePropagation) {
-		e._stopImmediatePropagation = e.stopImmediatePropagation;
-		e.stopImmediatePropagation = function() {
-			if (this.defaultPrevented) defaultPrevented = true;
-			this._preventDefault();
-			this._stopImmediatePropagation();
-		}
-	}
-	
-	function backstop(event) {
-		if (event.defaultPrevented)  defaultPrevented = true;
-		event._preventDefault();
-	}
-	window.addEventListener(e.type, backstop, false);
-	
-	asap(function() {
-		window.removeEventListener(e.type, backstop, false);
-		if (defaultPrevented) return;
-		fn(e);
-	});
-}
-
 /* 
 NOTE:  for more details on how checkStyleSheets() works cross-browser see 
 http://aaronheckmann.blogspot.com/2010/01/writing-jquery-plugin-manager-part-1.html
@@ -1776,7 +1742,7 @@ _.defaults(DOM, {
 	siblings: siblings, firstChild: firstChild, // selections
 	copyAttributes: copyAttributes, removeAttributes: removeAttributes, textContent: textContent, scriptText: scriptText, // attrs
 	composeNode: composeNode, importSingleNode: importSingleNode, insertNode: insertNode, // nodes
-	ready: domReady, addEvent: addEvent, removeEvent: removeEvent, overrideDefaultAction: overrideDefaultAction, // events
+	ready: domReady, addEvent: addEvent, removeEvent: removeEvent, // events
 	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
 	scrollToId: scrollToId,
 	polyfill: polyfill
