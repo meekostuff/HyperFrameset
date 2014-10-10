@@ -3290,8 +3290,16 @@ start: function(startOptions) {
 	},
 	
 	function() {
-		window.addEventListener('click', function(e) { framer.onClick(e); }, false); // onClick generates requestnavigation event
-		window.addEventListener('submit', function(e) { framer.onSubmit(e); }, false);
+		window.addEventListener('click', function(e) {
+			if (e.defaultPrevented) return;
+			var acceptDefault = framer.onClick(e);
+			if (acceptDefault === false) e.preventDefault();
+		}, false); // onClick generates requestnavigation event
+		window.addEventListener('submit', function(e) {
+			if (e.defaultPrevented) return;
+			var acceptDefault = framer.onSubmit(e);
+			if (acceptDefault === false) e.preventDefault();
+		}, false);
 		
 		sprockets.register(framer.definition.cdom.selectorPrefix + 'frame', HFrame, {
 			callbacks: {
@@ -3359,17 +3367,17 @@ start: function(startOptions) {
 
 },
 
-onClick: function(e) {
+onClick: function(e) { // return false means success
 	var framer = this;
 
 	var details = framer.getNavigationDetails(e);
 	if (!details) return; // no hyperlink detected
 	
-	e.preventDefault();
-	framer.requestNavigation(details.url, details);
+	framer.triggerRequestNavigation(details.url, details);
+	return false;
 },
 
-onSubmit: function(e) {
+onSubmit: function(e) { // return false means success
 	var framer = this;
 
 	// test submit
@@ -3391,8 +3399,8 @@ onSubmit: function(e) {
 	default: return; // TODO handle POST
 	}
 	
-	e.preventDefault();
-	framer.requestNavigation(details.url, details);
+	framer.triggerRequestNavigation(details.url, details);
+	return false;
 	
 	function encode(form) {
 		var data = [];
@@ -3404,7 +3412,7 @@ onSubmit: function(e) {
 	}
 },
 
-requestNavigation: function(url, details) {
+triggerRequestNavigation: function(url, details) {
 	asap(function() {
 		var event = document.createEvent('CustomEvent');
 		event.initCustomEvent('requestnavigation', true, true, details.url);
@@ -3430,7 +3438,7 @@ onRequestNavigation: function(e, frame) { // `return false` means success (so pr
 	}
 	
 	if (!frame.isFrameset) {
-		if (requestNavigation(frame, url, details)) e.preventDefault();
+		if (requestNavigation(frame, url, details)) return false;
 		return;
 	}
 	
@@ -3443,8 +3451,7 @@ onRequestNavigation: function(e, frame) { // `return false` means success (so pr
 	var isPageLink = (oURL.nohash === baseURL.nohash); // TODO what about page-links that match the current hash?
 	if (isPageLink) {
 		framer.onPageLink(url, details);
-		e.preventDefault();
-		return;
+		return false;
 	}
 
 	var frameset = frame;
@@ -3453,11 +3460,7 @@ onRequestNavigation: function(e, frame) { // `return false` means success (so pr
 		return;
 	}
 	
-	if (requestNavigation(frameset, url, details)) {
-		e.preventDefault();
-		return false;
-	}
-
+	if (requestNavigation(frameset, url, details)) return false;
 	return;
 
 	function requestNavigation(frame, url, details) { // `return true` means success
