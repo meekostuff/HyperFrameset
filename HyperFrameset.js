@@ -403,6 +403,18 @@ leftDocumentCallback: function(element) {
 	var binding = Binding.getInterface(element);
 	if (!binding) return;
 	binding.leftDocumentCallback();
+},
+
+managedEvents: [],
+
+manageEvent: function(type) {
+	if (_.contains(this.managedEvents, type)) return;
+	this.managedEvents.push(type);
+	window.addEventListener(type, function(event) {
+		// NOTE stopPropagation() prevents custom default-handlers from running. DOMSprockets nullifies it.
+		event.stopPropagation = function() { logger.warn('event.stopPropagation() is a no-op'); }
+		event.stopImmediatePropagation = function() { logger.warn('event.stopImmediatePropagation() is a no-op'); }
+	}, true);
 }
 
 });
@@ -489,9 +501,11 @@ addHandler: function(handler) {
 	var type = handler.type;
 	var capture = (handler.eventPhase == 1); // Event.CAPTURING_PHASE
 	if (capture) {
-		logger.warn('Capturing events not supported');
+		logger.warn('Capture phase for events not supported');
 		return; // FIXME should this convert to bubbling instead??
 	}
+
+	Binding.manageEvent(type);
 	var fn = function(event) {
 		if (fn.normalize) event = fn.normalize(event);
 		return handleEvent.call(implementation, event, handler);
@@ -514,6 +528,13 @@ removeListener: function(fn) {
 
 });
 
+// WARN polyfill Event#preventDefault
+if (!('defaultPrevented' in Event.prototype)) { // NOTE ensure defaultPrevented works
+	Event.prototype.defaultPrevented = false;
+	Event.prototype._preventDefault = Event.prototype.preventDefault;
+	Event.prototype.preventDefault = function() { this.defaultPrevented = true; this._preventDefault(); }
+}
+
 function handleEvent(event, handler) {
 	var bindingImplementation = this;
 	var target = event.target;
@@ -528,7 +549,7 @@ function handleEvent(event, handler) {
 	}
 	switch (handler.eventPhase) { // FIXME DOMSprockets doesn't intend to support eventPhase
 	case 1:
-		throw "Capturing not supported";
+		throw 'Capture phase for events not supported';
 		break;
 	case 2:
 		if (delegator !== target) return;
@@ -540,15 +561,6 @@ function handleEvent(event, handler) {
 		break;
 	}
 
-	if (!event._stopPropagation) { // NOTE stopPropagation() prevents custom default-handlers from running. DOMSprockets nullifies it.
-		event._stopPropagation = event.stopPropagation;
-		event.stopPropagation = function() { logger.warn('event.stopPropagation() is a no-op'); }
-	}
-	if (!('defaultPrevented' in event)) { // NOTE ensure defaultPrevented works
-		event.defaultPrevented = false;
-		event._preventDefault = event.preventDefault;
-		event.preventDefault = function() { this.defaultPrevented = true; this._preventDefault(); }
-	}
 	if (handler.action) {
 		var result = handler.action.call(bindingImplementation, event, delegator);
 		if (result === false) event.preventDefault();
@@ -3278,6 +3290,9 @@ start: function(startOptions) {
 	},
 	
 	function() {
+		window.addEventListener('click', function(e) { framer.onClick(e); }, false); // onClick generates requestnavigation event
+		window.addEventListener('submit', function(e) { }, false);
+		
 		sprockets.register(framer.definition.cdom.selectorPrefix + 'frame', HFrame, {
 			callbacks: {
 				attached: function() {
@@ -3296,10 +3311,10 @@ start: function(startOptions) {
 			
 			handlers: [
 			{
-				type: 'click',
+				type: 'requestnavigation',
 				action: function(e) {
 					if (e.defaultPrevented) return;
-					var acceptDefault = framer.onClick(e, this);
+					var acceptDefault = framer.onRequestNavigation(e, this);
 					if (acceptDefault === false) e.preventDefault();
 				}
 			}
@@ -3322,10 +3337,10 @@ start: function(startOptions) {
 			
 			handlers: [
 			{
-				type: 'click',
+				type: 'requestnavigation',
 				action: function(e) {
 					if (e.defaultPrevented) return;
-					var acceptDefault = framer.onClick(e, this);
+					var acceptDefault = framer.onRequestNavigation(e, this);
 					if (acceptDefault === false) e.preventDefault();
 				}
 			}
@@ -3344,21 +3359,39 @@ start: function(startOptions) {
 
 },
 
-onClick: function(e, frame) { // `return false` means success (so preventDefault)
+onClick: function(e) {
 	var framer = this;
-	if (!frame) throw 'Invalid frame / frameset in onClick';
+
+	var details = framer.getNavigationDetails(e);
+	if (!details) return; // no hyperlink detected
+	
+	e.preventDefault();
+	asap(function() {
+		var event = document.createEvent('CustomEvent');
+		event.initCustomEvent('requestnavigation', true, true, details.url);
+		var acceptDefault = details.element.dispatchEvent(event);
+		if (acceptDefault !== false) {
+			location.replace(details.url);
+		}
+	});
+},
+
+onRequestNavigation: function(e, frame) { // `return false` means success (so preventDefault)
+	var framer = this;
+	if (!frame) throw 'Invalid frame / frameset in onRequestNavigation';
 	// NOTE only pushState enabled browsers use this
 	// We want panning to be the default behavior for clicks on hyperlinks - <a href>
 	// Before panning to the next page, have to work out if that is appropriate
 	// `return` means ignore the click
 
-	var details = framer.getNavigationDetail(e);
-	if (!details) return;
-
-	var url = details.url;
+	var url = e.detail;
+	var details = {
+		url: url,
+		element: e.target
+	}
 	
 	if (!frame.isFrameset) {
-		if (onRequestNavigation(frame, details, false))	return false;
+		if (requestNavigation(frame, url, details)) e.preventDefault();
 		return;
 	}
 	
@@ -3371,7 +3404,7 @@ onClick: function(e, frame) { // `return false` means success (so preventDefault
 	var isPageLink = (oURL.nohash === baseURL.nohash); // TODO what about page-links that match the current hash?
 	if (isPageLink) {
 		framer.onPageLink(url, details);
-		return false;
+		e.preventDefault();
 	}
 
 	var frameset = frame;
@@ -3380,27 +3413,24 @@ onClick: function(e, frame) { // `return false` means success (so preventDefault
 		return;
 	}
 	
-	if (onRequestNavigation(frameset, details, true)) {
+	if (requestNavigation(frameset, url, details)) {
+		e.preventDefault();
 		return false;
 	}
 
 	logger.error('There was a problem handling the url: ' + url + '\n' + 'Fallback to browser navigation');
 	return;
 
-	function onRequestNavigation(frame, details, isFrameset) { // `return true` means success
-		var url = details.url;
+	function requestNavigation(frame, url, details) { // `return true` means success
 		var changeset = frame.definition.lookup(url, details);
 		if (!changeset) return false;
-		framer.load(url, changeset, isFrameset);
+		framer.load(url, changeset, frame.isFrameset);
 		return true;
 	}
 
 },
 
-getNavigationDetail: function(e) {
-	if ('navigationDetail' in e) return e.navigationDetail;
-	e.navigationDetail = null;
-	
+getNavigationDetails: function(e) {	
 	if (e.button != 0) return; // FIXME what is the value for button in IE's W3C events model??
 	if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return; // FIXME do these always trigger modified click behavior??
 
@@ -3415,13 +3445,12 @@ getNavigationDetail: function(e) {
 
 	// NOTE The following creates a pseudo-event and dispatches to frames in a bubbling order.
 	// FIXME May as well use a virtual event system, e.g. DOMSprockets
-	var detail = e.navigationDetail = {
+	var details = {
 		url: url,
-		referrer: document.URL,
 		element: hyperlink
 	}; // TODO more details?? event??
 
-	return detail;
+	return details;
 },
 
 onPageLink: function(url, details) {
