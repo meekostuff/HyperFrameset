@@ -1440,18 +1440,8 @@ _.defaults(Promise, {
 var DOM = Meeko.DOM;
 var $id = DOM.$id, $ = DOM.$, $$ = DOM.$$, matches = DOM.matches, closest = DOM.closest;
 
-var getTagName = (typeof document.documentElement.scopeName !== 'string') ?
-function(el) {
+var getTagName = function(el) {
 	return el && el.nodeType === 1 ? _.lc(el.tagName) : "";
-} :
-function(el) {
-	if (!el || el.nodeType !== 1) return '';
-	var tag = _.lc(el.tagName);
-	var scopeName = _.lc(el.scopeName); // IE8, IE9
-	if (!scopeName || scopeName === 'html') return tag;
-	var prefix = scopeName + ':';
-	if (tag.indexOf(prefix) === 0) return tag;
-	return prefix + tag;
 }
 
 var siblings = function(conf, refNode, conf2, refNode2) {
@@ -2494,7 +2484,12 @@ function CustomDOM(options) {
 	if (!CustomDOM.separator[style]) throw 'Unexpected namespaceStyle: ' + style;
 	var ns = options.namespace = _.lc(options.namespace);
 	if (!ns) throw 'Unexpected namespace: ' + ns;
-	this.init(options);
+	
+	var cdom = this;
+	_.assign(cdom, options);
+	var separator = CustomDOM.separator[cdom.namespaceStyle];
+	cdom.prefix = cdom.namespace + separator;
+	cdom.selectorPrefix = cdom.namespace + (separator === ':' ? '\\:' : separator);
 }
 
 CustomDOM.separator = {
@@ -2517,44 +2512,6 @@ CustomDOM.getNamespaces = function(doc) { // NOTE modelled on IE8, IE9 document.
 	});
 	return namespaces;
 }
-
-_.defaults(CustomDOM.prototype, {
-	
-init: function(options) {
-	var cdom = this;
-	if (options) _.assign(cdom, options);
-	var separator = CustomDOM.separator[cdom.namespaceStyle];
-	cdom.prefix = cdom.namespace + separator;
-	cdom.selectorPrefix = cdom.namespace + (separator === ':' ? '\\:' : separator);
-},
-
-attr: function(el, attrName, value) {
-	if (typeof value === 'undefined') return el.getAttribute(attrName);
-	el.setAttribute(attrName, value);
-},
-
-match$: function(el, selector) {
-	var cdom = this;
-	var tag = getTagName(el);
-	if (!tag) return false;
-	selector = _.lc(selector);
-	var fullSelector = cdom.prefix + selector;
-	if (tag === fullSelector) return true; // modern browsers
-	if (cdom.namespaceStyle !== 'xml') return false;
-	var scopeName = el.scopeName; // IE8 xml
-	if (!scopeName) return false;
-	scopeName = _.lc(scopeName);
-	if (scopeName === cdom.namespace) return true;
-	return false;
-},
-
-$$: function(selector, context) {
-	var cdom = this;
-	selector = cdom.selectorPrefix + selector;
-	return DOM.$$(selector, context);
-}
-
-});
 
 return CustomDOM;
 
@@ -2625,8 +2582,8 @@ init: function(el) {
 		options: _.defaults({}, HFrameDefinition.options),
 		boundElement: el,
 		id: el.id,
-		type: cdom.attr(el, 'type'),
-		mainSelector: cdom.attr(el, 'main') // TODO consider using a hash in `@src`
+		type: el.getAttribute('type'),
+		mainSelector: el.getAttribute('main') // TODO consider using a hash in `@src`
     });
 	var bodies = frameDef.bodies = [];
 	_.forEach(_.toArray(el.childNodes), function(node) {
@@ -2648,7 +2605,7 @@ init: function(el) {
 			return;
 		}
 		if (_.contains(hfHeadTags, tag)) return; // ignore typical <head> elements
-		if (cdom.match$(node, 'body')) {
+		if (tag === cdom.prefix + 'body') {
 			bodies.push(new HBodyDefinition(node, frameset));
 			return;
 		}
@@ -2716,14 +2673,14 @@ init: function(el) {
 	var cdom = frameset.cdom;
 	_.defaults(bodyDef, {
 		boundElement: el,
-		condition: normalizeCondition(cdom.attr(el, 'condition')) || 'loaded',
+		condition: normalizeCondition(el.getAttribute('condition')) || 'loaded',
 		fragment: frameset.document.createDocumentFragment(),
 		transforms: []
 	});
 	var node;
 	while (node = el.firstChild) {
 		el.removeChild(node);
-		if (cdom.match$(node, 'transform')) bodyDef.transforms.push(new HTransformDefinition(node, frameset));
+		if (getTagName(node) === cdom.prefix + 'transform') bodyDef.transforms.push(new HTransformDefinition(node, frameset));
 		else bodyDef.fragment.appendChild(node);
 	}
 	if (!bodyDef.transforms.length && bodyDef.condition === 'loaded') {
@@ -2776,8 +2733,8 @@ init: function(el) {
 	var cdom = frameset.cdom;
 	_.defaults(transform, {
 		boundElement: el,
-		type: cdom.attr(el, 'type') || 'main',
-		format: cdom.attr(el, 'format')
+		type: el.getAttribute('type') || 'main',
+		format: el.getAttribute('format')
     });
 	if (transform.type === 'main') transform.format = '';
 	var frag = frameset.document.createDocumentFragment();
@@ -2882,18 +2839,18 @@ init: function(doc, settings) {
 	body.parentNode.removeChild(body);
 	frameset.document = doc;
 	frameset.element = body;
-	var frameElts = cdom.$$('frame', body);
+	var frameElts = $$(cdom.selectorPrefix + 'frame', body);
 	var frameRefElts = [];
 	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
 		// NOTE first rebase @src with scope: urls
-		var src = cdom.attr(el, 'src');
+		var src = el.getAttribute('src');
 		if (src) {
 			var newSrc = rebaseURL(src, scopeURL);
-			if (newSrc != src) cdom.attr(el, 'src', newSrc);
+			if (newSrc != src) el.setAttribute('src', newSrc);
 		}
 		
 		var id = el.getAttribute('id');
-		var defId = cdom.attr(el, 'def');
+		var defId = el.getAttribute('def');
 		if (defId && defId !== id) {
 			frameRefElts.push(el);
 			return;
@@ -2906,12 +2863,12 @@ init: function(doc, settings) {
 		}
 		if (!defId) {
 			defId = id;
-			cdom.attr(placeholder, 'def', defId);
+			placeholder.setAttribute('def', defId);
 		}
 		frameset.frames[id] = new HFrameDefinition(el, frameset);
 	});
 	_.forEach(frameRefElts, function(el) {
-		var defId = cdom.attr(el, 'def');
+		var defId = el.getAttribute('def');
 		if (!frameset.frames[defId]) {
 			throw "Hyperframe references non-existant frame #" + defId;
 		}
