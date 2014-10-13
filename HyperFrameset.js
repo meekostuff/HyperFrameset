@@ -1870,7 +1870,51 @@ var defaultInfo = {
 	responseType: 'document'
 }
 
+// NOTE cache, etc is currently used only for landing page
+// FIXME cacheLookup doesn't indicate if a resource is currently being fetched
+// TODO an API like ServiceWorker may be more appropriate
+var cache = [];
+
+function cacheAdd(request, response) {
+	var rq = _.defaults({}, request);
+	var resp = _.defaults({}, response);
+	resp.document = response.document.cloneNode(true); // TODO handle other response types
+	cache.push({
+		request: rq,
+		response: resp
+	});
+}
+
+function cacheLookup(request) {
+	var response;
+	_.some(cache, function(entry) {
+		if (!cacheMatch(request, entry)) return false;
+		response = entry.response;
+		return true;
+	});
+	if (!response) return;
+	var resp = _.defaults({}, response);
+	resp.document = response.document.cloneNode(true); // TODO handle other response types
+	return resp;
+}
+
+function cacheMatch(request, entry) {
+	if (request.url !== entry.request.url) return false;
+	// FIXME what testing is appropriate?? `method`, other headers??
+	return true;
+}
+
 var httpProxy = {
+
+add: function(response) { // NOTE this is only for the landing page
+	var url = response.url;
+	if (!url) throw 'Invalid url in response object';
+	if (!_.contains(responseTypes, response.type)) throw 'Invalid type in response object';
+	var request = {
+		url: response.url
+	}
+	cacheAdd(request, response);
+},
 
 load: function(url, requestInfo) {
 	var info = {
@@ -1892,15 +1936,21 @@ var request = function(info) {
 	case 'post':
 		throw "POST not supported"; // FIXME proper error handling
 		info.body = serialize(info.body, info.type);
+		return doRequest(info);
 		break;
 	case 'get':
-		// no-op
+		var response = cacheLookup(info);
+		if (response) return Promise.resolve(response);
+		return doRequest(info)
+			.then(function(response) {
+				cacheAdd(info, response);
+				return response;
+			});
 		break;
 	default:
 		throw _.uc(method) + ' not supported';
 		break;
 	}
-	return doRequest(info);
 }
 
 var doRequest = function(info) {
@@ -3231,8 +3281,6 @@ frameset: null,
 
 started: false,
 
-landingDocument: null,
-
 start: function(startOptions) {
 	var framer = this;
 	
@@ -3241,8 +3289,12 @@ start: function(startOptions) {
 
 	framer.started = true;
 	startOptions.contentDocument
-	.then(function(doc) {
-		framer.landingDocument = doc;
+	.then(function(doc) { // FIXME potential race condition between document finished loading and frameset rendering
+		httpProxy.add({
+			url: document.URL,
+			type: 'document',
+			document: doc
+		});
 	});
 	
 	return pipe(null, [
