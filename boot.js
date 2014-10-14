@@ -63,6 +63,24 @@ var STAGING_DOCUMENT_IS_INERT = (function() {
 
 })();
 
+/*
+	SUPPORTS_MUTATION_OBSERVERS indicates that DOM mutation can be adequately observed.
+	This is a requirement of DOMSprockets and element visibilitychange events.
+	If this is false then the `no_frameset` option applies.
+*/
+
+var SUPPORTS_MUTATION_OBSERVERS = (function() {
+
+	if (window.MutationObserver) return true;
+
+	if (!window.addEventListener) return false;
+	var supported = false;
+	var div = document.createElement('div');
+	div.addEventListener('DOMAttrModified', function(e) { supported = true; }, false);
+	div.setAttribute('hidden', '');
+	return supported;
+	
+})();
 
 /*
  ### JS utilities
@@ -710,8 +728,8 @@ if (isSet('no_style')) {
 
 var no_frameset = isSet('no_frameset');
 if (no_frameset) return; // TODO logger.info()
-if (!(window.XMLHttpRequest && sessionOptions && 'readyState' in document && STAGING_DOCUMENT_IS_INERT)) {
-	throw 'HyperFrameset depends on native XMLHttpRequest and sessionStorage and JSON';
+if (!(window.XMLHttpRequest && sessionOptions && 'readyState' in document && STAGING_DOCUMENT_IS_INERT && SUPPORTS_MUTATION_OBSERVERS)) {
+	throw 'HyperFrameset depends on native XMLHttpRequest, sessionStorage, JSON and MutationObserver';
 }
 
 
