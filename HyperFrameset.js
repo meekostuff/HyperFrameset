@@ -3479,16 +3479,19 @@ start: function(startOptions) {
 				},
 				enteredDocument: function() {
 					var frame = this;
-					var parentFrame;
-					var parent = closest(frame.boundElement.parentNode, framer.definition.cdom.selectorPrefix + 'frame');
-					if (parent) parentFrame = HFrame(parent);
-					else {
-						parent = document.body; // TODO  should this be closest(frame.boundElement.parentNode, 'body'); 
-						parentFrame = HFrameset(parent);
-					}
-					frame.parentFrame = parentFrame;
-					parentFrame.frameEntered(frame);
-					framer.frameEntered(frame);
+					whenVisible(frame.boundElement)
+					.then(function() {
+						var parentFrame;
+						var parent = closest(frame.boundElement.parentNode, framer.definition.cdom.selectorPrefix + 'frame');
+						if (parent) parentFrame = HFrame(parent);
+						else {
+							parent = document.body; // TODO  should this be closest(frame.boundElement.parentNode, 'body'); 
+							parentFrame = HFrameset(parent);
+						}
+						frame.parentFrame = parentFrame;
+						parentFrame.frameEntered(frame);
+						framer.frameEntered(frame);
+					});
 				},
 				leftDocument: function() {
 					var frame = this;
@@ -3520,6 +3523,22 @@ start: function(startOptions) {
 	
 	]);
 
+	function whenVisible(element) { // FIXME this quite possibly causes leaks if closestHidden is removed from document before removeEventListener
+	return new Promise(function(resolve, reject) {	
+		var closestHidden = closest(element, '[hidden]');
+		if (!closestHidden) {
+			resolve();
+			return;
+		}
+		var listener = function(e) {
+			if (e.target.hidden) return;
+			closestHidden.removeEventListener('visibilitychange', listener, false);
+			whenVisible(element).then(resolve);
+		}
+		closestHidden.addEventListener('visibilitychange', listener, false);
+	});
+	}
+	
 },
 
 onClick: function(e) { // return false means success
