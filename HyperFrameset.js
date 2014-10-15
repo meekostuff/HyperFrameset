@@ -3052,11 +3052,21 @@ var HFrame = sprockets.Base.evolve({
 init: function() {
 	var frame = this;
 	_.defaults(frame, {
+		frames: [],
 		bodyElement: null,
 		name: frame.attr('name'),
 		src: frame.attr('src'),
 		mainSelector: frame.attr('main') // TODO consider using a hash in `@src`
     });
+},
+
+frameEntered: function(frame) {
+	this.frames.push(frame);
+},
+
+frameLeft: function(frame) {
+	var index = this.frames.indexOf(frame);
+	this.frames.splice(index);
 },
 
 preload: function(request) {
@@ -3103,14 +3113,22 @@ return HFrame;
 
 var HFrameset = (function() {
 	
-function HFrameset(dstDoc) {
-	if (!dstDoc) return; // in case of inheritance
-	this.document = dstDoc;
-}
-
-_.defaults(HFrameset.prototype, {
+var HFrameset = sprockets.Base.evolve({
 
 isFrameset: true,
+
+init: function() {
+	this.frames = [];	
+},
+
+frameEntered: function(frame) {
+	this.frames.push(frame);
+},
+
+frameLeft: function(frame) {
+	var index = this.frames.indexOf(frame);
+	this.frames.splice(index);
+},
 
 render: function() {
 
@@ -3421,19 +3439,20 @@ start: function(startOptions) {
 			if (acceptDefault === false) e.preventDefault();
 		}, false);
 		
-		sprockets.register(framer.definition.cdom.selectorPrefix + 'frame', HFrame, {
+		sprockets.register('body', HFrameset, {
 			callbacks: {
 				attached: function() {
-					var frame = this;
-					var defId = frame.attr('def');
-					frame.definition = framer.definition.frames[defId];
-					if (frame.init) frame.init();
+					var frameset = this;
+					frameset.definition = framer.definition;
+					if (frameset.init) frameset.init();
 				},
 				enteredDocument: function() {
-					framer.frameEntered(this);
+					var frameset = this;
+					framer.frameset = frameset;
+					frameset.render();
 				},
-				leftDocument: function() {
-					// FIXME notify framer
+				leftDocument: function() { // FIXME should never be called??
+					delete framer.frameset;
 				}
 			},
 			
@@ -3450,16 +3469,32 @@ start: function(startOptions) {
 			
 			});
 
-		sprockets.register('body', HFrameset, {
+		sprockets.register(framer.definition.cdom.selectorPrefix + 'frame', HFrame, {
 			callbacks: {
 				attached: function() {
-					var frameset = this;
-					frameset.definition = framer.definition;
-					if (frameset.init) frameset.init();
+					var frame = this;
+					var defId = frame.attr('def');
+					frame.definition = framer.definition.frames[defId];
+					if (frame.init) frame.init();
 				},
 				enteredDocument: function() {
-					var frameset = this;
-					frameset.render();
+					var frame = this;
+					var parentFrame;
+					var parent = closest(frame.boundElement.parentNode, framer.definition.cdom.selectorPrefix + 'frame');
+					if (parent) parentFrame = HFrame(parent);
+					else {
+						parent = document.body; // TODO  should this be closest(frame.boundElement.parentNode, 'body'); 
+						parentFrame = HFrameset(parent);
+					}
+					frame.parentFrame = parentFrame;
+					parentFrame.frameEntered(frame);
+					framer.frameEntered(frame);
+				},
+				leftDocument: function() {
+					var frame = this;
+					frame.parentFrame.frameLeft(frame);
+					delete frame.parentFrame;
+					// FIXME notify framer
 				}
 			},
 			
@@ -3630,12 +3665,12 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 	var frameset = framer.frameset;
 	var target = changeset.target;
 	var frames = [];
-	var frameElements = $$(framer.definition.cdom.selectorPrefix + 'frame'); // FIXME framer should maintain a list of current frames
-	_.forEach(frameElements, function(el) {
-		var frame = HFrame(el);
-		if (frame.name === target) frames.push(frame);
+	recurseFrames(frameset, function(frame) {
+		if (frame.name !== target) return;
+		frames.push(frame);
+		return true;
 	});
-	var request =  { method: 'get', url: url, responseType: 'document' }; // TODO one day may support different response-type
+	var request = { method: 'get', url: url, responseType: 'document' }; // TODO one day may support different response-type
 	// FIXME warning if more than one frame??
 	_.forEach(frames, function(frame) {
 		frame.preload(request);
@@ -3650,6 +3685,13 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 
 	function loadFrames(frames, response) {
 		_.forEach(frames, function(frame) { frame.load(response); });
+	}
+	
+	function recurseFrames(parentFrame, fn) {
+		_.forEach(parentFrame.frames, function(frame) {
+			var found = fn(frame);
+			if (!found) recurseFrames(frame, fn);
+		});			
 	}
 },
 
