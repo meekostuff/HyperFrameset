@@ -2736,6 +2736,7 @@ init: function(el) {
 		}
 		if (_.contains(hfHeadTags, tag)) return; // ignore typical <head> elements
 		if (tag === cdom.prefix + 'body') {
+			el.removeChild(node);
 			bodies.push(new HBodyDefinition(node, frameset));
 			return;
 		}
@@ -2804,15 +2805,14 @@ init: function(el) {
 	_.defaults(bodyDef, {
 		boundElement: el,
 		condition: normalizeCondition(el.getAttribute('condition')) || 'loaded',
-		fragment: frameset.document.createDocumentFragment(),
 		transforms: []
 	});
-	var node;
-	while (node = el.firstChild) {
-		el.removeChild(node);
-		if (getTagName(node) === cdom.prefix + 'transform') bodyDef.transforms.push(new HTransformDefinition(node, frameset));
-		else bodyDef.fragment.appendChild(node);
-	}
+	_.forEach(_.toArray(el.childNodes), function(node) {
+		if (getTagName(node) === cdom.prefix + 'transform') {
+			el.removeChild(node);
+			bodyDef.transforms.push(new HTransformDefinition(node, frameset));
+		}	
+	});
 	if (!bodyDef.transforms.length && bodyDef.condition === 'loaded') {
 		logger.warn('HBody definition for loaded content contains no HTransform definitions');
 	}
@@ -2823,19 +2823,17 @@ render: function(resource, condition, options) {
 	var frameset = bodyDef.frameset;
 	var cdom = frameset.cdom;
 	var fragment;
-	if (bodyDef.transforms.length) {
-		if (!resource) return null;
-		var doc = resource.document; // FIXME what if resource is a Request?
-		if (!doc) return null;
-		fragment = doc;
-		if (options.mainSelector) fragment = $(options.mainSelector, doc);
-		_.forEach(bodyDef.transforms, function(transform) {
-			fragment = transform.process(fragment);
-		});
+	if (bodyDef.transforms.length <= 0) {
+		return bodyDef.boundElement.cloneNode(true);
 	}
-	else {
-		fragment = bodyDef.fragment.cloneNode(true);
-	}
+	if (!resource) return null;
+	var doc = resource.document; // FIXME what if resource is a Request?
+	if (!doc) return null;
+	fragment = doc;
+	if (options.mainSelector) fragment = $(options.mainSelector, doc);
+	_.forEach(bodyDef.transforms, function(transform) {
+		fragment = transform.process(fragment);
+	});
 	var el = bodyDef.boundElement.cloneNode(false);
 	el.appendChild(fragment);
 	return el;
