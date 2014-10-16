@@ -1003,27 +1003,27 @@ attr: function(name, value) {
 	if (typeof value === 'undefined') return element.getAttribute(name);
 	element.setAttribute(name, value); // TODO DWIM
 },
-hasClass: function(token) { // FIXME use @class instead of .className
-	return _.contains(_.words(this.boundElement.className), token);
+hasClass: function(token) {
+	return _.contains(_.words(this.boundElement.getAttribute('class')), token);
 },
 addClass: function(token) {
 	if (this.hasClass(token)) return this;
 	var element = this.boundElement;
-	var text = element.className;
+	var text = element.getAttribute('class');
 	var n = text.length,
 		space = (n && text.charAt(n-1) !== " ") ? " " : "";
 	text += space + token;
-	element.className = text;
+	element.setAttribute('class', text);
 	return this;
 },
 removeClass: function(token) {
 	var element = this.boundElement;
-	var text = element.className;
+	var text = element.getAttribute('class');
 	var prev = text.split(/\s+/);
 	var next = [];
 	_.forEach(prev, function(str) { if (str !== token) next.push(str); });
 	if (prev.length == next.length) return this;
-	element.className = next.join(" ");
+	element.setAttribute('class', next.join(" "));
 	return this;
 },
 toggleClass: function(token, force) {
@@ -2610,16 +2610,17 @@ var framer = Meeko.framer = (function(classNamespace) {
 var CustomDOM = (function() {
 
 function CustomDOM(options) {
-	var style = options.namespaceStyle = _.lc(options.namespaceStyle);
-	if (!CustomDOM.separator[style]) throw 'Unexpected namespaceStyle: ' + style;
-	var ns = options.namespace = _.lc(options.namespace);
-	if (!ns) throw 'Unexpected namespace: ' + ns;
+	var style = options.style = _.lc(options.style);
+	var styleInfo = CustomDOM.namespaceStyles[style];
+	if (!styleInfo) throw 'Unexpected style: ' + style;
+	var ns = options.name = _.lc(options.name);
+	if (!ns) throw 'Unexpected name: ' + ns;
 	
 	var cdom = this;
 	_.assign(cdom, options);
-	var separator = CustomDOM.separator[cdom.namespaceStyle];
-	cdom.prefix = cdom.namespace + separator;
-	cdom.selectorPrefix = cdom.namespace + (separator === ':' ? '\\:' : separator);
+	var separator = styleInfo.separator;
+	cdom.prefix = cdom.name + separator;
+	cdom.selectorPrefix = cdom.name + (separator === ':' ? '\\:' : separator);
 }
 
 CustomDOM.separator = {
@@ -2627,18 +2628,38 @@ CustomDOM.separator = {
 	'xml': ':'
 };
 
+CustomDOM.namespaceStyles = {
+	'vendor': {
+		configNamespace: 'custom',
+		separator: '-'
+	},
+	'xml': {
+		configNamespace: 'xmlns',
+		separator: ':'
+	}
+}
+
+_.forOwn(CustomDOM.namespaceStyles, function(styleInfo) {
+	styleInfo.configPrefix = styleInfo.configNamespace + styleInfo.separator;
+});
+
 CustomDOM.getNamespaces = function(doc) { // NOTE modelled on IE8, IE9 document.namespaces interface
 	var namespaces = [];
-	var xmlnsPrefix = 'xmlns:';
-	var xmlnsLength = xmlnsPrefix.length;
 	_.forEach(_.toArray(doc.documentElement.attributes), function(attr) {
+		var style;
+		var name;
 		var fullName = _.lc(attr.name);
-		if (fullName.indexOf(xmlnsPrefix) !== 0) return;
-		var name = fullName.substr(xmlnsLength);
-		namespaces.push({
-			name: name,
-			urn: attr.value
-		});
+		for (var style in CustomDOM.namespaceStyles) {
+			var styleInfo = CustomDOM.namespaceStyles[style];
+			if (fullName.indexOf(styleInfo.configPrefix) !== 0) continue;
+			var name = fullName.substr(styleInfo.configPrefix.length);
+			namespaces.push({
+				style: style,
+				name: name,
+				urn: attr.value
+			});
+			break;
+		}
 	});
 	return namespaces;
 }
@@ -2648,9 +2669,9 @@ return CustomDOM;
 })();
 
 var hfTags = _.words('frame body transform');
-var hfDefaults = {
-	namespace: 'hf',
-	namespaceStyle: 'vendor'
+var hfDefaultNamespace = {
+	name: 'hf',
+	style: 'vendor'
 }
 
 var hfHeadTags = _.words('title meta link style script');
@@ -2943,22 +2964,16 @@ init: function(doc, settings) {
 		frames: {} // all hyperframe definitions. Indexed by @id (which may be auto-generated)
 	});
 
-	var cdom;
-	var xmlns;
+	var hfNS = hfDefaultNamespace;
 	frameset.namespaces = CustomDOM.getNamespaces(doc);
 	_.some(frameset.namespaces, function(ns) {
 		if (_.lc(ns.urn) !== 'hyperframeset') return false;
-		xmlns = ns.name;
+		hfNS = ns;
 		return true;
 	});
 	
-	if (xmlns) cdom = new CustomDOM({
-		namespace: xmlns,
-		namespaceStyle: 'xml'
-	});
-	else cdom = new CustomDOM(hfDefaults);
-	frameset.cdom = cdom;
-	
+	var cdom = frameset.cdom = new CustomDOM(hfNS);
+
 	// NOTE first rebase scope: urls
 	var scopeURL = URL(settings.scope);
 	rebase(doc, scopeURL);
@@ -4021,37 +4036,40 @@ transform: function(provider) {
 function transform(el, provider, context, variables) {
 	
 	var ht_if = htAttr(el, 'if');
+	var ht_unless = htAttr(el, 'unless');
 	var ht_forEach = htAttr(el, 'for-each');
-	var ht_var = htAttr(el, 'var');
-	
-	if (ht_forEach === false) {
 
-		if (ht_if !== false) {
-			var keep = provider.evaluate(ht_if, context, variables, 'boolean');
-			if (!keep) return null;
-		}
-	
-		var newEl = transformNode(el, provider, context, variables); // NOTE newEl === el
-		return newEl;
+	if (ht_forEach === false) {
+		return processNode(el, provider, context, variables); // NOTE return value === el
 	}
 	
 	// handle for-each
+	var ht_var = htAttr(el, 'var');
+	
 	var subVars = _.defaults({}, variables);
 	var subContexts = provider.evaluate(ht_forEach, context, variables, 'array');
 	var result = document.createDocumentFragment(); // FIXME which is the right doc to create this frag in??
 	
 	_.forEach(subContexts, function(subContext) {
 		if (ht_var) subVars[ht_var] = subContext;
-		if (ht_if !== false) {
-			var keep = provider.evaluate(ht_if, subContext, subVars, 'boolean');
-			if (!keep) return;
-		}
 		var srcEl = el.cloneNode(true);
-		var newEl = transformNode(srcEl, provider, subContext, subVars); // NOTE newEl === srcEl
-		result.appendChild(newEl);
+		var newEl = processNode(srcEl, provider, subContext, subVars); // NOTE newEl === srcEl
+		if (newEl) result.appendChild(newEl);
 	});
 	
 	return result;
+
+	function processNode(node, provider, context, variables) {
+		if (ht_if !== false) {
+			var keep = provider.evaluate(ht_if, context, variables, 'boolean');
+			if (!keep) return;
+		}
+		if (ht_unless !== false) {
+			var keep = !provider.evaluate(ht_unless, context, variables, 'boolean');
+			if (!keep) return;
+		}
+		return transformNode(node, provider, context, variables); // NOTE return value === node
+	}
 }
 
 function transformNode(node, provider, context, variables) {
