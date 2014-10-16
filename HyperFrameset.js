@@ -3546,8 +3546,15 @@ onClick: function(e) { // return false means success
 	if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return; // FIXME do these always trigger modified click behavior??
 
 	// Find closest <a href> to e.target
-	var hyperlink = closest(e.target, 'a');
-	if (!hyperlink) return; // only handling hyperlink clicks
+	var linkElement = closest(e.target, 'a, [link]');
+	if (!linkElement) return;
+	var hyperlink;
+	if (getTagName(linkElement) === 'a') hyperlink = linkElement;
+	else {
+		hyperlink = $('a, link', linkElement);
+		if (!hyperlink) hyperlink = closest('a', linkElement);
+		if (!hyperlink) return;
+	}
 	var href = hyperlink.getAttribute("href");
 	if (!href) return; // not really a hyperlink
 
