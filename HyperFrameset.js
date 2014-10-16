@@ -3542,9 +3542,25 @@ start: function(startOptions) {
 onClick: function(e) { // return false means success
 	var framer = this;
 
-	var details = framer.getNavigationDetails(e);
-	if (!details) return; // no hyperlink detected
-	
+	if (e.button != 0) return; // FIXME what is the value for button in IE's W3C events model??
+	if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return; // FIXME do these always trigger modified click behavior??
+
+	// Find closest <a href> to e.target
+	var hyperlink = closest(e.target, 'a');
+	if (!hyperlink) return; // only handling hyperlink clicks
+	var href = hyperlink.getAttribute("href");
+	if (!href) return; // not really a hyperlink
+
+	var baseURL = URL(document.URL);
+	var url = baseURL.resolve(href); // TODO probably don't need to resolve on browsers that support pushstate
+
+	// NOTE The following creates a pseudo-event and dispatches to frames in a bubbling order.
+	// FIXME May as well use a virtual event system, e.g. DOMSprockets
+	var details = {
+		url: url,
+		element: hyperlink
+	}; // TODO more details?? event??
+
 	framer.triggerRequestNavigation(details.url, details);
 	return false;
 },
@@ -3642,29 +3658,6 @@ onRequestNavigation: function(e, frame) { // `return false` means success (so pr
 		return true;
 	}
 
-},
-
-getNavigationDetails: function(e) {	
-	if (e.button != 0) return; // FIXME what is the value for button in IE's W3C events model??
-	if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return; // FIXME do these always trigger modified click behavior??
-
-	// Find closest <a href> to e.target
-	var hyperlink = closest(e.target, 'a');
-	if (!hyperlink) return; // only handling hyperlink clicks
-	var href = hyperlink.getAttribute("href");
-	if (!href) return; // not really a hyperlink
-
-	var baseURL = URL(document.URL);
-	var url = baseURL.resolve(href); // TODO probably don't need to resolve on browsers that support pushstate
-
-	// NOTE The following creates a pseudo-event and dispatches to frames in a bubbling order.
-	// FIXME May as well use a virtual event system, e.g. DOMSprockets
-	var details = {
-		url: url,
-		element: hyperlink
-	}; // TODO more details?? event??
-
-	return details;
 },
 
 onPageLink: function(url, details) {
