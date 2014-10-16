@@ -2320,7 +2320,7 @@ this.push = function(node) {
 
 	var triggerFu; // triggerFu allows this script to be enabled, i.e. inserted
 	if (prev) {
-		if (hasAttribute(prevScript, 'async') || supportsSync && !hasAttribute(script, 'async')) triggerFu = prev.enabled;
+		if (hasAttribute(prevScript, 'async') || script.src && supportsSync && !hasAttribute(script, 'async')) triggerFu = prev.enabled;
 		else triggerFu = prev.complete; 
 	}
 	else triggerFu = Promise.resolve();
