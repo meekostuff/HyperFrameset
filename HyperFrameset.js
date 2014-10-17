@@ -3098,7 +3098,8 @@ preload: function(request) {
 
 load: function(response) { // FIXME need a teardown method that releases child-frames	
 	var frame = this;
-	frame.src = response.url;
+	if (response) frame.src = response.url;
+	// else a no-src frame
 	return pipe(response, [
 	
 	function(response) { return frame.definition.render(response, 'loaded'); },
@@ -3732,6 +3733,15 @@ frameEntered: function(frame) {
 	var src;
 	if (frame.name === framer.currentChangeset.target) src = framer.currentChangeset.url; // FIXME should only be used at startup
 	else src = frame.src;
+
+	if (src == null) { // a non-src frame
+		return frame.load(null, { condition: 'loaded' });
+	}
+
+	if (src === '') {
+		return; // FIXME frame.load(null, { condition: 'uninitialized' })
+	}
+	
 	var request = { method: 'get', url: src, responseType: 'document'};
 	return pipe(null, [
 	
