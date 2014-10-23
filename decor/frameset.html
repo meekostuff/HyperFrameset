@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html custom-hf="HyperFrameset">
+<head>
+<style>
+html { width: 100%; text-align: center; font-family: arial, sans-serif; background-color: #ffffff; color: #000000; }
+body { width: 72ex; margin: 0 auto; text-align: left; }
+h1 { padding: 0.2em 0.5em; background-color: #eee; border-top: 4px solid #ccc; text-align: center; }
+h2 { padding: 0.2em 0.5em; background-color: #eee; border-left: 4px solid #ccc; }
+h3 { padding: 0.2em 0.5em; border-left: 4px solid #ccc; border-top: 1px solid #ccc; }
+abbr { border-bottom: 1px dotted; }
+dt { font-weight: bolder; }
+</style>
+<script for="hf-frameset">
+({
+	lookup: function(url) { return 'hf_main'; }
+})
+</script>
+</head>
+<body>
+
+<hf-frame name="hf_main">
+	<hf-body condition="loaded">
+		<hf-transform type="main">
+		</hf-transform>
+	</hf-body>
+	<hf-body condition="loading">
+<div style="text-align: center; width: 100%;">
+	<img src="waiting-big.gif" />
+</div>
+	</hf-body>
+</hf-frame>
+</body>
+</html>
