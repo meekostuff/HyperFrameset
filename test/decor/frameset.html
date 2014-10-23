@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html xmlns:hf="HyperFrameset">
+<html custom-hf="HyperFrameset">
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <link rel="stylesheet" href="frameset.css" />
@@ -7,7 +7,7 @@
 .remove { background-color: red; color: white; }
 .noframeset { border: 2px solid blue; }
 *[id] { margin: 0.5em; border: 1px dashed black; }
-hf\:frame { display: block; margin: 0.5em; border: 2px dotted black; }
+hf-frame { display: block; margin: 0.5em; border: 2px dotted black; }
 </style>
 <style>
 .style-fail { display: none; }
@@ -18,12 +18,12 @@ nav li { display: inline; list-style: outside none; margin: 0.1em; padding: 0.25
 #panner { background-color: #77ff77; color: #ffffff; text-align: center; }
 .hidden { display: none; }
 </style>
-<script for="hf:frameset">
+<script for="hf-frameset">
 ({
 	lookup: function(url, details) { return 'hf_main'; }
 })
 </script>
-<script for="hf:frame">
+<script for="hf-frame">
 ({
 	entering: function(msg) { document.getElementById('panner').className = ''; }
 })
@@ -34,9 +34,9 @@ nav li { display: inline; list-style: outside none; margin: 0.1em; padding: 0.25
 .style-in-body-fail { display: none; }
 </style>
 
-<hf:frame name="hf_top" src="scope:./index.html" type="html">
-	<hf:body>
-		<hf:transform type="ht" format="css">
+<hf-frame name="hf_top" src="scope:./index.html" type="html">
+	<hf-body>
+		<hf-transform type="ht" format="css">
 			<h1 expr:_text=".title {_text}">{{title}}</h1>
 			
 			<nav expr:_html=".nav">
@@ -57,9 +57,9 @@ If you can see this then &lt;style&gt; elements
 in the &lt;body&gt; of the frameset document aren't being imported.
 </div> 
 
-<hf:frame name="hf_main" src="scope:./normal.html" type="html">
-	<hf:body>
-		<hf:transform type="ht" format="css">
+<hf-frame name="hf_main" src="scope:./normal.html" type="html">
+	<hf-body>
+		<hf-transform type="ht" format="css">
 		
 			<div id="frameset-header" class="section">
 			#frameset-header
@@ -85,13 +85,13 @@ in the &lt;body&gt; of the frameset document aren't being imported.
 				</div>
 			</div>
 		
-		</hf:transform>
-	</hf:body>
-</hf:frame>
+		</hf-transform>
+	</hf-body>
+</hf-frame>
 
-		</hf:transform>
-	</hf:body>
-</hf:frame>
+		</hf-transform>
+	</hf-body>
+</hf-frame>
 
 </body>
 </html>
