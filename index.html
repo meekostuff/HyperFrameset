@@ -40,168 +40,6 @@ for your obligations if you intend to modify or distribute HyperFrameset or part
 SOME OF IT MAY BE OUT-OF-DATE. MOSTLY IT IS JUST TOO LONG AND DISORGANISED. 
 A BETTER UNDERSTANDING WILL BE GAINED THROUGH EXPLORING A DEMO - VIEW SOURCE IS YOUR FRIEND.</p>
 
-<h2>Overview</h2>
-
-<p>The HTMLFrameset model is the starting point for the design of HyperFrameset. 
-This model has been evolved in the following important ways. </p>
-
-<h3>The frameset document is like a super-stylesheet</h3>
-
-<p>With HTMLFramesets the browser must first open the frameset document which in turn loads primary and auxiliary content in frames.
-This has the undesirable consequence that the URL in the address-bar doesn't match the URL of the primary content.</p>
-
-<p><small><strong>This will also be the case with more flexible HTMLFrameset-like sites that rely on <code>&lt;iframe&gt;</code> instead of <code>&lt;frame&gt;</code>.</strong></small></p>
-
-<p>With HyperFrameset, when the browser visits a landing-page the appropriate frameset document is loaded and <em>applied</em> via AJAX,
-with the landing-page content inserted into its appropriate frame 
-and auxiliary content loaded into frames as defined by the frameset. 
-Hyperlink navigation within the same site is managed by AJAX and history.pushState,
-so the URL in the address-bar automatically matches the URL of the primary content.</p>
-
-<p><strong>NOTE:</strong></p>
-
-<ul>
-<li><p>A frameset document is similar to an external stylesheet in that it can be shared between several pages.
-It may even be referenced with a resource link in the content page, just like stylesheets:</p>
-
-<p><link href="frameset.html" rel="frameset" type="text/html" /></p>
-
-<p><small><strong>(This referencing method depends on the configuration. Scripted frameset lookup is preferred.)</strong></small></p></li>
-<li><p>The frameset document is still HTML.</p></li>
-</ul>
-
-<h3>Framed documents are <strong>content-only</strong></h3>
-
-<p>HTMLFramesets fostered a site and page design where the content of individual pages
-was the primary content that matched the page URL <strong>and no other content</strong>.
-But because HTMLFrameset frames create a new browsing context 
-they did allow each page to be scripted and styled in isolation from the containing frameset. </p>
-
-<p>The HyperFrameset model does not provide this scripting and styling isolation and 
-more-over it considers that the primary content of a page is the only aspect of relevance to the frameset view. 
-For this reason, scripts and stylesheets are stripped from content pages before they are inserted into the frameset view.</p>
-
-<h3>Frames are seamless</h3>
-
-<p>HyperFrameset frames don't create a new browsing context with <code>&lt;frame&gt;</code> or <code>&lt;iframe&gt;</code>,
-so their content automatically inherits styles from their including context.
-This means that styling for all framed content is provided by the frameset document,
-as you would expect from a super-stylesheet. </p>
-
-<p>HyperFrameset frames are declared with markup like</p>
-
-<pre><code>&lt;hf-frame src="..."&gt;&lt;/hf-frame&gt;
-</code></pre>
-
-<p>so they look like HTMLIFrames, but don't imply a new browsing context. </p>
-
-<h3>CSS is used for layout</h3>
-
-<p>With HTMLFramesets, <code>&lt;frameset&gt;</code> elements provide layout, splitting a region into either rows or columns of <code>&lt;frame&gt;</code>s or <code>&lt;frameset&gt;</code>s.</p>
-
-<p>With HyperFrameset there is no equivalent to <code>&lt;frameset&gt;</code> elements, frames can be placed anywhere in the frameset document and layout is done with CSS.
-In this regard HyperFrameset frames are more like <code>&lt;iframe&gt;</code>s.</p>
-
-<h3>Frames can have different presentations for different states.</h3>
-
-<p>Since HyperFrameset is implemented with AJAX it has complete control of frame presentation,
-whether the frame is <code>blank</code>, <code>loading</code> or <code>loaded</code>.
-The frameset can define appropriate presentation with conditional frame bodies, such as</p>
-
-<pre><code>&lt;hf-frame&gt;
-    &lt;hf-body condition="loaded"&gt;
-    ...
-    &lt;/hf-body&gt;
-    &lt;hf-body condition="loading"&gt;
-    ...
-    &lt;/hf-body&gt;
-    &lt;hf-body condition="blank"&gt;
-    ...
-    &lt;/hf-body&gt;
-&lt;/hf-frame&gt;
-</code></pre>
-
-<p>Control over frame presentation can also be extended to effects for page transitions,
-when a frame unloads content from one URL and loads content from the next URL.
-(Transition effects have not been implemented yet)</p>
-
-<h3>Framed documents can be transformed</h3>
-
-<p>A page that is being viewed standalone - perhaps because JS is disabled or failed, or the browser is out-of-date -
-will benefit from a basic stylesheet and some basic site navigation and auxiliary content.
-HyperFrameset will strip the stylesheet and has some basic ability to crop the primary content of the page,
-but what if the structure of the content when displayed in the frameset 
-needs to be significantly different to that in the standalone case?</p>
-
-<p>HyperFrameset provides the capability of HTML-to-HTML transformation of content pages through script or templating.
-The defining markup for transformation might look like</p>
-
-<pre><code>&lt;hf-frame&gt;
-    &lt;hf-body&gt;
-        &lt;hf-transform type="script"&gt;
-        ({
-            transform: function(content) {
-            ...
-            }
-        })
-        &lt;/hf-transform&gt;
-    &lt;/hf-body&gt;
-&lt;/hf-frame&gt;
-</code></pre>
-
-<p>NOTE: Transformations facilitate dynamic declaration of <code>&lt;hf-frame&gt;</code>s.</p>
-
-<h3>Targets for hyperlinks are scriptable</h3>
-
-<p>With HTMLFramesets the target frame for a hyperlink in any particular frame is (by default)
-obtained from the <code>target</code> attribute on the hyperlink itself.
-This requires the framed document to have an understanding of the structure of the frameset in which it is placed.</p>
-
-<p>With HyperFrameset the target frame is obtained from a callback function defined in <em>the frameset document</em>. </p>
-
-<h3>Frameset documents are definitions</h3>
-
-<p>With HTMLFramesets the frameset document is a <em>declaration</em> of browser presentation,
-and there will be a one-to-one mapping of HTMLFrames in the view and <code>&lt;frame&gt;</code> declarations in the frameset document.</p>
-
-<p>With HyperFrameset the frameset document is a <em>definition</em> of browser presentation,
-and any <code>&lt;hf-frame&gt;</code> in the frameset document could be <em>both</em> a declaration of a frame instance in the view <em>and</em>
-a definition for other frame instances.</p>
-
-<p>For the purpose of illustration:
-A frame <em>definition</em> would have both a frame-body (without which it doesn't define anything)
-and an ID (so it can be referenced). For example</p>
-
-<pre><code>&lt;hf-frame id="hf_frame1"&gt;
-    &lt;hf-body&gt;
-    ...
-    &lt;/hf-body&gt;
-&lt;/hf-frame&gt;
-</code></pre>
-
-<p>A frame <em>declaration</em> (which isn't also a definition) would have no body and would reference a frame definition by ID.
-For example</p>
-
-<pre><code>&lt;hf-frame def="hf_frame1"&gt;&lt;/hf-frame&gt;
-</code></pre>
-
-<h3>Nested frames</h3>
-
-<p>With HTMLFramesets, <code>&lt;frameset&gt;</code> elements are nestable as long as they are a child of a <code>&lt;frameset&gt;</code>.</p>
-
-<p>With HyperFrameset, a <code>&lt;hf-frame&gt;</code> is arbitrarily nestable inside another <code>&lt;hf-frame&gt;</code>.
-When this is combined with document transformation it makes dynamically loaded hierarchical-menus and directory-trees trivial, for example</p>
-
-<ul>
-<li><p>the frameset document has a <code>&lt;hf-frame&gt;</code> that sources a master page which contains hyperlinks to sections of the site.
-The <code>&lt;hf-frame&gt;</code> defines a transform which processes some of those hyperlinks
-into <code>&lt;hf-frame&gt;</code>s which are in turn loaded into the view.</p></li>
-<li><p>a directory tree is split into several files, each containg one sub-directory. 
-A navigation section in the frameset has a <code>&lt;hf-frame&gt;</code> that sources the top level file of the directory tree.
-The <code>&lt;hf-frame&gt;</code> also defines a transform which converts sub-directory hyperlinks 
-into <code>&lt;hf-frame&gt;</code>s that source the sub-directory and apply the <em>same transform</em> as for the root directory. </p></li>
-</ul>
-
 <h2>Installation</h2>
 
 <ol>
@@ -398,6 +236,169 @@ inserting the <code>&lt;main&gt;</code> content from page.html into the <code>hf
 <li>If the address-bar URL needs updating then call <code>history.pushState</code></li>
 </ol>
 
+<h2>Overview</h2>
+
+<p>The HTMLFrameset model is the starting point for the design of HyperFrameset. 
+This model has been evolved in the following important ways. </p>
+
+<h3>The frameset document is like a super-stylesheet</h3>
+
+<p>With HTMLFramesets the browser must first open the frameset document which in turn loads primary and auxiliary content in frames.
+This has the undesirable consequence that the URL in the address-bar doesn't match the URL of the primary content.</p>
+
+<p><small><strong>This will also be the case with more flexible HTMLFrameset-like sites that rely on <code>&lt;iframe&gt;</code> instead of <code>&lt;frame&gt;</code>.</strong></small></p>
+
+<p>With HyperFrameset, when the browser visits a landing-page the appropriate frameset document is loaded and <em>applied</em> via AJAX,
+with the landing-page content inserted into its appropriate frame 
+and auxiliary content loaded into frames as defined by the frameset. 
+Hyperlink navigation within the same site is managed by AJAX and history.pushState,
+so the URL in the address-bar automatically matches the URL of the primary content.</p>
+
+<p><strong>NOTE:</strong></p>
+
+<ul>
+<li><p>A frameset document is similar to an external stylesheet in that it can be shared between several pages.
+It may even be referenced with a resource link in the content page, just like stylesheets:</p>
+
+<pre><code>&lt;link rel="frameset" type="text/html" href="frameset.html" /&gt;
+</code></pre>
+
+<p><small><strong>(This referencing method depends on the configuration. Scripted frameset lookup is preferred.)</strong></small></p></li>
+<li><p>The frameset document is still HTML.</p></li>
+</ul>
+
+<h3>Framed documents are <strong>content-only</strong></h3>
+
+<p>HTMLFramesets fostered a site and page design where the content of individual pages
+was the primary content that matched the page URL <strong>and no other content</strong>.
+But because HTMLFrameset frames create a new browsing context 
+they did allow each page to be scripted and styled in isolation from the containing frameset. </p>
+
+<p>The HyperFrameset model does not provide this scripting and styling isolation and 
+more-over it considers that the primary content of a page is the only aspect of relevance to the frameset view. 
+For this reason, scripts and stylesheets are stripped from content pages before they are inserted into the frameset view.</p>
+
+<h3>Frames are seamless</h3>
+
+<p>HyperFrameset frames don't create a new browsing context with <code>&lt;frame&gt;</code> or <code>&lt;iframe&gt;</code>,
+so their content automatically inherits styles from their including context.
+This means that styling for all framed content is provided by the frameset document,
+as you would expect from a super-stylesheet. </p>
+
+<p>HyperFrameset frames are declared with markup like</p>
+
+<pre><code>&lt;hf-frame src="..."&gt;&lt;/hf-frame&gt;
+</code></pre>
+
+<p>so they look like HTMLIFrames, but don't imply a new browsing context. </p>
+
+<h3>CSS is used for layout</h3>
+
+<p>With HTMLFramesets, <code>&lt;frameset&gt;</code> elements provide layout, splitting a region into either rows or columns of <code>&lt;frame&gt;</code>s or <code>&lt;frameset&gt;</code>s.</p>
+
+<p>With HyperFrameset there is no equivalent to <code>&lt;frameset&gt;</code> elements, frames can be placed anywhere in the frameset document and layout is done with CSS.
+In this regard HyperFrameset frames are more like <code>&lt;iframe&gt;</code>s.</p>
+
+<h3>Frames can have different presentations for different states.</h3>
+
+<p>Since HyperFrameset is implemented with AJAX it has complete control of frame presentation,
+whether the frame is <code>blank</code>, <code>loading</code> or <code>loaded</code>.
+The frameset can define appropriate presentation with conditional frame bodies, such as</p>
+
+<pre><code>&lt;hf-frame&gt;
+    &lt;hf-body condition="loaded"&gt;
+    ...
+    &lt;/hf-body&gt;
+    &lt;hf-body condition="loading"&gt;
+    ...
+    &lt;/hf-body&gt;
+    &lt;hf-body condition="blank"&gt;
+    ...
+    &lt;/hf-body&gt;
+&lt;/hf-frame&gt;
+</code></pre>
+
+<p>Control over frame presentation can also be extended to effects for page transitions,
+when a frame unloads content from one URL and loads content from the next URL.
+(Transition effects have not been implemented yet)</p>
+
+<h3>Framed documents can be transformed</h3>
+
+<p>A page that is being viewed standalone - perhaps because JS is disabled or failed, or the browser is out-of-date -
+will benefit from a basic stylesheet and some basic site navigation and auxiliary content.
+HyperFrameset will strip the stylesheet and has some basic ability to crop the primary content of the page,
+but what if the structure of the content when displayed in the frameset 
+needs to be significantly different to that in the standalone case?</p>
+
+<p>HyperFrameset provides the capability of HTML-to-HTML transformation of content pages through script or templating.
+The defining markup for transformation might look like</p>
+
+<pre><code>&lt;hf-frame&gt;
+    &lt;hf-body&gt;
+        &lt;hf-transform type="script"&gt;
+        ({
+            transform: function(content) {
+            ...
+            }
+        })
+        &lt;/hf-transform&gt;
+    &lt;/hf-body&gt;
+&lt;/hf-frame&gt;
+</code></pre>
+
+<p>NOTE: Transformations facilitate dynamic declaration of <code>&lt;hf-frame&gt;</code>s.</p>
+
+<h3>Targets for hyperlinks are scriptable</h3>
+
+<p>With HTMLFramesets the target frame for a hyperlink in any particular frame is (by default)
+obtained from the <code>target</code> attribute on the hyperlink itself.
+This requires the framed document to have an understanding of the structure of the frameset in which it is placed.</p>
+
+<p>With HyperFrameset the target frame is obtained from a callback function defined in <em>the frameset document</em>. </p>
+
+<h3>Frameset documents are definitions</h3>
+
+<p>With HTMLFramesets the frameset document is a <em>declaration</em> of browser presentation,
+and there will be a one-to-one mapping of HTMLFrames in the view and <code>&lt;frame&gt;</code> declarations in the frameset document.</p>
+
+<p>With HyperFrameset the frameset document is a <em>definition</em> of browser presentation,
+and any <code>&lt;hf-frame&gt;</code> in the frameset document could be <em>both</em> a declaration of a frame instance in the view <em>and</em>
+a definition for other frame instances.</p>
+
+<p>For the purpose of illustration:
+A frame <em>definition</em> would have both a frame-body (without which it doesn't define anything)
+and an ID (so it can be referenced). For example</p>
+
+<pre><code>&lt;hf-frame id="hf_frame1"&gt;
+    &lt;hf-body&gt;
+    ...
+    &lt;/hf-body&gt;
+&lt;/hf-frame&gt;
+</code></pre>
+
+<p>A frame <em>declaration</em> (which isn't also a definition) would have no body and would reference a frame definition by ID.
+For example</p>
+
+<pre><code>&lt;hf-frame def="hf_frame1"&gt;&lt;/hf-frame&gt;
+</code></pre>
+
+<h3>Nested frames</h3>
+
+<p>With HTMLFramesets, <code>&lt;frameset&gt;</code> elements are nestable as long as they are a child of a <code>&lt;frameset&gt;</code>.</p>
+
+<p>With HyperFrameset, a <code>&lt;hf-frame&gt;</code> is arbitrarily nestable inside another <code>&lt;hf-frame&gt;</code>.
+When this is combined with document transformation it makes dynamically loaded hierarchical-menus and directory-trees trivial, for example</p>
+
+<ul>
+<li><p>the frameset document has a <code>&lt;hf-frame&gt;</code> that sources a master page which contains hyperlinks to sections of the site.
+The <code>&lt;hf-frame&gt;</code> defines a transform which processes some of those hyperlinks
+into <code>&lt;hf-frame&gt;</code>s which are in turn loaded into the view.</p></li>
+<li><p>a directory tree is split into several files, each containg one sub-directory. 
+A navigation section in the frameset has a <code>&lt;hf-frame&gt;</code> that sources the top level file of the directory tree.
+The <code>&lt;hf-frame&gt;</code> also defines a transform which converts sub-directory hyperlinks 
+into <code>&lt;hf-frame&gt;</code>s that source the sub-directory and apply the <em>same transform</em> as for the root directory. </p></li>
+</ul>
+
 <h2>Developing a Site</h2>
 
 <blockquote>
@@ -446,7 +447,7 @@ This can occur because</p>
 <li>Javascript is disabled</li>
 <li>HyperFrameset does not support the browser</li>
 <li>the HyperFrameset script failed to download</li>
-<li>HyperFrameset is configured to NOT autostart</li>
+<li>HyperFrameset is configured to NOT start</li>
 <li>the frameset document failed to download</li>
 </ul>
 
@@ -699,7 +700,11 @@ or the URL of a different page that is to be panned in.</p></li>
 <code>detect(doc)</code> is mainly provided for backwards compatibility,
 as can be seen in the default <code>config.js</code> script. </p>
 
-<p><strong>TODO:</strong> Explain <code>scope</code> and how it is implied</p>
+<p><strong>TODO:</strong></p>
+
+<ul>
+<li>Explain <code>scope</code> and how it is implied</li>
+</ul>
 
 <h2>Frameset Document</h2>
 
@@ -707,9 +712,12 @@ as can be seen in the default <code>config.js</code> script. </p>
 The remainder of the document - the <code>&lt;html&gt;</code>, <code>&lt;head&gt;</code> and children - replaces the landing-page in the browser view.
 After this replacement the window state should be as though the frameset document was the landing-page. </p>
 
-<p><strong>TODO:</strong>
-- xml and custom namespaces on <code>&lt;html&gt;</code>
-- changing the namespace for HyperFrameset</p>
+<p><strong>TODO:</strong></p>
+
+<ul>
+<li>xml and custom namespaces on <code>&lt;html&gt;</code></li>
+<li>changing the namespace for HyperFrameset</li>
+</ul>
 
 <h3><code>&lt;script&gt;</code> handling</h3>
 
@@ -875,9 +883,12 @@ and generate a <code>requestnavigation</code> event which itself has the default
 <li><code>detail</code>: the URL that will be navigated to by default</li>
 </ul>
 
-<p><strong>TODO:</strong>
-- event.stopPropagation() / event.stopImmediatePropagation() are no-ops.
-- use event.defaultPrevented / event.preventDefault() to determine default handling</p>
+<p><strong>TODO:</strong></p>
+
+<ul>
+<li>event.stopPropagation() / event.stopImmediatePropagation() are no-ops.</li>
+<li>use event.defaultPrevented / event.preventDefault() to determine default handling</li>
+</ul>
 
 <h3>Hyperlink handling</h3>
 
