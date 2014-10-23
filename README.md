@@ -1,45 +1,198 @@
 HyperFrameset
 =============
 
-**WARNING: This project is pre-alpha software. DO NOT USE**
+> HyperFramesets are the way HTMLFramesets were meant to work -
+> super-stylesheets with seamless frames, document transforms and configurable routing. And history.pushState.
 
-**WARNING: This documentation is out of date - most of it is probably wrong.**
-
-> HyperFramesets are how HTMLFramesets should have been designed. 
-> They might even be the way web-sites were meant to work. 
-
-HyperFrameset is a Javascript [transclusion](http://en.wikipedia.org/wiki/Transclusion)
+HyperFrameset is a light-weight Javascript [transclusion](http://en.wikipedia.org/wiki/Transclusion)
 and layout engine which runs in the browser.
-It evolves the HTMLFrameset concept of independently loadable frames for HTMLDocuments
-but because it is implemented with AJAX on a single-page it is far more flexible.  
-And because it uses `history.pushState` the address-bar URL matches the primary content of the page. 
+Whilst the implementation relies on AJAX and `history.pushState`,
+conceptually the design is an evolution of HTMLFramesets.
 
-> HyperFrameset provides **full** separation of content from presentation.
-> With CSS you can change the styling of a whole site with one stylesheet.
-> With HyperFrameset you can change everything -
-> banner, navbars, ads, page-layout and stylesheets.
-> This facilitates API-first / HTML-payload sites which are
-> simple, robust and low-bandwidth, 
-> plus "pushState assisted navigation" comes for free.
+**WARNING:** THIS PROJECT IS ALPHA SOFTWARE. ONLY USE IT FOR EXPERIMENTATION.
 
-A site frameset page is similar to an external stylesheet in that it can be shared between several pages.
-It may even be referenced with a resource link, just like stylesheets:
+### Browser support
+
+HyperFrameset requires features only available in recent versions of popular browsers, 
+but sites that adapt well to HyperFrameset will (probably)
+have full functionality when HyperFrameset doesn't run.
+
+HyperFrameset can run on browsers which support `history.pushState` and `MutationObserver`.
+These are available on most browsers in significant use today.
+Since `MutationObserver` is NOT supported on IE10, HyperFrameset uses `MutationEvents` on that platform. 
+
+### License
+
+HyperFrameset is available under 
+[MPL 2.0](http://www.mozilla.org/MPL/2.0/ "Mozilla Public License version 2.0").
+See the [MPL 2.0 FAQ](http://www.mozilla.org/MPL/2.0/FAQ.html "Frequently Asked Questions")
+for your obligations if you intend to modify or distribute HyperFrameset or part thereof. 
+
+### Contact
+
+If you have any questions or comments, don't hesitate to contact the author via
+[web](http://meekostuff.net/), [email](mailto:shogun70@gmail.com) or [twitter](http://twitter.com/meekostuff). 
+
+**WARNING:** THIS DOCUMENTATION IS A WORK-IN-PROGRESS.
+SOME OF IT MAY BE OUT-OF-DATE. MOSTLY IT IS JUST TOO LONG AND DISORGANISED. 
+A BETTER UNDERSTANDING WILL BE GAINED THROUGH EXPLORING A DEMO - VIEW SOURCE IS YOUR FRIEND.
+
+
+Overview
+--------
+
+The HTMLFrameset model is the starting point for the design of HyperFrameset. 
+This model has been evolved in the following important ways. 
+
+### The frameset document is like a super-stylesheet
+
+With HTMLFramesets the browser must first open the frameset document which in turn loads primary and auxiliary content in frames.
+This has the undesirable consequence that the URL in the address-bar doesn't match the URL of the primary content.
+
+<small>**This will also be the case with more flexible HTMLFrameset-like sites that rely on `<iframe>` instead of `<frame>`.**</small>
+
+With HyperFrameset, when the browser visits a landing-page the appropriate frameset document is loaded and *applied* via AJAX,
+with the landing-page content inserted into its appropriate frame 
+and auxiliary content loaded into frames as defined by the frameset. 
+Hyperlink navigation within the same site is managed by AJAX and history.pushState,
+so the URL in the address-bar automatically matches the URL of the primary content.
+
+**NOTE:**
+
+- A frameset document is similar to an external stylesheet in that it can be shared between several pages.
+  It may even be referenced with a resource link in the content page, just like stylesheets:
 
     <link rel="frameset" type="text/html" href="frameset.html" />
 
-<small>**(This referencing method depends on the configuration. Scripted frameset lookup is preferred.)**</small>
+  <small>**(This referencing method depends on the configuration. Scripted frameset lookup is preferred.)**</small>
 
-HyperFrameset.js is around 20kB when minified and gzipped.
+- The frameset document is still HTML.
 
-To see it in action visit:
+### Framed documents are **content-only**
 
-- FIXME demos, etc
+HTMLFramesets fostered a site and page design where the content of individual pages
+was the primary content that matched the page URL **and no other content**.
+But because HTMLFrameset frames create a new browsing context 
+they did allow each page to be scripted and styled in isolation from the containing frameset. 
 
-For more info on the concept of HyperFrameset and its affinity with pushState assisted navigation, read  
+The HyperFrameset model does not provide this scripting and styling isolation and 
+more-over it considers that the primary content of a page is the only aspect of relevance to the frameset view. 
+For this reason, scripts and stylesheets are stripped from content pages before they are inserted into the frameset view.
 
-- FIXME tutorials, etc
+### Frames are seamless
 
-Also make sure you check the [wiki](https://github.com/meekostuff/HyperFrameset/wiki).
+HyperFrameset frames don't create a new browsing context with `<frame>` or `<iframe>`,
+so their content automatically inherits styles from their including context.
+This means that styling for all framed content is provided by the frameset document,
+as you would expect from a super-stylesheet. 
+
+HyperFrameset frames are declared with markup like
+
+    <hf-frame src="..."></hf-frame>
+
+so they look like HTMLIFrames, but don't imply a new browsing context. 
+
+### CSS is used for layout
+
+With HTMLFramesets, `<frameset>` elements provide layout, splitting a region into either rows or columns of `<frame>`s or `<frameset>`s.
+
+With HyperFrameset there is no equivalent to `<frameset>` elements, frames can be placed anywhere in the frameset document and layout is done with CSS.
+In this regard HyperFrameset frames are more like `<iframe>`s.
+
+### Frames can have different presentations for different states.
+
+Since HyperFrameset is implemented with AJAX it has complete control of frame presentation,
+whether the frame is `blank`, `loading` or `loaded`.
+The frameset can define appropriate presentation with conditional frame bodies, such as
+
+    <hf-frame>
+	    <hf-body condition="loaded">
+		...
+		</hf-body>
+	    <hf-body condition="loading">
+		...
+		</hf-body>
+	    <hf-body condition="blank">
+		...
+		</hf-body>
+	</hf-frame>
+
+Control over frame presentation can also be extended to effects for page transitions,
+when a frame unloads content from one URL and loads content from the next URL.
+(Transition effects have not been implemented yet)
+
+### Framed documents can be transformed
+
+A page that is being viewed standalone - perhaps because JS is disabled or failed, or the browser is out-of-date -
+will benefit from a basic stylesheet and some basic site navigation and auxiliary content.
+HyperFrameset will strip the stylesheet and has some basic ability to crop the primary content of the page,
+but what if the structure of the content when displayed in the frameset 
+needs to be significantly different to that in the standalone case?
+
+HyperFrameset provides the capability of HTML-to-HTML transformation of content pages through script or templating.
+The defining markup for transformation might look like
+
+    <hf-frame>
+		<hf-body>
+			<hf-transform type="script">
+			({
+				transform: function(content) {
+				...
+				}
+			})
+			</hf-transform>
+		</hf-body>
+	</hf-frame>
+
+NOTE: Transformations facilitate dynamic declaration of `<hf-frame>`s.
+
+### Targets for hyperlinks are scriptable
+
+With HTMLFramesets the target frame for a hyperlink in any particular frame is (by default)
+obtained from the `target` attribute on the hyperlink itself.
+This requires the framed document to have an understanding of the structure of the frameset in which it is placed.
+
+With HyperFrameset the target frame is obtained from a callback function defined in *the frameset document*. 
+
+### Frameset documents are definitions
+
+With HTMLFramesets the frameset document is a *declaration* of browser presentation,
+and there will be a one-to-one mapping of HTMLFrames in the view and `<frame>` declarations in the frameset document.
+
+With HyperFrameset the frameset document is a *definition* of browser presentation,
+and any `<hf-frame>` in the frameset document could be *both* a declaration of a frame instance in the view *and*
+a definition for other frame instances.
+
+For the purpose of illustration:
+A frame *definition* would have both a frame-body (without which it doesn't define anything)
+and an ID (so it can be referenced). For example
+
+    <hf-frame id="hf_frame1">
+		<hf-body>
+		...
+		</hf-body>
+	</hf-frame>
+
+A frame *declaration* (which isn't also a definition) would have no body and would reference a frame definition by ID.
+For example
+
+	<hf-frame def="hf_frame1"></hf-frame>
+
+### Nested frames
+
+With HTMLFramesets, `<frameset>` elements are nestable as long as they are a child of a `<frameset>`.
+
+With HyperFrameset, a `<hf-frame>` is arbitrarily nestable inside another `<hf-frame>`.
+When this is combined with document transformation it makes dynamically loaded hierarchical-menus and directory-trees trivial, for example
+
+- the frameset document has a `<hf-frame>` that sources a master page which contains hyperlinks to sections of the site.
+    The `<hf-frame>` defines a transform which processes some of those hyperlinks
+	into `<hf-frame>`s which are in turn loaded into the view.
+	
+- a directory tree is split into several files, each containg one sub-directory. 
+    A navigation section in the frameset has a `<hf-frame>` that sources the top level file of the directory tree.
+	The `<hf-frame>` also defines a transform which converts sub-directory hyperlinks 
+	into `<hf-frame>`s that source the sub-directory and apply the *same transform* as for the root directory. 
 
 
 Installation
@@ -49,7 +202,7 @@ Installation
 	
 		/path/to/HyperFrameset/
 
-2. Open a browser and navigate to the following page
+2. Open a **modern** browser and navigate to the following page
 	
 		http://your.domain.com/path/to/HyperFrameset/test/normal.html
 	
@@ -71,9 +224,8 @@ Installation
 Quick Start
 -----------
 
-**Although this is no longer the preferred way of specifying the hyperframeset, it is still the default and is conceptually easiest to understand.**
-**If you are new to HyperFrameset then read this documentation straight through.**
-**Otherwise feel free to skip to the [Configuration](#configuration) section first.**
+**Although this is not the preferred way of specifying the hyperframeset, it is still the default and is conceptually easiest to understand.**  
+**TODO:** A better quick start would be copying a demo site.
 
 Create a HTML document (page.html) with some page specific content. 
 Any page specific scripts, styles or meta-data should go in `<head>`. 
@@ -83,11 +235,11 @@ only displayed if HyperFrameset is NOT enabled.
     <!DOCTYPE html>
 	<html>
 	<head>
-		<title>Content</title>
 		<!-- source the HyperFrameset boot-script -->
 		<script src="/path/to/HyperFrameset/boot.js"></script>
-		<!-- create a link to the frameset page. All attributes are needed -->
-		<link rel="frameset" type="text/html" href="frameset.html" />
+		<title>Content</title>
+		<!-- create a link to the frameset document. All attributes are needed -->
+		<link rel="frameset" type="text/html" href="/frameset.html" />
 		<!-- include fallback stylesheets for when HyperFrameset doesn't run. -->
 		<style>
 		.styled-from-page { background-color: red; color: white; }
@@ -124,6 +276,11 @@ will appear as the final page without the page specific content.
 		<style>
 		.styled-from-frameset { border: 2px solid blue; }
 		</style>
+		<script for="hf-frameset">
+		({
+			lookup: function(url) { return 'hf_main'; } // the target for all same-scope hyperlinks
+		})
+		</script>
 	</head>
 	<body>
 		<header>
@@ -150,20 +307,8 @@ will appear as the final page without the page specific content.
 	</body>
 	</html>
 
-When page.html is loaded into the browser, HyperFrameset will merge frameset.html into it, following these steps:
-
-1. Set the visibility of the page to "hidden". \*
-2. Detect the first `<link rel="frameset" href="..." />`, fully resolve the @href and use as the frameset URL.
-3. Load the frameset URL with XMLHttpRequest and parse into a HTMLDocument (possibly using an `<iframe>`)
-4. Fully resolve URLs for all scripts, images and links in the frameset page. 
-5. Insert `<script>`, `<style>`, `<link>`, and conditionally `<meta>` and `<title>` 
-from the `<head>` of the frameset page into the `<head>` of the content page.
-6. Insert the child nodes of the `<body>` of the frameset page at the start of the `<body>` in the content page
-7. Move relevant content from content page into the frameset. Remove the irrelevant content.
-8. When all linked stylesheets for the document have loaded, set the visibility of the page to "visible".
-This step may occur at any time during or after step 7. \*
-
-\* Steps 1 & 8 are handled by the boot-script.
+When page.html is loaded into the browser, HyperFrameset will load frameset.html and apply it to the view,
+inserting the `<main>` content from page.html into the `hf_main` frame.
 
 This process results in a DOM tree something like this:
 
@@ -172,8 +317,9 @@ This process results in a DOM tree something like this:
 	<head>
 		<!-- source the HyperFrameset boot-script -->
 		<script src="/path/to/HyperFrameset/boot.js"></script>
-		<!-- create a link to the frameset page. All attributes are needed -->
-		<link rel="frameset" type="text/html" href="frameset.html" />
+		<!-- create a link to the frameset document. All attributes are needed -->
+		<link rel="frameset" type="text/html" href="/frameset.html" />
+		<title>Content</title>
 		<style>
 		.styled-from-frameset { border: 2px solid blue; }
 		</style>
@@ -186,10 +332,10 @@ This process results in a DOM tree something like this:
 		
 		<nav>
 			<label>Navigation</label>
-			<hf-frame name="hf_nav" type="html" src="scope:./index.html" main="nav">
+			<hf-frame name="hf_nav" type="html" src="/index.html" main="nav">
 				<hf-body>
-					<a href="./page.html">Page One</a><br />
-					<a href="./page2.html">Page Two</a>
+					<a href="/page.html">Page One</a><br />
+					<a href="/page2.html">Page Two</a>
 				</hf-body>
 			</hf-frame>
 		</nav>
@@ -216,146 +362,110 @@ This process results in a DOM tree something like this:
 	</html>
 
 
-Fallbacks
----------
+### How it works (approximately)
 
-Sometimes HyperFrameset will not be able to apply the frameset document to the page.
+When the browser first visits a page in a HyperFrameset enabled site, the following startup sequence is applied:
+
+1. a small boot-script is loaded
+2. if the browser can't support HyperFrameset then startup is abandoned (leaving the page unframed)
+3. the HyperFrameset script and config-script are loaded
+4. the frameset document for the site is detected and loaded
+5. the unframed landing-page in the browser view is replaced by the frameset document
+6. the main content of the unframed page (and that of any other pages referenced by frames in the frameset document) is inserted into the view
+
+When a hyperlink in the view is activated the following navigation sequence is applied:
+
+1. If the hyperlink is to an external site then abandon scripted navigation and allow normal browser navigation
+2. Examine the hyperlink URL and event-source to find the appropriate target frame and whether the address-bar URL needs updating.
+3. Load the hyperlinked page and insert into the appropriate target frame.
+4. If the address-bar URL needs updating then call `history.pushState`
+
+
+Developing a Site
+-----------------
+
+> Perfection is achieved not when there is nothing left to add, but when there is nothing left to take away.
+> -- <cite>Antoine de Saint-Exupery</cite>
+
+<small>HyperFrameset can be used for a whole site, or for a section within a site (say a documentation set).
+In the following, "site" can also refer to a section within a site.</small>
+
+A general reminder when developing a site is to stop adding stuff to individual pages:
+
+- don't add site navigation or contact forms to pages - they need their own page
+- don't add placeholder tags to pages
+- don't add presentation classes to elements
+- don't add inline styles to elements
+
+
+### Site Design
+
+**HINT:** Think [API first](http://thinkbda.com/journal/the-long-web/), HTML payload.
+
+- Site navigation (or a Table-of-Contents) is a resource. It should have its own page.
+- Anything requiring a form submission is a resource. It should have its own page.
+- You should be able to (eventually) navigate to any resource by starting at the home page (or Table-of-Contents page).
+- If every page has a link to the home page then you can navigate (eventually) from any entry point to any other resource.
+- Don't forget Search Engine Optimization. (**TODO:** expand on this)
+
+A reasonable illustration of a simple site is the [GNU make manual](http://www.gnu.org/software/make/manual/html_node/).
+- The table-of-contents has its own URL
+- Each page contains only primary content and some minimal contextual links - Contents / Index / Up / Previous / Next
+- There is (nearly) no inline styling
+- If you remove all styling it is still readable
+
+
+### Page Design
+
+To work with HyperFrameset, an individual page only needs to contain the primary content for its URL.
+
+However, sometimes HyperFrameset will not be able to apply the frameset document to the page.
 This can occur because
 
 - Javascript is disabled
+- HyperFrameset does not support the browser
 - the HyperFrameset script failed to download
 - HyperFrameset is configured to NOT autostart
 - the frameset document failed to download
 
-In this scenario you would like the page to have some basic styling and auxiliary content -
-something that can be dispensed with when HyperFrameset runs.
+In this scenario you would like the content-page to have some auxiliary content and basic styling -
+something that can be dispensed with if HyperFrameset takes over. 
 
-### Stylesheets
 
-All `<link rel="stylesheet">` or `<style>` elements 
-will be removed from the page when the frameset document is applied.
+#### Auxiliary content
 
-### Auxiliary content
-
-Any `<body>` content that isn't referenced by the frameset document
+Any landing-page content that isn't referenced by the frameset document
 will be removed from the page when the frameset is applied. 
 
+**RECOMMENDATION:** Wrap the *primary content* of content pages in a `<main>` or `<div role="main">` element.
+The default processing of content pages (a `<hf-frame>` with no `<hf-transform>`) is to crop to this "main" element
+(or the `<body>` if this isn't found). 
 
-PushState Assisted Navigation
------------------------------
+(**TODO:** point to some demo markup. Mention appropriate hyperlinks and how they can be used in scoping)
 
-If `history.pushState` is available then HyperFrameset will conditionally over-ride the default browser behavior when hyperlinks are clicked.
-If the @href of the hyperlink is a document that specifies the same frameset as the current page then it can be merged into the current page
-in a _similar_ way to the startup merging of frameset and document. 
+#### Stylesheets
 
-Some hyperlinks are not appropriate for this and are ignored by HyperFrameset:
+All `<link rel="stylesheet">` or `<style>` elements in the content page 
+will be removed when the frameset document is applied,
+so you can use them for fallback presentation
+without worrying about clashes with styling provided by the frameset document.
 
-- hyperlinks to pages on other sites 
-- hyperlinks with a different protocol, e.g. `javascript:...`, `ftp:`
-- hyperlinks that target a different window or iframe, e.g.
-	
-			<a href="some_page.html" target="_blank">...</a>
-- anchor hyperlinks - `<a href="#skip">`
+**WARNING:** Inline styles are not removed by HyperFrameset and SHOULD NOT be used in content pages.
 
-That leaves hyperlinks to other pages within the same site.
+#### Scripts
 
-If a frameset lookup function has been registered then HyperFrameset queries what the frameset of the hyperlinked page would be.
-If it is the same as the current frameset then the page is downloaded and used to replace the real content of the current page. 
+Scripts in content pages are NEVER run by HyperFrameset 
+so they COULD be used for fallback actions.
+If HyperFrameset does apply **and** `capturing` of the landing-page is enabled,
+then scripts in the landing page are disabled anyway.
+However, if HyperFrameset does apply but `capturing` is not enabled,
+then there is a potential clash between the actions of the landing page scripts and HyperFrameset processing.
 
-Otherwise normal browser navigation to the next page is triggered. 
-
-**Note** that the HyperFrameset `click` handling can always be prevented by calling `event.preventDefault()`.
-
-"PushState Assisted Navigation" (PAN) may sometimes be referred to as panning, as in [camera panning](http://en.wikipedia.org/Panning_\(camera\)). 
-
-
-`<form>` handling
------------------
-
-HyperFrameset ONLY handles forms where `@method="GET"`.
-
-All other forms are NOT handled, which means the native browser behavior will apply
-unless external code prevents the default-action and implements a different behavior.
-
-You are encouraged to handle other forms in a site-specific manner. 
-
-### @method = GET
-
-The form's `@action` and input values are processed to generate a query URL
-which is then used to perform pushState assisted navigaion. 
-This mimics standard browser behavior.
-
-
-`<script>` handling
--------------------
-
-- Scripts in content-pages are NEVER run by HyperFrameset. 
 **RECOMMENDATION:** Content-pages do not need and SHOULD NOT have scripts, even for fallback.
 
-- All scripts which are in the frameset document are executed via dynamic script insertion, 
-but behave **like** scripts that are part of a loading document.
-Content is not blocked, but earlier scripts block later scripts 
-unless the earlier script has the `src` and `async` attributes. 
 
-    `<script src="..." async></script>`
-
-This dynamic script insertion is referred to as **enabling** in the following rules. 
-
-- Scripts in the `<head>` of the frameset are **enabled** AFTER all the content in the `<head>` of the frameset is INSERTED INTO the page.
-
-- Scripts in the `<body>` of the frameset are **enabled** in a context dependent manner. FIXME currently not at all
-
-
-Capturing
----------
-
-**NOTE** this option MUST be enabled (for now)
-
-The **capturing** [boot option](#boot-options) prevents normal browser parsing of the *landing page*.  
-This allows HyperFrameset to manage parsing in the same way that AJAXed pages are handled.
-The main benefits of this would be:
-
-- normalizing landing-page content occurs before the content is rendered, and 
-
-- because `<link>` and `<img>` resources aren't automatically downloaded they can be changed (or removed) with no penalty.
-
-The drawbacks are:
-
-- parsing and displaying of content doesn't begin until the landing-page has fully down-loaded.
-  On long pages over slow networks this will have quite a noticeable delay before any content is viewable. 
-
-The article "[Capturing - Improving Performance of the Adaptive Web](https://hacks.mozilla.org/2013/03/capturing-improving-performance-of-the-adaptive-web/)"
-provides a short description and discussion of this approach.
-
-### Restrictions
-
-1. The boot-script must be within - or before - `<head>`.
-2. The boot-script must be the first `<script>` in the page.
-3. If within `<head>` the boot-script may only be preceded by `<meta http-equiv>` elements.
-
-Capturing should be enabled by setting the **capturing** boot option to "strict". This enforces all the preceding restrictions.
-
-Setting the option to true only enforces the first restriction, with warnings given about the other two.
-
-
-Debugging
----------
-
-By default, HyperFrameset logs error and warning messages to the browser console.
-The logger can be configured to provide info and debug messages (see Configuration).
-
-External code is called from HyperFrameset (e.g. nodeInserted / nodeRemoved hooks)
-using [event dispatch](http://dean.edwards.name/weblog/2009/03/callbacks-vs-events/)
-instead of `try / catch` blocks.
-This isolates HyperFrameset from errors in external code,
-but doesn't prevent errors and stack-traces being logged in the browser console.
-
-Unfortunately, Firefox [doesn't log errors in event-listeners](https://bugzilla.mozilla.org/show_bug.cgi?id=503244).
-You may find debugging easier in a different browser. 
-
-
-Configuration
--------------
+Startup Configuration
+---------------------
 
 ### Preparation
 
@@ -431,15 +541,17 @@ When you want to:
 These options aren't specifically related to the operation of HyperFrameset. 
 The boot-script has the following options (default values in **bold**).
 
-- main_script: **"{bootscriptdir}HyperFrameset.js"**
 - log_level: "none", "error", **"warn"**, "info", "debug"
 - polling_interval: **50** (milliseconds)
-- autostart: false, **true**
-- capturing: false, **true**, "strict" FIXME only **true** is acceptable now
+- no_style: **false**, true
+- no_frameset: **false**, true
+- capturing: false, "auto", **true**, "strict"
 - hidden_timeout: **3000** (milliseconds)
+- startup_timeout: **10000** (milliseconds)
 - html5\_block\_elements: **"article aside figcaption figure footer header hgroup main nav section"**
 - html5\_inline\_elements: **"abbr mark output time audio video picture"**
 - config_script: **"{bootscriptdir}config.js"**
+- main_script: **"{bootscriptdir}HyperFrameset.js"**
 
 Sources for options are detailed below. 
 
@@ -453,18 +565,14 @@ Options can be **preset** by script, like this:
 	var Meeko = window.Meeko || (window.Meeko = {});
 	Meeko.options = {
 		log_level: "info",
-		autostart: false,
 		hidden_timeout: 1000
 	};
 	</script>
 
 This tells HyperFrameset to
 - log 'info', 'warn' and 'error' messages
-- prevent automatic startup, and
-- when a manual start is requested to hide the page until all frameset-resources are loaded *or*
+- hide the page until all frameset-resources are loaded *or*
 	1000 milliseconds (1 second) have elapsed, whichever comes *first*.
-
-If autostart is turned off, HyperFrameset can be manually started by calling `Meeko.framer.start()`.
 
 #### From localStorage and sessionStorage
 When debugging a page you probably don't want to modify the page source to change HyperFrameset options,
@@ -472,32 +580,58 @@ especially as you may have to change them back after you've found the problem.
 For this reason HyperFrameset reads `sessionStorage` and `localStorage` at startup, looking for config options.
 `sessionStorage` options override those found in `localStorage`, which in turn override those in data-attributes.
 
-Config options are read from JSON stored in the `Meeko.options` key. Thus the following would prevent `autostart` and turn on `debug` logging.
+Config options are read from JSON stored in the `Meeko.options` key. Thus the following would disable hiding of the landing-page and turn on `debug` logging.
 
-	sessionStorage.setItem('Meeko.options', JSON.stringify({ autostart: false, log_level: "debug" }) );
+	sessionStorage.setItem('Meeko.options', JSON.stringify({ hidden_timeout: 0, log_level: "debug" }) );
 
 _Note_ that the page would require a refresh after these settings were made.
 
 
-### HyperFrameset configuration
+### Capturing the Landing Page
 
-There are two aspects of HyperFrameset:
+The **capturing** [boot option](#boot-options) prevents normal browser parsing of the *landing page*.  
+This allows HyperFrameset to manage parsing in the same way that AJAXed pages are handled.
+The main benefits of this would be:
 
-1. Decoration - the wrapping of the primary content of the page with site frameset
+- other `<script>`s in the landing-page are disabled
 
-2. Panning - replacing the primary content of the page while retaining the same frameset
+- because `<link>` and `<img>` resources aren't automatically downloaded they can be changed (or removed) with no penalty.
 
-These aspects are opposite in purpose, but similar in operation.
-In particular, they both involve: 
-- downloading of external content
-- normalizing this content to prepare for HyperFrameset processing
-- notifications of content insertion / removal, etc
+The drawbacks are:
+
+- parsing and displaying of content doesn't begin until the landing-page has fully down-loaded.
+  On long pages over slow networks this will have quite a noticeable delay before any content is viewable. 
+
+The article "[Capturing - Improving Performance of the Adaptive Web](https://hacks.mozilla.org/2013/03/capturing-improving-performance-of-the-adaptive-web/)"
+provides a short description and discussion of this approach.
+
+#### Restrictions
+
+1. The boot-script must be within - or before - `<head>`.
+2. The boot-script should be the first `<script>` in the page.
+3. If within `<head>` the boot-script should only be preceded by `<meta http-equiv>` elements.
+
+Capturing should be enabled by setting the **capturing** boot option to "strict". This enforces all the preceding restrictions.
+
+Setting the option to true only enforces the first restriction, with warnings given about the other two.
 
 
-### Frameset engine
+The Frameset Overseer
+---------------------
 
-Options for framing are stored in `Meeko.framer.options`,
-which can be accessed directly or by calling 
+Before a frameset document can be loaded,  
+HyperFrameset must discover which frameset document is right for the landing-page.
+
+Before responding to a hyperlink activation,  
+HyperFrameset must determine whether the hyperlinked page can share the currently applied frameset document.
+
+The entity which oversees the frameset and frames is called the `framer`, and it has a JS reference object `Meeko.framer`.
+This object is available once the HyperFrameset script has loaded.
+
+### Configuration
+
+`framer` options are stored in `Meeko.framer.options`,
+which can be accessed directly or preferably by calling 
 
 	Meeko.framer.config(options);
 	
@@ -510,10 +644,10 @@ This can be achieved by editing the site-specific `config.js` created during [Pr
 Usually you only want to configure how HyperFrameset determines the appropriate frameset-document for a page. 
 Do this by providing one of the following options: 
 
-- **`detect(doc)`**  
+- **`detect(doc)`** 
 	MUST return the frameset-URL by inspecting the current page when HyperFrameset starts (this doesn't allow panning)
 
-- **`lookup(url)`**  
+- **`lookup(url)`**
 	MUST return the frameset-URL for any URL in the site, either the current `document.URL`,
 	or the URL of a different page that is to be panned in.
 
@@ -521,32 +655,255 @@ Do this by providing one of the following options:
 `detect(doc)` is mainly provided for backwards compatibility,
 as can be seen in the default `config.js` script. 
 
-**TODO:** `request`, `normalize`, notifications
+**TODO:** Explain `scope` and how it is implied
 
 
-#### Pre-decorated pages
+Frameset Document
+-----------------
 
-Pages on your site may not be in the format that HyperFrameset and your frameset-document are expecting.
-In this case you need to provide a `normalize(doc)` function
-which will manipulate the DOM of `doc` into the appropriate format, e.g.
+When the frameset document has loaded, the `<body>` is separated and used to create the frameset definition.
+The remainder of the document - the `<html>`, `<head>` and children - replaces the landing-page in the browser view.
+After this replacement the window state should be as though the frameset document was the landing-page. 
 
-		Meeko.panner.config({
-			normalize: function(doc) {
-				var content = doc.getElementsByTagName('main')[0];
-				content.id = 'mk_content';
-				doc.body.innerHTML = '';
-				doc.body.appendChild(content);
-			}
-		});
+**TODO:**
+- xml and custom namespaces on `<html>`
+- changing the namespace for HyperFrameset
 
-**NOTE:** configuring the `normalize` option prevents initial page decoration
-until the `DOMContentLoaded` event (or safest equivalent). FIXME only **capturing** is supported anyway.
 
-### Bonus APIs
+### `<script>` handling
+
+- Scripts containing a `for` attribute are configuration scripts with special handling not documented in this section.
+These scripts MUST NOT have a `src` attribute. For example:
+
+    <script for="hf-frameset">
+	({
+		lookup: function(url) { }
+	})
+	</script>
+
+- Scripts in the `<head>` of the frameset document are executed via dynamic script insertion, 
+but behave **like** scripts that are part of a landing page.
+So earlier scripts block later scripts 
+unless the earlier script has the `src` **and** `async` attributes. 
+
+    `<script src="..." async></script>`
+
+These scripts are **enabled** AFTER all the content in the `<head>` of the frameset is INSERTED INTO the page.
+  
+- Scripts that are children of `<hf-frame>` elements are configuration scripts with special handling not documented in this section.
+These scripts MUST NOT have a `src` attribute.
+
+- Other scripts in the body of the frameset document are ignored.
+
+
+Frameset Definition
+-------------------
+
+The frameset definition is created by processing the `<body>` of the frameset document.
+Every `<hf-frame>` is **both** a frame definition and a frame declaration,
+unless it has a `def` attribute in which case it is only a declaration.
+
+Each frame definition is added to the list of definitions maintained in the frameset definition.
+
+Each frame declaration has its children - if any - removed.
+
+The result of this processing is list of frame definitions which contain
+zero or more frame declarations as descendants.
+Likewise, the `<body>` will contain zero (but probably more) frame declarations as descendants.
+
+After processing, the `<body>` is inserted into the browser view.
+Its contained frame declarations are automatically handled,
+typically by fetching and rendering the frame `src`.
+These renderings may insert more frame declarations which are again automatically handled.
+
+### Configuration
+
+Any `<script for="hf-frameset">` in the `<head>` is used for configuring the frameset definition.
+The script MUST NOT have a `src` attribute, and is evaluated with
+
+    (Function('return (' + script.text + ');'))()
+
+to generate an options object for the frameset definition.
+The script SHOULD have a format like
+
+    <script for="hf-frameset">
+	({
+		lookup: function(url) { }
+	})
+	</script>
+    
+This is a valid yet inert script when not handled by HyperFrameset.
+
+The options object will configure how HyperFrameset determines the appropriate frame target
+for the landing-page URL and `requestnavigation` events.
+The following callbacks can be configured
+
+- **`lookup(url, details)`**
+	return the target frame `name` for the landing-page URL or a `requestnavigation` event.  
+	For the landing-page there is no `details` object.  
+	For `requestnavigation` events the `details` object has the following fields:
+		+ url: the URL to be navigated to
+		+ element: the source element for the event (`<a href>` or `<form method="get">`)
+		+ referrer: the current document.URL
+	If this method returns a valid target frame `name` then pushState-assisted-navigation is initiated
+	and frames with that target `name` are loaded with the hyperlinked resource.  
+	Otherwise normal browser navigation is performed.
+
+
+
+Frame Definition
+----------------
+
+    <hf-frame id="hfdef_frameX">
+		<hf-body condition="loaded">
+			<hf-transform type="main">
+			</hf-transform>
+		</hf-body>
+	</hf-frame>
+	
+**TODO:** `<hf-body>`, `<hf-transform>`
+
+### Configuration
+
+Any `<script>` which is a child of the `<hf-frame>` is used for configuring the frame definition.
+The script MUST NOT have a `src` attribute, and is evaluated with
+
+    (Function('return (' + script.text + ');'))()
+
+to generate an options object for the frame definition.
+The script SHOULD have a format like
+
+    <script>
+	({
+		lookup: function(url) { }
+	})
+	</script>
+    
+This is a valid yet inert script when not handled by HyperFrameset.
+
+The options object will configure how HyperFrameset determines the appropriate frame target
+for the landing-page URL and `requestnavigation` events.
+The following callbacks can be configured
+
+- **`lookup(url, details)`**
+	return the target frame `name` for a `requestnavigation` event.  
+	The `details` object has the following fields:
+		+ url: the URL to be navigated to
+		+ element: the source element for the event (`<a href>` or `<form method="get">`)
+		+ referrer: the current document.URL
+	If this method returns a valid target frame `name` then frames with that `name`
+	are loaded with the hyperlinked resource.
+	Otherwise the `requestnavigation` event bubbles up to ancestor frames or the frameset. 
+
+
+Frame Declaration
+-----------------
+
+	<hf-frame def="hfdef_frameX" name="hf_frame1" src="scope:./index.html" main="main"></hf-frame>
+	
+When a frame declaration enters the browser view, its `src` attribute is interpreted as a URL and fetched.
+Its `def` attribute is used to lookup a frame definition which will process the fetched document
+and produce a rendering for the frame.
+
+### Frame naming
+
+Just like `<frame>` and `<iframe>`, a frame declaration can have a `name` attribute,
+which allows it to be a target for `requestnavigation` events.
+
+
+Navigation Requests
+-------------------
+
+**NOTE:**
+- `history.pushState` is a requirement for HyperFrameset. If it isn't available then HyperFrameset will not start.
+- "PushState Assisted Navigation" (PAN) may sometimes be referred to as panning, as in [camera panning](http://en.wikipedia.org/Panning_\(camera\)). 
+
+
+### `requestnavigation` event
+
+User initiated browser navigation is triggered by `click` events which bubble through `<a href>` and by form submission.
+HyperFrameset will (conditionally) prevent default browser handling of these events
+and generate a `requestnavigation` event which itself has the default action of normal browser navigation.
+
+The `requestnavigation` event has the following fields:
+
+- `target`: the hyperlink or form element
+- `detail`: the URL that will be navigated to by default
+
+**TODO:**
+- event.stopPropagation() / event.stopImmediatePropagation() are no-ops.
+- use event.defaultPrevented / event.preventDefault() to determine default handling
+
+
+### Hyperlink handling
+
+The "hyperlink-element" is a `<a href>` found through the following steps:
+
+1. Find the closest (self-or-ancestor) "linking-element" to the `click` event target.  
+	A linking-element is a `<a href>` element **or** any element with the `link` attribute.  
+2. If there is no linking-element then abandon the search, returning nothing.
+3. If the linking-element is `<a href>` then return it as the hyperlink-element. 
+4. Otherwise find the first descendant `<a href>` **or** `<link href>` of the linking-element and return it as the hyperlink-element. 
+5. If there isn't one then return the closest `<a href>` ancestor of the linking-element.
+6. If there isn't one then the search fails, returning nothing.
+
+Interpret the hyperlink `href` as an absolute URL
+which is used in triggering the `requestnavigation` event.
+This **extends** standard browser behavior. 
+
+
+### `<form>` handling
+
+HyperFrameset ONLY handles forms where `@method="GET"`.
+
+All other forms are NOT handled, which means the native browser behavior will apply
+unless external code prevents the default-action and implements a different behavior.
+
+You are encouraged to handle other forms in a site-specific manner. 
+
+#### @method = GET
+
+The form's `@action` and input values are processed to generate an absolute query URL
+which is then used to trigger the `requestnavigation` event.
+This will mimic standard browser behavior.
+
+
+### `requestnavigation` handling
+
+The `requestnavigation` event bubbles up from the hyperlink or form, potentially passing through frames and then to the frameset.
+
+Each frame can potentially handle the event, if its `lookup()` callback returns a valid frame target `name`.
+If it does then the `framer` takes charge of loading the resource and updating the target frame (or frames).
+Panning is NOT used in this case - potentially cross-site URLs can be loaded. 
+
+If no frames handle the event then the `framer` determines whether to perform panning or normal browser navigation. 
+
+Some hyperlinks are not appropriate for panning and immediately trigger normal navigation:
+
+- hyperlinks to pages on other sites 
+- hyperlinks with a different protocol, e.g. `javascript:...`, `ftp:`
+- anchor hyperlinks - `<a href="#skip">`
+
+That leaves hyperlinks to other pages within the same site.
+
+If a framer `lookup()` callback has been registered it is queried for the frameset of the hyperlinked page.
+If it is not the same as the current frameset then normal navigation is triggered.
+
+If a frameset definition `lookup()` is registered it is queried for the frame-target of the hyperlinked page.
+If it is valid then the resource is loaded and the target frame (or frames) are updated.
+
+Otherwise normal browser navigation is triggered. 
+
+
+Bonus APIs
+----------
 
 HyperFrameset defines various utility classes and functions for internal use.
 Many of these are also available for external use if appropriate.
-The most useful of these are in the `Meeko.DOM` namespace, and include 
+The most useful of these are include:
+
++ `Meeko.Promise`
+	This is a JS implementation of ES6 Promises
 
 + `Meeko.URL`
 	This provides overlapping functionality with the [proposed URL API](http://url.spec.whatwg.org/#api). 
@@ -560,44 +917,48 @@ The most useful of these are in the `Meeko.DOM` namespace, and include
 	This is short-hand for `document.getElementById` (typically aliased to `$id` in a code block)
 
 + `Meeko.DOM.$$`
-	This is short-hand for `document.getElementsByTagName` (typically aliased to `$$` in a code block)
+	This is short-hand for `document.querySelector` (typically aliased to `$$` in a code block)
 
++ `Meeko.DOM.$$`
+	This is short-hand for `document.querySelectorAll` (typically aliased to `$$` in a code block)
+
++ `Meeko.sprockets`
+	This provides functionality similar to Custom Elements. See the [DOMSprockets project](http://github.com/meekostuff/DOMSprockets)
+
+
+Debugging
+---------
+
+By default, HyperFrameset logs error and warning messages to the browser console.
+The logger can be configured to provide info and debug messages (see Configuration).
+
+External code is called from HyperFrameset (e.g. nodeInserted / nodeRemoved hooks)
+using [event dispatch](http://dean.edwards.name/weblog/2009/03/callbacks-vs-events/)
+instead of `try / catch` blocks.
+This isolates HyperFrameset from errors in external code,
+but doesn't prevent errors and stack-traces being logged in the browser console.
+
+Unfortunately, Firefox [doesn't log errors in event-listeners](https://bugzilla.mozilla.org/show_bug.cgi?id=503244).
+You may find debugging easier in a different browser. 
 
 
 Notes and Warnings
 ------------------
-- HyperFrameset may not be compatible with IE behaviors, eg [CSS3 PIE](http://css3pie.com/).
-- unlike CSS, frameset pages SHOULD be in the same domain as the content page otherwise the browsers cross-site restrictions will apply.
-Detection for this hasn't been implemented yet. 
-- all stylesheets in the content document will be deleted at the start of merging of the frameset page. 
-This allows for a fallback styling option of frameset-less pages. 
+
 - the configuration options and mechanism may change in future releases
+- unlike CSS, frameset documents SHOULD be in the same domain as the content page otherwise the browsers cross-site restrictions will apply.
+Detection for this hasn't been implemented yet. 
+- all stylesheets in the content document are removed before applying the frameset document. 
+This allows for a fallback styling option of frameset-less pages. 
 - URLs in `<style>` sections of the frameset are not resolved.
 This means that relative URLs - which are meant to be relative to the frameset URL - 
 will probably be wrong when imported into the page.
 The work-around for this is to use absolute-paths or absolute-URLs (which you should probably be using anyway).
-- There are no compatibility checks and warnings between the content and frameset pages (charset, etc)
+- There are no compatibility checks and warnings between the content and frameset documents (charset, etc)
 
 
 TODO
 ----
 - this README is too long - needs to be split up into sub-sections
 - some features would be best explained with demo pages / sites 
-
-
-License
--------
-
-HyperFrameset is available under 
-[MPL 2.0](http://www.mozilla.org/MPL/2.0/ "Mozilla Public License version 2.0").
-See the [MPL 2.0 FAQ](http://www.mozilla.org/MPL/2.0/FAQ.html "Frequently Asked Questions")
-for your obligations if you intend to modify or distribute HyperFrameset or part thereof. 
-
-
-Contact
--------
-
-If you have any questions or comments, don't hesitate to contact the author via
-[web](http://meekostuff.net/), [email](mailto:shogun70@gmail.com) or [twitter](http://twitter.com/meekostuff). 
-
 
