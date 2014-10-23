@@ -3686,7 +3686,7 @@ onRequestNavigation: function(e, frame) { // `return false` means success (so pr
 
 onPageLink: function(url, details) {
 	var framer = this;
-	alert('Ignoring on-same-page links for now.'); // FIXME
+	logger.warn('Ignoring on-same-page links for now.'); // FIXME
 },
 
 navigate: function(url, changeset) { // FIXME doesn't support replaceState
