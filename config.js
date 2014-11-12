@@ -2,7 +2,7 @@
 
 var logger = Meeko.logger;
 var _ = Meeko.stuff;
-var DOM = Meeko.DOM, $id = DOM.$id, $$ = DOM.$$;
+var DOM = Meeko.DOM;
 var URL = Meeko.URL, baseURL = URL(document.URL);
 
 var framesetURL, scope;
@@ -42,7 +42,7 @@ function getFramesetURL(doc) {
 
 function getFramesetLink(doc) {
 	var link, specificity = 0;
-	_.forEach($$("link", doc.head), function(el) {
+	_.forEach(DOM.findAll("link", doc.head), function(el) {
 		var tmp, sp = 0;
 		if (!/^\bFRAMESET\b/i.test(el.rel)) return;
 		var type = el.type.toLowerCase();
