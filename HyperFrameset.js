@@ -4315,14 +4315,14 @@ return ScriptProcessor;
 framer.registerProcessor('script', ScriptProcessor);
 
 
-// NOTE textAttr & htmlAttr used in HTemplateProcessor & CSSDecoder
+// NOTE textAttr & htmlAttr used in HazardProcessor & CSSDecoder
 var textAttr = '_text';
 var htmlAttr = '_html';
 
-var HTemplateProcessor = (function() {
+var HazardProcessor = (function() {
 
-var htNamespace = 'ht';
-var htAttrPrefix = htNamespace + ':';
+var hazNamespace = 'haz';
+var hazAttrPrefix = hazNamespace + ':';
 var exprNamespace = 'expr';
 var exprPrefix = exprNamespace + ':';
 var mexprNamespace = 'mexpr';
@@ -4330,17 +4330,17 @@ var mexprPrefix = mexprNamespace + ':';
 var exprTextAttr = exprPrefix + textAttr;
 var exprHtmlAttr = exprPrefix + htmlAttr;
 
-function htAttr(el, attr) {
-	var htAttrName = htAttrPrefix + attr;
-	if (!el.hasAttribute(htAttrName)) return false;
-	var value = el.getAttribute(htAttrName);
-	el.removeAttribute(htAttrName);
+function hazAttr(el, attr) {
+	var hazAttrName = hazAttrPrefix + attr;
+	if (!el.hasAttribute(hazAttrName)) return false;
+	var value = el.getAttribute(hazAttrName);
+	el.removeAttribute(hazAttrName);
 	return value;
 }
 
-function HTemplateProcessor() {}
+function HazardProcessor() {}
 
-_.defaults(HTemplateProcessor.prototype, {
+_.defaults(HazardProcessor.prototype, {
 	
 loadTemplate: function(template) {
 	this.template = template;
@@ -4355,23 +4355,23 @@ transform: function(provider) {
 
 function transform(el, provider, context, variables) {
 	
-	var ht_if = htAttr(el, 'if');
-	var ht_unless = htAttr(el, 'unless');
-	var ht_forEach = htAttr(el, 'for-each');
+	var haz_if = hazAttr(el, 'if');
+	var haz_unless = hazAttr(el, 'unless');
+	var haz_forEach = hazAttr(el, 'for-each');
 
-	if (ht_forEach === false) {
+	if (haz_forEach === false) {
 		return processNode(el, provider, context, variables); // NOTE return value === el
 	}
 	
 	// handle for-each
-	var ht_var = htAttr(el, 'var');
+	var haz_var = hazAttr(el, 'var');
 	
 	var subVars = _.defaults({}, variables);
-	var subContexts = provider.evaluate(ht_forEach, context, variables, 'array');
+	var subContexts = provider.evaluate(haz_forEach, context, variables, 'array');
 	var result = document.createDocumentFragment(); // FIXME which is the right doc to create this frag in??
 	
 	_.forEach(subContexts, function(subContext) {
-		if (ht_var) subVars[ht_var] = subContext;
+		if (haz_var) subVars[haz_var] = subContext;
 		var srcEl = el.cloneNode(true);
 		var newEl = processNode(srcEl, provider, subContext, subVars); // NOTE newEl === srcEl
 		if (newEl) result.appendChild(newEl);
@@ -4380,12 +4380,12 @@ function transform(el, provider, context, variables) {
 	return result;
 
 	function processNode(node, provider, context, variables) {
-		if (ht_if !== false) {
-			var keep = provider.evaluate(ht_if, context, variables, 'boolean');
+		if (haz_if !== false) {
+			var keep = provider.evaluate(haz_if, context, variables, 'boolean');
 			if (!keep) return;
 		}
-		if (ht_unless !== false) {
-			var keep = !provider.evaluate(ht_unless, context, variables, 'boolean');
+		if (haz_unless !== false) {
+			var keep = !provider.evaluate(haz_unless, context, variables, 'boolean');
 			if (!keep) return;
 		}
 		return transformNode(node, provider, context, variables); // NOTE return value === node
@@ -4494,10 +4494,10 @@ function evalExpression(expr, provider, context, variables, type) { // FIXME rob
 	return value;
 }
 
-return HTemplateProcessor;	
+return HazardProcessor;	
 })();
 
-framer.registerProcessor('ht', HTemplateProcessor);
+framer.registerProcessor('hazard', HazardProcessor);
 
 
 var CSSDecoder = (function() {
@@ -4515,7 +4515,7 @@ evaluate: function(query, context, variables, type) {
 	var queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
 	var selector = queryParts[1];
 	var attr = queryParts[2];
-	if (type === 'array') { // ht:for-each
+	if (type === 'array') { // haz:for-each
 		if (attr) logger.warn('Ignoring attribute selector because evaluate() requested array');
 		return findAll(context, selector, variables);
 	}
@@ -4532,7 +4532,7 @@ evaluate: function(query, context, variables, type) {
 		case htmlAttr: return node.innerHTML;
 		default: return node.getAttribute(attr);
 		}
-	case 'boolean': // ht:if
+	case 'boolean': // haz:if
 		if (!node) return false;
 		switch(attr) {
 		case null: case undefined: case '': return true;
