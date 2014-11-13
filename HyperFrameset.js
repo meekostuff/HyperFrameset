@@ -4297,13 +4297,7 @@ transform: function(provider) {
 		logger.warn('"script" transform template did not produce valid transform object');
 		return;
 	}
-	try {
-		return this.processor.transform(srcNode);
-	}
-	catch(err) { // FIXME should trigger a fallback rendering
-		logger.warn(err); 
-		return srcNode;
-	}
+	return this.processor.transform(srcNode);
 }
 	
 });
