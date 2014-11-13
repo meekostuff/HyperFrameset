@@ -23,7 +23,7 @@ var window = this;
 var document = window.document;
 
 var defaultOptions = {
-	"log_level": "warn"
+	'log_level': 'warn'
 }
 
 var vendorPrefix = 'meeko';
@@ -204,7 +204,7 @@ function postError(error) {
 
 var throwErrors = (function() { // TODO maybe it isn't worth isolating on platforms that don't have dispatchEvent()
 
-var evType = vendorPrefix + "-error";
+var evType = vendorPrefix + '-error';
 var throwErrors = (window.dispatchEvent) ?
 function() {
 	var handlers = _.map(errorQueue, function(error) {
@@ -213,7 +213,7 @@ function() {
 	_.forEach(handlers, function(handler) {
 		window.addEventListener(evType, handler, false);
 	});
-	var e = document.createEvent("Event");
+	var e = document.createEvent('Event');
 	e.initEvent(evType, true, true);
 	window.dispatchEvent(e);
 	_.forEach(handlers, function(handler) {
@@ -301,7 +301,7 @@ _initialize: function() {
 	promise._processing = false;
 },
 
-_accept: function(result, sync) { // NOTE equivalent to "accept algorithm". External calls MUST NOT use sync
+_accept: function(result, sync) { // NOTE equivalent to 'accept algorithm'. External calls MUST NOT use sync
 	var promise = this;
 	if (promise._accepted != null) return;
 	promise._accepted = true;
@@ -309,7 +309,7 @@ _accept: function(result, sync) { // NOTE equivalent to "accept algorithm". Exte
 	promise._requestProcessing(sync);
 },
 
-_resolve: function(value, sync) { // NOTE equivalent to "resolve algorithm". External calls MUST NOT use sync
+_resolve: function(value, sync) { // NOTE equivalent to 'resolve algorithm'. External calls MUST NOT use sync
 	var promise = this;
 	if (promise._accepted != null) return;
 	if (value != null && typeof value.then === 'function') {
@@ -328,7 +328,7 @@ _resolve: function(value, sync) { // NOTE equivalent to "resolve algorithm". Ext
 	promise._accept(value, sync);
 },
 
-_reject: function(error, sync) { // NOTE equivalent to "reject algorithm". External calls MUST NOT use sync
+_reject: function(error, sync) { // NOTE equivalent to 'reject algorithm'. External calls MUST NOT use sync
 	var promise = this;
 	if (promise._accepted != null) return;
 	promise._accepted = false;
@@ -516,7 +516,7 @@ var DOM = Meeko.DOM = (function() {
 
 // WARN getSpecificity is for selectors, **but not** for selector-chains
 var getSpecificity = function(selector) { // NOTE this fn is small but extremely naive (and wrongly counts attrs and pseudo-attrs with element-type)
-	if (selector.indexOf(',') >= 0) throw Error("getSpecificity does not support selectors that contain COMMA (,)");
+	if (selector.indexOf(',') >= 0) throw Error('getSpecificity does not support selectors that contain COMMA (,)');
 	var idCount = selector.split('#').length - 1;
 	var classCount = selector.split('.').length - 1;
 	var typeCount =
@@ -585,7 +585,7 @@ var releaseNodes = function(callback, context) { // FIXME this is never called
 
 var matchesSelector;
 _.some(_.words('moz webkit ms o'), function(prefix) {
-	var method = prefix + "MatchesSelector";
+	var method = prefix + 'MatchesSelector';
 	if (document.documentElement[method]) {
 		matchesSelector = function(element, selector) { return element[method](selector); }
 		return true;
@@ -599,7 +599,7 @@ function(element, selector, scope) {
 	if (scope) selector = absolutizeSelector(selector, scope);
 	return matchesSelector(element, selector);
 } :
-function() { throw Error("matches not supported"); } // NOTE fallback
+function() { throw Error('matches not supported'); } // NOTE fallback
 
 var closest = matchesSelector ?
 function(element, selector, scope) {
@@ -609,7 +609,7 @@ function(element, selector, scope) {
 	}
 	return;
 } :
-function() { throw Error("closest not supported"); } // NOTE fallback
+function() { throw Error('closest not supported'); } // NOTE fallback
 
 function absolutizeSelector(selector, scope) { // WARN does not handle relative selectors that start with sibling selectors
 	switch (scope.nodeType) {
@@ -645,7 +645,7 @@ function(selector, node, scope) {
 	}
 	return _.toArray(node.querySelectorAll(selector));
 } :
-function() { throw Error("findAll() not supported"); };
+function() { throw Error('findAll() not supported'); };
 
 var find = document.querySelector ?
 function(selector, node, scope) {
@@ -656,7 +656,7 @@ function(selector, node, scope) {
 	}
 	return node.querySelector(selector);
 } :
-function() { throw Error("find() not supported"); };
+function() { throw Error('find() not supported'); };
 
 var contains = // WARN `contains()` means contains-or-isSameNode
 document.documentElement.contains && function(node, otherNode) {
@@ -666,15 +666,15 @@ document.documentElement.contains && function(node, otherNode) {
 	return false;
 } ||
 document.documentElement.compareDocumentPosition && function(node, otherNode) { return (node === otherNode) || !!(node.compareDocumentPosition(otherNode) & 16); } ||
-function(node, otherNode) { throw Error("contains not supported"); };
+function(node, otherNode) { throw Error('contains not supported'); };
 
 var addEventListener =
 document.addEventListener && function(node, type, listener, capture) { return node.addEventListener(type, listener, capture); } ||
-function(node, type, listener, capture) { throw Error("addEventListener not supported"); };
+function(node, type, listener, capture) { throw Error('addEventListener not supported'); };
 
 var removeEventListener =
 document.removeEventListener && function(node, type, listener, capture) { return node.removeEventListener(type, listener, capture); } ||
-function(node, type, listener, capture) { throw Eror("removeEventListener not supported"); };
+function(node, type, listener, capture) { throw Eror('removeEventListener not supported'); };
 
 return {
 	getSpecificity: getSpecificity, cmpSpecificty: cmpSpecificty,
@@ -691,7 +691,7 @@ return {
  */
 if (!Meeko.logger) Meeko.logger = (function() {
 
-var levels = this.levels = _.words("none error warn info debug");
+var levels = this.levels = _.words('none error warn info debug');
 
 _.forEach(levels, function(name, num) {
 	
@@ -893,7 +893,7 @@ function handleEvent(event, handler) {
 	var bindingImplementation = this;
 	var target = event.target;
 	var current = bindingImplementation.element;
-	if (!DOM.hasData(current)) throw Error("Handler called on non-bound element");
+	if (!DOM.hasData(current)) throw Error('Handler called on non-bound element');
 	if (!matchesEvent(handler, event, true)) return; // NOTE the phase check is below
 	var delegator = current;
 	if (handler.delegator) {
@@ -930,33 +930,33 @@ function handleEvent(event, handler) {
 var convertXBLHandler = function(config) {
 	var handler = {}
 	handler.type = config.event;
-	if (null == config.event) logger.warn("Invalid handler: event property undeclared");
+	if (null == config.event) logger.warn('Invalid handler: event property undeclared');
 
 	function lookupValue(attrName, lookup) {
 		var attrValue = config[attrName];
 		var result;
 		if (attrValue) {
 			result = lookup[attrValue];
-			if (null == result) logger.info("Ignoring invalid property " + attrName + ": " + attrValue);
+			if (null == result) logger.info('Ignoring invalid property ' + attrName + ': ' + attrValue);
 		}
 		return result;
 	}
 
-	handler.eventPhase = lookupValue("phase", {
-		"capture": 1, // Event.CAPTURING_PHASE,
-		"target": 2, // Event.AT_TARGET,
-		"bubble": 3, // Event.BUBBLING_PHASE,
-		"default-action": 0x78626C44 
+	handler.eventPhase = lookupValue('phase', {
+		'capture': 1, // Event.CAPTURING_PHASE,
+		'target': 2, // Event.AT_TARGET,
+		'bubble': 3, // Event.BUBBLING_PHASE,
+		'default-action': 0x78626C44 
 	}) || 0;
 
-	handler.preventDefault = lookupValue("default-action", {
-		"cancel" : true,
-		"perform" : false
+	handler.preventDefault = lookupValue('default-action', {
+		'cancel' : true,
+		'perform' : false
 	}) || false;
 
-	handler.stopPropagation = lookupValue("propagate", {
-		"stop": true,
-		"continue": false
+	handler.stopPropagation = lookupValue('propagate', {
+		'stop': true,
+		'continue': false
 	}) || false;
 	
 	function attrText_to_numArray(attr) {				
@@ -975,21 +975,21 @@ var convertXBLHandler = function(config) {
 	// Event Filters: mouse / keyboard / text / mutation / modifiers
 	
 	// mouse
-	handler.button = attrText_to_numArray("button");
-	handler.clickCount = attrText_to_numArray("click-count");
+	handler.button = attrText_to_numArray('button');
+	handler.clickCount = attrText_to_numArray('click-count');
 	
 	// keyboard
 	handler.key = config.key;
 	handler.keyLocation = [];
-	var keyLocationText = config["key-location"]
+	var keyLocationText = config['key-location']
 	var keyLocationStrings =  (keyLocationText) ? keyLocationText.split(/\s+/) : [];
 	for (var n=keyLocationStrings.length, i=0; i<n; i++) {
 		var text = keyLocationStrings[i];
 		switch (text) {
-			case "standard": handler.keyLocation.push(KeyboardEvent.DOM_KEY_LOCATION_STANDARD); break;
-			case "left": handler.keyLocation.push(KeyboardEvent.DOM_KEY_LOCATION_LEFT); break;
-			case "right": handler.keyLocation.push(KeyboardEvent.DOM_KEY_LOCATION_RIGHT); break;
-			case "numpad": handler.keyLocation.push(KeyboardEvent.DOM_KEY_LOCATION_NUMPAD); break;
+			case 'standard': handler.keyLocation.push(KeyboardEvent.DOM_KEY_LOCATION_STANDARD); break;
+			case 'left': handler.keyLocation.push(KeyboardEvent.DOM_KEY_LOCATION_LEFT); break;
+			case 'right': handler.keyLocation.push(KeyboardEvent.DOM_KEY_LOCATION_RIGHT); break;
+			case 'numpad': handler.keyLocation.push(KeyboardEvent.DOM_KEY_LOCATION_NUMPAD); break;
 		}
 	}
 
@@ -997,30 +997,30 @@ var convertXBLHandler = function(config) {
 	handler.text = config.text;
 	
 	// non-standard
-	handler.filter = new RegExp(config.filter, "");
+	handler.filter = new RegExp(config.filter, '');
 	
 	// mutation
 	// FIXME not supported anymore
-	handler.attrName = config["attr-name"];
+	handler.attrName = config['attr-name'];
 	handler.attrChange = [];
-	var attrChangeText = config["attr-change"];
+	var attrChangeText = config['attr-change'];
 	var attrChangeStrings =  (attrChangeText) ? attrChangeText.split(/\s+/) : [];
 	for (var n=attrChangeStrings.length, i=0; i<n; i++) {
 		var text = attrChangeStrings[i];
 		switch (text) {
-			case "modification": handler.attrChange.push(MutationEvent.MODIFICATION); break;
-			case "addition": handler.attrChange.push(MutationEvent.ADDITION); break;
-			case "removal": handler.attrChange.push(MutationEvent.REMOVAL); break;
+			case 'modification': handler.attrChange.push(MutationEvent.MODIFICATION); break;
+			case 'addition': handler.attrChange.push(MutationEvent.ADDITION); break;
+			case 'removal': handler.attrChange.push(MutationEvent.REMOVAL); break;
 		}
 	}
-	handler.prevValue = config["prev-value"];
-	handler.newValue = config["new-value"];
+	handler.prevValue = config['prev-value'];
+	handler.newValue = config['new-value'];
 	
 	// modifiers
 	// TODO should handler.modifiers be {} or []?
-	if (null != config["modifiers"]) {
+	if (null != config['modifiers']) {
 		handler.modifiers = [];
-		var modifiersText = config["modifiers"];
+		var modifiersText = config['modifiers'];
 		var modifiersStrings = (modifiersText) ? modifiersText.split(/\s+/) : [];
 		for (var n=modifiersStrings, i=0; i<n; i++) {
 			var text = modifiersStrings[i];
@@ -1030,8 +1030,8 @@ var convertXBLHandler = function(config) {
 				var key = m[2];
 				var condition = 1; // MUST
 				if (m[3]) condition = 0; // OPTIONAL
-				else if (m[1] == "+") condition = 1; // MUST
-				else if (m[1] == "-") condition = -1; // MUST NOT
+				else if (m[1] == '+') condition = 1; // MUST
+				else if (m[1] == '-') condition = -1; // MUST NOT
 				handler.modifiers.push({ key: key, condition: condition });
 			}
 		}
@@ -1080,8 +1080,8 @@ var matchesEvent = function(handler, event, ignorePhase) {
 		}
 		if (handler.clickCount && handler.clickCount.length) { 
 			var count = 1;
-			// if ("dblclick" == event.type) count = 2;
-			if ("click" == event.type) count = (event.detail) ? event.detail : 1;
+			// if ('dblclick' == event.type) count = 2;
+			if ('click' == event.type) count = (event.detail) ? event.detail : 1;
 			if (!_.contains(handler.clickCount, count)) return false;
 		}
 		if (handler.modifiers) {
@@ -1092,7 +1092,7 @@ var matchesEvent = function(handler, event, ignorePhase) {
 	// KeyboardEvents
 	// NOTE some of these are non-standard
 	var ourKeyIdentifiers = {
-		Backspace: "U+0008", Delete: "U+007F", Escape: "U+001B", Space: "U+0020", Tab: "U+0009"
+		Backspace: 'U+0008', Delete: 'U+007F', Escape: 'U+001B', Space: 'U+0020', Tab: 'U+0009'
 	}
 
 	if (evType in xblKeyboardEvents) {
@@ -1100,14 +1100,14 @@ var matchesEvent = function(handler, event, ignorePhase) {
 			var success = false;
 			var keyId = event.keyIdentifier;
 			if (/^U\+00....$/.test(keyId)) { // TODO Needed for Safari-2. It would be great if this test could be done elsewhere
-				keyId = keyId.replace(/^U\+00/, "U+");
+				keyId = keyId.replace(/^U\+00/, 'U+');
 			}
 			if (handler.key != keyId && ourKeyIdentifiers[handler.key] != keyId) return false;
 		}
 
 		// TODO key-location		
 		if (handler.modifiers || handler.key) {
-			if (!modifiersMatchEvent(handler.modifiers || [ "none" ], event)) return false;
+			if (!modifiersMatchEvent(handler.modifiers || [ 'none' ], event)) return false;
 		}
 	}
 
@@ -1141,11 +1141,11 @@ var modifiersMatchEvent = function(modifiers, event) {
 		for (var i=0, n=modifiers.length; i<n; i++) {
 			var modifier = modifiers[i];
 			switch (modifier.key) {
-				case "none":
+				case 'none':
 					if (evMods_any) return false;
 					break;
 	
-				case "any":
+				case 'any':
 					any = true;
 					break;
 	
@@ -1413,7 +1413,7 @@ getInterface: function(element) {
 		});
 		if (binding) return binding.implementation;
 	}
-	throw Error("No sprocket declared");
+	throw Error('No sprocket declared');
 },
 
 getScope: function(element) {
@@ -1577,7 +1577,7 @@ if (!('hidden' in document.documentElement)) {
 
 	var head = document.head;
 	var fragment = document.createDocumentFragment();
-	var style = document.createElement("style");
+	var style = document.createElement('style');
 	fragment.appendChild(style); // NOTE on IE this realizes style.styleSheet 
 	
 	var cssText = '*[hidden] { display: none; }\n';
@@ -1805,10 +1805,10 @@ var window = this;
 var document = window.document;
 
 
-if (!window.XMLHttpRequest) throw "HyperFrameset requires native XMLHttpRequest";
-if (!window.Meeko || !window.Meeko.sprockets) throw "HyperFrameset requires DOMSprockets"
+if (!window.XMLHttpRequest) throw Error('HyperFrameset requires native XMLHttpRequest');
+if (!window.Meeko || !window.Meeko.sprockets) throw Error('HyperFrameset requires DOMSprockets');
 
-var vendorPrefix = "meeko";
+var vendorPrefix = 'meeko';
 
 var _ = Meeko.stuff; // provided by DOMSprockets
 
@@ -1831,7 +1831,7 @@ var pipe = Promise.pipe;
 var DOM = Meeko.DOM;
 
 var getTagName = function(el) {
-	return el && el.nodeType === 1 ? _.lc(el.tagName) : "";
+	return el && el.nodeType === 1 ? _.lc(el.tagName) : '';
 }
 
 var siblings = function(conf, refNode, conf2, refNode2) {
@@ -1839,9 +1839,9 @@ var siblings = function(conf, refNode, conf2, refNode2) {
 	conf = _.lc(conf);
 	if (conf2) {
 		conf2 = _.lc(conf2);
-		if (conf === 'ending' || conf === 'before') throw 'siblings() startNode looks like stopNode';
-		if (conf2 === 'starting' || conf2 === 'after') throw 'siblings() stopNode looks like startNode';
-		if (!refNode2 || refNode2.parentNode !== refNode.parentNode) throw 'siblings() startNode and stopNode are not siblings';
+		if (conf === 'ending' || conf === 'before') throw Error('siblings() startNode looks like stopNode');
+		if (conf2 === 'starting' || conf2 === 'after') throw Error('siblings() stopNode looks like startNode');
+		if (!refNode2 || refNode2.parentNode !== refNode.parentNode) throw Error('siblings() startNode and stopNode are not siblings');
 	}
 	
 	var nodeList = [];
@@ -1849,15 +1849,15 @@ var siblings = function(conf, refNode, conf2, refNode2) {
 	var node, stopNode, first = refNode.parentNode.firstChild;
 
 	switch (conf) {
-	case "starting": node = refNode; break;
-	case "after": node = refNode.nextSibling; break;
-	case "ending": node = first; stopNode = refNode.nextSibling; break;
-	case "before": node = first; stopNode = refNode; break;
-	default: throw conf + " is not a valid configuration in siblings()";
+	case 'starting': node = refNode; break;
+	case 'after': node = refNode.nextSibling; break;
+	case 'ending': node = first; stopNode = refNode.nextSibling; break;
+	case 'before': node = first; stopNode = refNode; break;
+	default: throw Error(conf + ' is not a valid configuration in siblings()');
 	}
 	if (conf2) switch (conf2) {
-	case "ending": stopNode = refNode2.nextSibling; break;
-	case "before": stopNode = refNode2; break;
+	case 'ending': stopNode = refNode2.nextSibling; break;
+	case 'before': stopNode = refNode2; break;
 	}
 	
 	if (!node) return nodeList; // FIXME is this an error??
@@ -1872,7 +1872,7 @@ var matchesElement = function(selector, node) { // WARN only matches by tagName
 	return (node) ? matcher(node) : matcher;
 }
 var firstChild = function(parent, matcher) { // WARN only matches by tagName or matcher function
-	var fn = (typeof matcher == "function") ? 
+	var fn = (typeof matcher == 'function') ? 
 		matcher : 
 		matchesElement(matcher);
 	var nodeList = parent.childNodes;
@@ -1885,34 +1885,34 @@ var insertNode = function(conf, refNode, node) { // like imsertAdjacentHTML but 
 	var doc = refNode.ownerDocument;
 	if (doc.adoptNode) node = doc.adoptNode(node); // Safari 5 was throwing because imported nodes had been added to a document node
 	switch(conf) {
-	case "beforebegin": refNode.parentNode.insertBefore(node, refNode); break;
-	case "afterend": refNode.parentNode.insertBefore(node, refNode.nextSilbing); break;
-	case "afterbegin": refNode.insertBefore(node, refNode.firstChild); break;
-	case "beforeend": refNode.appendChild(node); break;
-	case "replace": refNode.parentNode.replaceChild(node, refNode);
+	case 'beforebegin': refNode.parentNode.insertBefore(node, refNode); break;
+	case 'afterend': refNode.parentNode.insertBefore(node, refNode.nextSilbing); break;
+	case 'afterbegin': refNode.insertBefore(node, refNode.firstChild); break;
+	case 'beforeend': refNode.appendChild(node); break;
+	case 'replace': refNode.parentNode.replaceChild(node, refNode);
 	}
 	return refNode;
 }
 
 var composeNode = function(srcNode, context) { // document.importNode() NOT available on IE <= 8
 	if (!context) context = document;
-	if (context.nodeType !== 9 && context.nodeType !== 11) throw 'Non-document context in composeNode()';
+	if (context.nodeType !== 9 && context.nodeType !== 11) throw Error('Non-document context in composeNode()');
 	if (srcNode.nodeType != 1) return;
 	var tag = getTagName(srcNode);
 	var node = context.createElement(tag);
 	copyAttributes(node, srcNode);
 	switch(tag) {
-	case "title":
-		if (srcNode.innerHTML === "") node = null;
+	case 'title':
+		if (srcNode.innerHTML === '') node = null;
 		else node.innerText = srcNode.innerHTML;
 		break;
-	case "style":
+	case 'style':
 		var frag = context.createDocumentFragment();
 		frag.appendChild(node);
 		node.styleSheet.cssText = srcNode.styleSheet.cssText;
 		frag.removeChild(node);
 		break;
-	case "script":
+	case 'script':
 		node.text = srcNode.text;
 		break;
 	default: // meta, link, base have no content
@@ -1924,11 +1924,11 @@ var composeNode = function(srcNode, context) { // document.importNode() NOT avai
 
 var textContent = document.documentElement.textContent ?
 function(el, text) { // NOTE https://developer.mozilla.org/en-US/docs/Web/API/Node.textContent#Differences_from_innerText
-	if (typeof text === "undefined") return el.textContent;
+	if (typeof text === 'undefined') return el.textContent;
 	el.textContent = text;
 } :
 function(el, text) {
-	if (typeof text === "undefined") return el.innerText;
+	if (typeof text === 'undefined') return el.innerText;
 	el.innerText = text;
 }
 
@@ -1980,7 +1980,7 @@ var removeAttributes = function(node) {
 }
 
 var createDocument = function() { // modern browsers. IE >= 9
-	var doc = document.implementation.createHTMLDocument("");
+	var doc = document.implementation.createHTMLDocument('');
 	doc.removeChild(doc.documentElement);
 	return doc;
 }
@@ -1995,8 +1995,8 @@ var cloneDocument = function(srcDoc, options) {
 	doc.appendChild(docEl);
 
 	// WARN sometimes IE9 doesn't read the content of inserted <style>
-	_.forEach(DOM.findAll("style", doc), function(node) {
-		if (node.styleSheet && node.styleSheet.cssText == "") node.styleSheet.cssText = node.innerHTML;		
+	_.forEach(DOM.findAll('style', doc), function(node) {
+		if (node.styleSheet && node.styleSheet.cssText == '') node.styleSheet.cssText = node.innerHTML;		
 	});
 	
 	return doc;
@@ -2004,7 +2004,7 @@ var cloneDocument = function(srcDoc, options) {
 
 var importSingleNode = function(srcNode, context) {
 	if (!context) context = document;
-	if (context.nodeType !== 9 && context.nodeType !== 11) throw 'Non-document context for importSingleNode()';
+	if (context.nodeType !== 9 && context.nodeType !== 11) throw Error('Non-document context for importSingleNode()');
 	return context.importNode(srcNode, false);
 }
 
@@ -2018,20 +2018,20 @@ var scrollToId = function(id) { // FIXME this isn't being used
 
 var addEvent = 
 	document.addEventListener && function(node, event, fn) { return node.addEventListener(event, fn, false); } ||
-	document.attachEvent && function(node, event, fn) { return node.attachEvent("on" + event, fn); } ||
-	function(node, event, fn) { node["on" + event] = fn; }
+	document.attachEvent && function(node, event, fn) { return node.attachEvent('on' + event, fn); } ||
+	function(node, event, fn) { node['on' + event] = fn; }
 
 var removeEvent = 
 	document.removeEventListener && function(node, event, fn) { return node.removeEventListener(event, fn, false); } ||
-	document.detachEvent && function(node, event, fn) { return node.detachEvent("on" + event, fn); } ||
-	function(node, event, fn) { if (node["on" + event] == fn) node["on" + event] = null; }
+	document.detachEvent && function(node, event, fn) { return node.detachEvent('on' + event, fn); } ||
+	function(node, event, fn) { if (node['on' + event] == fn) node['on' + event] = null; }
 
 var readyStateLookup = { // used in domReady() and checkStyleSheets()
-	"uninitialized": false,
-	"loading": false,
-	"interactive": false,
-	"loaded": true,
-	"complete": true
+	'uninitialized': false,
+	'loading': false,
+	'interactive': false,
+	'loaded': true,
+	'complete': true
 }
 
 var domReady = (function() { // WARN this assumes that document.readyState is valid or that content is ready...
@@ -2052,8 +2052,8 @@ function processQueue() {
 }
 
 var events = {
-	"DOMContentLoaded": document,
-	"load": window
+	'DOMContentLoaded': document,
+	'load': window
 };
 
 if (!loaded) _.forOwn(events, function(node, type) { addEvent(node, type, onLoaded); });
@@ -2078,7 +2078,7 @@ TODO: does this still work when there are errors loading stylesheets??
 var checkStyleSheets = function() { // TODO would be nice if this didn't need to be polled
 	// check that every <link rel="stylesheet" type="text/css" /> 
 	// has loaded
-	return _.every(DOM.findAll("link"), function(node) {
+	return _.every(DOM.findAll('link'), function(node) {
 		if (!node.rel || !/^stylesheet$/i.test(node.rel)) return true;
 		if (node.type && !/^text\/css$/i.test(node.type)) return true;
 		if (node.disabled) return true;
@@ -2099,9 +2099,9 @@ var checkStyleSheets = function() { // TODO would be nice if this didn't need to
 		catch (error) {
 			// handle Firefox cross-domain
 			switch(error.name) {
-			case "NS_ERROR_DOM_SECURITY_ERR": case "SecurityError":
+			case 'NS_ERROR_DOM_SECURITY_ERR': case 'SecurityError':
 				return true;
-			case "NS_ERROR_DOM_INVALID_ACCESS_ERR": case "InvalidAccessError":
+			case 'NS_ERROR_DOM_INVALID_ACCESS_ERR': case 'InvalidAccessError':
 				return false;
 			default:
 				return true;
@@ -2183,7 +2183,7 @@ var URL = function(str) {
 	this.parse(str);
 }
 
-var keys = ["source","protocol","hostname","port","pathname","search","hash"];
+var keys = ['source','protocol','hostname','port','pathname','search','hash'];
 var parser = /^([^:\/?#]+:)?(?:\/\/([^:\/?#]*)(?::(\d*))?)?([^?#]*)?(\?[^#]*)?(#.*)?$/;
 
 URL.prototype.parse = function parse(str) {
@@ -2286,8 +2286,8 @@ var httpProxy = {
 
 add: function(response) { // NOTE this is only for the landing page
 	var url = response.url;
-	if (!url) throw 'Invalid url in response object';
-	if (!_.contains(responseTypes, response.type)) throw 'Invalid type in response object';
+	if (!url) throw Error('Invalid url in response object');
+	if (!_.contains(responseTypes, response.type)) throw Error('Invalid type in response object');
 	var request = {
 		url: response.url
 	}
@@ -2300,8 +2300,8 @@ load: function(url, requestInfo) {
 	};
 	if (requestInfo) _.defaults(info, requestInfo);
 	_.defaults(info, defaultInfo);
-	if (!_.contains(methods, info.method)) throw 'method not supported: ' + info.method;
-	if (!_.contains(responseTypes, info.responseType)) throw 'responseType not supported: ' + info.responseType;
+	if (!_.contains(methods, info.method)) throw Error('method not supported: ' + info.method);
+	if (!_.contains(responseTypes, info.responseType)) throw Error('responseType not supported: ' + info.responseType);
 	return request(info);
 }
 
@@ -2312,7 +2312,7 @@ var request = function(info) {
 	var method = _.lc(info.method);
 	switch (method) {
 	case 'post':
-		throw "POST not supported"; // FIXME proper error handling
+		throw Error('POST not supported'); // FIXME proper error handling
 		info.body = serialize(info.body, info.type);
 		return doRequest(info);
 		break;
@@ -2326,7 +2326,7 @@ var request = function(info) {
 			});
 		break;
 	default:
-		throw _.uc(method) + ' not supported';
+		throw Error(_.uc(method) + ' not supported');
 		break;
 	}
 }
@@ -2423,8 +2423,8 @@ resolveURL: function(url, baseURL) {
 });
 
 var urlAttributes = {};
-_.forEach(_.words("link@<href script@<src img@<longDesc,<src,+srcset iframe@<longDesc,<src object@<data embed@<src video@<poster,<src audio@<src source@<src,+srcset input@formAction,<src button@formAction,<src a@+ping,href area@href q@cite blockquote@cite ins@cite del@cite form@action"), function(text) {
-	var m = text.split("@"), tagName = m[0], attrs = m[1];
+_.forEach(_.words('link@<href script@<src img@<longDesc,<src,+srcset iframe@<longDesc,<src object@<data embed@<src video@<poster,<src audio@<src source@<src,+srcset input@formAction,<src button@formAction,<src a@+ping,href area@href q@cite blockquote@cite ins@cite del@cite form@action'), function(text) {
+	var m = text.split('@'), tagName = m[0], attrs = m[1];
 	var attrList = urlAttributes[tagName] = {};
 	_.forEach(attrs.split(','), function(attrName) {
 		var downloads = false;
@@ -2495,10 +2495,10 @@ var resolveAll = function(doc, baseURL) {
 function normalize(doc, details) { 
 
 	_.forEach(DOM.findAll('script', doc), function(node) {
-		if (!node.type || /^text\/javascript$/i.test(node.type)) node.type = "text/javascript?disabled";
+		if (!node.type || /^text\/javascript$/i.test(node.type)) node.type = 'text/javascript?disabled';
 	});
 
-	_.forEach(DOM.findAll("style", doc.body), function(node) { // TODO support <style scoped>
+	_.forEach(DOM.findAll('style', doc.body), function(node) { // TODO support <style scoped>
 		doc.head.appendChild(node);
 	});
 
@@ -2537,7 +2537,7 @@ function innerHTMLParser(html, details) {
 		var doc = createHTMLDocument('');
 		var docElement = doc.documentElement;
 		docElement.innerHTML = html;
-		var m = html.match(/<html(?=\s|>)(?:[^>]*)>/i); // WARN this assumes there are no comments containing "<html" and no attributes containing ">".
+		var m = html.match(/<html(?=\s|>)(?:[^>]*)>/i); // WARN this assumes there are no comments containing '<html' and no attributes containing '>'.
 		var div = document.createElement('div');
 		div.innerHTML = m[0].replace(/^<html/i, '<div');
 		var htmlElement = div.firstChild;
@@ -2591,7 +2591,7 @@ var testScript = document.createElement('script'),
 	supportsSync = (testScript.async === true);
 
 this.push = function(node) {
-	if (emptying) throw 'Attempt to append script to scriptQueue while emptying';
+	if (emptying) throw Error('Attempt to append script to scriptQueue while emptying');
 	
 	// TODO assert node is in document
 
@@ -2599,11 +2599,11 @@ this.push = function(node) {
 
 	if (!/^text\/javascript\?disabled$/i.test(node.type)) {
 		completeRe.resolve();
-		logger.info("Unsupported script-type " + node.type);
+		logger.info('Unsupported script-type ' + node.type);
 		return completeFu;
 	}
 
-	var script = document.createElement("script");
+	var script = document.createElement('script');
 
 	// preloadedFu is needed for IE <= 8
 	// On other browsers (and for inline scripts) it is pre-accepted
@@ -2621,7 +2621,7 @@ this.push = function(node) {
 		logger.warn('@defer not supported on scripts');
 	}
 	if (supportsSync && script.src && !hasAttribute(script, 'async')) script.async = false;
-	script.type = "text/javascript";
+	script.type = 'text/javascript';
 	
 	// enabledFu resolves after script is inserted
 	var enabledRe = {}, enabledFu = new Promise(enabledRe); 
@@ -2668,16 +2668,16 @@ this.push = function(node) {
 
 	function addListeners() {
 		if (supportsOnLoad) {
-			addEvent(script, "load", onLoad);
-			addEvent(script, "error", onError);
+			addEvent(script, 'load', onLoad);
+			addEvent(script, 'error', onError);
 		}
 		else addEvent(script, 'readystatechange', onChange);
 	}
 	
 	function removeListeners() {
 		if (supportsOnLoad) {
-			removeEvent(script, "load", onLoad);
-			removeEvent(script, "error", onError);
+			removeEvent(script, 'load', onLoad);
+			removeEvent(script, 'error', onError);
 		}
 		else removeEvent(script, 'readystatechange', onChange);
 	}
@@ -2689,10 +2689,10 @@ this.push = function(node) {
 			return;
 		}
 		switch (readyState) {
-		case "complete":
+		case 'complete':
 			onLoad(e);
 			break;
-		case "loading":
+		case 'loading':
 			onError(e);
 			break;
 		default: break;
@@ -2739,7 +2739,7 @@ var historyManager = (function() {
 
 var historyManager = {};
 
-var stateTag = "HyperFrameset";
+var stateTag = 'HyperFrameset';
 var currentState;
 var popStateHandler;
 var started = false;
@@ -2752,7 +2752,7 @@ getState: function() {
 
 start: function(data, title, url, onNewState, onPopState) { // FIXME this should call onPopState if history.state is defined
 return scheduler.now(function() {
-	if (started) throw 'historyManager has already started';
+	if (started) throw Error('historyManager has already started');
 	started = true;
 	popStateHandler = onPopState;
 	var newState = State.create(data, title, url);
@@ -2803,7 +2803,7 @@ if (history.replaceState) window.addEventListener('popstate', function(e) {
 	}, true);
 
 function State(settings) {
-	if (!settings[stateTag]) throw 'Invalid settings for new State';
+	if (!settings[stateTag]) throw Error('Invalid settings for new State');
 	this.settings = settings;
 }
 
@@ -2828,7 +2828,7 @@ getData: function() {
 update: function(data, callback) {
 	var state = this;
 	return Promise.resolve(function() {
-		if (state !== currentState) throw 'Cannot update state: not current';
+		if (state !== currentState) throw Error('Cannot update state: not current');
 		return scheduler.now(function() {
 			if (history.replaceState) history.replaceState(state.settings, title, url);
 			return callback(state);
@@ -2922,9 +2922,9 @@ var CustomDOM = (function() {
 function CustomDOM(options) {
 	var style = options.style = _.lc(options.style);
 	var styleInfo = CustomDOM.namespaceStyles[style];
-	if (!styleInfo) throw 'Unexpected style: ' + style;
+	if (!styleInfo) throw Error('Unexpected style: ' + style);
 	var ns = options.name = _.lc(options.name);
-	if (!ns) throw 'Unexpected name: ' + ns;
+	if (!ns) throw Error('Unexpected name: ' + ns);
 	
 	var cdom = this;
 	_.assign(cdom, options);
@@ -3323,7 +3323,7 @@ init: function(doc, settings) {
 	_.forEach(frameRefElts, function(el) {
 		var defId = el.getAttribute('def');
 		if (!frameset.frames[defId]) {
-			throw "Hyperframe references non-existant frame #" + defId;
+			throw Error('Hyperframe references non-existant frame #' + defId);
 		}
 		var placeholder = el.cloneNode(false);
 		el.parentNode.replaceChild(placeholder, el);
@@ -3468,7 +3468,7 @@ render: function() {
 		mergeElement(dstBody, srcBody);
 
 		_.forEach(_.toArray(srcBody.childNodes), function(node) {
-			insertNode("beforeend", dstBody, node);
+			insertNode('beforeend', dstBody, node);
 		});
 	}
 
@@ -3482,7 +3482,7 @@ _.defaults(HFrameset, {
 	
 prerender: function(dstDoc, definition) {
 
-	if (getFramesetMarker(dstDoc)) throw "The HFrameset has already been applied";
+	if (getFramesetMarker(dstDoc)) throw Error('The HFrameset has already been applied');
 
 	var srcDoc = cloneDocument(definition.document);
 
@@ -3499,14 +3499,14 @@ prerender: function(dstDoc, definition) {
 	function() {
 		selfMarker = getSelfMarker(dstDoc);
 		if (selfMarker) return;
-		selfMarker = dstDoc.createElement("link");
+		selfMarker = dstDoc.createElement('link');
 		selfMarker.rel = selfRel;
 		selfMarker.href = dstDoc.URL;
 		dstDoc.head.insertBefore(selfMarker, dstDoc.head.firstChild);
 	},
 
 	function() {
-		var framesetMarker = dstDoc.createElement("link");
+		var framesetMarker = dstDoc.createElement('link');
 		framesetMarker.rel = framesetRel;
 		framesetMarker.href = definition.src;
 		dstDoc.head.insertBefore(framesetMarker, selfMarker);
@@ -3518,7 +3518,7 @@ prerender: function(dstDoc, definition) {
 		mergeHead(dstDoc, srcDoc.head, true);
 		// allow scripts to run. FIXME scripts should always be appended to document.head
 		var forScripts = [];
-		_.forEach(DOM.findAll("script", dstDoc.head), function(script) {
+		_.forEach(DOM.findAll('script', dstDoc.head), function(script) {
 			var forAttr = script.getAttribute('for');
 			if (forAttr) { // TODO possibly we want to evaluate forScripts in document order
 				forScripts.push(script);
@@ -3565,15 +3565,15 @@ prerender: function(dstDoc, definition) {
 function separateHead(dstDoc, isFrameset) {
 	var dstHead = dstDoc.head;
 	var framesetMarker = getFramesetMarker(dstDoc);
-	if (!framesetMarker) throw 'No ' + framesetRel + ' marker found. ';
+	if (!framesetMarker) throw Error('No ' + framesetRel + ' marker found. ');
 
 	var selfMarker = getSelfMarker(dstDoc);
 	// remove frameset / page elements except for <script type=text/javascript>
-	if (isFrameset) _.forEach(siblings("after", framesetMarker, "before", selfMarker), remove);
-	else _.forEach(siblings("after", selfMarker), remove);
+	if (isFrameset) _.forEach(siblings('after', framesetMarker, 'before', selfMarker), remove);
+	else _.forEach(siblings('after', selfMarker), remove);
 	
 	function remove(node) {
-		if (getTagName(node) == "script" && (!node.type || node.type.match(/^text\/javascript/i))) return;
+		if (getTagName(node) == 'script' && (!node.type || node.type.match(/^text\/javascript/i))) return;
 		dstHead.removeChild(node);
 	}
 }
@@ -3582,7 +3582,7 @@ function mergeHead(dstDoc, srcHead, isFrameset) {
 	var baseURL = URL(dstDoc.URL);
 	var dstHead = dstDoc.head;
 	var framesetMarker = getFramesetMarker();
-	if (!framesetMarker) throw 'No ' + framesetRel + ' marker found. ';
+	if (!framesetMarker) throw Error('No ' + framesetRel + ' marker found. ');
 	var selfMarker = getSelfMarker();
 
 	separateHead(dstDoc, isFrameset);
@@ -3590,24 +3590,24 @@ function mergeHead(dstDoc, srcHead, isFrameset) {
 	_.forEach(_.toArray(srcHead.childNodes), function(srcNode) {
 		if (srcNode.nodeType != 1) return;
 		switch (getTagName(srcNode)) {
-		case "title":
+		case 'title':
 			if (isFrameset) return; // ignore <title> in frameset. FIXME what if topic content has no <title>?
 			if (!srcNode.innerHTML) return; // IE will add a title even if non-existant
 			break;
-		case "link": // FIXME no duplicates @rel, @href pairs
+		case 'link': // FIXME no duplicates @rel, @href pairs
 			break;
-		case "meta": // FIXME no duplicates, warn on clash
+		case 'meta': // FIXME no duplicates, warn on clash
 			if (srcNode.httpEquiv) return;
 			if (/^\s*viewport\s*$/i.test(srcNode.name)) srcNode = composeNode(srcNode); // TODO Opera mobile was crashing. Is there another way to fix this?
 			break;
-		case "style": 
+		case 'style': 
 			break;
-		case "script":  // FIXME no duplicate @src
+		case 'script':  // FIXME no duplicate @src
 			break;
 		}
 		if (isFrameset) insertNode('beforebegin', selfMarker, srcNode);
 		else insertNode('beforeend', dstHead, srcNode);
-		if (getTagName(srcNode) == "link") srcNode.href = srcNode.getAttribute("href"); // Otherwise <link title="..." /> stylesheets don't work on Chrome
+		if (getTagName(srcNode) == 'link') srcNode.href = srcNode.getAttribute('href'); // Otherwise <link title="..." /> stylesheets don't work on Chrome
 	});
 }
 
@@ -3624,7 +3624,7 @@ function getFramesetMarker(doc) {
 	if (!doc) doc = document;
 	var marker = firstChild(doc.head, function(el) {
 		return el.nodeType == 1 &&
-			getTagName(el) == "link" &&
+			getTagName(el) == 'link' &&
 			framesetRelRegex.test(el.rel);
 	});
 	return marker;
@@ -3635,7 +3635,7 @@ function getSelfMarker(doc) {
 	if (!doc) doc = document;
 	var marker = firstChild(doc.head, function(el) {
 		return el.nodeType == 1 &&
-			getTagName(el) == "link" &&
+			getTagName(el) == 'link' &&
 			selfRelRegex.test(el.rel);
 	});
 	return marker;
@@ -3659,24 +3659,24 @@ var notify = function(msg) { // FIXME this isn't being used called everywhere it
 	if (handler[msg.stage]) listener = handler[msg.stage];
 
 	else switch(msg.module) {
-	case "frame":
-		listener =	(msg.type == "leaving") ?
-			(msg.stage == "before") ? handler : null :
-			(msg.stage == "after") ? handler : null;
+	case 'frame':
+		listener =	(msg.type == 'leaving') ?
+			(msg.stage == 'before') ? handler : null :
+			(msg.stage == 'after') ? handler : null;
 		break;
-	case "frameset":
-		listener = (msg.type == "leaving") ?
-			(msg.stage == "before") ? handler : null :
-			(msg.stage == "after") ? handler : null;
+	case 'frameset':
+		listener = (msg.type == 'leaving') ?
+			(msg.stage == 'before') ? handler : null :
+			(msg.stage == 'after') ? handler : null;
 		break;
 	default:
-		throw msg.module + " is invalid module";
+		throw Error(msg.module + ' is invalid module');
 		break;
 	}
 
-	if (typeof listener == "function") {
+	if (typeof listener == 'function') {
 		var promise = asap(function() { listener(msg); }); // TODO isFunction(listener)
-		promise['catch'](function(err) { throw err; });
+		promise['catch'](function(err) { throw Error(err); });
 		return promise;
 	}
 	else return Promise.resolve();
@@ -3694,8 +3694,8 @@ started: false,
 start: function(startOptions) {
 	var framer = this;
 	
-	if (framer.started) throw "Already started";
-	if (!startOptions || !startOptions.contentDocument) throw "No contentDocument passed to start()";
+	if (framer.started) throw Error('Already started');
+	if (!startOptions || !startOptions.contentDocument) throw Error('No contentDocument passed to start()');
 
 	framer.started = true;
 	startOptions.contentDocument
@@ -3724,7 +3724,7 @@ start: function(startOptions) {
 	},
 
 	function(framerConfig) { // initiate fetch of framesetURL
-		if (!framerConfig) throw "No frameset could be determined for this page";
+		if (!framerConfig) throw Error('No frameset could be determined for this page');
 		framer.scope = framerConfig.scope; // FIXME shouldn't set this until loadFramesetDefinition() returns success
 		framer.framesetURL = framerConfig.framesetURL;
 		return httpProxy.load(framerConfig.framesetURL, { responseType: 'document' })
@@ -3881,7 +3881,7 @@ onClick: function(e) { // return false means success
 		if (!hyperlink) hyperlink = DOM.closest('a', linkElement);
 		if (!hyperlink) return;
 	}
-	var href = hyperlink.getAttribute("href");
+	var href = hyperlink.getAttribute('href');
 	if (!href) return; // not really a hyperlink
 
 	var baseURL = URL(document.URL);
@@ -3946,7 +3946,7 @@ triggerRequestNavigation: function(url, details) {
 
 onRequestNavigation: function(e, frame) { // `return false` means success (so preventDefault)
 	var framer = this;
-	if (!frame) throw 'Invalid frame / frameset in onRequestNavigation';
+	if (!frame) throw Error('Invalid frame / frameset in onRequestNavigation');
 	// NOTE only pushState enabled browsers use this
 	// We want panning to be the default behavior for clicks on hyperlinks - <a href>
 	// Before panning to the next page, have to work out if that is appropriate
@@ -4086,7 +4086,7 @@ lookup: function(docURL) {
 
 	// FIXME error if `result` is a relative URL
 	if (typeof result === 'string') result = implyFramesetScope(result, docURL);
-	if (typeof result !== 'object' || !result.scope || !result.framesetURL) throw 'Unexpected result from frameset lookup';
+	if (typeof result !== 'object' || !result.scope || !result.framesetURL) throw Error('Unexpected result from frameset lookup');
 	return result;
 },
 
@@ -4098,7 +4098,7 @@ detect: function(srcDoc) {
 
 	// FIXME error if `result` is a relative URL
 	if (typeof result === 'string') result = implyFramesetScope(result, document.URL);
-	if (typeof result !== 'object' || !result.scope || !result.framesetURL) throw 'Unexpected result from frameset detect';
+	if (typeof result !== 'object' || !result.scope || !result.framesetURL) throw Error('Unexpected result from frameset detect');
 	return result;
 },
 
@@ -4149,7 +4149,7 @@ function inferChangeset(url, partial) {
 		}
 		*/
 	default:
-		throw 'Invalid changeset returned from lookup()';
+		throw Error('Invalid changeset returned from lookup()');
 		break;
 	}
 	
@@ -4258,7 +4258,7 @@ loadTemplate: function(template) {
 		switch (node.nodeType) {
 		case 1: // Element
 			switch (getTagName(node)) {
-			case "script":
+			case 'script':
 				if (script) logger.warn('Ignoring secondary <script> in "script" transform template');
 				else script = node;
 				return;
