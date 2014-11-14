@@ -4539,8 +4539,11 @@ evaluate: function(query, context, variables, type) {
 	case 'node': // expr:.html
 		switch(attr) {
 		case null: case undefined: case '': return node;
-		case htmlAttr: return node.innerHTML;
 		case textAttr: return textContent(node);
+		case htmlAttr:
+			var frag = document.createDocumentFragment(); // FIXME which document??
+			_.forEach(node.childNodes, function(child) { frag.appendChild(child.cloneNode(true)); });
+			return frag;
 		default: return node.getAttribute(attr);
 		}
 	default: return node; // TODO shouldn't this be an error / warning??
