@@ -3077,17 +3077,20 @@ init: function(el) {
 	// FIXME create fallback bodies
 },
 
-render: function(resource, condition) {
+render: function(resource, condition, details) {
 	var frameDef = this;
 	var frameset = frameDef.frameset;
 	var cdom = frameset.cdom;
-	var options = {
+	if (!details) details = {};
+	_.assign(details, { // TODO more details??
+		scope: framer.scope,
+		url: resource && resource.url,
 		mainSelector: frameDef.mainSelector,
 		type: frameDef.type
-	}
+	});
 	var bodyDef = _.find(frameDef.bodies, function(body) { return body.condition === condition;});
 	if (!bodyDef) return; // FIXME what to do here??
-	return bodyDef.render(resource, condition, options);
+	return bodyDef.render(resource, details);
 }
 
 	
@@ -3149,7 +3152,7 @@ init: function(el) {
 	}
 },
 
-render: function(resource, condition, options) {
+render: function(resource, details) {
 	var bodyDef = this;
 	var frameset = bodyDef.frameset;
 	var cdom = frameset.cdom;
@@ -3161,9 +3164,9 @@ render: function(resource, condition, options) {
 	var doc = resource.document; // FIXME what if resource is a Request?
 	if (!doc) return null;
 	fragment = doc;
-	if (options.mainSelector) fragment = DOM.find(options.mainSelector, doc);
+	if (details.mainSelector) fragment = DOM.find(details.mainSelector, doc);
 	_.forEach(bodyDef.transforms, function(transform) {
-		fragment = transform.process(fragment);
+		fragment = transform.process(fragment, details);
 	});
 	var el = bodyDef.element.cloneNode(false);
 	el.appendChild(fragment);
@@ -3203,7 +3206,7 @@ init: function(el) {
 	processor.loadTemplate(frag);
 },
 
-process: function(srcNode) {
+process: function(srcNode, details) {
 	var transform = this;
 	var frameset = transform.frameset;
 	var cdom = frameset.cdom;
@@ -3216,7 +3219,7 @@ process: function(srcNode) {
 		srcNode: srcNode
 	}
 	var processor = transform.processor;
-	var output = processor.transform(decoder);
+	var output = processor.transform(decoder, details);
 	return output;
 }
 
@@ -4226,7 +4229,7 @@ loadTemplate: function(template) {
 	if (/\S+/.test(textContent(template))) logger.warn('"main" transforms do not use templates');
 },
 
-transform: function(provider) {
+transform: function(provider, details) { // TODO how to use details?
 	var frag = document.createDocumentFragment();
 	var srcDoc = provider.srcNode;
 	var srcNode;
@@ -4290,14 +4293,14 @@ loadTemplate: function(template) {
 	}
 },
 
-transform: function(provider) {
+transform: function(provider, details) {
 	var srcNode = provider.srcNode;
 	var processor = this.processor;
 	if (!this.processor || !this.processor.transform) {
 		logger.warn('"script" transform template did not produce valid transform object');
 		return;
 	}
-	return this.processor.transform(srcNode);
+	return this.processor.transform(srcNode, details);
 }
 	
 });
@@ -4340,7 +4343,7 @@ loadTemplate: function(template) {
 	this.template = template;
 },
 
-transform: function(provider) {
+transform: function(provider, details) { // TODO how to use details
 	var clone = this.template.cloneNode(true);
 	return transformNode(clone, provider, null, {});
 }
@@ -4535,7 +4538,8 @@ evaluate: function(query, context, variables, type) {
 		}
 	case 'node': // expr:.html
 		switch(attr) {
-		case null: case undefined: case '': case htmlAttr: return node;
+		case null: case undefined: case '': return node;
+		case htmlAttr: return node.innerHTML;
 		case textAttr: return textContent(node);
 		default: return node.getAttribute(attr);
 		}
