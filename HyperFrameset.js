@@ -1800,11 +1800,10 @@ ariaClosest: function(role) {
     + Up-front feature testing to prevent boot on unsupportable platorms...
         e.g. can't create HTML documents
     + use requestAnimationFrame() when available
+    + The passing of nodes between documents needs to be audited.
+		Safari and IE10,11 in particular seem to require nodes to be imported / adopted
+		(not fully understood right now)
  */
-
-// WARN for IE7, IE8 sometimes XMLHttpRequest is in a detectable but not callable state
-// This is usually fixed by refreshing, or by the following DISABLED work-around.
-// var XMLHttpRequest = window.XMLHttpRequest; 
 
 (function() {
 
@@ -2351,7 +2350,7 @@ return new Promise(function(resolve, reject) {
 	function onchange() {
 		if (xhr.readyState != 4) return;
 		if (xhr.status != 200) { // FIXME what about other status codes?
-			reject(xhr.status); // FIXME what should status be??
+			reject(function() { throw Error('Unexpected status for XMLHttpRequest :' + xhr.status); });
 			return;
 		}
 		asap(onload); // Use delay to stop the readystatechange event interrupting other event handlers (on IE). 
@@ -2670,7 +2669,7 @@ this.push = function(node) {
 	function onError(e) {
 		removeListeners();
 		spliceItem(queue, current);
-		completeRe.reject('NetworkError'); // FIXME throw DOMError()
+		completeRe.reject(function() { throw Error('Script loading failed'); }); // FIXME throw NetworkError()
 	}
 
 	function addListeners() {
@@ -2902,7 +2901,7 @@ return new Promise(function(resolve, reject) {
 	if (max == null) max = maxSize;
 	if (queue.length > max || (queue.length === max && processing)) {
 		if (fail) asap(fail).then(resolve, reject);
-		else reject();
+		else reject(function() { throw Error('No `fail` callback passed to whenever()'); });
 		return;
 	}
 	queue.push({ fn: fn, resolve: resolve, reject: reject });
