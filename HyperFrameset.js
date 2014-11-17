@@ -2297,6 +2297,8 @@ add: function(response) { // NOTE this is only for the landing page
 	var request = {
 		url: response.url
 	}
+	_.defaults(request, defaultInfo);
+	response.document = normalize(response.document, request);
 	cacheAdd(request, response);
 },
 
