@@ -4468,8 +4468,8 @@ function evalExpression(expr, provider, context, variables, type) { // FIXME rob
 		if (value && value.nodeType) value = textContent(value);
 		break;
 	case 'node':
-		var frag = document.createDocumentFragment();
-		if (value && value.nodeType) frag.appendChild(value.cloneNode(true));
+		var frag = document.createDocumentFragment(); // FIXME which document
+		if (value && value.nodeType) frag.appendChild(document.importNode(value, true));
 		else {
 			var div = document.createElement('div');
 			div.innerHTML = value;
@@ -4542,7 +4542,7 @@ evaluate: function(query, context, variables, type) {
 		case textAttr: return textContent(node);
 		case htmlAttr:
 			var frag = document.createDocumentFragment(); // FIXME which document??
-			_.forEach(node.childNodes, function(child) { frag.appendChild(child.cloneNode(true)); });
+			_.forEach(node.childNodes, function(child) { frag.appendChild(document.importNode(child, true)); });
 			return frag;
 		default: return node.getAttribute(attr);
 		}
