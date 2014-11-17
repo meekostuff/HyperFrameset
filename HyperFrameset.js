@@ -2593,7 +2593,6 @@ var queue = [],
 	emptying = false;
 
 var testScript = document.createElement('script'),
-	supportsOnLoad = (testScript.setAttribute('onload', ';'), typeof testScript.onload === 'function'),
 	supportsSync = (testScript.async === true);
 
 this.push = function(node) {
@@ -2604,20 +2603,15 @@ return new Promise(function(resolve, reject) {
 
 	if (!/^text\/javascript\?disabled$/i.test(node.type)) {
 		logger.info('Unsupported script-type ' + node.type);
-		resolve();
+		resolve(); // TODO should this be reject() ??
 		return;
 	}
 
 	var script = document.createElement('script');
 
-	// preloadedFu is needed for IE <= 8
-	// On other browsers (and for inline scripts) it is pre-accepted
-	var preloadedFu = new Promise(); 
-	if (!node.src || supportsOnLoad) preloadedFu.resolve(); // WARN must use `node.src` because attrs not copied to `script` yet
 	if (node.src) addListeners(); // WARN must use `node.src` because attrs not copied to `script` yet
 	
 	copyAttributes(script, node); 
-
 	scriptText(script, scriptText(node));
 
 	if (script.getAttribute('defer')) { // @defer is not appropriate. Implement as @async
@@ -2651,9 +2645,6 @@ return new Promise(function(resolve, reject) {
 
 	// The following are hoisted
 	function enable() {
-		preloadedFu.then(_enable, function(err) { logger.error('Script preloading failed'); });
-	}
-	function _enable() {
 		insertNode('replace', node, script);
 		enabledFu.resolve(); 
 		if (!script.src) {
@@ -2675,38 +2666,15 @@ return new Promise(function(resolve, reject) {
 	}
 
 	function addListeners() {
-		if (supportsOnLoad) {
-			addEvent(script, 'load', onLoad);
-			addEvent(script, 'error', onError);
-		}
-		else addEvent(script, 'readystatechange', onChange);
+		addEvent(script, 'load', onLoad);
+		addEvent(script, 'error', onError);
 	}
 	
 	function removeListeners() {
-		if (supportsOnLoad) {
-			removeEvent(script, 'load', onLoad);
-			removeEvent(script, 'error', onError);
-		}
-		else removeEvent(script, 'readystatechange', onChange);
+		removeEvent(script, 'load', onLoad);
+		removeEvent(script, 'error', onError);
 	}
 	
-	function onChange(e) { // for IE <= 8 which don't support script.onload
-		var readyState = script.readyState;
-		if (!script.parentNode) {
-			if (readyState === 'loaded') preloadedRe.resolve(); 
-			return;
-		}
-		switch (readyState) {
-		case 'complete':
-			onLoad(e);
-			break;
-		case 'loading':
-			onError(e);
-			break;
-		default: break;
-		}	
-	}
-
 	function spliceItem(a, item) {
 		for (var n=a.length, i=0; i<n; i++) {
 			if (a[i] !== item) continue;
