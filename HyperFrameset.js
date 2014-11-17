@@ -2597,24 +2597,23 @@ var testScript = document.createElement('script'),
 	supportsSync = (testScript.async === true);
 
 this.push = function(node) {
+return new Promise(function(resolve, reject) {
 	if (emptying) throw Error('Attempt to append script to scriptQueue while emptying');
 	
 	// TODO assert node is in document
 
-	var completeRe = {}, completeFu = new Promise(completeRe);
-
 	if (!/^text\/javascript\?disabled$/i.test(node.type)) {
-		completeRe.resolve();
 		logger.info('Unsupported script-type ' + node.type);
-		return completeFu;
+		resolve();
+		return;
 	}
 
 	var script = document.createElement('script');
 
 	// preloadedFu is needed for IE <= 8
 	// On other browsers (and for inline scripts) it is pre-accepted
-	var preloadedRe = {}, preloadedFu = new Promise(preloadedRe); 
-	if (!node.src || supportsOnLoad) preloadedRe.resolve(); // WARN must use `node.src` because attrs not copied to `script` yet
+	var preloadedFu = new Promise(); 
+	if (!node.src || supportsOnLoad) preloadedFu.resolve(); // WARN must use `node.src` because attrs not copied to `script` yet
 	if (node.src) addListeners(); // WARN must use `node.src` because attrs not copied to `script` yet
 	
 	copyAttributes(script, node); 
@@ -2630,7 +2629,7 @@ this.push = function(node) {
 	script.type = 'text/javascript';
 	
 	// enabledFu resolves after script is inserted
-	var enabledRe = {}, enabledFu = new Promise(enabledRe); 
+	var enabledFu = new Promise(); 
 	
 	var prev = queue[queue.length - 1], prevScript = prev && prev.script;
 
@@ -2643,9 +2642,12 @@ this.push = function(node) {
 	
 	triggerFu.then(enable, enable);
 
+	var completeFu = new Promise();
+	completeFu.then(resolve, reject);
+
 	var current = { script: script, complete: completeFu, enabled: enabledFu };
 	queue.push(current);
-	return completeFu;
+	return;
 
 	// The following are hoisted
 	function enable() {
@@ -2653,23 +2655,23 @@ this.push = function(node) {
 	}
 	function _enable() {
 		insertNode('replace', node, script);
-		enabledRe.resolve(); 
+		enabledFu.resolve(); 
 		if (!script.src) {
 			spliceItem(queue, current);
-			completeRe.resolve();
+			completeFu.resolve();
 		}
 	}
 	
 	function onLoad(e) {
 		removeListeners();
 		spliceItem(queue, current);
-		completeRe.resolve();
+		completeFu.resolve();
 	}
 
 	function onError(e) {
 		removeListeners();
 		spliceItem(queue, current);
-		completeRe.reject(function() { throw Error('Script loading failed'); }); // FIXME throw NetworkError()
+		completeFu.reject(function() { throw Error('Script loading failed'); }); // FIXME throw NetworkError()
 	}
 
 	function addListeners() {
@@ -2713,6 +2715,7 @@ this.push = function(node) {
 		}
 	}
 
+});
 }
 
 this.empty = function() {
