@@ -1781,7 +1781,8 @@ ariaClosest: function(role) {
 })();
 
 
-})(window);/*!
+})(window);
+/*!
  * HyperFrameset
  * Copyright 2009-2014 Sean Hogan (http://meekostuff.net/)
  * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
@@ -3373,6 +3374,8 @@ var HFrame = (function() {
 
 var HFrame = sprockets.evolve(sprockets.RoleType, {
 
+role: 'frame',
+
 init: function() {
 	var frame = this;
 	_.defaults(frame, {
@@ -3440,6 +3443,7 @@ var HFrameset = (function() {
 	
 var HFrameset = sprockets.evolve(sprockets.RoleType, {
 
+role: 'frameset',
 isFrameset: true,
 
 init: function() {
