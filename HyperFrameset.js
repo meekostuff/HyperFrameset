@@ -4356,17 +4356,17 @@ function transform(el, provider, context, variables) {
 	
 	var haz_if = hazAttr(el, 'if');
 	var haz_unless = hazAttr(el, 'unless');
-	var haz_forEach = hazAttr(el, 'for-each');
+	var haz_each = hazAttr(el, 'each');
 
-	if (haz_forEach === false) {
+	if (haz_each === false) {
 		return processNode(el, provider, context, variables); // NOTE return value === el
 	}
 	
-	// handle for-each
+	// handle each
 	var haz_var = hazAttr(el, 'var');
 	
 	var subVars = _.defaults({}, variables);
-	var subContexts = provider.evaluate(haz_forEach, context, variables, 'array');
+	var subContexts = provider.evaluate(haz_each, context, variables, 'array');
 	var result = document.createDocumentFragment(); // FIXME which is the right doc to create this frag in??
 	
 	_.forEach(subContexts, function(subContext) {
@@ -4514,7 +4514,7 @@ evaluate: function(query, context, variables, type) {
 	var queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
 	var selector = queryParts[1];
 	var attr = queryParts[2];
-	if (type === 'array') { // haz:for-each
+	if (type === 'array') { // haz:each
 		if (attr) logger.warn('Ignoring attribute selector because evaluate() requested array');
 		return findAll(context, selector, variables);
 	}
