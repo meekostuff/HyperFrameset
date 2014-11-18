@@ -8,6 +8,8 @@ HyperFrameset is a light-weight Javascript [transclusion](http://en.wikipedia.or
 and layout engine which runs in the browser.
 Whilst the implementation relies on AJAX and `history.pushState`,
 conceptually the design is an evolution of HTMLFramesets.
+The primary advance is that the landing page initiates loading of
+the frameset document, not the other way round. 
 
 **WARNING:** THIS PROJECT IS ALPHA SOFTWARE. ONLY USE IT FOR EXPERIMENTATION.
 
