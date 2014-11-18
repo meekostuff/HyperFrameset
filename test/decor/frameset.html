@@ -4,6 +4,7 @@
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <link rel="stylesheet" href="frameset.css" />
 <style>
+.not-found { background: url( "not-found(1).gif" ); } /* Tests <style> url resolving. Inspect DOM manually. TODO visual test */
 .remove { background-color: red; color: white; }
 .noframeset { border: 2px solid blue; }
 *[id] { margin: 0.5em; border: 1px dashed black; }
@@ -16,7 +17,7 @@ body { background-color: #ffffff; }
 nav ul { margin: 0; padding: 0; }
 nav li { display: inline; list-style: outside none; margin: 0.1em; padding: 0.25em 1em; background-color: #dddddd; }
 #panner { background-color: #77ff77; color: #ffffff; text-align: center; }
-.hidden { display: none; }
+
 </style>
 <script for="hf-frameset">
 ({
@@ -25,7 +26,7 @@ nav li { display: inline; list-style: outside none; margin: 0.1em; padding: 0.25
 </script>
 <script for="hf-frame">
 ({
-	entering: function(msg) { document.getElementById('panner').className = ''; }
+	entering: function(msg) { document.getElementById('panner').hidden = false; }
 })
 </script>
 </head>
@@ -45,7 +46,7 @@ nav li { display: inline; list-style: outside none; margin: 0.1em; padding: 0.25
 <!-- #hf_top encapsulates #hf_main -->		
 <hr />
 
-<p id="panner" class="hidden"><b>pushState Assisted Navigation</b> is active</p>
+<p id="panner" hidden><b>pushState Assisted Navigation</b> is active</p>
 
 <div class="style-fail" style="background-color: red;">
 If you can see this then &lt;style&gt; elements
