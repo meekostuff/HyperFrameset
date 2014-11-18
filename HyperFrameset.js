@@ -1967,6 +1967,11 @@ function legacy(el, val) { // really old non-IE
 
 })();
 	
+function styleText(node, text) { // TODO IE <style> can have `.sheet` independent of `.textContent` (but probably not for parsed documents)
+	if (typeof text === 'undefined') return node.textContent;
+	node.textContent = text;
+}
+
 var hasAttribute = function(node, attrName) { // WARN needs to be more complex for IE <= 7
 	return node.hasAttribute(attrName);
 }
@@ -2502,6 +2507,8 @@ var resolveAll = function(doc, baseURL) {
 */
 function normalize(doc, details) { 
 
+	var baseURL = URL(details.url);
+
 	_.forEach(DOM.findAll('script', doc), function(node) {
 		if (!node.type || /^text\/javascript$/i.test(node.type)) node.type = 'text/javascript?disabled';
 	});
@@ -2509,13 +2516,24 @@ function normalize(doc, details) {
 	_.forEach(DOM.findAll('style', doc.body), function(node) { // TODO support <style scoped>
 		doc.head.appendChild(node);
 	});
+	
+	_.forEach(DOM.findAll('style', doc.head), function(node) {
+		// TODO the following rewrites url() property values but isn't robust
+		var text = styleText(node);
+		var replacements = 0;
+		text = text.replace(/\burl\(\s*(['"]?)([^\r\n]*)\1\s*\)/ig, function(match, quote, url) {
+				absURL = baseURL.resolve(url);
+				if (absURL === url) return match;
+				replacements++;
+				return "url(" + quote + absURL + quote + ")";
+			});
+		if (replacements) styleText(node, text);
+	});
 
-	var baseURL = URL(details.url);
 	resolveAll(doc, baseURL, false);
 
 	return doc;	
 }
-
 
 var HTMLParser = Meeko.HTMLParser = (function() {
 
