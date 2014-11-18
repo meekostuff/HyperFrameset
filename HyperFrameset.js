@@ -1583,7 +1583,7 @@ Object.defineProperty(Element.prototype, '$', {
 if (!('hidden' in document.documentElement)) {
 
 	var head = document.head;
-	// NOTE on <=IE9 this needs a styleSheet work-around
+	// NOTE on <=IE8 this needs a styleSheet work-around
 	var style = document.createElement('style');
 	
 	var cssText = '*[hidden] { display: none; }\n';
@@ -2925,6 +2925,13 @@ function CustomDOM(options) {
 	cdom.selectorPrefix = cdom.name + (separator === ':' ? '\\:' : separator);
 }
 
+_.defaults(CustomDOM.prototype, {
+
+mkTagName: function(name) { return this.prefix + name; },
+mkSelector: function(name) { return this.selectorPrefix + name; }
+
+});
+
 CustomDOM.separator = {
 	'vendor': '-',
 	'xml': ':'
@@ -3058,7 +3065,7 @@ init: function(el) {
 			return;
 		}
 		if (_.contains(hfHeadTags, tag)) return; // ignore typical <head> elements
-		if (tag === cdom.prefix + 'body') {
+		if (tag === cdom.mkTagName('body')) {
 			el.removeChild(node);
 			bodies.push(new HBodyDefinition(node, frameset));
 			return;
@@ -3134,7 +3141,7 @@ init: function(el) {
 		transforms: []
 	});
 	_.forEach(_.toArray(el.childNodes), function(node) {
-		if (getTagName(node) === cdom.prefix + 'transform') {
+		if (getTagName(node) === cdom.mkTagName('transform')) {
 			el.removeChild(node);
 			bodyDef.transforms.push(new HTransformDefinition(node, frameset));
 		}	
@@ -3287,7 +3294,7 @@ init: function(doc, settings) {
 	body.parentNode.removeChild(body);
 	frameset.document = doc;
 	frameset.element = body;
-	var frameElts = DOM.findAll(cdom.selectorPrefix + 'frame', body);
+	var frameElts = DOM.findAll(cdom.mkSelector('frame'), body);
 	var frameRefElts = [];
 	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
 		// NOTE first rebase @src with scope: urls
@@ -3327,7 +3334,6 @@ init: function(doc, settings) {
 
 render: function() {
 	var frameset = this;
-	var cdom = frameset.cdom;
 	return frameset.element.cloneNode(true);
 }
 
@@ -3537,12 +3543,12 @@ prerender: function(dstDoc, definition) {
 			}
 			catch(err) { return; } // FIXME log a warning
 			
-			var nsPrefix = definition.cdom.prefix;
+			var cdom = definition.cdom;
 			switch(forAttr) {
-			case nsPrefix + 'frameset':
+			case cdom.mkTagName('frameset'):
 				definition.config(forOptions);
 				break;
-			case nsPrefix + 'frame':
+			case cdom.mkTagName('frame'):
 				_.assign(HFrameDefinition.options, forOptions);
 				break;
 			default:
@@ -3788,7 +3794,7 @@ start: function(startOptions) {
 			
 			});
 
-		sprockets.registerComponent(framer.definition.cdom.selectorPrefix + 'frame', HFrame, {
+		sprockets.registerComponent(framer.definition.cdom.mkSelector('frame'), HFrame, {
 			callbacks: {
 				attached: function() {
 					var frame = this;
@@ -3801,7 +3807,7 @@ start: function(startOptions) {
 					whenVisible(frame.element)
 					.then(function() {
 						var parentFrame;
-						var parent = DOM.closest(frame.element.parentNode, framer.definition.cdom.selectorPrefix + 'frame');
+						var parent = DOM.closest(frame.element.parentNode, framer.definition.cdom.mkSelector('frame'));
 						if (parent) parentFrame = HFrame(parent);
 						else {
 							parent = document.body; // TODO  should this be closest(frame.element.parentNode, 'body'); 
