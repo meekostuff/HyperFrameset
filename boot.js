@@ -521,14 +521,16 @@ var inlineTags = words(bootOptions['html5_inline_elements']);
 function addStyles() {
 	if (blockTags.length <= 0) return; // FIXME add a test for html5 support. TODO what about inline tags?
 
-	var head = document.head;
-	var fragment = document.createDocumentFragment();
-	var style = document.createElement("style");
-	fragment.appendChild(style); // NOTE on IE this realizes style.styleSheet 
-	
 	var cssText = blockTags.join(', ') + ' { display: block; }\n';
-	if (style.styleSheet) style.styleSheet.cssText = cssText;
-	else style.textContent = cssText;
+
+	var head = document.head;
+	var style = document.createElement("style");
+	if ('textContent' in style) style.textContent = cssText; // standard: >=IE9
+	else { // legacy: <=IE8
+		var fragment = document.createDocumentFragment();
+		fragment.appendChild(style); // NOTE on IE this realizes style.styleSheet 
+		style.styleSheet.cssText = cssText;
+	}
 	
 	head.insertBefore(style, head.firstChild);
 }

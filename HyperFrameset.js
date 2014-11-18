@@ -1583,13 +1583,11 @@ Object.defineProperty(Element.prototype, '$', {
 if (!('hidden' in document.documentElement)) {
 
 	var head = document.head;
-	var fragment = document.createDocumentFragment();
+	// NOTE on <=IE9 this needs a styleSheet work-around
 	var style = document.createElement('style');
-	fragment.appendChild(style); // NOTE on IE this realizes style.styleSheet 
 	
 	var cssText = '*[hidden] { display: none; }\n';
-	if (style.styleSheet) style.styleSheet.cssText = cssText;
-	else style.textContent = cssText;
+	style.textContent = cssText;
 	
 	head.insertBefore(style, head.firstChild);
 
@@ -1913,13 +1911,10 @@ var composeNode = function(srcNode, context) { // document.importNode() NOT avai
 		else node.innerText = srcNode.innerHTML;
 		break;
 	case 'style':
-		var frag = context.createDocumentFragment();
-		frag.appendChild(node);
-		node.styleSheet.cssText = srcNode.styleSheet.cssText;
-		frag.removeChild(node);
+		styleText(node, styleText(srcNode));
 		break;
 	case 'script':
-		node.text = srcNode.text;
+		scriptText(node, scriptText(srcNode));
 		break;
 	default: // meta, link, base have no content
 		// FIXME what to do with <base>?
@@ -2005,9 +2000,9 @@ var cloneDocument = function(srcDoc, options) {
 	var docEl = document.importNode(srcDoc.documentElement, true);
 	doc.appendChild(docEl);
 
-	// WARN sometimes IE9 doesn't read the content of inserted <style>
+	// WARN sometimes IE9/IE10 doesn't read the content of inserted <style>
 	_.forEach(DOM.findAll('style', doc), function(node) {
-		if (node.styleSheet && node.styleSheet.cssText == '') node.styleSheet.cssText = node.innerHTML;		
+		if (node.styleSheet && node.styleSheet.cssText == '') styleText(node, styleText(node));
 	});
 	
 	return doc;
