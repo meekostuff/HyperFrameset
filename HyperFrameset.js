@@ -3676,8 +3676,8 @@ var notify = function(msg) { // FIXME this isn't being used called everywhere it
 		break;
 	case 'frameset':
 		listener =
-			msg.type == 'resourceLeft' ? (msg.stage == 'before' ? handler : null) :
-			msg.type == 'resourceEntered' ? (msg.stage == 'after' ? handler : null) :
+			msg.type == 'leftState' ? (msg.stage == 'before' ? handler : null) :
+			msg.type == 'enteredState' ? (msg.stage == 'after' ? handler : null) :
 			null;
 		break;
 	default:
@@ -3852,10 +3852,10 @@ start: function(startOptions) {
 		return sprockets.start(); // FIXME should be a promise
 	},
 	
-	function() { // FIXME should this be called be stylesheets are confirmed?
+	function() { // FIXME should this be called before stylesheets are confirmed?
 		return notify({
 			module: 'frameset',
-			type: 'resourceEntered',
+			type: 'enteredState',
 			stage: 'before'
 		});
 	},
@@ -3867,7 +3867,7 @@ start: function(startOptions) {
 	function() { // FIXME need to wait for the DOM to stabilize before this notification
 		return notify({
 			module: 'frameset',
-			type: 'resourceEntered',
+			type: 'enteredState',
 			stage: 'after'
 		});
 	}
@@ -4048,7 +4048,7 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 	function() {
 		return notify({ // FIXME need a timeout on notify
 			module: 'frameset',
-			type: 'resourceLeft',
+			type: 'leftState',
 			stage: 'before'
 			// TODO details, resource, url, frames??
 			});
@@ -4065,7 +4065,7 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 		response = resp;
 		return notify({ // FIXME need a timeout on notify
 			module: 'frameset',
-			type: 'resourceEntered',
+			type: 'enteredState',
 			stage: 'before'
 			// TODO details, resource, url, frames??
 			});
@@ -4079,7 +4079,7 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 	function() { // FIXME need to wait for the DOM to stabilize before this notification
 		return notify({ // FIXME need a timeout on notify
 			module: 'frameset',
-			type: 'resourceEntered',
+			type: 'enteredState',
 			stage: 'after'
 			// TODO details, resource, url, frames??
 			});
