@@ -1878,17 +1878,18 @@ var notify = function(msg) { // FIXME this isn't being used called everywhere it
 	var listener;
 
 	if (handler[msg.stage]) listener = handler[msg.stage];
-
 	else switch(msg.module) {
 	case 'frame':
-		listener =	(msg.type == 'leaving') ?
-			(msg.stage == 'before') ? handler : null :
-			(msg.stage == 'after') ? handler : null;
+		listener =
+			msg.type == 'bodyLeft' ? (msg.stage == 'before' ? handler : null) :
+			msg.type == 'bodyEntered' ? (msg.stage == 'after' ? handler : null) :
+			null;
 		break;
 	case 'frameset':
-		listener = (msg.type == 'leaving') ?
-			(msg.stage == 'before') ? handler : null :
-			(msg.stage == 'after') ? handler : null;
+		listener =
+			msg.type == 'resourceLeft' ? (msg.stage == 'before' ? handler : null) :
+			msg.type == 'resourceEntered' ? (msg.stage == 'after' ? handler : null) :
+			null;
 		break;
 	default:
 		throw Error(msg.module + ' is invalid module');
@@ -2061,9 +2062,25 @@ start: function(startOptions) {
 
 		return sprockets.start(); // FIXME should be a promise
 	},
+	
+	function() { // FIXME should this be called be stylesheets are confirmed?
+		return notify({
+			module: 'frameset',
+			type: 'resourceEntered',
+			stage: 'before'
+		});
+	},
 
 	function() { // after this, startup has been completed
 		return wait(function() { return checkStyleSheets(); })
+	},
+	
+	function() { // FIXME need to wait for the DOM to stabilize before this notification
+		return notify({
+			module: 'frameset',
+			type: 'resourceEntered',
+			stage: 'after'
+		});
 	}
 	
 	]);
@@ -2235,19 +2252,53 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 		return true;
 	});
 	var request = { method: 'get', url: url, responseType: 'document' }; // TODO one day may support different response-type
-	// FIXME warning if more than one frame??
-	_.forEach(frames, function(frame) {
-		frame.preload(request);
-	});
-	return httpProxy.load(url, request)
-	.then(function(response) {
+	var response;
+
+	return pipe(null, [
+
+	function() {
+		return notify({ // FIXME need a timeout on notify
+			module: 'frameset',
+			type: 'resourceLeft',
+			stage: 'before'
+			// TODO details, resource, url, frames??
+			});
+	},
+	function() {
+		_.forEach(frames, function(frame) {
+			frame.preload(request);
+		});
+	},
+	function() {
+		return httpProxy.load(url, request);
+	},
+	function(resp) {
+		response = resp;
+		return notify({ // FIXME need a timeout on notify
+			module: 'frameset',
+			type: 'resourceEntered',
+			stage: 'before'
+			// TODO details, resource, url, frames??
+			});
+	},
+	function() {
 		if (changeState) return historyManager.pushState(changeset, '', url, function(state) {
 				loadFrames(frames, response)
 			});
 		else return loadFrames(frames, response);
-	});
+	},
+	function() { // FIXME need to wait for the DOM to stabilize before this notification
+		return notify({ // FIXME need a timeout on notify
+			module: 'frameset',
+			type: 'resourceEntered',
+			stage: 'after'
+			// TODO details, resource, url, frames??
+			});
+	}
+		
+	]);
 
-	function loadFrames(frames, response) {
+	function loadFrames(frames, response) { // TODO promisify
 		_.forEach(frames, function(frame) { frame.load(response); });
 	}
 	
