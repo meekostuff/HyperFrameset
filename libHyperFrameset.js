@@ -1512,6 +1512,7 @@ init: function(doc, settings) {
 	frameset.document = doc;
 	frameset.element = body;
 	var frameElts = DOM.findAll(cdom.mkSelector('frame'), body);
+	var frameDefElts = [];
 	var frameRefElts = [];
 	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
 		// NOTE first rebase @src with scope: urls
@@ -1521,31 +1522,35 @@ init: function(doc, settings) {
 			if (newSrc != src) el.setAttribute('src', newSrc);
 		}
 		
+		// NOTE even if the frame is only a declaration (@def && @def !== @id) it still has its content removed
+		var placeholder = el.cloneNode(false);
+		el.parentNode.replaceChild(placeholder, el);
+
 		var id = el.getAttribute('id');
 		var defId = el.getAttribute('def');
 		if (defId && defId !== id) {
 			frameRefElts.push(el);
 			return;
 		}
-		var placeholder = el.cloneNode(false);
-		el.parentNode.replaceChild(placeholder, el);
 		if (!id) {
-			id = '__frame_' + index + '__'; // FIXME should be a function at top of module
+			id = '__frame_' + index + '__'; // FIXME not guaranteed to be unique. Should be a function at top of module
 			el.setAttribute('id', id);
 		}
 		if (!defId) {
 			defId = id;
 			placeholder.setAttribute('def', defId);
 		}
+		frameDefElts.push(el);
+	});
+	_.forEach(frameDefElts, function(el) {
+		var id = el.getAttribute('id');
 		frameset.frames[id] = new HFrameDefinition(el, frameset);
 	});
 	_.forEach(frameRefElts, function(el) {
 		var defId = el.getAttribute('def');
 		if (!frameset.frames[defId]) {
-			throw Error('Hyperframe references non-existant frame #' + defId);
+			logger.warn('HyperFrame references non-existant frame #' + defId);
 		}
-		var placeholder = el.cloneNode(false);
-		el.parentNode.replaceChild(placeholder, el);
 	});
 },
 
