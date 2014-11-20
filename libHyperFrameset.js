@@ -196,8 +196,8 @@ var copyAttributes = function(node, srcNode) { // helper for composeNode()
 }
 
 var removeAttributes = function(node) {
-	_.forEach(_.toArray(node.attributes), function(attrName) {
-		node.removeAttribute(attrName); // WARN might not work for @class on IE <= 7
+	_.forEach(_.toArray(node.attributes), function(attr) {
+		node.removeAttribute(attr.name);
 	});
 	return node;
 }
