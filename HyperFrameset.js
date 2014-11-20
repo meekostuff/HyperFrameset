@@ -3780,11 +3780,14 @@ start: function(startOptions) {
 					var frameset = this;
 					frameset.definition = framer.definition;
 					if (frameset.init) frameset.init();
-				},
+					frameset._ready = {};
+					frameset.ready = new Promise(frameset._ready); // FIXME should this be in the HFrameset definition?
+				}, 
 				enteredDocument: function() {
 					var frameset = this;
 					framer.frameset = frameset;
-					frameset.render();
+					frameset.render()
+					.then(function() { frameset._ready.resolve(); }); 
 				},
 				leftDocument: function() { // FIXME should never be called??
 					delete framer.frameset;
@@ -3852,25 +3855,36 @@ start: function(startOptions) {
 		return sprockets.start(); // FIXME should be a promise
 	},
 	
-	function() { // FIXME should this be called before stylesheets are confirmed?
-		return notify({
-			module: 'frameset',
-			type: 'enteredState',
-			stage: 'before'
-		});
+	function() { // NOTE this doesn't prevent start() from resolving
+		pipe(null, [
+
+		function() {
+			return notify({ // FIXME should this be called before stylesheets are confirmed?
+				module: 'frameset',
+				type: 'enteredState',
+				stage: 'before'
+			});
+		},
+		
+		function() {
+			return HFrameset(document.body).ready;
+		},
+		
+		function() { // FIXME this should wait until at least the landing document has been rendered in one frame
+			return notify({
+				module: 'frameset',
+				type: 'enteredState',
+				stage: 'after'
+			});
+		}
+		
+		]);
 	},
 
-	function() { // after this, startup has been completed
+	// TODO it would be nice if <body> wasn't populated until stylesheets were loaded
+	function() {
 		return wait(function() { return checkStyleSheets(); })
-	},
-	
-	function() { // FIXME need to wait for the DOM to stabilize before this notification
-		return notify({
-			module: 'frameset',
-			type: 'enteredState',
-			stage: 'after'
-		});
-	}
+	}	
 	
 	]);
 
@@ -4046,7 +4060,7 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 	return pipe(null, [
 
 	function() {
-		return notify({ // FIXME need a timeout on notify
+		if (changeState) return notify({ // FIXME need a timeout on notify
 			module: 'frameset',
 			type: 'leftState',
 			stage: 'before'
@@ -4059,11 +4073,11 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 		});
 	},
 	function() {
-		return httpProxy.load(url, request);
+		return httpProxy.load(url, request)
+		.then(function(resp) { response = resp; });
 	},
-	function(resp) {
-		response = resp;
-		return notify({ // FIXME need a timeout on notify
+	function() {
+		if (changeState) return notify({ // FIXME need a timeout on notify
 			module: 'frameset',
 			type: 'enteredState',
 			stage: 'before'
@@ -4077,7 +4091,7 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 		else return loadFrames(frames, response);
 	},
 	function() { // FIXME need to wait for the DOM to stabilize before this notification
-		return notify({ // FIXME need a timeout on notify
+		if (changeState) return notify({ // FIXME need a timeout on notify
 			module: 'frameset',
 			type: 'enteredState',
 			stage: 'after'
