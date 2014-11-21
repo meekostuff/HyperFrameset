@@ -2628,21 +2628,42 @@ function HazardProcessor() {}
 _.defaults(HazardProcessor.prototype, {
 	
 loadTemplate: function(template) {
-	this.template = template;
+	var processor = this;
+	processor.top = template;
+	processor.templates = {};
+	_.forEach(DOM.findAll('[id]', template), function(el) {
+		var id = el.getAttribute('id');
+		processor.templates[id] = el;
+	});
 },
 
 transform: function(provider, details) { // TODO how to use details
-	var clone = this.template.cloneNode(true);
-	return transformNode(clone, provider, null, {});
-}
+	var clone = this.top.cloneNode(true);
+	return this.transformNode(clone, provider, null, {});
+},
 
-});
-
-function transform(el, provider, context, variables) {
+transformTree: function(el, provider, context, variables) {
+	var processor = this;
 	
 	var haz_if = hazAttr(el, 'if');
 	var haz_unless = hazAttr(el, 'unless');
 	var haz_each = hazAttr(el, 'each');
+	var haz_template = hazAttr(el, 'template');
+	
+	if (haz_template) {
+		template = processor.templates[haz_template];
+		if (!template) {
+			logger.warn('Hazard could not find template #' + haz_template);
+			return;
+		}
+		var tagName = getTagName(el);
+		var templateTagName = getTagName(template);
+		if (tagName !== templateTagName) {
+			logger.warn('Hazard found mismatched tagNames between template ' + templateTagName + '#' + haz_template + ' and ' + tagName);
+		}
+		el = template.cloneNode(true);
+		el.removeAttribute('id');
+	}
 
 	if (haz_each === false) {
 		return processNode(el, provider, context, variables); // NOTE return value === el
@@ -2673,11 +2694,13 @@ function transform(el, provider, context, variables) {
 			var keep = !provider.evaluate(haz_unless, context, variables, 'boolean');
 			if (!keep) return;
 		}
-		return transformNode(node, provider, context, variables); // NOTE return value === node
+		return processor.transformNode(node, provider, context, variables); // NOTE return value === node
 	}
-}
+},
 
-function transformNode(node, provider, context, variables) {
+transformNode: function(node, provider, context, variables) {
+	var processor = this;
+	
 	var nodeType = node.nodeType;
 	if (!nodeType) return node;
 	if (nodeType !== 1 && nodeType !== 11) return node;
@@ -2688,7 +2711,7 @@ function transformNode(node, provider, context, variables) {
 
 	_.forEach(_.toArray(node.childNodes), function(current) {
 		if (current.nodeType !== 1) return;
-		var newChild = transform(current, provider, context, variables);
+		var newChild = processor.transformTree(current, provider, context, variables);
 		if (newChild !== current) {
 			if (newChild && newChild.nodeType) node.replaceChild(newChild, current);
 			else node.removeChild(current); // FIXME warning if newChild not empty
@@ -2696,6 +2719,9 @@ function transformNode(node, provider, context, variables) {
 	});
 	return node;
 }
+
+});
+
 
 function transformSingleElement(el, provider, context, variables) {
 	_.forEach(_.toArray(el.attributes), function(attr) {
