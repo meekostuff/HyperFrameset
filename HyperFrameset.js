@@ -23,7 +23,8 @@ var window = this;
 var document = window.document;
 
 var defaultOptions = {
-	'log_level': 'warn'
+	'log_level': 'warn',
+	'polling_interval': 50
 }
 
 var vendorPrefix = 'meeko';
@@ -742,7 +743,7 @@ function detachBinding(definition, element) {
 var Binding = function(definition) {
 	var binding = this;
 	binding.definition = definition;
-	binding.implementation = _.create(definition.prototype);
+	binding.object = _.create(definition.prototype);
 	binding.listeners = [];
 	binding.inDocument = null; // TODO state assertions in attach/onenter/leftDocumentCallback/detach
 }
@@ -751,7 +752,7 @@ _.assign(Binding, {
 
 getInterface: function(element) {
 	var nodeData = DOM.getData(element);
-	if (nodeData && nodeData.implementation) return nodeData;
+	if (nodeData && nodeData.object) return nodeData;
 },
 
 enteredDocumentCallback: function(element) {
@@ -785,9 +786,9 @@ _.assign(Binding.prototype, {
 attach: function(element) {
 	var binding = this;
 	var definition = binding.definition;
-	var implementation = binding.implementation;
+	var object = binding.object;
 
-	implementation.element = element; 
+	object.element = element; 
 	if (definition.handlers) _.forEach(definition.handlers, function(handler) {
 		var listener = binding.addHandler(handler); // handler might be ignored ...
 		if (listener) binding.listeners.push(listener);// ... resulting in an undefined listener
@@ -799,43 +800,43 @@ attach: function(element) {
 attachedCallback: function() {
 	var binding = this;
 	var definition = binding.definition;
-	var implementation = binding.implementation;
+	var object = binding.object;
 
 	binding.inDocument = false;
 	var callbacks = definition.callbacks;
 	if (callbacks) {
-		if (callbacks.attached) callbacks.attached.call(implementation); // FIXME try/catch
+		if (callbacks.attached) callbacks.attached.call(object); // FIXME try/catch
 	}
 },
 
 enteredDocumentCallback: function() {
 	var binding = this;
 	var definition = binding.definition;
-	var implementation = binding.implementation;
+	var object = binding.object;
 
 	binding.inDocument = true;
 	var callbacks = definition.callbacks;
 	if (callbacks) {
-		if (callbacks.enteredDocument) callbacks.enteredDocument.call(implementation);	
+		if (callbacks.enteredDocument) callbacks.enteredDocument.call(object);	
 	}	
 },
 
 leftDocumentCallback: function() {
 	var binding = this;
 	var definition = binding.definition;
-	var implementation = binding.implementation;
+	var object = binding.object;
 
 	binding.inDocument = false;
 	var callbacks = definition.callbacks;
 	if (callbacks) {
-		if (callbacks.leftDocument) callbacks.leftDocument.call(implementation);	
+		if (callbacks.leftDocument) callbacks.leftDocument.call(object);	
 	}
 },
 
 detach: function() {
 	var binding = this;
 	var definition = binding.definition;
-	var implementation = binding.implementation;
+	var object = binding.object;
 
 	_.forEach(binding.listeners, binding.removeListener, binding);
 	binding.listeners.length = 0;
@@ -846,19 +847,19 @@ detach: function() {
 detachedCallback: function() {
 	var binding = this;
 	var definition = binding.definition;
-	var implementation = binding.implementation;
+	var object = binding.object;
 	
 	binding.inDocument = null;
 	var callbacks = definition.callbacks;
 	if (callbacks) {
-		if (callbacks.detached) callbacks.detached.call(implementation);	
+		if (callbacks.detached) callbacks.detached.call(object);	
 	}	
 },
 
 addHandler: function(handler) {
 	var binding = this;
-	var implementation = binding.implementation;
-	var element = implementation.element;
+	var object = binding.object;
+	var element = object.element;
 	var type = handler.type;
 	var capture = (handler.eventPhase == 1); // Event.CAPTURING_PHASE
 	if (capture) {
@@ -869,7 +870,7 @@ addHandler: function(handler) {
 	Binding.manageEvent(type);
 	var fn = function(event) {
 		if (fn.normalize) event = fn.normalize(event);
-		return handleEvent.call(implementation, event, handler);
+		return handleEvent.call(object, event, handler);
 	}
 	fn.type = type;
 	fn.capture = capture;
@@ -879,8 +880,8 @@ addHandler: function(handler) {
 
 removeListener: function(fn) {
 	var binding = this;
-	var implementation = binding.implementation;
-	var element = implementation.element;
+	var object = binding.object;
+	var element = object.element;
 	var type = fn.type;
 	var capture = fn.capture;
 	var target = (element === document.documentElement && _.contains(redirectedWindowEvents, type)) ? window : element; 
@@ -1205,10 +1206,9 @@ function BindingRule(selector, bindingDefn) {
 
 
 var bindingRules = [];
-var enteringRules = [];
 
 // FIXME BIG BALL OF MUD
-function applyRuleToEnteredElement(rule, element) { // FIXME compare current and new CSS specifities
+function applyRuleToEnteredElement(rule, element, callback) { // FIXME compare current and new CSS specifities
 	var binding = Binding.getInterface(element);
 	if (binding && binding.definition !== rule.definition) {
 		logger.warn('Binding rule applied when binding already present');
@@ -1216,31 +1216,22 @@ function applyRuleToEnteredElement(rule, element) { // FIXME compare current and
 	}
 	if (!binding) binding = attachBinding(rule.definition, element);
 	if (!binding.inDocument) binding.enteredDocumentCallback();
+	if (callback) callback(rule, element);
 }
 
-function applyRuleToEnteredTree(rule, root) {
+function applyRuleToEnteredTree(rule, root, callback) {
 	if (!root || root === document) root = document.documentElement;
-	if (DOM.matches(root, rule.selector)) applyRuleToEnteredElement(rule, root);
-	_.forEach(DOM.findAll(rule.selector, root), function(el) { applyRuleToEnteredElement(rule, el); });
-}
-
-function applyEnteringRules() {
-	var rule; while (rule = enteringRules.shift()) {
-		var definition = rule.definition;
-		applyRuleToEnteredTree(rule /* , document */);
-		bindingRules.unshift(rule); // TODO splice in specificity order
-	}
+	if (DOM.matches(root, rule.selector)) applyRuleToEnteredElement(rule, root, callback);
+	_.forEach(DOM.findAll(rule.selector, root), function(el) { applyRuleToEnteredElement(rule, el, callback); });
 }
 
 _.assign(sprockets, {
 
 registerElement: function(tagName, desc) { // FIXME test tagName
-	var alreadyTriggered = (enteringRules.length > 0);
 	var bindingDefn = new BindingDefinition(desc);
 	var selector = tagName + ', [is=' + tagName + ']'; // TODO why should @is be supported??
 	var rule = new BindingRule(selector, bindingDefn);
-	enteringRules.push(rule);
-	if (!alreadyTriggered) setTimeout(applyEnteringRules);
+	bindingRules.push(rule);
 	return rule;
 }
 
@@ -1254,20 +1245,52 @@ _.assign(sprockets, {
 start: function() { // FIXME find a way to allow progressive binding application
 	if (started) throw Error('sprockets management has already started');
 	started = true;
+	this.nodeInserted(document.documentElement);
 	observe();
-	applyEnteringRules();
 },
 
 nodeInserted: function(node) { // NOTE called AFTER node inserted into document
 	if (!started) throw Error('sprockets management has not started yet');
 	if (node.nodeType !== 1) return;
+
+	var sprocketRules = [];
+	var scope = sprockets.getScope(node);
+	if (scope) bufferRules(scope);
+
 	_.forEach(bindingRules, function(rule) {
-		applyRuleToEnteredTree(rule, node);
+		applyRuleToEnteredTree(rule, node, componentCallback);
 	});
+
+	_.forEach(sprocketRules, function(rule) {
+		rule.selector = rule.matches; // FIXME absolutizeSelector?? Otherwise use one or the other universally
+		applyRuleToEnteredTree(rule, node, enteredComponentCallback);
+	});
+	
+	function bufferRules(scope) { // buffer uses unshift so LIFO
+		var binding = DOM.getData(scope);
+		if (!binding || !binding.sprockets) return;
+		_.forEach(binding.sprockets, function(rule) {
+			if (!rule.enteredComponent) return;
+			var clonedRule = _.assign({}, rule);
+			clonedRule.scope = scope;
+			sprocketRules.unshift(clonedRule);
+		});
+	}
+	
+	function componentCallback(rule, el) {
+		bufferRules(el);
+	}
+
+	function enteredComponentCallback(rule, el) {
+		var binding = DOM.getData(rule.scope);
+		rule.enteredComponent.call(binding.object, el);
+	}
 },
 
 nodeRemoved: function(node) { // NOTE called AFTER node removed document
 	if (!started) throw Error('sprockets management has not started yet');
+
+	// TODO leftComponentCallback. Might be hard to implement *after* node is removed
 	
 	Binding.leftDocumentCallback(node);
 	_.forEach(DOM.findAll('*', node), Binding.leftDocumentCallback);
@@ -1324,7 +1347,10 @@ registerComponent: function(tagName, sprocket, extras) {
 	defn.callbacks.attached = function() {
 		var binding = this;
 		if (defn.sprockets) _.forEach(defn.sprockets, function(rule) {
-			sprockets.register({ scope: binding.element, matches: rule.matches }, rule.sprocket);
+			var registrationRule = _.assign({}, rule);
+			registrationRule.scope = binding.element;
+			var registrationSprocket = rule.sprocket;
+			sprockets.register(registrationRule, registrationSprocket);
 		});
 		if (onattached) return onattached.call(this);
 	};
@@ -1332,26 +1358,35 @@ registerComponent: function(tagName, sprocket, extras) {
 },
 
 register: function(options, sprocket) {
-	if (typeof options === 'string') options = {
-		scope: document,
-		matches: options
+	var registrationRule = {};
+	var scope;
+	if (typeof options === 'string') {
+		_.assign(registrationRule, {
+			matches: options
+		});
+		scope = document;
 	}
-	var nodeData = DOM.getData(options.scope);
+	else {
+		_.assign(registrationRule, options);
+		scope = options.scope;
+		delete registrationRule.scope;
+	}
+	var nodeData = DOM.getData(scope);
 	if (!nodeData) {
 		nodeData = {};
-		DOM.setData(options.scope, nodeData);
+		DOM.setData(scope, nodeData);
 	}
 	var nodeSprockets = nodeData.sprockets;
 	if (!nodeSprockets) nodeSprockets = nodeData.sprockets = [];
-	var sprocketRule = { matches: options.matches, definition: sprocket };
-	nodeSprockets.unshift(sprocketRule); // WARN last registered means highest priority. Is this appropriate??
+	registrationRule.definition = sprocket;
+	nodeSprockets.unshift(registrationRule); // WARN last registered means highest priority. Is this appropriate??
 },
 
 evolve: function(base, properties) {
 	var prototype = _.create(base.prototype);
 	var sub = new SprocketDefinition(prototype);
-	var baseDefinition = base.prototype.__definition__ || {};
-	var definition = prototype.__definition__ = {};
+	var baseDefinition = base.prototype.__properties__ || {};
+	var definition = prototype.__properties__ = {};
 	_.forOwn(baseDefinition, function(desc, prop) {
 		definition[prop] = _.create(desc);
 	});
@@ -1361,7 +1396,7 @@ evolve: function(base, properties) {
 
 defineProperties: function(sprocket, properties) {
 	var prototype = sprocket.prototype;
-	var definition = prototype.__definition__ || (prototype.__definition__ = {});
+	var definition = prototype.__properties__ || (prototype.__properties__ = {});
 	_.forOwn(properties, function(desc, name) {
 		switch (typeof desc) {
 		case 'object':
@@ -1380,12 +1415,12 @@ defineProperties: function(sprocket, properties) {
 },
 
 getPropertyDescriptor: function(sprocket, prop) {
-	return sprocket.prototype.__definition__[prop];
+	return sprocket.prototype.__properties__[prop];
 },
 
 matches: function(element, sprocket) {
 	var binding = Binding.getInterface(element);
-	if (binding) return prototypeMatchesSprocket(binding.implementation, sprocket);
+	if (binding) return prototypeMatchesSprocket(binding.object, sprocket);
 	var declaredSprocketRule = getSprocketRule(element);
 	if (declaredSprocketRule && prototypeMatchesSprocket(declaredSprocketRule.definition.prototype, sprocket)) return true;
 	return false;
@@ -1409,14 +1444,14 @@ find: function(element, sprocket) {
 },
 
 cast: function(element, sprocket) {
-	var implementation = sprockets.getInterface(element);
-	if (prototypeMatchesSprocket(implementation, sprocket)) return implementation;
+	var object = sprockets.getInterface(element);
+	if (prototypeMatchesSprocket(object, sprocket)) return object;
 	throw Error('Attached sprocket is not compatible');
 },
 
 getInterface: function(element) {
 	var binding = Binding.getInterface(element);
-	if (binding) return binding.implementation;
+	if (binding) return binding.object;
 	for (var node=sprockets.getScope(element.parentNode); node; node=sprockets.getScope(node.parentNode)) {
 		var nodeData = DOM.getData(node);
 		var sprocketRules = nodeData.sprockets;
@@ -1426,7 +1461,7 @@ getInterface: function(element) {
 			binding = attachBinding(rule.definition, element);
 			return true;
 		});
-		if (binding) return binding.implementation;
+		if (binding) return binding.object;
 	}
 	throw Error('No sprocket declared');
 },
@@ -1701,14 +1736,14 @@ aria: function(name, value) {
 },
 
 ariaCan: function(name, value) {
-	var desc = this.__definition__[name];
+	var desc = this.__properties__[name];
 	if (!desc) throw Error('Property not defined: ' + name);
 	if (desc.type !== 'boolean' || desc.can && !desc.can.call(this)) return false;
 	return true;
 },
 
 ariaToggle: function(name, value) {
-	var desc = this.__definition__[name];
+	var desc = this.__properties__[name];
 	if (!desc) throw Error('Property not defined: ' + name);
 	if (desc.type !== 'boolean' || desc.can && !desc.can.call(this)) throw Error('Property can not toggle: ' + name);
 	var oldValue = desc.get.call(this);
@@ -1719,13 +1754,13 @@ ariaToggle: function(name, value) {
 },
 
 ariaGet: function(name) {
-	var desc = this.__definition__[name];
+	var desc = this.__properties__[name];
 	if (!desc) throw Error('Property not defined: ' + name);
 	return desc.get.call(this); // TODO type and error handling
 },
 
 ariaSet: function(name, value) {
-	var desc = this.__definition__[name];
+	var desc = this.__properties__[name];
 	if (!desc) throw Error('Property not defined: ' + name);
 	return desc.set.call(this, value); // TODO type and error handling
 }
