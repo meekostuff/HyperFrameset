@@ -12,14 +12,14 @@ element.addEventListener - IE9+
 */
 
 /* FIXME
-event modifiers aren't filtering
+- event modifiers aren't filtering
+- everything in the sprockets code (apart from the Binding implementation) is a BIG BALL OF MUD
 */
 
 if (!this.Meeko) this.Meeko = {};
 
-(function() {
+(function(window) {
 
-var window = this;
 var document = window.document;
 
 var defaultOptions = {
@@ -83,6 +83,9 @@ var words = function(text) { return text.split(/\s+/); }
 
 var forOwn = function(object, fn, context) {
 	var keys = Object.keys(object);
+	if (typeof object === 'function' && object.hasOwnProperty('prototype') && keys.indexOf('prototype' < 0)) {
+		fn.call(context, object.prototype, 'prototype', object);
+	}
 	for (var i=0, n=keys.length; i<n; i++) {
 		var key = keys[i];
 		fn.call(context, object[key], key, object);
@@ -97,6 +100,9 @@ var isEmpty = function(o) { // NOTE lodash supports arrays and strings too
 
 var defaults = function(dest, src) {
 	var keys = Object.keys(src);
+	if (dest.prototype == null && typeof src === 'function' && src.hasOwnProperty('prototype') && keys.indexOf('prototype' < 0)) {
+		dest.prototype = src.prototype;
+	}
 	for (var i=0, n=keys.length; i<n; i++) {
 		var key = keys[i];
 		if (typeof dest[key] !== 'undefined') continue;
@@ -107,6 +113,9 @@ var defaults = function(dest, src) {
 
 var assign = function(dest, src) {
 	var keys = Object.keys(src);
+	if (typeof src === 'function' && src.hasOwnProperty('prototype') && keys.indexOf('prototype' < 0)) {
+		dest.prototype = src.prototype;
+	}
 	for (var i=0, n=keys.length; i<n; i++) {
 		var key = keys[i];
 		Object.defineProperty(dest, key, Object.getOwnPropertyDescriptor(src, key));
@@ -694,28 +703,32 @@ return {
 
 })();
 
+
 /*
  ### Logger (minimal implementation - can be over-ridden)
  */
 if (!Meeko.logger) Meeko.logger = (function() {
 
-var levels = this.levels = _.words('none error warn info debug');
+var logger = {};
+
+var levels = logger.levels = _.words('none error warn info debug');
 
 _.forEach(levels, function(name, num) {
 	
 levels[name] = num;
-this[name] = !window.console && function() {} ||
-	console[name] && function() { if (num <= this.LOG_LEVEL) console[name].apply(console, arguments); } ||
-	function() { if (num <= this.LOG_LEVEL) console.log.apply(console, arguments); }
+logger[name] = !window.console && function() {} ||
+	console[name] && function() { if (num <= logger.LOG_LEVEL) console[name].apply(console, arguments); } ||
+	function() { if (num <= logger.LOG_LEVEL) console.log.apply(console, arguments); }
 
 }, this);
 
-this.LOG_LEVEL = levels[defaultOptions['log_level']]; // DEFAULT
+logger.LOG_LEVEL = levels[defaultOptions['log_level']]; // DEFAULT
+
+return logger;
 
 })(); // end logger definition
 
-var logger = logger || Meeko.logger;
-
+var logger = Meeko.logger;
 
 this.Meeko.sprockets = (function() {
 
@@ -803,10 +816,7 @@ attachedCallback: function() {
 	var object = binding.object;
 
 	binding.inDocument = false;
-	var callbacks = definition.callbacks;
-	if (callbacks) {
-		if (callbacks.attached) callbacks.attached.call(object); // FIXME try/catch
-	}
+	if (definition.attached) definition.attached.call(object); // FIXME try/catch
 },
 
 enteredDocumentCallback: function() {
@@ -815,10 +825,7 @@ enteredDocumentCallback: function() {
 	var object = binding.object;
 
 	binding.inDocument = true;
-	var callbacks = definition.callbacks;
-	if (callbacks) {
-		if (callbacks.enteredDocument) callbacks.enteredDocument.call(object);	
-	}	
+	if (definition.enteredDocument) definition.enteredDocument.call(object);	
 },
 
 leftDocumentCallback: function() {
@@ -827,10 +834,7 @@ leftDocumentCallback: function() {
 	var object = binding.object;
 
 	binding.inDocument = false;
-	var callbacks = definition.callbacks;
-	if (callbacks) {
-		if (callbacks.leftDocument) callbacks.leftDocument.call(object);	
-	}
+	if (definition.leftDocument) definition.leftDocument.call(object);	
 },
 
 detach: function() {
@@ -850,10 +854,7 @@ detachedCallback: function() {
 	var object = binding.object;
 	
 	binding.inDocument = null;
-	var callbacks = definition.callbacks;
-	if (callbacks) {
-		if (callbacks.detached) callbacks.detached.call(object);	
-	}	
+	if (definition.detached) definition.detached.call(object);	
 },
 
 addHandler: function(handler) {
@@ -1194,9 +1195,8 @@ function(prototype, object) {
 /* CSS Rules */
 
 function BindingDefinition(desc) {
-	this.prototype = desc.prototype;
-	this.handlers = desc.handlers && desc.handlers.length ? desc.handlers.slice(0) : [];
-	this.callbacks = desc.callbacks;
+	_.assign(this, desc);
+	if (!this.handlers) this.handlers = [];
 }
 
 function BindingRule(selector, bindingDefn) {
@@ -1205,9 +1205,8 @@ function BindingRule(selector, bindingDefn) {
 }
 
 
-var bindingRules = [];
+var bindingRules = sprockets.rules = [];
 
-// FIXME BIG BALL OF MUD
 function applyRuleToEnteredElement(rule, element, callback) { // FIXME compare current and new CSS specifities
 	var binding = Binding.getInterface(element);
 	if (binding && binding.definition !== rule.definition) {
@@ -1227,8 +1226,9 @@ function applyRuleToEnteredTree(rule, root, callback) {
 
 _.assign(sprockets, {
 
-registerElement: function(tagName, desc) { // FIXME test tagName
-	var bindingDefn = new BindingDefinition(desc);
+registerElement: function(tagName, defn) { // FIXME test tagName
+	if (defn.rules) logger.warn('registerElement() does not support rules. Try registerComposite()');
+	var bindingDefn = new BindingDefinition(defn);
 	var selector = tagName + ', [is=' + tagName + ']'; // TODO why should @is be supported??
 	var rule = new BindingRule(selector, bindingDefn);
 	bindingRules.push(rule);
@@ -1253,45 +1253,63 @@ nodeInserted: function(node) { // NOTE called AFTER node inserted into document
 	if (!started) throw Error('sprockets management has not started yet');
 	if (node.nodeType !== 1) return;
 
-	var sprocketRules = [];
-	var scope = sprockets.getScope(node);
-	if (scope) bufferRules(scope);
-
+	var composites = [];
 	_.forEach(bindingRules, function(rule) {
 		applyRuleToEnteredTree(rule, node, componentCallback);
 	});
 
-	_.forEach(sprocketRules, function(rule) {
-		rule.selector = rule.matches; // FIXME absolutizeSelector?? Otherwise use one or the other universally
-		applyRuleToEnteredTree(rule, node, enteredComponentCallback);
-	});
+	var composite = sprockets.getComposite(node);
+	if (composite) applyCompositedRules(node, composite);
+
+	while (composite = composites.shift()) applyCompositedRules(composite);
 	
-	function bufferRules(scope) { // buffer uses unshift so LIFO
-		var binding = DOM.getData(scope);
-		if (!binding || !binding.sprockets) return;
-		_.forEach(binding.sprockets, function(rule) {
-			if (!rule.enteredComponent) return;
-			var clonedRule = _.assign({}, rule);
-			clonedRule.scope = scope;
-			sprocketRules.unshift(clonedRule);
-		});
-	}
-	
-	function componentCallback(rule, el) {
-		bufferRules(el);
+	return;
+		
+	function enteredComponentCallback(rule, el) {
+		var binding = DOM.getData(rule.composite);
+		rule.callback.call(binding.object, el);
 	}
 
-	function enteredComponentCallback(rule, el) {
-		var binding = DOM.getData(rule.scope);
-		rule.enteredComponent.call(binding.object, el);
+	function componentCallback(rule, el) {
+		var binding = DOM.getData(el);
+		if (!binding || !binding.rules) return;
+		composites.push(el);
 	}
+
+	function applyCompositedRules(node, composite) {
+		if (!composite) composite = node;
+		var rules = getRules(composite);
+		if (rules.length <= 0) return;
+
+		var walker = createCompositeWalker(node, false); // don't skipRoot
+		var el;
+		while (el = walker.nextNode()) {
+			_.forEach(rules, function(rule) {
+				var selector = rule.selector; // FIXME absolutizeSelector??
+				if (DOM.matches(el, selector)) applyRuleToEnteredElement(rule, el, enteredComponentCallback);
+			});
+		}
+	}
+	
+	function getRules(composite) { // buffer uses unshift so LIFO
+		var rules = [];
+		var binding = DOM.getData(composite);
+		_.forEach(binding.rules, function(rule) {
+			if (!rule.callback) return;
+			var clonedRule = _.assign({}, rule);
+			clonedRule.composite = composite;
+			rules.unshift(clonedRule);
+		});
+		return rules;
+	}
+	
 },
 
 nodeRemoved: function(node) { // NOTE called AFTER node removed document
 	if (!started) throw Error('sprockets management has not started yet');
 
 	// TODO leftComponentCallback. Might be hard to implement *after* node is removed
-	
+	// FIXME the following logic maybe completely wrong
 	Binding.leftDocumentCallback(node);
 	_.forEach(DOM.findAll('*', node), Binding.leftDocumentCallback);
 }
@@ -1339,56 +1357,93 @@ var SprocketDefinition = function(prototype) {
 
 _.assign(sprockets, {
 
-registerComponent: function(tagName, sprocket, extras) {
-	var defn = { prototype: sprocket.prototype };
-	if (extras) _.defaults(defn, extras);
-	if (!defn.callbacks) defn.callbacks = {};
-	var onattached = defn.callbacks.attached;
-	defn.callbacks.attached = function() {
-		var binding = this;
-		if (defn.sprockets) _.forEach(defn.sprockets, function(rule) {
-			var registrationRule = _.assign({}, rule);
-			registrationRule.scope = binding.element;
-			var registrationSprocket = rule.sprocket;
-			sprockets.register(registrationRule, registrationSprocket);
+registerSprocket: function(selector, definition, callback) { // WARN this can promote any element into a composite
+	var rule = {};
+	var composite;
+	if (typeof selector === 'string') {
+		_.assign(rule, {
+			selector: selector
 		});
-		if (onattached) return onattached.call(this);
-	};
-	sprockets.registerElement(tagName, defn);
+		composite = document;
+	}
+	else {
+		_.assign(rule, selector);
+		composite = selector.composite;
+		delete rule.composite;
+	}
+	var nodeData = DOM.getData(composite); // NOTE nodeData should always be a binding
+	if (!nodeData) {
+		nodeData = {};
+		DOM.setData(composite, nodeData);
+	}
+	var nodeRules = nodeData.rules;
+	if (!nodeRules) nodeRules = nodeData.rules = [];
+	rule.definition = definition;
+	rule.callback = callback;
+	nodeRules.unshift(rule); // WARN last registered means highest priority. Is this appropriate??
 },
 
 register: function(options, sprocket) {
-	var registrationRule = {};
-	var scope;
-	if (typeof options === 'string') {
-		_.assign(registrationRule, {
-			matches: options
+	return sprockets.registerSprocket(options, sprocket);
+},
+
+registerComposite: function(tagName, definition) {
+	var defn = _.assign({}, definition);
+	var rules = defn.rules;
+	delete defn.rules;
+	if (!rules) logger.warn('registerComposite() called without any sprocket rules. Try registerElement()');
+	var onattached = defn.attached;
+	defn.attached = function() {
+		var object = this;
+		if (rules) _.forEach(rules, function(rule) {
+			var selector = {
+				composite: object.element
+			}
+			var definition = {};
+			var callback;
+			if (Array.isArray(rule)) {
+				selector.selector = rule[0];
+				definition = rule[1];
+				callback = rule[2];
+			}
+			else {
+				selector.selector = rule.selector;
+				definition = rule.definition;
+				callback = rule.callback;
+			}
+			sprockets.registerSprocket(selector, definition, callback);
 		});
-		scope = document;
+		if (onattached) return onattached.call(this);
+	};
+	return sprockets.registerElement(tagName, defn);
+},
+
+registerComponent: function(tagName, sprocket, extras) {
+	var defn = { prototype: sprocket.prototype };
+	if (extras) {
+		defn.handlers = extras.handlers;
+		if (extras.sprockets) _.forEach(extras.sprockets, function(oldRule) {
+			if (!defn.rules) defn.rules = [];
+			var rule = {
+				selector: oldRule.matches,
+				definition: oldRule.sprocket,
+				callback: oldRule.enteredComponent
+			}
+			defn.rules.push(rule);
+		});
+		if (extras.callbacks) _.defaults(defn, extras.callbacks);
 	}
-	else {
-		_.assign(registrationRule, options);
-		scope = options.scope;
-		delete registrationRule.scope;
-	}
-	var nodeData = DOM.getData(scope);
-	if (!nodeData) {
-		nodeData = {};
-		DOM.setData(scope, nodeData);
-	}
-	var nodeSprockets = nodeData.sprockets;
-	if (!nodeSprockets) nodeSprockets = nodeData.sprockets = [];
-	registrationRule.definition = sprocket;
-	nodeSprockets.unshift(registrationRule); // WARN last registered means highest priority. Is this appropriate??
+	if (defn.rules) return sprockets.registerComposite(tagName, defn);
+	else return sprockets.registerElement(tagName, defn);
 },
 
 evolve: function(base, properties) {
 	var prototype = _.create(base.prototype);
 	var sub = new SprocketDefinition(prototype);
-	var baseDefinition = base.prototype.__properties__ || {};
-	var definition = prototype.__properties__ = {};
-	_.forOwn(baseDefinition, function(desc, prop) {
-		definition[prop] = _.create(desc);
+	var baseProperties = base.prototype.__properties__ || {};
+	var subProperties = prototype.__properties__ = {};
+	_.forOwn(baseProperties, function(desc, name) {
+		subProperties[name] = _.create(desc);
 	});
 	if (properties) sprockets.defineProperties(sub, properties);
 	return sub;
@@ -1418,29 +1473,55 @@ getPropertyDescriptor: function(sprocket, prop) {
 	return sprocket.prototype.__properties__[prop];
 },
 
-matches: function(element, sprocket) {
+_matches: function(element, sprocket, rule) { // internal utility method which is passed a "cached" rule
 	var binding = Binding.getInterface(element);
 	if (binding) return prototypeMatchesSprocket(binding.object, sprocket);
-	var declaredSprocketRule = getSprocketRule(element);
-	if (declaredSprocketRule && prototypeMatchesSprocket(declaredSprocketRule.definition.prototype, sprocket)) return true;
+	if (rule && DOM.matches(element, rule.selector)) return true; // TODO should make rules scoped by rule.composite
 	return false;
 },
 
-closest: function(element, sprocket) { // FIXME optimize by attaching sprocket here
-	for (var node=element; node; node=node.parentNode) {
-		if (!sprockets.matches(node, sprocket)) continue;
-		return node;
+matches: function(element, sprocket, inComposite) {
+	var composite;
+	if (inComposite) {
+		composite = sprockets.getComposite(element);
+		if (!composite) return false;
+	}
+	var rule = getMatchingSprocketRule(element.parentNode, sprocket, inComposite);
+	return sprockets._matches(element, sprocket, rule);
+},
+
+closest: function(element, sprocket, inComposite) {
+	var composite;
+	if (inComposite) {
+		composite = sprockets.getComposite(element);
+		if (!composite) return;
+	}
+	var rule = getMatchingSprocketRule(element.parentNode, sprocket, inComposite);
+	for (var node=element; node && node.nodeType === 1; node=node.parentNode) {
+		if (sprockets._matches(node, sprocket, rule)) return node;
+		if (node === composite) return;
 	}
 },
 
-findAll: function(element, sprocket) {
+findAll: function(element, sprocket) { // FIXME this search is blocked by descendant composites (scopes). Is this appropriate?
 	var rule = getMatchingSprocketRule(element, sprocket);
-	return DOM.findAll(rule.matches, element); // FIXME should be scoped to rule.scope??
+	var walker = createCompositeWalker(element, true); // skipRoot
+	
+	var node, nodeList = [];
+	while (node = walker.nextNode()) {
+		if (DOM.matches(node, rule.selector)) nodeList.push(node);
+	}
+	return nodeList;
 },
 
-find: function(element, sprocket) {
+find: function(element, sprocket) { // FIXME this search is blocked by descendant composites (scopes). Is this appropriate?
 	var rule = getMatchingSprocketRule(element, sprocket);
-	return DOM.find(rule.matches, element); // FIXME should be scoped to rule.scope??
+	var walker = createCompositeWalker(element, true); // skipRoot
+	
+	var node;
+	while (node = walker.nextNode()) {
+		if (DOM.matches(node, rule.selector)) return node;
+	}
 },
 
 cast: function(element, sprocket) {
@@ -1452,70 +1533,88 @@ cast: function(element, sprocket) {
 getInterface: function(element) {
 	var binding = Binding.getInterface(element);
 	if (binding) return binding.object;
-	for (var node=sprockets.getScope(element.parentNode); node; node=sprockets.getScope(node.parentNode)) {
-		var nodeData = DOM.getData(node);
-		var sprocketRules = nodeData.sprockets;
-		_.some(sprocketRules, function(rule) {
-			var prototype = rule.definition.prototype;
-			if (!DOM.matches(element, rule.matches)) return false; // TODO should be using relative selector
-			binding = attachBinding(rule.definition, element);
-			return true;
-		});
-		if (binding) return binding.object;
-	}
-	throw Error('No sprocket declared');
+	var rule = getSprocketRule(element);
+	if (!rule) 	throw Error('No sprocket declared'); // WARN should never happen - should be a universal fallback
+	var binding = attachBinding(rule.definition, element);
+	return binding.object;
 },
 
-getScope: function(element) {
+isComposite: function(node) {
+	if (!DOM.hasData(node)) return false;
+	var nodeData = DOM.getData(node);
+	if (!nodeData.rules) return false;
+	return true;
+},
+
+getComposite: function(element) { // WARN this can return `document`. Not sure if that should count
 	for (var node=element; node; node=node.parentNode) {
-		if (!DOM.hasData(node)) continue;
-		var nodeData = DOM.getData(node);
-		var sprocketRules = nodeData.sprockets;
-		if (!sprocketRules) continue;
-		return node;
+		if (sprockets.isComposite(node)) return node;
 	}
 }
 
 });
 
 function getSprocketRule(element) {
-	for (var scope=sprockets.getScope(element.parentNode); scope; scope=sprockets.getScope(scope.parentNode)) {
-		var sprocketRule;
-		var nodeData = DOM.getData(scope);
-		var sprocketRules = nodeData.sprockets;
-		_.some(sprocketRules, function(rule) {
-			if (!DOM.matches(element, rule.matches)) return false; // TODO should be using relative selector
-			sprocketRule = { scope: scope };
-			_.defaults(sprocketRule, rule);
-			return true;
-		});
-		if (sprocketRule) return sprocketRule;
-	}
+	var sprocketRule;
+	var composite = sprockets.getComposite(element);
+	sprocketRule = getRuleFromComposite(composite, element);
+	if (sprocketRule) return sprocketRule;
+	return getRuleFromComposite(document, element);
 }
 
-function getMatchingSprocketRule(element, sprocket) {
-	for (var scope=sprockets.getScope(element); scope; scope=sprockets.getScope(scope.parentNode)) {
-		var sprocketRule;
-		var nodeData = DOM.getData(scope);
-		var sprocketRules = nodeData.sprockets;
-		_.some(sprocketRules, function(rule) {
-			if (typeof sprocket === 'string') {
-				if (rule.definition.prototype.role !== sprocket) return false;
-			}
-			else {
-				if (sprocket.prototype !== rule.definition.prototype && !isPrototypeOf(sprocket.prototype, rule.definition.prototype)) return false;
-			}
-			sprocketRule = { scope: scope };
-			_.defaults(sprocketRule, rule);
-			return true;
-		});
-		if (sprocketRule) return sprocketRule;
-	}
+function getRuleFromComposite(composite, element) {
+	var sprocketRule;
+	var nodeData = DOM.getData(composite);
+	_.some(nodeData.rules, function(rule) {
+		if (!DOM.matches(element, rule.selector)) return false; // TODO should be using relative selector
+		sprocketRule = { composite: composite };
+		_.defaults(sprocketRule, rule);
+		return true;
+	});
+	if (sprocketRule) return sprocketRule;
+}
+
+function getMatchingSprocketRule(element, sprocket, inComposite) {
+	var sprocketRule;
+	var composite = sprockets.getComposite(element);
+	sprocketRule = getMatchingRuleFromComposite(composite, sprocket);
+	if (inComposite || sprocketRule) return sprocketRule;
+	return getMatchingRuleFromComposite(document, sprocket);
+}
+
+function getMatchingRuleFromComposite(composite, sprocket) {
+	var sprocketRule;
+	var nodeData = DOM.getData(composite);
+	_.some(nodeData.rules, function(rule) {
+		if (typeof sprocket === 'string') {
+			if (rule.definition.prototype.role !== sprocket) return false;
+		}
+		else {
+			if (sprocket.prototype !== rule.definition.prototype && !isPrototypeOf(sprocket.prototype, rule.definition.prototype)) return false;
+		}
+		sprocketRule = { composite: composite };
+		_.defaults(sprocketRule, rule);
+		return true;
+	});
+	return sprocketRule;
 }
 
 function prototypeMatchesSprocket(prototype, sprocket) {
 	if (typeof sprocket === 'string') return (prototype.role === sprocket);
 	else return (sprocket.prototype === prototype || isPrototypeOf(sprocket.prototype, prototype));
+}
+
+function createCompositeWalker(root, skipRoot) {
+	return document.createNodeIterator(
+			root,
+			1,
+			acceptNode,
+			null // IE9 throws if this irrelavent argument isn't passed
+		);
+	
+	function acceptNode(el) {
+		 return (skipRoot && el === root) ? NodeFilter.FILTER_SKIP : sprockets.isComposite(el) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT; 
+	}
 }
 
 sprockets.trigger = function(target, type, params) { // NOTE every JS initiated event is a custom-event
@@ -1816,6 +1915,10 @@ ariaFindAll: function(role) {
 
 ariaClosest: function(role) {
 	return sprockets.closest(this, role);
+},
+
+ariaMatches: function(role) {
+	return sprockets.matches(this, role);
 }
 	
 });
