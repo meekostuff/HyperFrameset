@@ -2615,6 +2615,15 @@ var mexprPrefix = mexprNamespace + ':';
 var exprTextAttr = exprPrefix + textAttr;
 var exprHtmlAttr = exprPrefix + htmlAttr;
 
+function hazAttrs(el, varPrefix) {
+	if (!varPrefix) varPrefix = "";
+	var values = {};
+	_.forEach(_.words('if unless each var template'), function(name) {
+		values[varPrefix + name] = hazAttr(el, name);
+	});
+	return values;
+}
+
 function hazAttr(el, attr) {
 	var hazAttrName = hazAttrPrefix + attr;
 	if (!el.hasAttribute(hazAttrName)) return false;
@@ -2645,39 +2654,38 @@ transform: function(provider, details) { // TODO how to use details
 transformTree: function(el, provider, context, variables) {
 	var processor = this;
 	
-	var haz_if = hazAttr(el, 'if');
-	var haz_unless = hazAttr(el, 'unless');
-	var haz_each = hazAttr(el, 'each');
-	var haz_template = hazAttr(el, 'template');
-	
-	if (haz_template) {
-		template = processor.templates[haz_template];
+	var haz = hazAttrs(el, '_');
+
+	if (haz._template) {
+		template = processor.templates[haz._template];
 		if (!template) {
-			logger.warn('Hazard could not find template #' + haz_template);
+			logger.warn('Hazard could not find template #' + haz._template);
 			return;
 		}
 		var tagName = getTagName(el);
 		var templateTagName = getTagName(template);
 		if (tagName !== templateTagName) {
-			logger.warn('Hazard found mismatched tagNames between template ' + templateTagName + '#' + haz_template + ' and ' + tagName);
+			logger.warn('Hazard found mismatched tagNames between template ' + templateTagName + '#' + haz._template + ' and ' + tagName);
 		}
+		
 		el = template.cloneNode(true);
+		
+		// Now remove @id and @haz:
 		el.removeAttribute('id');
+		hazAttrs(el);
 	}
 
-	if (haz_each === false) {
+	if (haz._each === false) {
 		return processNode(el, provider, context, variables); // NOTE return value === el
 	}
 	
 	// handle each
-	var haz_var = hazAttr(el, 'var');
-	
 	var subVars = _.defaults({}, variables);
-	var subContexts = provider.evaluate(haz_each, context, variables, 'array');
+	var subContexts = provider.evaluate(haz._each, context, variables, 'array');
 	var result = document.createDocumentFragment(); // FIXME which is the right doc to create this frag in??
 	
 	_.forEach(subContexts, function(subContext) {
-		if (haz_var) subVars[haz_var] = subContext;
+		if (haz._var) subVars[haz._var] = subContext;
 		var srcEl = el.cloneNode(true);
 		var newEl = processNode(srcEl, provider, subContext, subVars); // NOTE newEl === srcEl
 		if (newEl) result.appendChild(newEl);
@@ -2686,16 +2694,17 @@ transformTree: function(el, provider, context, variables) {
 	return result;
 
 	function processNode(node, provider, context, variables) {
-		if (haz_if !== false) {
-			var keep = provider.evaluate(haz_if, context, variables, 'boolean');
+		if (haz._if !== false) {
+			var keep = provider.evaluate(haz._if, context, variables, 'boolean');
 			if (!keep) return;
 		}
-		if (haz_unless !== false) {
-			var keep = !provider.evaluate(haz_unless, context, variables, 'boolean');
+		if (haz._unless !== false) {
+			var keep = !provider.evaluate(haz._unless, context, variables, 'boolean');
 			if (!keep) return;
 		}
 		return processor.transformNode(node, provider, context, variables); // NOTE return value === node
 	}
+	
 },
 
 transformNode: function(node, provider, context, variables) {
