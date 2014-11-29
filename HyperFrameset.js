@@ -3920,26 +3920,24 @@ start: function(startOptions) {
 			if (acceptDefault === false) e.preventDefault();
 		}, false);
 		
-		sprockets.registerComponent('body', HFrameset, { // FIXME should target the body using 'hf-frameset' as @is
-			callbacks: {
-				attached: function() {
-					var frameset = this;
-					frameset.definition = framer.definition;
-					if (frameset.init) frameset.init();
-					frameset._ready = {};
-					frameset.ready = new Promise(frameset._ready); // FIXME should this be in the HFrameset definition?
-				}, 
-				enteredDocument: function() {
-					var frameset = this;
-					framer.frameset = frameset;
-					frameset.render()
-					.then(function() { frameset._ready.resolve(); }); 
-				},
-				leftDocument: function() { // FIXME should never be called??
-					delete framer.frameset;
-				}
+		sprockets.registerElement('body', { // FIXME should target the body using 'hf-frameset' as @is
+			prototype: HFrameset.prototype, 
+			attached: function() {
+				var frameset = this;
+				frameset.definition = framer.definition;
+				if (frameset.init) frameset.init();
+				frameset._ready = {};
+				frameset.ready = new Promise(frameset._ready); // FIXME should this be in the HFrameset definition?
+			}, 
+			enteredDocument: function() {
+				var frameset = this;
+				framer.frameset = frameset;
+				frameset.render()
+				.then(function() { frameset._ready.resolve(); }); 
 			},
-			
+			leftDocument: function() { // FIXME should never be called??
+				delete framer.frameset;
+			},
 			handlers: [
 			{
 				type: 'requestnavigation',
@@ -3953,36 +3951,35 @@ start: function(startOptions) {
 			
 			});
 
-		sprockets.registerComponent(framer.definition.cdom.mkSelector('frame'), HFrame, {
-			callbacks: {
-				attached: function() {
-					var frame = this;
-					var defId = frame.attr('def');
-					frame.definition = framer.definition.frames[defId];
-					if (frame.init) frame.init();
-				},
-				enteredDocument: function() {
-					var frame = this;
-					whenVisible(frame.element)
-					.then(function() {
-						var parentFrame;
-						var parent = DOM.closest(frame.element.parentNode, framer.definition.cdom.mkSelector('frame'));
-						if (parent) parentFrame = HFrame(parent);
-						else {
-							parent = document.body; // TODO  should this be closest(frame.element.parentNode, 'body'); 
-							parentFrame = HFrameset(parent);
-						}
-						frame.parentFrame = parentFrame;
-						parentFrame.frameEntered(frame);
-						framer.frameEntered(frame);
-					});
-				},
-				leftDocument: function() {
-					var frame = this;
-					frame.parentFrame.frameLeft(frame);
-					delete frame.parentFrame;
-					// FIXME notify framer
-				}
+		sprockets.registerElement(framer.definition.cdom.mkSelector('frame'), {
+			prototype: HFrame.prototype,
+			attached: function() {
+				var frame = this;
+				var defId = frame.attr('def');
+				frame.definition = framer.definition.frames[defId];
+				if (frame.init) frame.init();
+			},
+			enteredDocument: function() {
+				var frame = this;
+				whenVisible(frame.element)
+				.then(function() {
+					var parentFrame;
+					var parent = DOM.closest(frame.element.parentNode, framer.definition.cdom.mkSelector('frame'));
+					if (parent) parentFrame = HFrame(parent);
+					else {
+						parent = document.body; // TODO  should this be closest(frame.element.parentNode, 'body'); 
+						parentFrame = HFrameset(parent);
+					}
+					frame.parentFrame = parentFrame;
+					parentFrame.frameEntered(frame);
+					framer.frameEntered(frame);
+				});
+			},
+			leftDocument: function() {
+				var frame = this;
+				frame.parentFrame.frameLeft(frame);
+				delete frame.parentFrame;
+				// FIXME notify framer
 			},
 			
 			handlers: [
