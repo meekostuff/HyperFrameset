@@ -1511,7 +1511,7 @@ init: function(doc, settings) {
 	body.parentNode.removeChild(body);
 	frameset.document = doc;
 	frameset.element = body;
-	var frameElts = DOM.findAll(cdom.mkSelector('frame'), body);
+	var frameElts = DOM.findAll(cdom.mkSelector('frame'), body); // TODO body.ariaFindAll('frame')
 	var frameDefElts = [];
 	var frameRefElts = [];
 	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
@@ -1590,6 +1590,183 @@ function rebaseURL(url, baseURL) {
 return HFramesetDefinition;	
 })();
 
+var cssText = [
+'* { box-sizing: border-box; }',
+'*[hidden] { display: none !important; }',
+'html, body { width: 100%; height: 100%; margin: 0; padding: 0; }',
+'hf-frame, hf-body, hf-panel, hf-hbox, hf-vbox, hf-deck { display: block; width: 100%; height: 100%; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+'hf-vbox { width: 100%; height: 100%; overflow: hidden; }',
+'hf-hbox { width: 100%; height: 100%; overflow: hidden; white-space: nowrap; }',
+'hf-vbox > * { display: block; width: 100%; height: auto; overflow-y: auto; text-align: left; }',
+'hf-hbox > * { display: inline-block; width: auto; height: 100%; overflow-x: auto; vertical-align: top; white-space: normal; }'
+].join('\n');
+
+var style = document.createElement('style');
+styleText(style, cssText);
+document.head.insertBefore(style, document.head.firstChild);
+
+var Panel = (function() {
+
+var Panel = sprockets.evolve(sprockets.RoleType, {
+
+role: 'panel',
+
+});
+
+_.assign(Panel, {
+
+attached: function() {
+	var height = this.attr('height');
+	if (height) this.css('height', height); // FIXME units
+	var width = this.attr('width');
+	if (width) this.css('width', width); // FIXME units
+}
+
+});
+
+return Panel;
+})();
+
+var Box = (function() {
+
+var Box = sprockets.evolve(sprockets.RoleType, {
+
+role: 'group',
+
+owns: {
+	get: function() { return _.filter(this.element.children, function(el) { return DOM.matches(el, 'hf-hbox, hf-vbox, hf-deck, hf-panel'); }); }
+}
+
+});
+
+_.assign(Box, {
+
+attached: function() {
+	var height = this.attr('height');
+	if (height) this.css('height', height); // FIXME units
+	var width = this.attr('width');
+	if (width) this.css('width', width); // FIXME units
+},
+
+enteredDocument: function() {
+	var element = this.element;
+	var nodes = _.toArray(element.childNodes);
+	_.forEach(nodes, function(node) {
+		if (DOM.matches(node, 'hf-hbox, hf-vbox, hf-deck, hf-panel')) return; // FIXME doesn't take into account custom ns and other layout tags
+		switch (node.nodeType) {
+		case 1:
+			node.hidden = true;
+			return;
+		case 3:
+			if (/^\s*$/.test(node.nodeValue )) {
+				element.removeChild(node);
+				return;
+			}
+			var wbr = element.ownerDocument.createElement('wbr');
+			wbr.hidden = true;
+			element.replaceChild(wbr, node);
+			wbr.appendChild(node);
+			return;
+		default:
+			return;
+		}
+	});
+}
+
+});
+return Box;
+})();
+
+var VBox = (function() {
+
+var VBox = sprockets.evolve(Box, {
+});
+
+_.assign(VBox, {
+
+attached: function() {
+	Box.attached.call(this);
+	var hAlign = this.attr('align'); // FIXME assert left/center/right/justify - also start/end (stretch?)
+	if (hAlign) this.css('text-align', hAlign); // NOTE defaults defined in <style> above
+},
+
+enteredDocument: function() {
+	Box.enteredDocument.call(this);
+	_.forEach(this.ariaGet('owns'), function(panel) {
+	});
+}
+
+});
+
+return VBox;
+})();
+
+var HBox = (function() {
+
+var HBox = sprockets.evolve(Box, {
+});
+
+_.assign(HBox, {
+
+attached: function() {
+	Box.attached.call(this);
+},
+
+enteredDocument: function() {
+	Box.enteredDocument.call(this);
+	var vAlign = this.attr('vAlign'); // FIXME assert top/middle/bottom/baseline - also start/end (stretch?)
+	_.forEach(this.ariaGet('owns'), function(panel) {
+		if (vAlign) panel.$.css('vertical-align', vAlign);
+	});
+}
+
+});
+
+return HBox;
+})();
+
+var Deck = (function() {
+
+var Deck = sprockets.evolve(Box, {
+
+activedescendant: {
+	set: function(item) {
+		
+		var element = this.element;
+		var panels = this.ariaGet('owns');
+		if (!_.contains(panels, item)) throw Error('set activedescendant failed: item is not child of deck');
+		_.forEach(panels, function(child) {
+			if (child === item) child.ariaToggle('hidden', false);
+			else child.ariaToggle('hidden', true);
+		});
+	
+	}
+}
+
+	
+});
+
+_.assign(Deck, {
+
+attached: function() {
+	Box.attached.call(this);
+},
+
+enteredDocument: function() {
+	Box.enteredDocument.call(this);
+	this.ariaSet('activedescendant', this.ariaGet('owns')[0]);
+}
+
+});
+
+return Deck;
+})();
+
+sprockets.registerElement('hf-panel', Panel);
+
+sprockets.registerElement('hf-vbox', VBox);
+
+sprockets.registerElement('hf-hbox', HBox);
 
 var HFrame = (function() {
 
@@ -2034,10 +2211,10 @@ start: function(startOptions) {
 				whenVisible(frame.element)
 				.then(function() {
 					var parentFrame;
-					var parent = DOM.closest(frame.element.parentNode, framer.definition.cdom.mkSelector('frame'));
+					var parent = DOM.closest(frame.element.parentNode, framer.definition.cdom.mkSelector('frame')); // TODO frame.element.parentNode.ariaClosest('frame')
 					if (parent) parentFrame = HFrame(parent);
 					else {
-						parent = document.body; // TODO  should this be closest(frame.element.parentNode, 'body'); 
+						parent = document.body; // TODO  frame.elenent.parentNode.ariaClosest('frameset'); 
 						parentFrame = HFrameset(parent);
 					}
 					frame.parentFrame = parentFrame;
