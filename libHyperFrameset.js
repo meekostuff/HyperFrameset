@@ -1594,11 +1594,11 @@ var cssText = [
 '* { box-sizing: border-box; }',
 '*[hidden] { display: none !important; }',
 'html, body { width: 100%; height: 100%; margin: 0; padding: 0; }',
-'hf-frame, hf-body, hf-panel, hf-hpanels, hf-vpanels, hf-deck { display: block; width: 100%; height: 100%; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
-'hf-vpanels { width: 100%; height: 100%; overflow: hidden; }',
-'hf-hpanels { width: 100%; height: 100%; overflow: hidden; white-space: nowrap; }',
-'hf-vpanels > * { display: block; width: 100%; height: auto; overflow-y: auto; text-align: left; }',
-'hf-hpanels > * { display: inline-block; width: auto; height: 100%; overflow-x: auto; vertical-align: top; white-space: normal; }'
+'hf-frame, hf-body, hf-panel, hf-hlayout, hf-vlayout, hf-deck { display: block; width: 100%; height: 100%; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+'hf-vlayout { width: 100%; height: 100%; overflow: hidden; }',
+'hf-hlayout { width: 100%; height: 100%; overflow: hidden; white-space: nowrap; }',
+'hf-vlayout > * { display: block; width: 100%; height: auto; overflow-y: auto; text-align: left; }',
+'hf-hlayout > * { display: inline-block; width: auto; height: 100%; overflow-x: auto; vertical-align: top; white-space: normal; }'
 ].join('\n');
 
 var style = document.createElement('style');
@@ -1627,19 +1627,19 @@ attached: function() {
 return Panel;
 })();
 
-var Panels = (function() {
+var Layout = (function() {
 
-var Panels = sprockets.evolve(sprockets.RoleType, {
+var Layout = sprockets.evolve(sprockets.RoleType, {
 
 role: 'group',
 
 owns: {
-	get: function() { return _.filter(this.element.children, function(el) { return DOM.matches(el, 'hf-hpanels, hf-vpanels, hf-deck, hf-panel'); }); }
+	get: function() { return _.filter(this.element.children, function(el) { return DOM.matches(el, 'hf-hlayout, hf-vlayout, hf-deck, hf-panel'); }); }
 }
 
 });
 
-_.assign(Panels, {
+_.assign(Layout, {
 
 attached: function() {
 	var height = this.attr('height');
@@ -1652,7 +1652,7 @@ enteredDocument: function() {
 	var element = this.element;
 	var nodes = _.toArray(element.childNodes);
 	_.forEach(nodes, function(node) {
-		if (DOM.matches(node, 'hf-hpanels, hf-vpanels, hf-deck, hf-panel')) return; // FIXME doesn't take into account custom ns and other layout tags
+		if (DOM.matches(node, 'hf-hlayout, hf-vlayout, hf-deck, hf-panel')) return; // FIXME doesn't take into account custom ns and other layout tags
 		switch (node.nodeType) {
 		case 1:
 			node.hidden = true;
@@ -1674,46 +1674,46 @@ enteredDocument: function() {
 }
 
 });
-return Panels;
+return Layout;
 })();
 
-var VPanels = (function() {
+var VLayout = (function() {
 
-var VPanels = sprockets.evolve(Panels, {
+var VLayout = sprockets.evolve(Layout, {
 });
 
-_.assign(VPanels, {
+_.assign(VLayout, {
 
 attached: function() {
-	Panels.attached.call(this);
+	Layout.attached.call(this);
 	var hAlign = this.attr('align'); // FIXME assert left/center/right/justify - also start/end (stretch?)
 	if (hAlign) this.css('text-align', hAlign); // NOTE defaults defined in <style> above
 },
 
 enteredDocument: function() {
-	Panels.enteredDocument.call(this);
+	Layout.enteredDocument.call(this);
 	_.forEach(this.ariaGet('owns'), function(panel) {
 	});
 }
 
 });
 
-return VPanels;
+return VLayout;
 })();
 
-var HPanels = (function() {
+var HLayout = (function() {
 
-var HPanels = sprockets.evolve(Panels, {
+var HLayout = sprockets.evolve(Layout, {
 });
 
-_.assign(HPanels, {
+_.assign(HLayout, {
 
 attached: function() {
-	Panels.attached.call(this);
+	Layout.attached.call(this);
 },
 
 enteredDocument: function() {
-	Panels.enteredDocument.call(this);
+	Layout.enteredDocument.call(this);
 	var vAlign = this.attr('vAlign'); // FIXME assert top/middle/bottom/baseline - also start/end (stretch?)
 	_.forEach(this.ariaGet('owns'), function(panel) {
 		if (vAlign) panel.$.css('vertical-align', vAlign);
@@ -1722,12 +1722,12 @@ enteredDocument: function() {
 
 });
 
-return HPanels;
+return HLayout;
 })();
 
 var Deck = (function() {
 
-var Deck = sprockets.evolve(Panels, {
+var Deck = sprockets.evolve(Layout, {
 
 activedescendant: {
 	set: function(item) {
@@ -1749,11 +1749,11 @@ activedescendant: {
 _.assign(Deck, {
 
 attached: function() {
-	Panels.attached.call(this);
+	Layout.attached.call(this);
 },
 
 enteredDocument: function() {
-	Panels.enteredDocument.call(this);
+	Layout.enteredDocument.call(this);
 	this.ariaSet('activedescendant', this.ariaGet('owns')[0]);
 }
 
@@ -1763,8 +1763,8 @@ return Deck;
 })();
 
 sprockets.registerElement('hf-panel', Panel);
-sprockets.registerElement('hf-vpanels', VPanels);
-sprockets.registerElement('hf-hpanels', HPanels);
+sprockets.registerElement('hf-vlayout', VLayout);
+sprockets.registerElement('hf-hlayout', HLayout);
 
 var HFrame = (function() {
 
