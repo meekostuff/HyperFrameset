@@ -721,7 +721,7 @@ function normalize(doc, details) {
 
 	var baseURL = URL(details.url);
 
-	_.forEach(DOM.findAll('script', doc), function(node) {
+	_.forEach(DOM.findAll('script', doc), function(node) { // FIXME is this needed anymore, now older browsers are not supported?
 		if (!node.type || /^text\/javascript$/i.test(node.type)) node.type = 'text/javascript?disabled';
 	});
 
@@ -1511,7 +1511,7 @@ init: function(doc, settings) {
 	body.parentNode.removeChild(body);
 	frameset.document = doc;
 	frameset.element = body;
-	var frameElts = DOM.findAll(cdom.mkSelector('frame'), body); // TODO body.ariaFindAll('frame')
+	var frameElts = DOM.findAll(cdom.mkSelector('frame'), body);
 	var frameDefElts = [];
 	var frameRefElts = [];
 	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
@@ -1594,7 +1594,7 @@ var cssText = [
 '* { box-sizing: border-box; }',
 '*[hidden] { display: none !important; }',
 'html, body { width: 100%; height: 100%; margin: 0; padding: 0; }',
-'hf-frame, hf-body, hf-panel, hf-hlayout, hf-vlayout, hf-deck { display: block; width: 100%; height: 100%; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+'hf-frame, hf-body, hf-panel, hf-hlayout, hf-vlayout, hf-deck hf-rdeck { display: block; width: 100%; height: 100%; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
 'hf-vlayout { width: 100%; height: 100%; overflow: hidden; }',
 'hf-hlayout { width: 100%; height: 100%; overflow: hidden; white-space: nowrap; }',
 'hf-vlayout > * { display: block; width: 100%; height: auto; overflow-y: auto; text-align: left; }',
@@ -1620,6 +1620,8 @@ attached: function() {
 	if (height) this.css('height', height); // FIXME units
 	var width = this.attr('width');
 	if (width) this.css('width', width); // FIXME units
+	var minWidth = this.attr('minwidth');
+	if (minWidth) this.css('min-width', minWidth); // FIXME units
 }
 
 });
@@ -1627,14 +1629,14 @@ attached: function() {
 return Panel;
 })();
 
-var Layout = (function() {
+var Layout = (function() { // a Layout is a list of Panel (or other Layout) and perhaps separators for hlayout, vlayout
 
 var Layout = sprockets.evolve(sprockets.RoleType, {
 
 role: 'group',
 
 owns: {
-	get: function() { return _.filter(this.element.children, function(el) { return DOM.matches(el, 'hf-hlayout, hf-vlayout, hf-deck, hf-panel'); }); }
+	get: function() { return _.filter(this.element.children, function(el) { return DOM.matches(el, 'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck, hf-panel'); }); }
 }
 
 });
@@ -1642,17 +1644,14 @@ owns: {
 _.assign(Layout, {
 
 attached: function() {
-	var height = this.attr('height');
-	if (height) this.css('height', height); // FIXME units
-	var width = this.attr('width');
-	if (width) this.css('width', width); // FIXME units
+	Panel.attached.call(this);
 },
 
 enteredDocument: function() {
 	var element = this.element;
 	var nodes = _.toArray(element.childNodes);
 	_.forEach(nodes, function(node) {
-		if (DOM.matches(node, 'hf-hlayout, hf-vlayout, hf-deck, hf-panel')) return; // FIXME doesn't take into account custom ns and other layout tags
+		if (DOM.matches(node, 'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck, hf-panel')) return; // FIXME doesn't take into account custom ns and other layout tags
 		switch (node.nodeType) {
 		case 1:
 			node.hidden = true;
@@ -1674,6 +1673,7 @@ enteredDocument: function() {
 }
 
 });
+
 return Layout;
 })();
 
@@ -1714,7 +1714,7 @@ attached: function() {
 
 enteredDocument: function() {
 	Layout.enteredDocument.call(this);
-	var vAlign = this.attr('vAlign'); // FIXME assert top/middle/bottom/baseline - also start/end (stretch?)
+	var vAlign = this.attr('align'); // FIXME assert top/middle/bottom/baseline - also start/end (stretch?)
 	_.forEach(this.ariaGet('owns'), function(panel) {
 		if (vAlign) panel.$.css('vertical-align', vAlign);
 	});
@@ -1762,9 +1762,48 @@ enteredDocument: function() {
 return Deck;
 })();
 
+var ResponsiveDeck = (function() {
+
+var ResponsiveDeck = sprockets.evolve(Deck, {
+	
+});
+
+_.assign(ResponsiveDeck, {
+
+attached: function() {
+	Deck.attached.call(this);
+},
+
+enteredDocument: function() {
+	Deck.enteredDocument.call(this);
+	var width = parseFloat(window.getComputedStyle(this.element, null).width);
+	var panels = this.ariaGet('owns');
+	var activePanel;
+	_.some(panels, function(panel) {
+		var minWidth = window.getComputedStyle(panel, null).minWidth;
+		if (minWidth == null || minWidth === '' || minWidth === '0px') {
+			activePanel = panel;
+			return true;
+		}
+		minWidth = parseFloat(minWidth); // FIXME minWidth should be "NNNpx" but need to test
+		if (minWidth > width) return false;
+		activePanel = panel;
+		return true;
+	});
+	if (activePanel) this.ariaSet('activedescendant', activePanel);
+}
+
+});
+
+return ResponsiveDeck;
+})();
+
+
 sprockets.registerElement('hf-panel', Panel);
 sprockets.registerElement('hf-vlayout', VLayout);
 sprockets.registerElement('hf-hlayout', HLayout);
+sprockets.registerElement('hf-deck', Deck);
+sprockets.registerElement('hf-rdeck', ResponsiveDeck);
 
 var HFrame = (function() {
 
