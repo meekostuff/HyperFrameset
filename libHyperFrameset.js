@@ -1594,11 +1594,15 @@ var cssText = [
 '* { box-sizing: border-box; }',
 '*[hidden] { display: none !important; }',
 'html, body { width: 100%; height: 100%; margin: 0; padding: 0; }',
-'hf-frame, hf-body, hf-panel, hf-hlayout, hf-vlayout, hf-deck hf-rdeck { display: block; width: 100%; height: 100%; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
-'hf-vlayout { width: 100%; height: 100%; overflow: hidden; }',
-'hf-hlayout { width: 100%; height: 100%; overflow: hidden; white-space: nowrap; }',
-'hf-vlayout > * { display: block; width: 100%; height: auto; overflow-y: auto; text-align: left; }',
-'hf-hlayout > * { display: inline-block; width: auto; height: 100%; overflow-x: auto; vertical-align: top; white-space: normal; }'
+'body { overflow: hidden; }',
+'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck { display: block; width: 100%; height: 100%; overflow: hidden; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+'hf-frame, hf-panel { display: block; width: auto; height: auto; overflow: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+'hf-body { display: block; width: auto; height: auto; overflow: hidden; margin: 0; }',
+'hf-vlayout { height: 100%; overflow: hidden; }',
+'hf-hlayout { width: 100%; overflow: hidden; white-space: nowrap; }',
+'hf-vlayout > * { display: block; width: 100%; height: auto; text-align: left; }',
+'hf-hlayout > * { display: inline-block; width: auto; height: 100%; vertical-align: top; white-space: normal; }',
+'hf-deck > * { width: 100%; height: 100%; }',
 ].join('\n');
 
 var style = document.createElement('style');
@@ -1636,7 +1640,7 @@ var Layout = sprockets.evolve(sprockets.RoleType, {
 role: 'group',
 
 owns: {
-	get: function() { return _.filter(this.element.children, function(el) { return DOM.matches(el, 'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck, hf-panel'); }); }
+	get: function() { return _.filter(this.element.children, function(el) { return DOM.matches(el, 'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck, hf-panel, hf-frame'); }); }
 }
 
 });
@@ -1649,9 +1653,14 @@ attached: function() {
 
 enteredDocument: function() {
 	var element = this.element;
+	var parent = element.parentNode;
+	if (DOM.matches(parent, 'hf-body')) {
+		parent.$.css('height', '100%');
+		parent.$.css('width', '100%');
+	}
 	var nodes = _.toArray(element.childNodes);
 	_.forEach(nodes, function(node) {
-		if (DOM.matches(node, 'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck, hf-panel')) return; // FIXME doesn't take into account custom ns and other layout tags
+		if (DOM.matches(node, 'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck, hf-panel, hf-frame')) return; // FIXME doesn't take into account custom ns and other layout tags
 		switch (node.nodeType) {
 		case 1:
 			node.hidden = true;
@@ -1798,7 +1807,7 @@ enteredDocument: function() {
 return ResponsiveDeck;
 })();
 
-
+// FIXME these registrations don't take into account custom ns
 sprockets.registerElement('hf-panel', Panel);
 sprockets.registerElement('hf-vlayout', VLayout);
 sprockets.registerElement('hf-hlayout', HLayout);
@@ -1867,6 +1876,12 @@ insert: function(bodyElement) { // FIXME need a teardown method that releases ch
 	frame.element.appendChild(bodyElement);
 	frame.bodyElement = bodyElement;
 },
+
+});
+
+_.assign(HFrame, {
+
+attached: Panel.attached
 
 });
 
@@ -2238,6 +2253,7 @@ start: function(startOptions) {
 		sprockets.registerElement(framer.definition.cdom.mkSelector('frame'), {
 			prototype: HFrame.prototype,
 			attached: function() {
+				HFrame.attached.call(this);
 				var frame = this;
 				var defId = frame.attr('def');
 				frame.definition = framer.definition.frames[defId];
