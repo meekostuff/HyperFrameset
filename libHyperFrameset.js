@@ -1591,18 +1591,23 @@ return HFramesetDefinition;
 })();
 
 var cssText = [
-'* { box-sizing: border-box; }',
-'*[hidden] { display: none !important; }',
+'* { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
+'*[hidden] { display: none !important; }', // TODO maybe not !important
 'html, body { width: 100%; height: 100%; margin: 0; padding: 0; }',
 'body { overflow: hidden; }',
 'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck { display: block; width: 100%; height: 100%; overflow: hidden; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
 'hf-frame, hf-panel { display: block; width: auto; height: auto; overflow: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
 'hf-body { display: block; width: auto; height: auto; overflow: hidden; margin: 0; }',
 'hf-vlayout { height: 100%; overflow: hidden; }',
-'hf-hlayout { width: 100%; overflow: hidden; white-space: nowrap; }',
+'hf-hlayout { width: 100%; overflow: hidden; }',
 'hf-vlayout > * { display: block; width: 100%; height: auto; text-align: left; }',
-'hf-hlayout > * { display: inline-block; width: auto; height: 100%; vertical-align: top; white-space: normal; }',
+'hf-hlayout > * { display: block; float: left; width: auto; height: 100%; vertical-align: top; }',
+'hf-hlayout::after { clear: both; }',
 'hf-deck > * { width: 100%; height: 100%; }',
+
+// FIXME use something other than @is
+'hf-body[is=hf-layout] { width: 100%; height: 100%; }',
+'hf-body[is=hf-layout] > *[is=hf-block] { display: block; overflow: auto; }'
 ].join('\n');
 
 var style = document.createElement('style');
@@ -1655,11 +1660,38 @@ enteredDocument: function() {
 	var element = this.element;
 	var parent = element.parentNode;
 	if (DOM.matches(parent, 'hf-body')) {
-		parent.$.css('height', '100%');
-		parent.$.css('width', '100%');
+		parent.setAttribute('is', 'hf-layout');
+		_.forEach(_.toArray(parent.childNodes), normalizeParentsChild, parent);
 	}
-	var nodes = _.toArray(element.childNodes);
-	_.forEach(nodes, function(node) {
+	_.forEach(_.toArray(element.childNodes), normalizeChild, element);
+	return;
+
+	// TODO the normalize* functions could be consolidated
+	function normalizeParentsChild(node) {
+		var parent = this;
+		if (DOM.matches(node, 'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck, hf-panel, hf-frame')) return; // FIXME doesn't take into account custom ns and other layout tags
+		if (DOM.matches(node, '[is=hf-block]')) return;
+		switch (node.nodeType) {
+		case 1:
+			node.setAttribute('is', 'hf-block');
+			return;
+		case 3:
+			if (/^\s*$/.test(node.nodeValue )) {
+				parent.removeChild(node);
+				return;
+			}
+			var div = parent.ownerDocument.createElement('div');
+			div.setAttribute('is', 'hf-block');
+			parent.replaceChild(div, node);
+			div.appendChild(node);
+			return;
+		default:
+			return;
+		}
+	}
+	
+	function normalizeChild(node) {
+		var element = this;
 		if (DOM.matches(node, 'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck, hf-panel, hf-frame')) return; // FIXME doesn't take into account custom ns and other layout tags
 		switch (node.nodeType) {
 		case 1:
@@ -1678,7 +1710,7 @@ enteredDocument: function() {
 		default:
 			return;
 		}
-	});
+	}
 }
 
 });
