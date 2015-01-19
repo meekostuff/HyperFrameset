@@ -1604,6 +1604,7 @@ var cssText = [
 'hf-hlayout > * { display: block; float: left; width: auto; height: 100%; vertical-align: top; }',
 'hf-hlayout::after { clear: both; }',
 'hf-deck > * { width: 100%; height: 100%; }',
+'hf-rdeck > * { width: 0; height: 0; }',
 
 // FIXME use something other than @is
 'hf-body[is=hf-layout] { width: 100%; height: 100%; }',
@@ -1831,7 +1832,11 @@ enteredDocument: function() {
 		activePanel = panel;
 		return true;
 	});
-	if (activePanel) this.ariaSet('activedescendant', activePanel);
+	if (activePanel) {
+		activePanel.$.css('height', '100%');
+		activePanel.$.css('width', '100%');
+		this.ariaSet('activedescendant', activePanel);
+	}
 }
 
 });
