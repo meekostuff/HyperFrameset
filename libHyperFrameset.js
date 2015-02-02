@@ -3151,7 +3151,7 @@ function findAll(context, selectorGroup, variables) {
 
 var uidIndex = 0;
 function expandSelector(context, selectorGroup, variables) { // FIXME currently only implements `context` expansion
-	var isRoot = context.nodeType === 9;
+	var isRoot = context.nodeType === 9 || context.nodeType === 11;
 	var id;
 	if (!isRoot) {
 		id = context.id;
