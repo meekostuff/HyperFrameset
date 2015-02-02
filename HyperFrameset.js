@@ -5061,6 +5061,7 @@ evaluate: function(query, context, variables, type) {
 	}
 	var node = find(context, selector, variables);
 	if (attr) {
+		attr = _.trim(attr);
 		if (attr.charAt(0) === '@') attr = attr.substr(1);
 	}
 
