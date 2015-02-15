@@ -8,8 +8,12 @@ HyperFrameset is a light-weight Javascript [transclusion](http://en.wikipedia.or
 and layout engine which runs in the browser.
 Whilst the implementation relies on AJAX and `history.pushState`,
 conceptually the design is an evolution of HTMLFramesets.
+
 The primary advance is that the landing page initiates loading of
-the frameset document, not the other way round. 
+the frameset document, not the other way round.
+HyperFrameset is consistent with the principles of
+[Progressive Enhancement](http://en.wikipedia.org/wiki/Progressive_enhancement) and
+[Resource Oriented Client Architecture](http://roca-style.org/ "ROCA").
 
 **WARNING:** THIS PROJECT IS ALPHA SOFTWARE. ONLY USE IT FOR EXPERIMENTATION.
 
@@ -706,7 +710,7 @@ Frameset Definition
 
 The frameset definition is created by processing the `<body>` of the frameset document.
 Every `<hf-frame>` is **both** a frame definition and a frame declaration,
-unless it has a `def` attribute in which case it is only a declaration.
+unless it has a `def` attribute in which case it is only a declaration - `@def` will contain the ID of a frame definition. 
 
 Each frame definition is added to the list of definitions maintained in the frameset definition.
 
@@ -714,11 +718,11 @@ Each frame declaration has its children - if any - removed.
 
 The result of this processing is list of frame definitions which contain
 zero or more frame declarations as descendants.
-Likewise, the `<body>` will contain zero (but probably more) frame declarations as descendants.
+Likewise, the `<body>` will contain one or more frame declarations as descendants.
 
 After processing, the `<body>` is inserted into the browser view.
 Its contained frame declarations are automatically handled,
-typically by fetching and rendering the frame `src`.
+typically by fetching and rendering the frame `@src`.
 These renderings may insert more frame declarations which are again automatically handled.
 
 ### Configuration
@@ -766,7 +770,152 @@ Frame Definition
 		</hf-body>
 	</hf-frame>
 	
-**TODO:** `<hf-body>`, `<hf-transform>`
+### `<hf-frame>`
+
+A frame definition must contain one or more `<hf-body>` elements.
+
+If it is to be referenced by other frame declarations then it must also have an `@id`.
+
+Since a frame definition is also a frame declaration it will typically contain
+other attributes detailed in the [Frame Declaration](#Frame_Declaration) section.
+
+### `<hf-body>`
+
+A frame body is a container for frame content.
+
+Within a frame definition it will contain one or more `<hf-transform>` child elements.
+
+Within the browser view it will contain a processed representation of the document fetched from the frame's `@src`.
+The processing involves applying each of the child transforms in turn -
+the first transform is applied to the `@src` document,
+subsequent transforms are fed the output of the previous transform.
+
+**TODO:** `@condition`: `loaded`, `loading`, `uninitialized`
+**TODO:** transition details
+
+### `<hf-transform>`
+
+The type of the transform is selected with `@type`.
+
+There are three built-in transform types: `main`, `script`, `hazard`.
+
+#### `main`
+
+	<hf-transform type="main" main=".content">
+	</hf-transform>
+	
+This transform identifies a single element in the source document that contains the primary content -
+the identified element is not included in the primary content. 
+This element can be identified with a CSS selector in the `main` attribute, e.g. `main=".content"`.
+If `@main` is not defined then a sequential search is performed with `main`, then `[role=main]`, then `body`.
+
+The transform element will contain no markup.
+
+#### `script`
+
+The transform SHOULD have a format like
+
+	<hf-transform type="script">
+    <script>
+	({
+		transform: function(fragment) { }
+	})
+	</script>
+	</hf-transform>
+    
+The script MUST NOT have a `src` attribute, and is evaluated with
+
+    (Function('return (' + script.text + ');'))()
+
+to generate a `processor` object for the transform. The transformation is performed by calling
+	
+	processor.transform(fragment);
+	
+which is passed either the source document or a document-fragment,
+and must return a document-fragment. 
+
+#### `hazard`
+
+	<hf-transform type="hazard" format="css">
+	<!-- Your HTML template here -->
+	<nav>
+	  <div haz:each=".navigation ul li">
+	    <span expr:_html="a"></span><!-- span.innerHTML = a.outerHTML -->
+	  </div>
+	</nav>
+	</hf-transform>
+
+This provides a simple templating service.
+The content will be HTML with special templating attributes,
+which include directives such as `@haz:if`
+and data expressions such as `@expr:href`.
+
+Directives and data expressions are interpreted using a data provider
+which is selected by `@format`. Currently the only `format` option is `css`.
+
+##### Directives
+
+###### `@haz:if`
+
+	<element haz:if="expression">
+
+The element will be part of the output only if the expression evaluates to `true`.
+
+###### `@haz:unless`
+
+	<element haz:unless="expression">
+
+The element will be part of the output only if the expression evaluates to `false`.
+
+###### `@haz:each`
+
+	<element haz:each="expression">
+
+The element will be repeated in the output for each item found by the expression.
+If zero items are found then the element will not be in the output at all.
+
+###### `@haz:template`
+
+	<element haz:template="ID">
+
+The element will be *replaced* with the element identified by `ID`.
+This template must be in the *current* hazard transform.
+Directives are stripped from the template and any directives on the current element are applied.
+
+##### Data Expressions
+
+These attributes have a name composed of a prefix then a colon (:) then a regular attribute name, e.g.
+
+	expr:href
+	
+The prefix determines how the expression given in the attribute value is processed.
+After processing the unprefixed attribute is set to the returned value.
+
+If the returned value is `boolean` then the attribute is either removed (`false`) or added as an empty attribute (`true`).
+
+If the attribute name is `_html` then the `innerHTML` of the element is set to the returned value
+(or if a node is returned then all current children of the element are reoved and the node is appended to the element).
+
+If the attribute name is `_text` then the `textContent` of the element is set to the returned value.
+
+There are two possible prefixes: `expr` and `mexpr`.
+
+*`expr:`* attribute values have the form (FIXME BNF or something)
+
+	css-selector {attribute-name} | javascript-snippet | javascript-snippet
+	
+`javascript-snippet`s are optional as is the `{attribute-name}`.
+
+`attribute-name` can be a regular attribute or `_html` (for `innerHTML`) or `_text` (for `textContent`).
+
+`javascript-snippet`s are evaluated with
+
+    (Function("value", 'return (' + snippet + ');'))()
+
+so the snippet can use `value` as the input and must return the desired result.
+
+*mexpr:`* attribute values are plain-text with sections bounded by `{{` and `}}` being interpolated by the algorithm of `expr:` attributes.
+
 
 ### Configuration
 
@@ -918,18 +1067,6 @@ The most useful of these are include:
 	- `origin`, `basepath`, `base`, `filename`, `nosearch`, `nohash` **(Extensions)**  
 	The URL object also has the `resolve(relativeURL)` method which performs a
 	fast conversion of a relative URL to absolute, using itself for the `baseURL`.
-	
-+ `Meeko.DOM.$id`
-	This is short-hand for `document.getElementById` (typically aliased to `$id` in a code block)
-
-+ `Meeko.DOM.$$`
-	This is short-hand for `document.querySelector` (typically aliased to `$$` in a code block)
-
-+ `Meeko.DOM.$$`
-	This is short-hand for `document.querySelectorAll` (typically aliased to `$$` in a code block)
-
-+ `Meeko.sprockets`
-	This provides functionality similar to Custom Elements. See the [DOMSprockets project](http://github.com/meekostuff/DOMSprockets)
 
 
 Debugging
@@ -937,15 +1074,6 @@ Debugging
 
 By default, HyperFrameset logs error and warning messages to the browser console.
 The logger can be configured to provide info and debug messages (see Configuration).
-
-External code is called from HyperFrameset (e.g. nodeInserted / nodeRemoved hooks)
-using [event dispatch](http://dean.edwards.name/weblog/2009/03/callbacks-vs-events/)
-instead of `try / catch` blocks.
-This isolates HyperFrameset from errors in external code,
-but doesn't prevent errors and stack-traces being logged in the browser console.
-
-Unfortunately, Firefox [doesn't log errors in event-listeners](https://bugzilla.mozilla.org/show_bug.cgi?id=503244).
-You may find debugging easier in a different browser. 
 
 
 Notes and Warnings
@@ -956,10 +1084,6 @@ Notes and Warnings
 Detection for this hasn't been implemented yet. 
 - all stylesheets in the content document are removed before applying the frameset document. 
 This allows for a fallback styling option of frameset-less pages. 
-- URLs in `<style>` sections of the frameset are not resolved.
-This means that relative URLs - which are meant to be relative to the frameset URL - 
-will probably be wrong when imported into the page.
-The work-around for this is to use absolute-paths or absolute-URLs (which you should probably be using anyway).
 - There are no compatibility checks and warnings between the content and frameset documents (charset, etc)
 
 
