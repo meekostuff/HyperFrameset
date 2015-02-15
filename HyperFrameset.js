@@ -4175,8 +4175,10 @@ start: function(startOptions) {
 	function(framerConfig) { // initiate fetch of framesetURL
 		if (!framerConfig) throw Error('No frameset could be determined for this page');
 		framer.scope = framerConfig.scope; // FIXME shouldn't set this until loadFramesetDefinition() returns success
-		framer.framesetURL = framerConfig.framesetURL;
-		return httpProxy.load(framerConfig.framesetURL, { responseType: 'document' })
+		var framesetURL = URL(framerConfig.framesetURL);
+		if (framesetURL.hash) logger.info('Ignoring hash component of frameset URL: ' + framesetURL.hash);
+		framer.framesetURL = framesetURL.nohash;
+		return httpProxy.load(framer.framesetURL, { responseType: 'document' })
 		.then(function(response) {
 			var framesetDoc = response.document;
 			return new HFramesetDefinition(framesetDoc, framerConfig);
@@ -4490,7 +4492,11 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 		frames.push(frame);
 		return true;
 	});
-	var request = { method: 'get', url: url, responseType: 'document' }; // TODO one day may support different response-type
+	
+	var fullURL = URL(url);
+	var hash = fullURL.hash;
+	var nohash = fullURL.nohash;
+	var request = { method: 'get', url: nohash, responseType: 'document' }; // TODO one day may support different response-type
 	var response;
 
 	return pipe(null, [
@@ -4509,7 +4515,7 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 		});
 	},
 	function() {
-		return httpProxy.load(url, request)
+		return httpProxy.load(nohash, request)
 		.then(function(resp) { response = resp; });
 	},
 	function() {
@@ -4520,7 +4526,7 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 			// TODO details, resource, url, frames??
 			});
 	},
-	function() {
+	function() { // FIXME how to handle `hash` if present??
 		if (changeState) return historyManager.pushState(changeset, '', url, function(state) {
 				loadFrames(frames, response)
 			});
@@ -4562,11 +4568,15 @@ frameEntered: function(frame) {
 		return; // FIXME frame.load(null, { condition: 'uninitialized' })
 	}
 	
-	var request = { method: 'get', url: src, responseType: 'document'};
-	return pipe(null, [
+	var fullURL = URL(src);
+	var nohash = fullURL.nohash;
+	var hash = fullURL.hash;
+	
+	var request = { method: 'get', url: nohash, responseType: 'document'};
+	return pipe(null, [ // FIXME how to handle `hash` if present??
 	
 	function() { return frame.preload(request); },
-	function() { return httpProxy.load(src, request); },
+	function() { return httpProxy.load(nohash, request); },
 	function(response) { return frame.load(response); }
 
 	]);
