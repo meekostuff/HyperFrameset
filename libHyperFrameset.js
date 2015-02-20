@@ -2957,7 +2957,14 @@ transformTree: function(el, provider, context, variables) {
 	
 	// handle each
 	var subVars = _.defaults({}, variables);
-	var subContexts = provider.evaluate(haz._each, context, variables, 'array');
+	var subContexts;
+	try {
+		subContexts = provider.evaluate(haz._each, context, variables, 'array');
+	}
+	catch (err) {
+		logger.warn('Error evaluating @haz:each="' + haz._each + '". Assumed empty.');
+		return;
+	}
 	var result = document.createDocumentFragment(); // FIXME which is the right doc to create this frag in??
 	
 	_.forEach(subContexts, function(subContext) {
@@ -2970,12 +2977,25 @@ transformTree: function(el, provider, context, variables) {
 	return result;
 
 	function processNode(node, provider, context, variables) {
+		var keep;
 		if (haz._if !== false) {
-			var keep = provider.evaluate(haz._if, context, variables, 'boolean');
+			try {
+				keep = provider.evaluate(haz._if, context, variables, 'boolean');
+			}
+			catch (err) {
+				logger.warn('Error evaluating @haz:if="' + haz._if + '". Assumed false.');
+				keep = false;
+			}
 			if (!keep) return;
 		}
 		if (haz._unless !== false) {
-			var keep = !provider.evaluate(haz._unless, context, variables, 'boolean');
+			try {
+				var keep = !provider.evaluate(haz._unless, context, variables, 'boolean');
+			}
+			catch(err) {
+				logger.warn('Error evaluating @haz:unless="' + haz._unless + '". Assumed false.');
+				keep = true;
+			}
 			if (!keep) return;
 		}
 		return processor.transformNode(node, provider, context, variables); // NOTE return value === node
@@ -3022,33 +3042,42 @@ function transformSingleElement(el, provider, context, variables) {
 		el.removeAttribute(attr.name);
 		var expr = attr.value;
 		var type = (attrName === htmlAttr) ? 'node' : 'text';
-		var value = (prefix === mexprPrefix) ?
-			evalMExpression(expr, provider, context, variables, type) :
-			evalExpression(expr, provider, context, variables, type);
+		var value;
+		try {
+			value = (prefix === mexprPrefix) ?
+				evalMExpression(expr, provider, context, variables, type) :
+				evalExpression(expr, provider, context, variables, type);
+		}
+		catch (err) {
+			logger.warn('Error evaluating @' + attr.name + '="' + attr.value + '". Assumed false.');
+			value = false;
+		}
 		setAttribute(el, attrName, value);
 	});
 }
 
-function setAttribute(el, attrName, value) {	
+function setAttribute(el, attrName, value) {
+	var type = typeof value;
 	switch (attrName) {
 	case textAttr:
+		if (type === 'undefined' || type === 'boolean' || value == null) value = '';
 		textContent(el, value);
 		break;
 	case htmlAttr:
+		if (type === 'undefined' || type === 'boolean' || value == null) value = '';
 		el.innerHTML = '';
 		if (value && value.nodeType) el.appendChild(value);
 		else el.innerHTML = value;
 		break;
 	default:
-		switch (typeof value) {
-		case 'boolean':
-			if (value) el.removeAttribute(attrName);
+		if (type === 'undefined' || type === 'boolean' || value == null) {
+			if (!value) el.removeAttribute(attrName);
 			else el.setAttribute(attrName, '');
-			break;
-		default:
-			el.setAttribute(attrName, value.toString());
-			break;
 		}
+		else {
+			el.setAttribute(attrName, value.toString());
+		}
+		break;
 	}
 }
 
