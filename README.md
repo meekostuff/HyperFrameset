@@ -912,9 +912,9 @@ There are two possible prefixes: `expr` and `mexpr`.
 
     (Function("value", 'return (' + snippet + ');'))()
 
-so the snippet can use `value` as the input and must return the desired result.
+so the snippet can use `value` as the input and must evaluate to the desired result.
 
-*mexpr:`* attribute values are plain-text with sections bounded by `{{` and `}}` being interpolated by the algorithm of `expr:` attributes.
+*`mexpr:`* attribute values are plain-text with sections bounded by `{{` and `}}` being interpolated by the algorithm of `expr:` attributes.
 
 
 ### Configuration
