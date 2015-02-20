@@ -1593,9 +1593,11 @@ return HFramesetDefinition;
 var cssText = [
 '* { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
 '*[hidden] { display: none !important; }', // TODO maybe not !important
-'html, body { width: 100%; height: 100%; margin: 0; padding: 0; }',
-'body { overflow: hidden; }',
-'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck { display: block; width: 100%; height: 100%; overflow: hidden; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+'html, body { margin: 0; padding: 0; }',
+'html { width: 100%; height: 100%; }',
+'hf-layer { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; overflow: visible; }',
+'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck { display: block; width: 0; height: 0; overflow: hidden; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck { width: 100%; height: 100%; }', // FIXME should be 0,0 before manual calculations
 'hf-frame, hf-panel { display: block; width: auto; height: auto; overflow: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
 'hf-body { display: block; width: auto; height: auto; overflow: hidden; margin: 0; }',
 'hf-vlayout { height: 100%; overflow: hidden; }',
@@ -1605,15 +1607,32 @@ var cssText = [
 'hf-hlayout::after { clear: both; }',
 'hf-deck > * { width: 100%; height: 100%; }',
 'hf-rdeck > * { width: 0; height: 0; }',
-
-// FIXME use something other than @is
-'hf-body[is=hf-layout] { width: 100%; height: 100%; }',
-'hf-body[is=hf-layout] > *[is=hf-block] { display: block; overflow: auto; }'
 ].join('\n');
 
 var style = document.createElement('style');
 styleText(style, cssText);
 document.head.insertBefore(style, document.head.firstChild);
+
+var Layer = (function() {
+
+var Layer = sprockets.evolve(sprockets.RoleType, {
+
+role: 'layer'
+
+});
+
+var zIndex = 1;
+
+_.assign(Panel, {
+
+attached: function() {
+	this.css('z-index', zIndex++);
+}
+
+});
+
+return Layer;
+});
 
 var Panel = (function() {
 
@@ -1660,45 +1679,27 @@ attached: function() {
 enteredDocument: function() {
 	var element = this.element;
 	var parent = element.parentNode;
-	if (DOM.matches(parent, 'hf-body')) {
-		parent.setAttribute('is', 'hf-layout');
-		_.forEach(_.toArray(parent.childNodes), normalizeParentsChild, parent);
+	if (DOM.matches(parent, 'hf-layer')) { // TODO vh, vw not tested on various platforms
+		var height = this.attr('height'); // TODO css unit parsing / validation
+		if (!height) height = '100vh';
+		else height = height.replace('%', 'vh');
+		this.css('height', height); // FIXME units
+		var width = this.attr('width'); // TODO css unit parsing / validation
+		if (!width) width = '100vw';
+		else width = width.replace('%', 'vw');
+		if (width) this.css('width', width); // FIXME units
 	}
 	_.forEach(_.toArray(element.childNodes), normalizeChild, element);
 	return;
-
-	// TODO the normalize* functions could be consolidated
-	function normalizeParentsChild(node) {
-		var parent = this;
-		if (DOM.matches(node, 'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck, hf-panel, hf-frame')) return; // FIXME doesn't take into account custom ns and other layout tags
-		if (DOM.matches(node, '[is=hf-block]')) return;
-		switch (node.nodeType) {
-		case 1:
-			node.setAttribute('is', 'hf-block');
-			return;
-		case 3:
-			if (/^\s*$/.test(node.nodeValue )) {
-				parent.removeChild(node);
-				return;
-			}
-			var div = parent.ownerDocument.createElement('div');
-			div.setAttribute('is', 'hf-block');
-			parent.replaceChild(div, node);
-			div.appendChild(node);
-			return;
-		default:
-			return;
-		}
-	}
 	
 	function normalizeChild(node) {
 		var element = this;
 		if (DOM.matches(node, 'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck, hf-panel, hf-frame')) return; // FIXME doesn't take into account custom ns and other layout tags
 		switch (node.nodeType) {
-		case 1:
+		case 1: // hide non-layout elements
 			node.hidden = true;
 			return;
-		case 3:
+		case 3: // hide text nodes by wrapping in <wbr hidden>
 			if (/^\s*$/.test(node.nodeValue )) {
 				element.removeChild(node);
 				return;
@@ -1845,6 +1846,7 @@ return ResponsiveDeck;
 })();
 
 // FIXME these registrations don't take into account custom ns
+sprockets.registerElement('hf-layer', Layer);
 sprockets.registerElement('hf-panel', Panel);
 sprockets.registerElement('hf-vlayout', VLayout);
 sprockets.registerElement('hf-hlayout', HLayout);
