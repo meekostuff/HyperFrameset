@@ -739,7 +739,7 @@ function start() {
 			var dstHead = dstDoc.head;
 			empty(dstHead);
 			nextSiblings(selfMarker, function(srcNode) {
-				var node = srcNode.cloneNode(true);
+				var node = dstDoc.importNode(srcNode, true);
 				switch (getTagName(srcNode)) {
 				case '':
 					break;
