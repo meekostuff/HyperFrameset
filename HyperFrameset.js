@@ -2071,31 +2071,6 @@ var insertNode = function(conf, refNode, node) { // like imsertAdjacentHTML but 
 	return refNode;
 }
 
-var composeNode = function(srcNode, context) { // document.importNode() NOT available on IE <= 8
-	if (!context) context = document;
-	if (context.nodeType !== 9 && context.nodeType !== 11) throw Error('Non-document context in composeNode()');
-	if (srcNode.nodeType != 1) return;
-	var tag = getTagName(srcNode);
-	var node = context.createElement(tag);
-	copyAttributes(node, srcNode);
-	switch(tag) {
-	case 'title':
-		if (srcNode.innerHTML === '') node = null;
-		else node.innerText = srcNode.innerHTML;
-		break;
-	case 'style':
-		styleText(node, styleText(srcNode));
-		break;
-	case 'script':
-		scriptText(node, scriptText(srcNode));
-		break;
-	default: // meta, link, base have no content
-		// FIXME what to do with <base>?
-		break;
-	}
-	return node;
-}
-
 var textContent = document.documentElement.textContent ?
 function(el, text) { // NOTE https://developer.mozilla.org/en-US/docs/Web/API/Node.textContent#Differences_from_innerText
 	if (typeof text === 'undefined') return el.textContent;
@@ -2144,7 +2119,7 @@ var hasAttribute = function(node, attrName) { // WARN needs to be more complex f
 	return node.hasAttribute(attrName);
 }
 
-var copyAttributes = function(node, srcNode) { // helper for composeNode()
+var copyAttributes = function(node, srcNode) {
 	_.forEach(_.toArray(srcNode.attributes), function(attr) {
 		node.setAttribute(attr.name, attr.value); // WARN needs to be more complex for IE <= 7
 	});
@@ -2293,7 +2268,7 @@ _.defaults(DOM, {
 	getTagName: getTagName, hasAttribute: hasAttribute, matchesElement: matchesElement, // properties
 	siblings: siblings, firstChild: firstChild, // selections
 	copyAttributes: copyAttributes, removeAttributes: removeAttributes, textContent: textContent, scriptText: scriptText, // attrs
-	composeNode: composeNode, importSingleNode: importSingleNode, insertNode: insertNode, // nodes
+	importSingleNode: importSingleNode, insertNode: insertNode, // nodes
 	ready: domReady, addEvent: addEvent, removeEvent: removeEvent, // events
 	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
 	scrollToId: scrollToId
@@ -4048,7 +4023,6 @@ function mergeHead(dstDoc, srcHead, isFrameset) {
 			break;
 		case 'meta': // FIXME no duplicates, warn on clash
 			if (srcNode.httpEquiv) return;
-			if (/^\s*viewport\s*$/i.test(srcNode.name)) srcNode = composeNode(srcNode); // TODO Opera mobile was crashing. Is there another way to fix this?
 			break;
 		case 'style': 
 			break;
