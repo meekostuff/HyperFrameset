@@ -200,12 +200,6 @@ var cloneDocument = function(srcDoc, options) {
 	return doc;
 }
 
-var importSingleNode = function(srcNode, context) {
-	if (!context) context = document;
-	if (context.nodeType !== 9 && context.nodeType !== 11) throw Error('Non-document context for importSingleNode()');
-	return context.importNode(srcNode, false);
-}
-
 var scrollToId = function(id) { // FIXME this isn't being used
 	if (id) {
 		var el = DOM.findId(id);
@@ -312,7 +306,7 @@ _.defaults(DOM, {
 	getTagName: getTagName, hasAttribute: hasAttribute, matchesElement: matchesElement, // properties
 	siblings: siblings, firstChild: firstChild, // selections
 	copyAttributes: copyAttributes, removeAttributes: removeAttributes, textContent: textContent, scriptText: scriptText, // attrs
-	importSingleNode: importSingleNode, insertNode: insertNode, // nodes
+	insertNode: insertNode, // nodes
 	ready: domReady, addEvent: addEvent, removeEvent: removeEvent, // events
 	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
 	scrollToId: scrollToId
