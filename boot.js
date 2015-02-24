@@ -744,7 +744,7 @@ function start() {
 				case '':
 					break;
 				case 'script':
-					if (srcNode.type || /^text\/javascript$/i.test(srcNode.type)) break;
+					if (!srcNode.type || /^text\/javascript$/i.test(srcNode.type)) break;
 					// else fall-thru
 				default:
 					srcNode.parentNode.removeChild(srcNode);
