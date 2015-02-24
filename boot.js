@@ -385,10 +385,10 @@ function prepareScript(url, onload, onerror) { // create script (and insert if s
 		onload();
 	}
 	
-	function onError(err) { 
+	function onError(errEvent) { 
 		script.onerror = null;
 		script.onload = null;
-		onerror(err);
+		onerror(Error('An error occured while loading ' + script.src));
 	}	
 }
 
@@ -432,7 +432,7 @@ function queue(fnList, callback, errCallback) {
 function abort() {
 	if (aborted) return;
 	aborted = true;
-	if (list.length) errorback();
+	if (list.length) errorback(Error('Startup aborted'));
 }
 
 function errorback(err) {
