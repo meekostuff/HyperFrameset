@@ -365,7 +365,7 @@ var testScript = document.createElement('script');
 var supportsOnLoad = (testScript.setAttribute('onload', ';'), typeof testScript.onload === 'function');
 var supportsSync = (testScript.async === true);
 
-if (!supportsOnLoad && !testScript.readyState) throw "script.onload not supported in this browser";
+if (!supportsOnLoad) throw "script.onload not supported in this browser";
 
 function prepareScript(url, onload, onerror) { // create script (and insert if supportsSync)
 	var script = document.createElement('script');
@@ -392,45 +392,10 @@ function prepareScript(url, onload, onerror) { // create script (and insert if s
 	}	
 }
 
-function enableScript(script) { // insert script (if not already done). Insertion is delayed if preloading
+function enableScript(script) { // insert script if not already done, i.e. !supportsSync
 	// TODO assert (!!script.parentNode === supportsSync)
 	if (supportsSync) return;
-
-	if (supportsOnLoad) {
-		head.appendChild(script);
-		return;
-	}
-
-	/*
-		IE <= 8 don't implement script.onload, script.onerror.
-		But they do implement script preloading:
-			http://wiki.whatwg.org/wiki/Dynamic_Script_Execution_Order#readyState_.22preloading.22
-		Preloading starts as soon as `script.src` is set.
-		If the script isn't inserted then it completes when `script.readyState === 'loaded'`.
-		If the script is then inserted the readyState signals success as 'complete' and failure as 'loading'.
-	*/
-	script.onreadystatechange = onChange;
-	if (script.readyState == 'loaded') onChange();
-
-	function onChange() {
-		var readyState = script.readyState;
-		if (!script.parentNode) {
-			if (readyState === 'loaded') head.appendChild(script);
-			return;
-		}
-		switch (readyState) {
-		case "complete": // NOTE successfully loaded
-			script.onreadystatechange = null;
-			script.onload();
-			break;
-		case "loading": // NOTE load failure
-			script.onreadystatechange = null;
-			script.onerror();
-			break;
-		default: break;
-		}
-	}
-
+	head.appendChild(script);
 }
 
 function disableScript(script) {
