@@ -432,7 +432,7 @@ function queue(fnList, callback, errCallback) {
 function abort() {
 	if (aborted) return;
 	aborted = true;
-	if (list.length) errorback(Error('Startup aborted'));
+	errorback(Error('Startup aborted'));
 }
 
 function errorback(err) {
@@ -442,9 +442,11 @@ function errorback(err) {
 		// NOTE the only other option is a prepared script
 		disableScript(fn);
 	}
-	if (onerror) onerror(err);
+	
+	if (onerror) try { onerror(err); } catch (oops) { }
 	else setTimeout(function() { throw err; });
 
+	if (!aborted) abort();
 }
 
 function queueback() {
@@ -463,8 +465,7 @@ function queueback() {
 			return;
 		}
 	}
-	if (oncomplete) oncomplete();
-	return;
+	if (!aborted && oncomplete) oncomplete();
 }
 
 return {
