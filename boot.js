@@ -431,6 +431,7 @@ function queue(fnList, callback, errCallback) {
 
 function abort() {
 	if (aborted) return;
+	if (list.length <= 0) return;
 	aborted = true;
 	errorback(Error('Startup aborted'));
 }
