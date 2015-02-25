@@ -538,7 +538,7 @@ return new Promise(function(resolve, reject) {
 	function onchange() {
 		if (xhr.readyState != 4) return;
 		if (xhr.status != 200) { // FIXME what about other status codes?
-			reject(function() { throw Error('Unexpected status for XMLHttpRequest :' + xhr.status); });
+			reject(function() { throw Error('Unexpected status ' + xhr.status + ' for ' + url); });
 			return;
 		}
 		asap(onload); // Use delay to stop the readystatechange event interrupting other event handlers (on IE). 
