@@ -802,6 +802,12 @@ return new Promise(function(resolve, reject) {
 	
 	// TODO assert node is in document
 
+	if (!node.type || /^text\/javascript$/i.test(node.type)) {
+		logger.info('Attempt to queue already executed script ' + node.src);
+		resolve(); // TODO should this be reject() ??
+		return;
+	}
+
 	if (!/^text\/javascript\?disabled$/i.test(node.type)) {
 		logger.info('Unsupported script-type ' + node.type);
 		resolve(); // TODO should this be reject() ??
