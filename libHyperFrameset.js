@@ -2505,6 +2505,7 @@ navigate: function(url, changeset) { // FIXME doesn't support replaceState
 load: function(url, changeset, changeState) { // FIXME doesn't support replaceState
 	var framer = this;	
 	var frameset = framer.frameset;
+	var mustNotify = changeState || changeState === 0;
 	var target = changeset.target;
 	var frames = [];
 	recurseFrames(frameset, function(frame) {
@@ -2522,7 +2523,7 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 	return pipe(null, [
 
 	function() {
-		if (changeState) return notify({ // FIXME need a timeout on notify
+		if (mustNotify) return notify({ // FIXME need a timeout on notify
 			module: 'frameset',
 			type: 'leftState',
 			stage: 'before'
@@ -2539,7 +2540,7 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 		.then(function(resp) { response = resp; });
 	},
 	function() {
-		if (changeState) return notify({ // FIXME need a timeout on notify
+		if (mustNotify) return notify({ // FIXME need a timeout on notify
 			module: 'frameset',
 			type: 'enteredState',
 			stage: 'before'
@@ -2553,7 +2554,7 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 		else return loadFrames(frames, response);
 	},
 	function() { // FIXME need to wait for the DOM to stabilize before this notification
-		if (changeState) return notify({ // FIXME need a timeout on notify
+		if (mustNotify) return notify({ // FIXME need a timeout on notify
 			module: 'frameset',
 			type: 'enteredState',
 			stage: 'after'
@@ -2611,7 +2612,7 @@ onPopState: function(changeset) {
 		logger.warn('Popped state URL does not match address-bar URL.');
 		// FIXME needs an optional error recovery, perhaps reloading document.URL
 	}
-	framer.load(url, changeset);
+	framer.load(url, changeset, 0);
 }
 
 });
