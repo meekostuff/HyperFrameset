@@ -149,7 +149,8 @@ function legacy(el, val) { // really old non-IE
 	var textNode = el.firstChild;
 	if (typeof val === 'undefined') return textNode ? textNode.nodeValue : '';
 	if (textNode) el.removeChild(textNode);
-	el.appendChild(document.createTextNode(val));
+	var doc = el.ownerDocument;
+	el.appendChild(doc.createTextNode(val)); // NOTE no adoption
 }
 
 })();
@@ -189,8 +190,8 @@ var createHTMLDocument = function(title) { // modern browsers. IE >= 9
 
 var cloneDocument = function(srcDoc, options) {
 	var doc = createDocument(options);
-	var docEl = document.importNode(srcDoc.documentElement, true);
-	doc.appendChild(docEl);
+	var docEl = doc.importNode(srcDoc.documentElement, true);
+	doc.appendChild(docEl); // NOTE already adopted
 
 	// WARN sometimes IE9/IE10 doesn't read the content of inserted <style>
 	_.forEach(DOM.findAll('style', doc), function(node) {
@@ -695,7 +696,7 @@ function normalize(doc, details) {
 	});
 
 	_.forEach(DOM.findAll('style', doc.body), function(node) { // TODO support <style scoped>
-		doc.head.appendChild(node);
+		doc.head.appendChild(node); // NOTE no adoption
 	});
 	
 	_.forEach(DOM.findAll('style', doc.head), function(node) {
@@ -1360,7 +1361,7 @@ render: function(resource, details) {
 		fragment = transform.process(fragment, details);
 	});
 	var el = bodyDef.element.cloneNode(false);
-	el.appendChild(fragment);
+	DOM.insertNode('beforeend', el, fragment);
 	return el;
 }
 
@@ -1390,9 +1391,10 @@ init: function(el) {
 		format: el.getAttribute('format')
     });
 	if (transform.type === 'main') transform.format = '';
-	var frag = frameset.document.createDocumentFragment();
+	var doc = frameset.document; // or el.ownerDocument
+	var frag = doc.createDocumentFragment();
 	var node;
-	while (node = el.firstChild) frag.appendChild(node);
+	while (node = el.firstChild) frag.appendChild(node); // NOTE no adoption
 	var processor = transform.processor = framer.createProcessor(transform.type);
 	processor.loadTemplate(frag);
 },
@@ -1499,7 +1501,7 @@ init: function(doc, settings) {
 		
 		// NOTE even if the frame is only a declaration (@def && @def !== @id) it still has its content removed
 		var placeholder = el.cloneNode(false);
-		el.parentNode.replaceChild(placeholder, el);
+		el.parentNode.replaceChild(placeholder, el); // NOTE no adoption
 
 		var id = el.getAttribute('id');
 		var defId = el.getAttribute('def');
@@ -1681,8 +1683,8 @@ enteredDocument: function() {
 			}
 			var wbr = element.ownerDocument.createElement('wbr');
 			wbr.hidden = true;
-			element.replaceChild(wbr, node);
-			wbr.appendChild(node);
+			element.replaceChild(wbr, node); // NOTE no adoption
+			wbr.appendChild(node); // NOTE no adoption
 			return;
 		default:
 			return;
@@ -1891,7 +1893,7 @@ insert: function(bodyElement) { // FIXME need a teardown method that releases ch
 	
 	// FIXME .bodyElement will probably become .bodies[] for transition animations.
 	if (frame.bodyElement) frame.element.removeChild(frame.bodyElement);
-	frame.element.appendChild(bodyElement);
+	DOM.insertNode('beforeend', frame.element, bodyElement);
 	frame.bodyElement = bodyElement;
 },
 
@@ -1941,7 +1943,7 @@ render: function() {
 		mergeElement(dstBody, srcBody);
 
 		_.forEach(_.toArray(srcBody.childNodes), function(node) {
-			insertNode('beforeend', dstBody, node);
+			DOM.insertNode('beforeend', dstBody, node);
 		});
 	}
 
@@ -1975,14 +1977,14 @@ prerender: function(dstDoc, definition) {
 		selfMarker = dstDoc.createElement('link');
 		selfMarker.rel = selfRel;
 		selfMarker.href = dstDoc.URL;
-		dstDoc.head.insertBefore(selfMarker, dstDoc.head.firstChild);
+		dstDoc.head.insertBefore(selfMarker, dstDoc.head.firstChild); // NOTE no adoption
 	},
 
 	function() {
 		var framesetMarker = dstDoc.createElement('link');
 		framesetMarker.rel = framesetRel;
 		framesetMarker.href = definition.src;
-		dstDoc.head.insertBefore(framesetMarker, selfMarker);
+		dstDoc.head.insertBefore(framesetMarker, selfMarker); // NOTE no adoption
 	},
 	
 	function() {
@@ -2773,14 +2775,16 @@ loadTemplate: function(template) {
 },
 
 transform: function(provider, details) { // TODO how to use details?
-	var frag = document.createDocumentFragment();
-	var srcDoc = provider.srcNode;
-	var srcNode;
-	if (!srcDoc.body) srcNode = srcDoc;
-	if (!srcNode) srcNode = DOM.find('main, [role=main]', srcDoc);
-	if (!srcNode) srcNode = srcDoc.body;
+	var srcNode = provider.srcNode;
+	var srcDoc = srcNode.nodeType === 9 ? srcNode : srcNode.ownerDocument;
+	var main;
+	if (!main) main = DOM.find('main, [role=main]', srcNode);
+	if (!main && srcNode === srcDoc) main = srcDoc.body;
+	if (!main) main = srcNode;
+
+	var frag = srcDoc.createDocumentFragment();
 	var node;
-	while (node = srcNode.firstChild) frag.appendChild(node);
+	while (node = main.firstChild) frag.appendChild(node); // NOTE no adoption
 	return frag;
 }
 	
@@ -2907,6 +2911,7 @@ transform: function(provider, details) { // TODO how to use details
 },
 
 transformTree: function(el, provider, context, variables) {
+	var doc = el.ownerDocument;
 	var processor = this;
 	
 	var haz = hazAttrs(el, '_');
@@ -2944,13 +2949,13 @@ transformTree: function(el, provider, context, variables) {
 		logger.warn('Error evaluating @haz:each="' + haz._each + '". Assumed empty.');
 		return;
 	}
-	var result = document.createDocumentFragment(); // FIXME which is the right doc to create this frag in??
+	var result = doc.createDocumentFragment(); // FIXME which is the right doc to create this frag in??
 	
 	_.forEach(subContexts, function(subContext) {
 		if (haz._var) subVars[haz._var] = subContext;
 		var srcEl = el.cloneNode(true);
 		var newEl = processNode(srcEl, provider, subContext, subVars); // NOTE newEl === srcEl
-		if (newEl) result.appendChild(newEl);
+		if (newEl) result.appendChild(newEl); // NOTE no adoption
 	});
 	
 	return result;
@@ -3045,7 +3050,7 @@ function setAttribute(el, attrName, value) {
 	case htmlAttr:
 		if (type === 'undefined' || type === 'boolean' || value == null) value = '';
 		el.innerHTML = '';
-		if (value && value.nodeType) el.appendChild(value);
+		if (value && value.nodeType) DOM.insertNode('beforeend', el, value);
 		else el.innerHTML = value;
 		break;
 	default:
@@ -3067,6 +3072,9 @@ function evalMExpression(mexpr, provider, context, variables, type) { // FIXME m
 }
 
 function evalExpression(expr, provider, context, variables, type) { // FIXME robustness
+	var doc = context ? // TODO which document
+		(context.nodeType === 9 ? context : context.ownerDocument) : 
+		document; 
 	var exprParts = expr.split('|');
 	var value = provider.evaluate(exprParts.shift(), context, variables, type);
 
@@ -3075,13 +3083,13 @@ function evalExpression(expr, provider, context, variables, type) { // FIXME rob
 		if (value && value.nodeType) value = textContent(value);
 		break;
 	case 'node':
-		var frag = document.createDocumentFragment(); // FIXME which document
-		if (value && value.nodeType) frag.appendChild(document.importNode(value, true));
+		var frag = doc.createDocumentFragment();
+		if (value && value.nodeType) frag.appendChild(doc.importNode(value, true)); // NOTE no adoption
 		else {
-			var div = document.createElement('div');
+			var div = doc.createElement('div');
 			div.innerHTML = value;
 			var node;
-			while (node = div.firstChild) frag.appendChild(node);
+			while (node = div.firstChild) frag.appendChild(node); // NOTE no adoption
 		}
 		value = frag;
 		break;
@@ -3116,6 +3124,7 @@ init: function(node) {
 
 evaluate: function(query, context, variables, type) {
 	if (!context) context = this.srcNode;
+	var doc = context.nodeType === 9 ? context : context.ownerDocument; // FIXME which document??
 	var queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
 	var selector = queryParts[1];
 	var attr = queryParts[2];
@@ -3149,8 +3158,10 @@ evaluate: function(query, context, variables, type) {
 		case null: case undefined: case '': return node;
 		case textAttr: return textContent(node);
 		case htmlAttr:
-			var frag = document.createDocumentFragment(); // FIXME which document??
-			_.forEach(node.childNodes, function(child) { frag.appendChild(document.importNode(child, true)); });
+			var frag = doc.createDocumentFragment();
+			_.forEach(node.childNodes, function(child) { 
+				frag.appendChild(doc.importNode(child, true)); // TODO does `child` really need to be cloned??
+			});
 			return frag;
 		default: return node.getAttribute(attr);
 		}
