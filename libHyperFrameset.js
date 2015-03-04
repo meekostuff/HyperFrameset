@@ -1273,7 +1273,7 @@ render: function(resource, condition, details) {
 	var frameset = frameDef.frameset;
 	var cdom = frameset.cdom;
 	if (!details) details = {};
-	_.assign(details, { // TODO more details??
+	_.defaults(details, { // TODO more details??
 		scope: framer.scope,
 		url: resource && resource.url,
 		mainSelector: frameDef.mainSelector,
@@ -1873,7 +1873,11 @@ load: function(response) { // FIXME need a teardown method that releases child-f
 	// else a no-src frame
 	return pipe(response, [
 	
-	function(response) { return frame.definition.render(response, 'loaded'); },
+	function(response) { 
+		return frame.definition.render(response, 'loaded', {
+			mainSelector: frame.mainSelector
+			}); 
+	},
 	function(result) {
 		if (!result) return;
 		return frame.insert(result);
