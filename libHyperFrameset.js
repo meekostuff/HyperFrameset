@@ -2332,7 +2332,8 @@ start: function(startOptions) {
 			return notify({ // FIXME should this be called before stylesheets are confirmed?
 				module: 'frameset',
 				type: 'enteredState',
-				stage: 'before'
+				stage: 'before',
+				url: document.URL
 			});
 		},
 		
@@ -2344,7 +2345,8 @@ start: function(startOptions) {
 			return notify({
 				module: 'frameset',
 				type: 'enteredState',
-				stage: 'after'
+				stage: 'after',
+				url: document.URL
 			});
 		}
 		
@@ -2538,7 +2540,8 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 		if (mustNotify) return notify({ // FIXME need a timeout on notify
 			module: 'frameset',
 			type: 'leftState',
-			stage: 'before'
+			stage: 'before',
+			url: document.URL
 			// TODO details, resource, url, frames??
 			});
 	},
@@ -2555,7 +2558,8 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 		if (mustNotify) return notify({ // FIXME need a timeout on notify
 			module: 'frameset',
 			type: 'enteredState',
-			stage: 'before'
+			stage: 'before',
+			url: url
 			// TODO details, resource, url, frames??
 			});
 	},
@@ -2569,7 +2573,8 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 		if (mustNotify) return notify({ // FIXME need a timeout on notify
 			module: 'frameset',
 			type: 'enteredState',
-			stage: 'after'
+			stage: 'after',
+			url: url
 			// TODO details, resource, url, frames??
 			});
 	}
