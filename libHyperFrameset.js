@@ -1571,10 +1571,10 @@ return HFramesetDefinition;
 })();
 
 var cssText = [
-'* { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
 '*[hidden] { display: none !important; }', // TODO maybe not !important
 'html, body { margin: 0; padding: 0; }',
 'html { width: 100%; height: 100%; }',
+'hf-layer, hf-hlayout, hf-vlayout, hf-deck, hf-rdeck, hf-panel, hf-frame, hf-body { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
 'hf-layer { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; overflow: visible; }',
 'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck { display: block; width: 0; height: 0; overflow: hidden; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
 'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck { width: 100%; height: 100%; }', // FIXME should be 0,0 before manual calculations
