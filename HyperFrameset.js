@@ -3209,7 +3209,10 @@ init: function(el) {
 			try {
 				options = (Function('return (' + scriptText(script) + ');'))();
 			}
-			catch(err) { return; } // FIXME log a warning
+			catch(err) { 
+				Task.postError(err);
+				return; 
+			}
 			_.assign(frameDef.options, options);
 			return;
 		}
@@ -3971,7 +3974,10 @@ prerender: function(dstDoc, definition) {
 			try {
 				forOptions = (Function('return (' + scriptText(script) + ');'))();
 			}
-			catch(err) { return; } // FIXME log a warning
+			catch(err) { 
+				Task.postError(err);
+				return; 
+			}
 			
 			var cdom = definition.cdom;
 			switch(forAttr) {
@@ -4788,7 +4794,7 @@ loadTemplate: function(template) {
 		return;
 	}
 	try { this.processor = (Function('return (' + scriptText(script) + ')'))(); }
-	catch(err) { }
+	catch(err) { Task.postError(err); }
 	
 	if (!this.processor || !this.processor.transform) {
 		logger.warn('"script" transform template did not produce valid transform object');
@@ -4902,6 +4908,7 @@ transformTree: function(el, provider, context, variables) {
 		subContexts = provider.evaluate(haz._each, context, variables, 'array');
 	}
 	catch (err) {
+		Task.postError(err);
 		logger.warn('Error evaluating @haz:each="' + haz._each + '". Assumed empty.');
 		return;
 	}
@@ -4923,6 +4930,7 @@ transformTree: function(el, provider, context, variables) {
 				keep = provider.evaluate(haz._if, context, variables, 'boolean');
 			}
 			catch (err) {
+				Task.postError(err);
 				logger.warn('Error evaluating @haz:if="' + haz._if + '". Assumed false.');
 				keep = false;
 			}
@@ -4933,6 +4941,7 @@ transformTree: function(el, provider, context, variables) {
 				var keep = !provider.evaluate(haz._unless, context, variables, 'boolean');
 			}
 			catch(err) {
+				Task.postError(err);
 				logger.warn('Error evaluating @haz:unless="' + haz._unless + '". Assumed false.');
 				keep = true;
 			}
@@ -4989,6 +4998,7 @@ function transformSingleElement(el, provider, context, variables) {
 				evalExpression(expr, provider, context, variables, type);
 		}
 		catch (err) {
+			Task.postError(err);
 			logger.warn('Error evaluating @' + attr.name + '="' + attr.value + '". Assumed false.');
 			value = false;
 		}
