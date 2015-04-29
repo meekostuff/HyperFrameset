@@ -20,7 +20,7 @@ Meeko.options = { // these are the default values
 	"polling_interval": 50,
 	"html5_block_elements": 'article aside figcaption figure footer header hgroup main nav section',
 	"html5_inline_elements": 'abbr mark output time audio video picture',
-	"main_script": '{bootscriptdir}HTMLDecor.js', // use an abs-path or abs-url
+	"main_script": '{bootscriptdir}HyperFrameset.js', // use an abs-path or abs-url
 	"config_script": '{bootscriptdir}config.js' // can be a script-url OR a function
 };
 
