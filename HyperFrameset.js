@@ -1991,6 +1991,7 @@ var _ = Meeko.stuff; // provided by DOMSprockets
 
 var logger = Meeko.logger; // provided by DOMSprockets or even boot-script
 
+var Task = Meeko.Task;
 var Promise = Meeko.Promise;
 
 // TODO call these as Promise methods rather than with local vars
