@@ -5044,7 +5044,7 @@ function evalMExpression(mexpr, provider, context, variables, type) { // FIXME m
 }
 
 function evalExpression(expr, provider, context, variables, type) { // FIXME robustness
-	var doc = context ? // TODO which document
+	var doc = (context && context.nodeType) ? // TODO which document
 		(context.nodeType === 9 ? context : context.ownerDocument) : 
 		document; 
 	var exprParts = expr.split('|');
