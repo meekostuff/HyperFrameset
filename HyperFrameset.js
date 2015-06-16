@@ -2323,6 +2323,74 @@ _.defaults(DOM, {
 	HTML_IN_XHR: HTML_IN_XHR, HTML_IN_DOMPARSER: HTML_IN_DOMPARSER
 });
 
+var CustomDOM = Meeko.CustomDOM = (function() {
+
+function CustomDOM(options) {
+	var style = options.style = _.lc(options.style);
+	var styleInfo = CustomDOM.namespaceStyles[style];
+	if (!styleInfo) throw Error('Unexpected style: ' + style);
+	var ns = options.name = _.lc(options.name);
+	if (!ns) throw Error('Unexpected name: ' + ns);
+	
+	var cdom = this;
+	_.assign(cdom, options);
+	var separator = styleInfo.separator;
+	cdom.prefix = cdom.name + separator;
+	cdom.selectorPrefix = cdom.name + (separator === ':' ? '\\:' : separator);
+}
+
+_.defaults(CustomDOM.prototype, {
+
+mkTagName: function(name) { return this.prefix + name; },
+mkSelector: function(name) { return this.selectorPrefix + name; }
+
+});
+
+CustomDOM.separator = {
+	'vendor': '-',
+	'xml': ':'
+};
+
+CustomDOM.namespaceStyles = {
+	'vendor': {
+		configNamespace: 'custom',
+		separator: '-'
+	},
+	'xml': {
+		configNamespace: 'xmlns',
+		separator: ':'
+	}
+}
+
+_.forOwn(CustomDOM.namespaceStyles, function(styleInfo) {
+	styleInfo.configPrefix = styleInfo.configNamespace + styleInfo.separator;
+});
+
+CustomDOM.getNamespaces = function(doc) { // NOTE modelled on IE8, IE9 document.namespaces interface
+	var namespaces = [];
+	_.forEach(_.toArray(doc.documentElement.attributes), function(attr) {
+		var style;
+		var name;
+		var fullName = _.lc(attr.name);
+		for (var style in CustomDOM.namespaceStyles) {
+			var styleInfo = CustomDOM.namespaceStyles[style];
+			if (fullName.indexOf(styleInfo.configPrefix) !== 0) continue;
+			var name = fullName.substr(styleInfo.configPrefix.length);
+			namespaces.push({
+				style: style,
+				name: name,
+				urn: attr.value
+			});
+			break;
+		}
+	});
+	return namespaces;
+}
+
+return CustomDOM;
+
+})();
+
 
 var URL = Meeko.URL = (function() {
 
@@ -3059,75 +3127,6 @@ var sprockets = Meeko.sprockets;
 
 var framer = Meeko.framer = (function(classNamespace) {
 
-var CustomDOM = (function() {
-
-function CustomDOM(options) {
-	var style = options.style = _.lc(options.style);
-	var styleInfo = CustomDOM.namespaceStyles[style];
-	if (!styleInfo) throw Error('Unexpected style: ' + style);
-	var ns = options.name = _.lc(options.name);
-	if (!ns) throw Error('Unexpected name: ' + ns);
-	
-	var cdom = this;
-	_.assign(cdom, options);
-	var separator = styleInfo.separator;
-	cdom.prefix = cdom.name + separator;
-	cdom.selectorPrefix = cdom.name + (separator === ':' ? '\\:' : separator);
-}
-
-_.defaults(CustomDOM.prototype, {
-
-mkTagName: function(name) { return this.prefix + name; },
-mkSelector: function(name) { return this.selectorPrefix + name; }
-
-});
-
-CustomDOM.separator = {
-	'vendor': '-',
-	'xml': ':'
-};
-
-CustomDOM.namespaceStyles = {
-	'vendor': {
-		configNamespace: 'custom',
-		separator: '-'
-	},
-	'xml': {
-		configNamespace: 'xmlns',
-		separator: ':'
-	}
-}
-
-_.forOwn(CustomDOM.namespaceStyles, function(styleInfo) {
-	styleInfo.configPrefix = styleInfo.configNamespace + styleInfo.separator;
-});
-
-CustomDOM.getNamespaces = function(doc) { // NOTE modelled on IE8, IE9 document.namespaces interface
-	var namespaces = [];
-	_.forEach(_.toArray(doc.documentElement.attributes), function(attr) {
-		var style;
-		var name;
-		var fullName = _.lc(attr.name);
-		for (var style in CustomDOM.namespaceStyles) {
-			var styleInfo = CustomDOM.namespaceStyles[style];
-			if (fullName.indexOf(styleInfo.configPrefix) !== 0) continue;
-			var name = fullName.substr(styleInfo.configPrefix.length);
-			namespaces.push({
-				style: style,
-				name: name,
-				urn: attr.value
-			});
-			break;
-		}
-	});
-	return namespaces;
-}
-
-return CustomDOM;
-
-})();
-
-var hfTags = _.words('frame body transform');
 var hfDefaultNamespace = {
 	name: 'hf',
 	style: 'vendor'
@@ -3448,7 +3447,7 @@ init: function(doc, settings) {
 	body.parentNode.removeChild(body);
 	frameset.document = doc;
 	frameset.element = body;
-	var frameElts = DOM.findAll(cdom.mkSelector('frame'), body);
+	var frameElts = DOM.findAll(frameset.mkSelector('frame'), body);
 	var frameDefElts = [];
 	var frameRefElts = [];
 	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
@@ -3494,7 +3493,15 @@ init: function(doc, settings) {
 render: function() {
 	var frameset = this;
 	return frameset.element.cloneNode(true);
+},
+
+mkSelector: function(selector) {
+	var cdom = this.cdom;
+	var tags = selector.split(/\s*,\s*|\s+/);
+	return _.map(tags, function(tag) { return cdom.mkSelector(tag); }).join(', ');
 }
+
+
 
 });
 
@@ -3526,29 +3533,6 @@ function rebaseURL(url, baseURL) {
 
 return HFramesetDefinition;	
 })();
-
-var cssText = [
-'*[hidden] { display: none !important; }', // TODO maybe not !important
-'html, body { margin: 0; padding: 0; }',
-'html { width: 100%; height: 100%; }',
-'hf-layer, hf-hlayout, hf-vlayout, hf-deck, hf-rdeck, hf-panel, hf-frame, hf-body { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
-'hf-layer { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; overflow: visible; }',
-'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck { display: block; width: 0; height: 0; overflow: hidden; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
-'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck { width: 100%; height: 100%; }', // FIXME should be 0,0 before manual calculations
-'hf-frame, hf-panel { display: block; width: auto; height: auto; overflow: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
-'hf-body { display: block; width: auto; height: auto; overflow: hidden; margin: 0; }',
-'hf-vlayout { height: 100%; overflow: hidden; }',
-'hf-hlayout { width: 100%; overflow: hidden; }',
-'hf-vlayout > * { display: block; width: 100%; height: auto; text-align: left; }',
-'hf-hlayout > * { display: block; float: left; width: auto; height: 100%; vertical-align: top; }',
-'hf-hlayout::after { clear: both; }',
-'hf-deck > * { width: 100%; height: 100%; }',
-'hf-rdeck > * { width: 0; height: 0; }',
-].join('\n');
-
-var style = document.createElement('style');
-styleText(style, cssText);
-document.head.insertBefore(style, document.head.firstChild);
 
 var Layer = (function() {
 
@@ -3602,7 +3586,7 @@ var Layout = sprockets.evolve(sprockets.RoleType, {
 role: 'group',
 
 owns: {
-	get: function() { return _.filter(this.element.children, function(el) { return DOM.matches(el, 'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck, hf-panel, hf-frame'); }); }
+	get: function() { return _.filter(this.element.children, function(el) { return DOM.matches(el, framer.definition.mkSelector('hlayout, vlayout, deck, rdeck, panel, frame')); }); }
 }
 
 });
@@ -3616,7 +3600,7 @@ attached: function() {
 enteredDocument: function() {
 	var element = this.element;
 	var parent = element.parentNode;
-	if (DOM.matches(parent, 'hf-layer')) { // TODO vh, vw not tested on various platforms
+	if (DOM.matches(parent, framer.definition.mkSelector('layer'))) { // TODO vh, vw not tested on various platforms
 		var height = this.attr('height'); // TODO css unit parsing / validation
 		if (!height) height = '100vh';
 		else height = height.replace('%', 'vh');
@@ -3631,7 +3615,7 @@ enteredDocument: function() {
 	
 	function normalizeChild(node) {
 		var element = this;
-		if (DOM.matches(node, 'hf-hlayout, hf-vlayout, hf-deck, hf-rdeck, hf-panel, hf-frame')) return; // FIXME doesn't take into account custom ns and other layout tags
+		if (DOM.matches(node, framer.definition.mkSelector('hlayout, vlayout, deck, rdeck, panel, frame'))) return; // FIXME doesn't take into account custom ns and other layout tags
 		switch (node.nodeType) {
 		case 1: // hide non-layout elements
 			node.hidden = true;
@@ -3782,13 +3766,42 @@ enteredDocument: function() {
 return ResponsiveDeck;
 })();
 
-// FIXME these registrations don't take into account custom ns
-sprockets.registerElement('hf-layer', Layer);
-sprockets.registerElement('hf-panel', Panel);
-sprockets.registerElement('hf-vlayout', VLayout);
-sprockets.registerElement('hf-hlayout', HLayout);
-sprockets.registerElement('hf-deck', Deck);
-sprockets.registerElement('hf-rdeck', ResponsiveDeck);
+
+function registerLayoutElements() {
+
+var framesetDef = framer.definition;
+
+sprockets.registerElement(framesetDef.mkSelector('layer'), Layer);
+sprockets.registerElement(framesetDef.mkSelector('panel'), Panel);
+sprockets.registerElement(framesetDef.mkSelector('vlayout'), VLayout);
+sprockets.registerElement(framesetDef.mkSelector('hlayout'), HLayout);
+sprockets.registerElement(framesetDef.mkSelector('deck'), Deck);
+sprockets.registerElement(framesetDef.mkSelector('rdeck'), ResponsiveDeck);
+
+var cssText = [
+'*[hidden] { display: none !important; }', // TODO maybe not !important
+'html, body { margin: 0; padding: 0; }',
+'html { width: 100%; height: 100%; }',
+framesetDef.mkSelector('layer, hlayout, vlayout, deck, rdeck, panel, frame, body') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
+framesetDef.mkSelector('layer') + ' { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; overflow: visible; }',
+framesetDef.mkSelector('hlayout, vlayout, deck, rdeck') + ' { display: block; width: 0; height: 0; overflow: hidden; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+framesetDef.mkSelector('hlayout, vlayout, deck, rdeck') + ' { width: 100%; height: 100%; }', // FIXME should be 0,0 before manual calculations
+framesetDef.mkSelector('frame, panel') + ' { display: block; width: auto; height: auto; overflow: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+framesetDef.mkSelector('body') + ' { display: block; width: auto; height: auto; overflow: hidden; margin: 0; }',
+framesetDef.mkSelector('vlayout') + ' { height: 100%; overflow: hidden; }',
+framesetDef.mkSelector('hlayout') + ' { width: 100%; overflow: hidden; }',
+framesetDef.mkSelector('vlayout') + ' > * { display: block; width: 100%; height: auto; text-align: left; }',
+framesetDef.mkSelector('hlayout') + ' > * { display: block; float: left; width: auto; height: 100%; vertical-align: top; }',
+framesetDef.mkSelector('hlayout') + '::after { clear: both; }',
+framesetDef.mkSelector('deck') + ' > * { width: 100%; height: 100%; }',
+framesetDef.mkSelector('rdeck') + ' > * { width: 0; height: 0; }',
+].join('\n');
+
+var style = document.createElement('style');
+styleText(style, cssText);
+document.head.insertBefore(style, document.head.firstChild);
+
+}
 
 var HFrame = (function() {
 
@@ -4203,6 +4216,8 @@ start: function(startOptions) {
 			if (acceptDefault === false) e.preventDefault();
 		}, false);
 		
+		registerLayoutElements();
+
 		sprockets.registerElement('body', { // FIXME should target the body using 'hf-frameset' as @is
 			prototype: HFrameset.prototype, 
 			attached: function() {
@@ -4234,7 +4249,7 @@ start: function(startOptions) {
 			
 			});
 
-		sprockets.registerElement(framer.definition.cdom.mkSelector('frame'), {
+		sprockets.registerElement(framer.definition.mkSelector('frame'), {
 			prototype: HFrame.prototype,
 			attached: function() {
 				HFrame.attached.call(this);
@@ -4248,7 +4263,7 @@ start: function(startOptions) {
 				whenVisible(frame.element)
 				.then(function() {
 					var parentFrame;
-					var parent = DOM.closest(frame.element.parentNode, framer.definition.cdom.mkSelector('frame')); // TODO frame.element.parentNode.ariaClosest('frame')
+					var parent = DOM.closest(frame.element.parentNode, framer.definition.mkSelector('frame')); // TODO frame.element.parentNode.ariaClosest('frame')
 					if (parent) parentFrame = HFrame(parent);
 					else {
 						parent = document.body; // TODO  frame.elenent.parentNode.ariaClosest('frameset'); 
@@ -4719,7 +4734,6 @@ createProcessor: function(type) {
 
 _.defaults(classNamespace, {
 
-	CustomDOM: CustomDOM,
 	HFrameDefinition: HFrameDefinition,
 	HFramesetDefinition: HFramesetDefinition,
 	HFrame: HFrame,
@@ -4859,7 +4873,9 @@ function hazAttr(el, attr) {
 	return value;
 }
 
-function HazardProcessor() {}
+function HazardProcessor() {
+
+}
 
 _.defaults(HazardProcessor.prototype, {
 	
