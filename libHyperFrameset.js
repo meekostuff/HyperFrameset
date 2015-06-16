@@ -2781,7 +2781,12 @@ _.defaults(classNamespace, {
 	HFrameDefinition: HFrameDefinition,
 	HFramesetDefinition: HFramesetDefinition,
 	HFrame: HFrame,
-	HFrameset: HFrameset
+	HFrameset: HFrameset,
+	Layer: Layer,
+	HLayout: HLayout,
+	VLayout: VLayout,
+	Deck: Deck,
+	ResponsiveDeck: ResponsiveDeck
 
 });
 
