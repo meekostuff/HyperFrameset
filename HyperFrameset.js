@@ -3125,7 +3125,7 @@ return scheduler;
 
 var sprockets = Meeko.sprockets;
 
-var framer = Meeko.framer = (function(classNamespace) {
+var framer = Meeko.framer = (function() {
 
 var hfDefaultNamespace = {
 	name: 'hf',
@@ -4732,7 +4732,7 @@ createProcessor: function(type) {
 
 });
 
-_.defaults(classNamespace, {
+_.defaults(framer, {
 
 	HFrameDefinition: HFrameDefinition,
 	HFramesetDefinition: HFramesetDefinition,
@@ -4748,7 +4748,7 @@ _.defaults(classNamespace, {
 
 return framer;
 
-})(Meeko);
+})();
 
 
 var MainProcessor = (function() {
