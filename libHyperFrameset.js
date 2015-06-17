@@ -33,6 +33,30 @@ var vendorPrefix = 'meeko';
 
 var _ = Meeko.stuff; // provided by DOMSprockets
 
+// TODO these additions to Meeko.stuff should go in DOMSprockets
+
+var without = function(a1, a2) {
+	var result = [];
+	_.forEach(a1, function(item) {
+		if (_.contains(a2, item) || _.contains(result, item)) return;
+		result.push(item);
+	});
+	return result;
+}
+
+var difference = function(a1, a2) {
+	var result = [].concat(
+		_.without(a1, a2),
+		_.without(a2, a1)
+	);
+	return result;
+}
+
+_.defaults(_, {
+	without: without, difference: difference
+});
+	
+
 var logger = Meeko.logger; // provided by DOMSprockets or even boot-script
 
 var Task = Meeko.Task;
@@ -1577,6 +1601,51 @@ function rebaseURL(url, baseURL) {
 
 return HFramesetDefinition;	
 })();
+ 
+var controllers = (function() {
+
+return {
+
+values: {},
+
+listeners: {},
+
+create: function(name) {
+	this.values[name] = [];
+	this.listeners[name] = [];
+},
+
+has: function(name) {
+	return (name in this.values);
+},
+
+get: function(name) { 
+	if (!this.has(name)) throw name + ' is not a registered controller';
+	return this.values[name];
+},
+
+set: function(name, value) {
+	if (!this.has(name)) throw name + ' is not a registered controller';
+	if (value === false || value == null) value = [];
+	else if (typeof value === 'string' || !('length' in value)) value = [ value ];
+	var oldValue = this.values[name];
+	if (_.difference(value, oldValue).length <= 0) return;
+	this.values[name] = value;
+	_.forEach(this.listeners[name], function(listener) {
+		Task.asap(function() { listener(value); });
+	});	
+},
+
+listen: function(name, listener) {
+	if (!this.has(name)) throw name + ' is not a registered controller';
+	this.listeners[name].push(listener);
+	var value = this.values[name];
+	Task.asap(function() { listener(value) });
+}
+
+};
+
+})();
 
 var Layer = (function() {
 
@@ -1616,6 +1685,19 @@ attached: function() {
 	if (width) this.css('width', width); // FIXME units
 	var minWidth = this.attr('minwidth');
 	if (minWidth) this.css('min-width', minWidth); // FIXME units
+}, 
+
+enteredDocument: function() {
+	var panel = this;
+	var name = panel.attr('name'); 
+	var value = panel.attr('value'); 
+	if (!name && !value) return;
+	panel.ariaToggle('hidden', true);
+	if (!name) return; // being controlled by an ancestor
+	controllers.listen(name, function(values) {
+		panel.ariaToggle('hidden', !(_.contains(values, value)));
+	});
+
 }
 
 });
@@ -1699,6 +1781,7 @@ attached: function() {
 },
 
 enteredDocument: function() {
+	Panel.enteredDocument.call(this);
 	Layout.enteredDocument.call(this);
 	_.forEach(this.ariaGet('owns'), function(panel) {
 	});
@@ -1721,6 +1804,7 @@ attached: function() {
 },
 
 enteredDocument: function() {
+	Panel.enteredDocument.call(this);
 	Layout.enteredDocument.call(this);
 	var vAlign = this.attr('align'); // FIXME assert top/middle/bottom/baseline - also start/end (stretch?)
 	_.forEach(this.ariaGet('owns'), function(panel) {
@@ -1762,7 +1846,24 @@ attached: function() {
 
 enteredDocument: function() {
 	Layout.enteredDocument.call(this);
-	this.ariaSet('activedescendant', this.ariaGet('owns')[0]);
+	var deck = this;
+	var name = deck.attr('name'); 
+	if (!name) {
+		deck.ariaSet('activedescendant', deck.ariaGet('owns')[0]);
+		return;
+	}
+	controllers.listen(name, function(values) {
+		var panels = deck.ariaGet('owns');
+		var active;
+		_.some(panels, function(child) { 
+			var value = child.getAttribute('value');
+			if (!_.contains(values, value)) return false;
+			active = child;
+			return true;
+		});
+		if (active) deck.ariaSet('activedescendant', active);
+	});
+
 }
 
 });
@@ -2778,6 +2879,7 @@ createProcessor: function(type) {
 
 _.defaults(framer, {
 
+	controllers: controllers,
 	HFrameDefinition: HFrameDefinition,
 	HFramesetDefinition: HFramesetDefinition,
 	HFrame: HFrame,
