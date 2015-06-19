@@ -287,6 +287,27 @@ function onLoaded(e) {
 
 })();
 
+function isVisible(element) {
+	var closestHidden = DOM.closest(element, '[hidden]');
+	return (!closestHidden);
+}
+
+
+function whenVisible(element) { // FIXME this quite possibly causes leaks if closestHidden is removed from document before removeEventListener
+	return new Promise(function(resolve, reject) {	
+		var closestHidden = DOM.closest(element, '[hidden]');
+		if (!closestHidden) {
+			resolve();
+			return;
+		}
+		var listener = function(e) {
+			if (e.target.hidden) return;
+			closestHidden.removeEventListener('visibilitychange', listener, false);
+			whenVisible(element).then(resolve);
+		}
+		closestHidden.addEventListener('visibilitychange', listener, false);
+	});
+}
 
 /* 
 NOTE:  for more details on how checkStyleSheets() works cross-browser see 
@@ -335,6 +356,7 @@ _.defaults(DOM, {
 	insertNode: insertNode, // nodes
 	ready: domReady, addEvent: addEvent, removeEvent: removeEvent, // events
 	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
+	isVisible: isVisible, whenVisible: whenVisible,
 	scrollToId: scrollToId
 });
 
@@ -2405,19 +2427,16 @@ start: function(startOptions) {
 			},
 			enteredDocument: function() {
 				var frame = this;
-				whenVisible(frame.element)
-				.then(function() {
-					var parentFrame;
-					var parent = DOM.closest(frame.element.parentNode, framer.definition.mkSelector('frame')); // TODO frame.element.parentNode.ariaClosest('frame')
-					if (parent) parentFrame = HFrame(parent);
-					else {
-						parent = document.body; // TODO  frame.elenent.parentNode.ariaClosest('frameset'); 
-						parentFrame = HFrameset(parent);
-					}
-					frame.parentFrame = parentFrame;
-					parentFrame.frameEntered(frame);
-					framer.frameEntered(frame);
-				});
+				var parentFrame;
+				var parentElement = DOM.closest(frame.element.parentNode, framer.definition.mkSelector('frame')); // TODO frame.element.parentNode.ariaClosest('frame')
+				if (parentElement) parentFrame = HFrame(parentElement);
+				else {
+					parentElement = document.body; // TODO  frame.elenent.parentNode.ariaClosest('frameset'); 
+					parentFrame = HFrameset(parentElement);
+				}
+				frame.parentFrame = parentFrame;
+				parentFrame.frameEntered(frame);
+				framer.frameEntered(frame);
 			},
 			leftDocument: function() {
 				var frame = this;
@@ -2477,21 +2496,6 @@ start: function(startOptions) {
 	
 	]);
 
-	function whenVisible(element) { // FIXME this quite possibly causes leaks if closestHidden is removed from document before removeEventListener
-	return new Promise(function(resolve, reject) {	
-		var closestHidden = DOM.closest(element, '[hidden]');
-		if (!closestHidden) {
-			resolve();
-			return;
-		}
-		var listener = function(e) {
-			if (e.target.hidden) return;
-			closestHidden.removeEventListener('visibilitychange', listener, false);
-			whenVisible(element).then(resolve);
-		}
-		closestHidden.addEventListener('visibilitychange', listener, false);
-	});
-	}
 	
 },
 
@@ -2682,7 +2686,7 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 	},
 	function() { // FIXME how to handle `hash` if present??
 		if (changeState) return historyManager.pushState(changeset, '', url, function(state) {
-				loadFrames(frames, response)
+				loadFrames(frames, response);
 			});
 		else return loadFrames(frames, response);
 	},
@@ -2699,7 +2703,10 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 	]);
 
 	function loadFrames(frames, response) { // TODO promisify
-		_.forEach(frames, function(frame) { frame.load(response); });
+		_.forEach(frames, function(frame) {
+			frame.attr('src', response.url);
+			if (DOM.isVisible(frame.element)) frame.load(response); // FIXME if !isVisible then **probably** handled by framer.frameEntered code
+		});
 	}
 	
 	function recurseFrames(parentFrame, fn) {
@@ -2711,9 +2718,13 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 },
 
 frameEntered: function(frame) {
-	var src;
-	if (frame.name === framer.currentChangeset.target) src = framer.currentChangeset.url; // FIXME should only be used at startup
-	else src = frame.src;
+	if (frame.name === framer.currentChangeset.target) { // FIXME should only be used at startup
+		frame.attr('src', framer.currentChangeset.url);
+	}
+
+	DOM.whenVisible(frame.element).then(function() { // FIXME could be clash with loadFrames() above
+
+	var src = frame.attr('src');
 
 	if (src == null) { // a non-src frame
 		return frame.load(null, { condition: 'loaded' });
@@ -2735,6 +2746,8 @@ frameEntered: function(frame) {
 	function(response) { return frame.load(response); }
 
 	]);
+
+	});
 },
 
 onPopState: function(changeset) {
