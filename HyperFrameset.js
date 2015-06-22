@@ -2898,7 +2898,7 @@ return new Promise(function(resolve, reject) {
 		script.setAttribute('async', '');
 		logger.warn('@defer not supported on scripts');
 	}
-	if (supportsSync && script.src && !hasAttribute(script, 'async')) script.async = false;
+	if (supportsSync && script.src && !DOM.hasAttribute(script, 'async')) script.async = false;
 	script.type = 'text/javascript';
 	
 	// enabledFu resolves after script is inserted
@@ -2908,7 +2908,7 @@ return new Promise(function(resolve, reject) {
 
 	var triggerFu; // triggerFu allows this script to be enabled, i.e. inserted
 	if (prev) {
-		if (hasAttribute(prevScript, 'async') || script.src && supportsSync && !hasAttribute(script, 'async')) triggerFu = prev.enabled;
+		if (DOM.hasAttribute(prevScript, 'async') || script.src && supportsSync && !DOM.hasAttribute(script, 'async')) triggerFu = prev.enabled;
 		else triggerFu = prev.complete; 
 	}
 	else triggerFu = Promise.resolve();
@@ -4865,6 +4865,35 @@ return framer;
 
 })();
 
+// end framer defn
+
+}).call(window);
+
+/*!
+ * HyperFrameset Processors and Decoders
+ * Copyright 2014-2015 Sean Hogan (http://meekostuff.net/)
+ * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+ */
+
+/* NOTE
+	+ assumes DOMSprockets + HyperFrameset
+*/
+/* TODO
+    + The passing of nodes between documents needs to be audited.
+		Safari and IE10,11 in particular seem to require nodes to be imported / adopted
+		(not fully understood right now)
+ */
+
+(function() {
+
+var window = this;
+var document = window.document;
+
+var _ = Meeko.stuff;
+var DOM = Meeko.DOM;
+var Task = Meeko.Task;
+var logger = Meeko.logger;
+var framer = Meeko.framer;
 
 var MainProcessor = (function() {
 
@@ -4873,7 +4902,7 @@ function MainProcessor() {}
 _.defaults(MainProcessor.prototype, {
 
 loadTemplate: function(template) {
-	if (/\S+/.test(textContent(template))) logger.warn('"main" transforms do not use templates');
+	if (/\S+/.test(DOM.textContent(template))) logger.warn('"main" transforms do not use templates');
 },
 
 transform: function(provider, details) { // TODO how to use details?
@@ -4987,7 +5016,7 @@ function hazAttrs(el, varPrefix) {
 
 function hazAttr(el, attr) {
 	var hazAttrName = hazAttrPrefix + attr;
-	if (!el.hasAttribute(hazAttrName)) return false;
+	if (!DOM.hasAttribute(el, hazAttrName)) return false;
 	var value = el.getAttribute(hazAttrName);
 	el.removeAttribute(hazAttrName);
 	return value;
@@ -5101,7 +5130,7 @@ transformNode: function(node, provider, context, variables) {
 	if (!nodeType) return node;
 	if (nodeType !== 1 && nodeType !== 11) return node;
 	var deep = true;
-	if (nodeType === 1 && (hasAttribute(node, exprTextAttr) || hasAttribute(node, exprHtmlAttr))) deep = false;
+	if (nodeType === 1 && (DOM.hasAttribute(node, exprTextAttr) || DOM.hasAttribute(node, exprHtmlAttr))) deep = false;
 	if (nodeType === 1) transformSingleElement(node, provider, context, variables);
 	if (!deep) return node;
 
@@ -5153,7 +5182,7 @@ function setAttribute(el, attrName, value) {
 	switch (attrName) {
 	case textAttr:
 		if (type === 'undefined' || type === 'boolean' || value == null) value = '';
-		textContent(el, value);
+		DOM.textContent(el, value);
 		break;
 	case htmlAttr:
 		if (type === 'undefined' || type === 'boolean' || value == null) value = '';
@@ -5188,7 +5217,7 @@ function evalExpression(expr, provider, context, variables, type) { // FIXME rob
 
 	switch (type) {
 	case 'text':
-		if (value && value.nodeType) value = textContent(value);
+		if (value && value.nodeType) value = DOM.textContent(value);
 		break;
 	case 'node':
 		var frag = doc.createDocumentFragment();
@@ -5202,7 +5231,7 @@ function evalExpression(expr, provider, context, variables, type) { // FIXME rob
 		value = frag;
 		break;
 	default: // FIXME should never occur. logger.warn !?
-		if (value && value.nodeType) value = textContent(value);
+		if (value && value.nodeType) value = DOM.textContent(value);
 		break;
 	}
 
@@ -5250,7 +5279,7 @@ evaluate: function(query, context, variables, type) {
 	case 'text': // expr:attr or expr:.text
 		if (!node) return '';
 		switch(attr) {
-		case null: case undefined: case '': case textAttr: return textContent(node);
+		case null: case undefined: case '': case textAttr: return DOM.textContent(node);
 		case htmlAttr: return node.innerHTML;
 		default: return node.getAttribute(attr);
 		}
@@ -5258,13 +5287,13 @@ evaluate: function(query, context, variables, type) {
 		if (!node) return false;
 		switch(attr) {
 		case null: case undefined: case '': return true;
-		case textAttr: case htmlAttr: return !/^\s*$/.test(textContent(node)); // FIXME potentially heavy. Implement as a DOM utility isEmptyNode()
-		default: return hasAttribute(node, nodeattr);
+		case textAttr: case htmlAttr: return !/^\s*$/.test(DOM.textContent(node)); // FIXME potentially heavy. Implement as a DOM utility isEmptyNode()
+		default: return DOM.hasAttribute(node, nodeattr);
 		}
 	case 'node': // expr:.html
 		switch(attr) {
 		case null: case undefined: case '': return node;
-		case textAttr: return textContent(node);
+		case textAttr: return DOM.textContent(node);
 		case htmlAttr:
 			var frag = doc.createDocumentFragment();
 			_.forEach(node.childNodes, function(child) { 
@@ -5322,6 +5351,248 @@ return CSSDecoder;
 framer.registerDecoder('css', CSSDecoder);
 
 
-// end framer defn
-
 }).call(window);
+// FIXME DOES NOT support itemref or itemid
+
+(function(window) {
+
+var document = window.document;
+
+var _ = Meeko.stuff;
+var DOM = Meeko.DOM;
+
+function intersects(a1, a2) { // TODO add to Meeko.stuff
+	return _.some(a1, function(i1) {
+		return _.some(a2, function(i2) { 
+			return i2 === i1; 
+		});
+	});
+}
+
+var Microdata = (function() {
+
+function walkTree(root, skipRoot, callback) { // callback(el) must return NodeFilter code
+	var walker = document.createNodeIterator(
+			root,
+			1,
+			acceptNode,
+			null // IE9 throws if this irrelavent argument isn't passed
+		);
+	
+	var el;
+	while (el = walker.nextNode());
+
+	function acceptNode(el) {
+		if (skipRoot && el === root) return NodeFilter.FILTER_SKIP;
+		return callback(el);
+	}
+}
+
+
+function getView(rootNode) {
+	if (!rootNode) rootNode = document;
+
+	return getScopeDesc(rootNode);
+	
+
+	function getScopeDesc(scopeEl) {
+		var scopeDesc = {
+			element: scopeEl,
+			isScope: true,
+			type: scopeEl.nodeType === 1 || _.words(scopeEl.getAttribute('itemtype')),
+			properties: createHTMLPropertiesCollection(),
+			childScopes: []
+		}
+
+		walkTree(scopeEl, true, function(el) {
+			var isScope = el.hasAttribute('itemscope');
+			var propName = el.getAttribute('itemprop');
+			if (!(isScope || propName)) return NodeFilter.FILTER_SKIP;
+			
+			var item = isScope ? getScopeDesc(el) : getPropDesc(el);
+			if (propName) scopeDesc.properties.addNamedItem(propName, item);
+			else scopeDesc.childScopes.push(item);
+
+			return isScope ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+		});
+
+		return scopeDesc;
+	}
+	
+}
+
+function getPropDesc(el) {
+	var name = el.getAttribute('itemprop');
+	
+	var prop = {
+		element: el,
+		name: name,
+		value: getValue(el)
+	}
+	
+	return prop;
+}
+
+function getValue(el) {
+	var tagName = el.tagName.toLowerCase();
+	var attrName = valueAttr[tagName];
+	if (attrName) return el[attrName] || el.getAttribute(attrName);
+
+	return el;
+}
+
+function getItems(scope, type) {
+	var typeList = 
+		(typeof type === 'string') ? _.words(_.trim(type)) :
+		type.length ? type :
+		[];
+			
+	var resultList = [];
+
+	_.forEach(scope.properties.names, function(propName) {
+		var propList = scope.properties.namedItem(propName);
+		_.forEach(propList, function(prop) {
+			if (prop.isScope) [].push.apply(resultList, getItems(prop, typeList));
+		});
+	});
+
+	_.forEach(scope.childScopes, function(scope) {
+		if (!typeList.length || intersects(scope.type, typeList)) resultList.push(scope);
+		[].push.apply(resultList, getItems(scope, typeList));
+	});
+
+	return resultList;
+}
+
+function createHTMLPropertiesCollection() {
+	var list = [];
+	list.names = [];
+	list.byName = {};
+	_.assign(list, HTMLPropertiesCollection.prototype);
+	return list;
+}
+
+var HTMLPropertiesCollection = function() {}
+_.assign(HTMLPropertiesCollection.prototype, {
+
+namedItem: function(name) {
+	return this.byName[name];
+},
+
+addNamedItem: function(name, item) {
+	this.push(item);
+	if (!this.byName[name]) {
+		this.byName[name] = [];
+		this.names.push(name);
+	}
+	this.byName[name].push(item);
+}
+
+});
+
+
+var valueAttr = {};
+_.forEach(_.words("meta@content link@href a@href area@href img@src video@src audio@src source@src track@src iframe@src embed@src object@data time@datetime data@value meter@value"), function(text) {
+	var m = text.split("@"), tagName = m[0], attrName = m[1];
+	valueAttr[tagName] = attrName;
+});
+
+
+return {
+
+getView: getView,
+getItems: getItems
+
+}
+
+})();
+
+var MicrodataDecoder = (function() {
+
+function MicrodataDecoder() {}
+
+_.defaults(MicrodataDecoder.prototype, {
+
+init: function(node) {
+	this.view = Microdata.getView(node);
+},
+
+evaluate: function(query, context, variables, type) {
+	if (!context) context = this.view;
+
+	var query = _.trim(query);
+	var startAtRoot = false;
+	var baseSchema;
+	var pathParts;
+
+	var m = query.match(/^(?:(\^)?\[([^\]]*)\]\.)/);
+	if (m && m.length) {
+		query = query.substr(m[0].length);
+		startAtRoot = !!m[1];
+		baseSchema = _.words(_.trim(m[2]));
+	}
+	pathParts = _.words(_.trim(query));
+	
+	var scopes;
+	if (baseSchema) {
+		if (startAtRoot) context = this.view;
+		scopes = Microdata.getItems(context, baseSchema);	
+	}
+	else scopes = [ context ];
+
+	if (type === 'array') {
+		var resultList = scopes;
+		_.forEach(pathParts, function(relPath, i) {
+			var parents = resultList;
+			resultList = [];
+			_.forEach(parents, function(desc) {
+				var props = desc.properties.namedItem(relPath);
+				if (props) [].push.apply(resultList, props);
+			});
+		});
+		return _.map(resultList, function(desc) {
+			if (desc.isScope) return desc;
+			return desc.value;
+		});
+	}
+
+	var item = scopes[0];
+	_.every(pathParts, function(relPath, i) {
+		var props = item.properties.namedItem(relPath);
+		item = null;
+		if (!props || !props.length) return false;
+		item = props[0];
+		if (item == null) return false;
+		return true;
+	});
+	
+	var value = item && item.value;
+
+	switch(type) {
+	case 'text': // expr:attr or expr:.text
+		if (!value) return '';
+		if (value.nodeType && value.nodeType === 1) return DOM.textContent(value);
+		return value;
+	case 'boolean': // haz:if
+		if (!value) return false;
+		return true;
+	case 'node': // expr:.html
+		return value;
+	default: return value; // TODO shouldn't this be an error / warning??
+	}
+}
+
+});
+
+return MicrodataDecoder;
+})();
+
+_.assign(Meeko, {
+	Microdata: Microdata,
+	MicrodataDecoder: MicrodataDecoder
+});
+
+})(window);
+
+Meeko.framer.registerDecoder('microdata', Meeko.MicrodataDecoder);
+
