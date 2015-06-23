@@ -13,7 +13,7 @@
 		(not fully understood right now)
  */
 
-(function() {
+(function(classnamespace) {
 
 var window = this;
 var document = window.document;
@@ -480,4 +480,244 @@ return CSSDecoder;
 framer.registerDecoder('css', CSSDecoder);
 
 
-}).call(window);
+var Microdata = (function() {
+
+function intersects(a1, a2) { // TODO add to Meeko.stuff
+	return _.some(a1, function(i1) {
+		return _.some(a2, function(i2) { 
+			return i2 === i1; 
+		});
+	});
+}
+
+function walkTree(root, skipRoot, callback) { // callback(el) must return NodeFilter code
+	var walker = document.createNodeIterator(
+			root,
+			1,
+			acceptNode,
+			null // IE9 throws if this irrelavent argument isn't passed
+		);
+	
+	var el;
+	while (el = walker.nextNode());
+
+	function acceptNode(el) {
+		if (skipRoot && el === root) return NodeFilter.FILTER_SKIP;
+		return callback(el);
+	}
+}
+
+
+function getView(rootNode) {
+	if (!rootNode) rootNode = document;
+
+	return getScopeDesc(rootNode);
+	
+
+	function getScopeDesc(scopeEl) {
+		var scopeDesc = {
+			element: scopeEl,
+			isScope: true,
+			type: scopeEl.nodeType === 1 || _.words(scopeEl.getAttribute('itemtype')),
+			properties: createHTMLPropertiesCollection(),
+			childScopes: []
+		}
+
+		walkTree(scopeEl, true, function(el) {
+			var isScope = el.hasAttribute('itemscope');
+			var propName = el.getAttribute('itemprop');
+			if (!(isScope || propName)) return NodeFilter.FILTER_SKIP;
+			
+			var item = isScope ? getScopeDesc(el) : getPropDesc(el);
+			if (propName) scopeDesc.properties.addNamedItem(propName, item);
+			else scopeDesc.childScopes.push(item);
+
+			return isScope ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT;
+		});
+
+		return scopeDesc;
+	}
+	
+}
+
+function getPropDesc(el) {
+	var name = el.getAttribute('itemprop');
+	
+	var prop = {
+		element: el,
+		name: name,
+		value: getValue(el)
+	}
+	
+	return prop;
+}
+
+function getValue(el) {
+	var tagName = el.tagName.toLowerCase();
+	var attrName = valueAttr[tagName];
+	if (attrName) return el[attrName] || el.getAttribute(attrName);
+
+	return el;
+}
+
+function getItems(scope, type) {
+	var typeList = 
+		(typeof type === 'string') ? _.words(_.trim(type)) :
+		type.length ? type :
+		[];
+			
+	var resultList = [];
+
+	_.forEach(scope.properties.names, function(propName) {
+		var propList = scope.properties.namedItem(propName);
+		_.forEach(propList, function(prop) {
+			if (prop.isScope) [].push.apply(resultList, getItems(prop, typeList));
+		});
+	});
+
+	_.forEach(scope.childScopes, function(scope) {
+		if (!typeList.length || intersects(scope.type, typeList)) resultList.push(scope);
+		[].push.apply(resultList, getItems(scope, typeList));
+	});
+
+	return resultList;
+}
+
+function createHTMLPropertiesCollection() {
+	var list = [];
+	list.names = [];
+	list.byName = {};
+	_.assign(list, HTMLPropertiesCollection.prototype);
+	return list;
+}
+
+var HTMLPropertiesCollection = function() {}
+_.assign(HTMLPropertiesCollection.prototype, {
+
+namedItem: function(name) {
+	return this.byName[name];
+},
+
+addNamedItem: function(name, item) {
+	this.push(item);
+	if (!this.byName[name]) {
+		this.byName[name] = [];
+		this.names.push(name);
+	}
+	this.byName[name].push(item);
+}
+
+});
+
+
+var valueAttr = {};
+_.forEach(_.words("meta@content link@href a@href area@href img@src video@src audio@src source@src track@src iframe@src embed@src object@data time@datetime data@value meter@value"), function(text) {
+	var m = text.split("@"), tagName = m[0], attrName = m[1];
+	valueAttr[tagName] = attrName;
+});
+
+
+return {
+
+getView: getView,
+getItems: getItems
+
+}
+
+})();
+
+var MicrodataDecoder = (function() {
+
+function MicrodataDecoder() {}
+
+_.defaults(MicrodataDecoder.prototype, {
+
+init: function(node) {
+	this.view = Microdata.getView(node);
+},
+
+evaluate: function(query, context, variables, type) {
+	if (!context) context = this.view;
+
+	var query = _.trim(query);
+	var startAtRoot = false;
+	var baseSchema;
+	var pathParts;
+
+	var m = query.match(/^(?:(\^)?\[([^\]]*)\]\.)/);
+	if (m && m.length) {
+		query = query.substr(m[0].length);
+		startAtRoot = !!m[1];
+		baseSchema = _.words(_.trim(m[2]));
+	}
+	pathParts = _.words(_.trim(query));
+	
+	var scopes;
+	if (baseSchema) {
+		if (startAtRoot) context = this.view;
+		scopes = Microdata.getItems(context, baseSchema);	
+	}
+	else scopes = [ context ];
+
+	if (type === 'array') {
+		var resultList = scopes;
+		_.forEach(pathParts, function(relPath, i) {
+			var parents = resultList;
+			resultList = [];
+			_.forEach(parents, function(desc) {
+				var props = desc.properties.namedItem(relPath);
+				if (props) [].push.apply(resultList, props);
+			});
+		});
+		return _.map(resultList, function(desc) {
+			if (desc.isScope) return desc;
+			return desc.value;
+		});
+	}
+
+	var item = scopes[0];
+	_.every(pathParts, function(relPath, i) {
+		var props = item.properties.namedItem(relPath);
+		item = null;
+		if (!props || !props.length) return false;
+		item = props[0];
+		if (item == null) return false;
+		return true;
+	});
+	
+	var value = item && item.value;
+
+	switch(type) {
+	case 'text': // expr:attr or expr:.text
+		if (!value) return '';
+		if (value.nodeType && value.nodeType === 1) return DOM.textContent(value);
+		return value;
+	case 'boolean': // haz:if
+		if (!value) return false;
+		return true;
+	case 'node': // expr:.html
+		return value;
+	default: return value; // TODO shouldn't this be an error / warning??
+	}
+}
+
+});
+
+return MicrodataDecoder;
+})();
+
+framer.registerDecoder('microdata', MicrodataDecoder);
+
+
+_.assign(classnamespace, {
+
+MainProcessor: MainProcessor,
+ScriptProcessor: ScriptProcessor,
+HazardProcessor: HazardProcessor,
+CSSDecoder: CSSDecoder,
+MicrodataDecoder: MicrodataDecoder
+
+});
+
+
+}).call(window, Meeko.framer);

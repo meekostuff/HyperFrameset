@@ -4884,7 +4884,7 @@ return framer;
 		(not fully understood right now)
  */
 
-(function() {
+(function(classnamespace) {
 
 var window = this;
 var document = window.document;
@@ -5351,15 +5351,7 @@ return CSSDecoder;
 framer.registerDecoder('css', CSSDecoder);
 
 
-}).call(window);
-// FIXME DOES NOT support itemref or itemid
-
-(function(window) {
-
-var document = window.document;
-
-var _ = Meeko.stuff;
-var DOM = Meeko.DOM;
+var Microdata = (function() {
 
 function intersects(a1, a2) { // TODO add to Meeko.stuff
 	return _.some(a1, function(i1) {
@@ -5368,8 +5360,6 @@ function intersects(a1, a2) { // TODO add to Meeko.stuff
 		});
 	});
 }
-
-var Microdata = (function() {
 
 function walkTree(root, skipRoot, callback) { // callback(el) must return NodeFilter code
 	var walker = document.createNodeIterator(
@@ -5587,12 +5577,18 @@ evaluate: function(query, context, variables, type) {
 return MicrodataDecoder;
 })();
 
-_.assign(Meeko, {
-	Microdata: Microdata,
-	MicrodataDecoder: MicrodataDecoder
+framer.registerDecoder('microdata', MicrodataDecoder);
+
+
+_.assign(classnamespace, {
+
+MainProcessor: MainProcessor,
+ScriptProcessor: ScriptProcessor,
+HazardProcessor: HazardProcessor,
+CSSDecoder: CSSDecoder,
+MicrodataDecoder: MicrodataDecoder
+
 });
 
-})(window);
 
-Meeko.framer.registerDecoder('microdata', Meeko.MicrodataDecoder);
-
+}).call(window, Meeko.framer);
