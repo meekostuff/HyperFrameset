@@ -67,7 +67,7 @@ loadTemplate: function(template) {
 	_.forEach(_.toArray(template.childNodes), function(node) {
 		switch (node.nodeType) {
 		case 1: // Element
-			switch (getTagName(node)) {
+			switch (DOM.getTagName(node)) {
 			case 'script':
 				if (script) logger.warn('Ignoring secondary <script> in "script" transform template');
 				else script = node;
@@ -91,7 +91,7 @@ loadTemplate: function(template) {
 		logger.warn('No <script> found in "script" transform template');
 		return;
 	}
-	try { this.processor = (Function('return (' + scriptText(script) + ')'))(); }
+	try { this.processor = (Function('return (' + DOM.scriptText(script) + ')'))(); }
 	catch(err) { Task.postError(err); }
 	
 	if (!this.processor || !this.processor.transform) {
@@ -184,8 +184,8 @@ transformTree: function(el, provider, context, variables) {
 			logger.warn('Hazard could not find template #' + haz._template);
 			return;
 		}
-		var tagName = getTagName(el);
-		var templateTagName = getTagName(template);
+		var tagName = DOM.getTagName(el);
+		var templateTagName = DOM.getTagName(template);
 		if (tagName !== templateTagName) {
 			logger.warn('Hazard found mismatched tagNames between template ' + templateTagName + '#' + haz._template + ' and ' + tagName);
 		}
