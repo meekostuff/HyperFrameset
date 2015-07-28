@@ -438,13 +438,15 @@ evaluate: function(query, context, variables, type) {
 });
 
 function find(context, selectorGroup, variables) {
+	if (_.trim(selectorGroup) === '') return context;
 	var finalSelector = expandSelector(context, selectorGroup, variables);
-	return context.querySelector(finalSelector);
+	return context.querySelector(finalSelector); // FIXME DOM.find
 }
 
 function findAll(context, selectorGroup, variables) {
+	if (_.trim(selectorGroup) === '') return [ context ];
 	var finalSelector = expandSelector(context, selectorGroup, variables);
-	return context.querySelectorAll(finalSelector);
+	return context.querySelectorAll(finalSelector); // FIXME DOM.findAll
 }
 
 var uidIndex = 0;
