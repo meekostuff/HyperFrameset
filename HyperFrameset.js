@@ -5517,6 +5517,8 @@ evaluate: function(query, context, variables, type) {
 	var baseSchema;
 	var pathParts;
 
+	if (query === '.') return (type === 'array') ? [ context ] : context;
+
 	var m = query.match(/^(?:(\^)?\[([^\]]*)\]\.)/);
 	if (m && m.length) {
 		query = query.substr(m[0].length);
