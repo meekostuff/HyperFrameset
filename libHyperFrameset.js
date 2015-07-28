@@ -1377,9 +1377,20 @@ init: function(el) {
 	var bodyDef = this;
 	var frameset = bodyDef.frameset;
 	var cdom = frameset.cdom;
+	var condition = el.getAttribute('condition');
+	var finalCondition;
+	if (condition) {
+		finalCondition = normalizeCondition(condition);
+		if (!finalCondition) {
+			finalCondition = condition;
+			logger.warn('Frame body defined with unknown condition: ' + condition);
+		}
+	}
+	else finalCondition = 'loaded';
+		
 	_.defaults(bodyDef, {
 		element: el,
-		condition: normalizeCondition(el.getAttribute('condition')) || 'loaded',
+		condition: finalCondition,
 		transforms: []
 	});
 	_.forEach(_.toArray(el.childNodes), function(node) {
