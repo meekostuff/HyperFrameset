@@ -125,6 +125,7 @@ var htmlAttr = '_html';
 
 var HazardProcessor = (function() {
 
+var hazDirectives = _.words('if unless each var template choose');
 var hazNamespace = 'haz';
 var hazAttrPrefix = hazNamespace + ':';
 var exprNamespace = 'expr';
@@ -137,7 +138,7 @@ var exprHtmlAttr = exprPrefix + htmlAttr;
 function hazAttrs(el, varPrefix) {
 	if (!varPrefix) varPrefix = "";
 	var values = {};
-	_.forEach(_.words('if unless each var template'), function(name) {
+	_.forEach(hazDirectives, function(name) {
 		values[varPrefix + name] = hazAttr(el, name);
 	});
 	return values;
@@ -238,7 +239,7 @@ transformTree: function(el, provider, context, variables) {
 		}
 		if (haz._unless !== false) {
 			try {
-				var keep = !provider.evaluate(haz._unless, context, variables, 'boolean');
+				keep = !provider.evaluate(haz._unless, context, variables, 'boolean');
 			}
 			catch(err) {
 				Task.postError(err);
@@ -246,6 +247,24 @@ transformTree: function(el, provider, context, variables) {
 				keep = true;
 			}
 			if (!keep) return;
+		}
+		if (haz._choose !== false) {
+			var childNodes = _.toArray(node.childNodes);
+			_.forEach(childNodes, function(child) { node.removeChild(child); });
+			var result = doc.createDocumentFragment();
+			_.some(childNodes, function(child) {
+				var _when = false;
+				if (child.nodeType === 1) _when = hazAttr(child, 'when');
+				if (_when === false) {
+					result.appendChild(child);
+					return false;
+				}
+				var found = provider.evaluate(_when, context, variables, 'boolean');
+				if (!found) return false;
+				result = child;
+				return true;
+			});
+			node.appendChild(result);
 		}
 		return processor.transformNode(node, provider, context, variables); // NOTE return value === node
 	}
