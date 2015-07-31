@@ -228,7 +228,7 @@ transformTree: function(el, provider, context, variables) {
 		var keep;
 		if (haz._if !== false) {
 			try {
-				keep = provider.evaluate(haz._if, context, variables, 'boolean');
+				keep = evalExpression(haz._if, provider, context, variables, 'boolean');
 			}
 			catch (err) {
 				Task.postError(err);
@@ -239,7 +239,7 @@ transformTree: function(el, provider, context, variables) {
 		}
 		if (haz._unless !== false) {
 			try {
-				keep = !provider.evaluate(haz._unless, context, variables, 'boolean');
+				keep = !evalExpression(haz._unless, provider, context, variables, 'boolean');
 			}
 			catch(err) {
 				Task.postError(err);
@@ -259,7 +259,7 @@ transformTree: function(el, provider, context, variables) {
 					result.appendChild(child);
 					return false;
 				}
-				var found = provider.evaluate(_when, context, variables, 'boolean');
+				var found = evalExpression(_when, provider, context, variables, 'boolean');
 				if (!found) return false;
 				result = child;
 				return true;
@@ -361,7 +361,7 @@ function evalExpression(expr, provider, context, variables, type) { // FIXME rob
 		(context.nodeType === 9 ? context : context.ownerDocument) : 
 		document; 
 	var exprParts = expr.split('|');
-	var value = provider.evaluate(exprParts.shift(), context, variables, type);
+	var value = provider.evaluate(exprParts.shift(), context, variables, type === 'array' ? 'array' : 'node'); // FIXME what's the right type here?
 
 	switch (type) {
 	case 'text':
@@ -414,7 +414,7 @@ evaluate: function(query, context, variables, type) {
 	var selector = queryParts[1];
 	var attr = queryParts[2];
 	if (type === 'array') { // haz:each
-		if (attr) logger.warn('Ignoring attribute selector because evaluate() requested array');
+		if (attr) logger.warn('Ignoring attribute selector because evaluate() requested array'); // FIXME should probably be an error
 		return findAll(context, selector, variables);
 	}
 	var node = find(context, selector, variables);
@@ -647,6 +647,7 @@ getItems: getItems
 
 })();
 
+
 var MicrodataDecoder = (function() {
 
 function MicrodataDecoder() {}
@@ -682,37 +683,28 @@ evaluate: function(query, context, variables, type) {
 	}
 	else scopes = [ context ];
 
-	if (type === 'array') {
-		var resultList = scopes;
-		_.forEach(pathParts, function(relPath, i) {
-			var parents = resultList;
-			resultList = [];
-			_.forEach(parents, function(desc) {
-				var props = desc.properties.namedItem(relPath);
-				if (props) [].push.apply(resultList, props);
-			});
+	var resultList = scopes;
+	_.forEach(pathParts, function(relPath, i) {
+		var parents = resultList;
+		resultList = [];
+		_.forEach(parents, function(desc) {
+			var props = desc.properties.namedItem(relPath);
+			if (props) [].push.apply(resultList, props);
 		});
-		return _.map(resultList, function(desc) {
-			if (desc.isScope) return desc;
-			return desc.value;
-		});
-	}
-
-	var item = scopes[0];
-	_.every(pathParts, function(relPath, i) {
-		var props = item.properties.namedItem(relPath);
-		item = null;
-		if (!props || !props.length) return false;
-		item = props[0];
-		if (item == null) return false;
-		return true;
 	});
-	
-	var value = item && item.value;
+	resultList = _.map(resultList, function(desc) {
+		if (desc.isScope) return desc;
+		return desc.value;
+	});
+
+	if (type === 'array') return resultList;
+
+	var item = resultList[0];
+	var value = item && 'value' in item ? item.value : item;
 
 	switch(type) {
 	case 'text': // expr:attr or expr:.text
-		if (!value) return '';
+		if (value == null || value === false) return '';
 		if (value.nodeType && value.nodeType === 1) return DOM.textContent(value);
 		return value;
 	case 'boolean': // haz:if
@@ -732,13 +724,81 @@ return MicrodataDecoder;
 framer.registerDecoder('microdata', MicrodataDecoder);
 
 
+var JSONDecoder = (function() { 
+// FIXME not really a JSON decoder since expects JSON input and 
+// doesn't use JSON paths
+
+function JSONDecoder() {}
+
+_.defaults(JSONDecoder.prototype, {
+
+init: function(object) {
+	if (typeof object !== 'object' || object === null) throw 'JSONDecoder cannot handle non-object';
+	this.object = object;
+},
+
+evaluate: function(query, context, variables, type) {
+	if (!context) context = this.object;
+
+	var query = _.trim(query);
+	var pathParts;
+
+	if (query === '.') return (type === 'array') ? [ context ] : context;
+
+	var m = query.match(/^\^/);
+	if (m && m.length) {
+		query = query.substr(m[0].length);
+		context = this.object;
+	}
+	pathParts = query.split('.');
+	
+	var resultList = [ context ];
+	_.forEach(pathParts, function(relPath, i) {
+		var parents = resultList;
+		resultList = [];
+		_.forEach(parents, function(item) {
+			var child = item[relPath];
+			if (child != null) {
+				if (Array.isArray(child)) [].push.apply(resultList, child);
+				else resultList.push(child);
+			}
+		});
+	});
+
+	if (type === 'array') return resultList;
+
+	var value = resultList[0];
+
+	switch(type) {
+	case 'text': // expr:attr or expr:.text
+		if (!value) return '';
+		if (value.nodeType && value.nodeType === 1) return DOM.textContent(value);
+		return value;
+	case 'boolean': // haz:if
+		if (!value) return false;
+		return true;
+	case 'node': // expr:.html
+		return value;
+	default: return value; // TODO shouldn't this be an error / warning??
+	}
+}
+
+});
+
+return JSONDecoder;
+})();
+
+framer.registerDecoder('json', JSONDecoder);
+
+
 _.assign(classnamespace, {
 
 MainProcessor: MainProcessor,
 ScriptProcessor: ScriptProcessor,
 HazardProcessor: HazardProcessor,
 CSSDecoder: CSSDecoder,
-MicrodataDecoder: MicrodataDecoder
+MicrodataDecoder: MicrodataDecoder,
+JSONDecoder: JSONDecoder
 
 });
 
