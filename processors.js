@@ -125,31 +125,65 @@ var htmlAttr = '_html';
 
 var HazardProcessor = (function() {
 
-var hazDirectives = _.words('if unless each var template choose');
 var hazNamespace = 'haz';
-var hazAttrPrefix = hazNamespace + ':';
 var exprNamespace = 'expr';
-var exprPrefix = exprNamespace + ':';
 var mexprNamespace = 'mexpr';
+var hazLangDefinition = 
+	'+when@test +each@select,var +if@test +unless@test +choose ' +
+	'+template@name include@name eval@select';
+
+var hazPrefix = hazNamespace + ':';
+var exprPrefix = exprNamespace + ':';
 var mexprPrefix = mexprNamespace + ':';
 var exprTextAttr = exprPrefix + textAttr;
 var exprHtmlAttr = exprPrefix + htmlAttr;
 
-function hazAttrs(el, varPrefix) {
-	if (!varPrefix) varPrefix = "";
-	var values = {};
-	_.forEach(hazDirectives, function(name) {
-		values[varPrefix + name] = hazAttr(el, name);
-	});
-	return values;
+var hazLang = _.map(_.words(hazLangDefinition), function(def) {
+	def = def.split('@');
+	var tag = def[0];
+	var hasAttrShorthand = tag[0] === '+';
+	if (hasAttrShorthand) tag = tag.substr(1);
+	var attrs = def[1];
+	attrs = (attrs && attrs !== '') ? attrs.split(',') : [];
+	return {
+		tag: tag,
+		hasAttrShorthand: hasAttrShorthand,
+		attrs: attrs
+	}
+});
+
+hazLangLookup = {};
+
+_.forEach(hazLang, function(directive) { // should happen in loadTemplate
+	var nsTag = hazPrefix + directive.tag; 
+	directive.nsTag = nsTag;
+	hazLangLookup[nsTag] = directive;
+});
+
+function walkTree(root, skipRoot, callback) { // always "accept" element nodes
+	var walker = document.createNodeIterator(
+			root,
+			1,
+			acceptNode,
+			null // IE9 throws if this irrelavent argument isn't passed
+		);
+	
+	var el;
+	while (el = walker.nextNode());
+
+	function acceptNode(el) {
+		if (skipRoot && el === root) return NodeFilter.FILTER_SKIP;
+		callback(el);
+		return NodeFilter.FILTER_ACCEPT;
+	}
 }
 
-function hazAttr(el, attr) {
-	var hazAttrName = hazAttrPrefix + attr;
-	if (!DOM.hasAttribute(el, hazAttrName)) return false;
-	var value = el.getAttribute(hazAttrName);
-	el.removeAttribute(hazAttrName);
-	return value;
+
+function convertToFragment(el) {
+	var doc = el.ownerDocument;
+	var frag = doc.createDocumentFragment();
+	_.forEach(_.toArray(el.childNodes), function(child) { frag.appendChild(child); });
+	return frag;
 }
 
 function HazardProcessor() {
@@ -162,9 +196,46 @@ loadTemplate: function(template) {
 	var processor = this;
 	processor.top = template;
 	processor.templates = {};
-	_.forEach(DOM.findAll('[id]', template), function(el) {
-		var id = el.getAttribute('id');
-		processor.templates[id] = el;
+
+	var doc = template.ownerDocument;
+
+	walkTree(template, true, function(el) {
+		var tag = DOM.getTagName(el);
+		if (tag in hazLangLookup) return;
+		_.forEach(hazLang, function(def) {
+			if (!def.hasAttrShorthand) return;
+			var nsTag = def.nsTag;
+			if (!el.hasAttribute(nsTag)) return;
+			var defaultAttr = def.attrs[0];
+			var value = el.getAttribute(nsTag);
+			el.removeAttribute(nsTag);
+			var directiveEl = doc.createElement(nsTag);
+			if (defaultAttr) directiveEl.setAttribute(defaultAttr, value);
+			_.forEach(def.attrs, function(attr, i) {
+				if (i === 0) return; // the defaultAttr
+				var nsAttr = hazPrefix + attr;
+				if (!el.hasAttribute(nsAttr)) return;
+				var value = el.getAttribute(nsAttr);
+				el.removeAttribute(nsAttr);
+				directiveEl.setAttribute(attr, value);
+			});
+			if (def.tag === 'choose') {
+				var frag = convertToFragment(el);
+				directiveEl.appendChild(frag);
+				el.appendChild(directiveEl);
+				return;
+			}
+			el.parentNode.replaceChild(directiveEl, el);
+			directiveEl.appendChild(el);
+		});
+	});
+	
+	walkTree(template, true, function(el) {
+		var tag = DOM.getTagName(el);
+		if (tag !== hazPrefix + 'template') return;
+		if (!el.hasAttribute('name')) return;
+		var name = el.getAttribute('name');
+		processor.templates[name] = el;
 	});
 },
 
@@ -176,99 +247,99 @@ transform: function(provider, details) { // TODO how to use details
 transformTree: function(el, provider, context, variables) {
 	var doc = el.ownerDocument;
 	var processor = this;
-	
-	var haz = hazAttrs(el, '_');
 
-	if (haz._template) {
-		template = processor.templates[haz._template];
+	var tag = DOM.getTagName(el);
+	var def = hazLangLookup[tag];
+
+	if (!def) {
+		return processor.transformNode(el, provider, context, variables); // NOTE return value === el
+	}
+
+	var invertTest = false;
+
+	switch (def.tag) {
+	case 'include':
+		var name = el.getAttribute('name');
+		template = processor.templates[name];
 		if (!template) {
-			logger.warn('Hazard could not find template #' + haz._template);
+			logger.warn('Hazard could not find template name=' + name);
 			return;
 		}
-		var tagName = DOM.getTagName(el);
-		var templateTagName = DOM.getTagName(template);
-		if (tagName !== templateTagName) {
-			logger.warn('Hazard found mismatched tagNames between template ' + templateTagName + '#' + haz._template + ' and ' + tagName);
-		}
-		
+	
 		el = template.cloneNode(true);
+		var frag = convertToFragment(el);
+		return processor.transformNode(el, provider, context, variables); 
+
+	case 'eval':
+		var selector = el.getAttribute('select');
+		var result = evalExpression(selector, provider, context, variables, 'node'); 
+		return result;
+
+	case 'unless':
+		invertTest = true;
+	case 'if':
+		var testVal = el.getAttribute('test');
+		var pass = false;
+		try {
+			pass = evalExpression(testVal, provider, context, variables, 'boolean');
+		}
+		catch (err) {
+			Task.postError(err);
+			logger.warn('Error evaluating <haz:if test="' + testVal + '">. Assumed false.');
+			pass = false;
+		}
+		if (invertTest) pass = !pass;
+		if (!pass) return;
+		var frag = convertToFragment(el);
+		return processor.transformNode(frag, provider, context, variables); 
+
+	case 'choose':
+		var childNodes = _.toArray(el.childNodes);
+		_.forEach(childNodes, function(child) { el.removeChild(child); });
+		var result = doc.createDocumentFragment();
+		_.some(childNodes, function(child) {
+			var childTag = DOM.getTagName(child);
+			var childDef = hazLangLookup[childTag];
+			if (!childDef || childDef.tag !== 'when') {
+				result.appendChild(child);
+				return false;
+			}
+			var testVal = child.getAttribute('test');
+			var pass = evalExpression(testVal, provider, context, variables, 'boolean');
+			if (!pass) return false;
+			result = convertToFragment(child);
+			return true;
+		});
+		return processor.transformNode(result, provider, context, variables); 
+
+	case 'each':
+		var selector = el.getAttribute('select');
+		var varName = el.getAttribute('var');
+		var subVars = _.defaults({}, variables);
+		var subContexts;
+		try {
+			subContexts = provider.evaluate(selector, context, variables, 'array');
+		}
+		catch (err) {
+			Task.postError(err);
+			logger.warn('Error evaluating <haz:each select="' + selector + '">. Assumed empty.');
+			return;
+		}
+
+		var result = doc.createDocumentFragment(); // FIXME which is the right doc to create this frag in??
 		
-		// Now remove @id and @haz:
-		el.removeAttribute('id');
-		hazAttrs(el);
-	}
+		_.forEach(subContexts, function(subContext) {
+			if (varName) subVars[varName] = subContext;
+			var srcFrag = convertToFragment(el.cloneNode(true));
+			var newFrag = processor.transformNode(srcFrag, provider, subContext, subVars); // NOTE newFrag === srcFrag
+			if (newFrag) result.appendChild(newFrag); // NOTE no adoption
+		});
+		
+		return result;
 
-	if (haz._each === false) {
-		return processNode(el, provider, context, variables); // NOTE return value === el
+	default: // FIXME
 	}
-	
-	// handle each
-	var subVars = _.defaults({}, variables);
-	var subContexts;
-	try {
-		subContexts = provider.evaluate(haz._each, context, variables, 'array');
-	}
-	catch (err) {
-		Task.postError(err);
-		logger.warn('Error evaluating @haz:each="' + haz._each + '". Assumed empty.');
-		return;
-	}
-	var result = doc.createDocumentFragment(); // FIXME which is the right doc to create this frag in??
-	
-	_.forEach(subContexts, function(subContext) {
-		if (haz._var) subVars[haz._var] = subContext;
-		var srcEl = el.cloneNode(true);
-		var newEl = processNode(srcEl, provider, subContext, subVars); // NOTE newEl === srcEl
-		if (newEl) result.appendChild(newEl); // NOTE no adoption
-	});
-	
-	return result;
-
-	function processNode(node, provider, context, variables) {
-		var keep;
-		if (haz._if !== false) {
-			try {
-				keep = evalExpression(haz._if, provider, context, variables, 'boolean');
-			}
-			catch (err) {
-				Task.postError(err);
-				logger.warn('Error evaluating @haz:if="' + haz._if + '". Assumed false.');
-				keep = false;
-			}
-			if (!keep) return;
-		}
-		if (haz._unless !== false) {
-			try {
-				keep = !evalExpression(haz._unless, provider, context, variables, 'boolean');
-			}
-			catch(err) {
-				Task.postError(err);
-				logger.warn('Error evaluating @haz:unless="' + haz._unless + '". Assumed false.');
-				keep = true;
-			}
-			if (!keep) return;
-		}
-		if (haz._choose !== false) {
-			var childNodes = _.toArray(node.childNodes);
-			_.forEach(childNodes, function(child) { node.removeChild(child); });
-			var result = doc.createDocumentFragment();
-			_.some(childNodes, function(child) {
-				var _when = false;
-				if (child.nodeType === 1) _when = hazAttr(child, 'when');
-				if (_when === false) {
-					result.appendChild(child);
-					return false;
-				}
-				var found = evalExpression(_when, provider, context, variables, 'boolean');
-				if (!found) return false;
-				result = child;
-				return true;
-			});
-			node.appendChild(result);
-		}
-		return processor.transformNode(node, provider, context, variables); // NOTE return value === node
-	}
-	
+			
 },
 
 transformNode: function(node, provider, context, variables) {
