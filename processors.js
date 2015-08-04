@@ -261,15 +261,20 @@ transformTree: function(el, provider, context, variables) {
 	var processor = this;
 
 	var tag = DOM.getTagName(el);
-	var def = hazLangLookup[tag];
+	var isHazElement = tag.indexOf(hazPrefix) === 0;
 
-	if (!def) {
+	if (!isHazElement) {
 		return processor.transformNode(el, provider, context, variables); // NOTE return value === el
 	}
 
+	var def = hazLangLookup[tag];
 	var invertTest = false;
 
 	switch (def.tag) {
+	default: // for unknown (or unhandled like template) haz: elements just process the children
+		var frag = convertToFragment(el);
+		return processor.transformNode(frag, provider, context, variables); 
+		
 	case 'include':
 		var name = el.getAttribute('name');
 		template = processor.templates[name];
@@ -280,7 +285,7 @@ transformTree: function(el, provider, context, variables) {
 	
 		el = template.cloneNode(true);
 		var frag = convertToFragment(el);
-		return processor.transformNode(el, provider, context, variables); 
+		return processor.transformNode(frag, provider, context, variables); 
 
 	case 'eval':
 		var selector = el.getAttribute('select');
@@ -349,7 +354,6 @@ transformTree: function(el, provider, context, variables) {
 		
 		return result;
 
-	default: // FIXME
 	}
 			
 },
@@ -446,6 +450,11 @@ function evalExpression(expr, provider, context, variables, type) { // FIXME rob
 	var exprParts = expr.split('|');
 	var value = provider.evaluate(exprParts.shift(), context, variables, type === 'array' ? 'array' : 'node'); // FIXME what's the right type here?
 
+	_.forEach(exprParts, function(scriptBody) {
+		var fn = Function('value', 'return (' + scriptBody + ');');
+		value = fn(value);
+	});
+
 	switch (type) {
 	case 'text':
 		if (value && value.nodeType) value = DOM.textContent(value);
@@ -461,15 +470,15 @@ function evalExpression(expr, provider, context, variables, type) { // FIXME rob
 		}
 		value = frag;
 		break;
+	case 'boolean':
+		if (value == null || value === false) value = false;
+		else value = true;
+		break;
 	default: // FIXME should never occur. logger.warn !?
 		if (value && value.nodeType) value = DOM.textContent(value);
 		break;
 	}
 
-	_.forEach(exprParts, function(scriptBody) {
-		var fn = Function('value', 'return (' + scriptBody + ');');
-		value = fn(value);
-	});
 
 	return value;
 }
@@ -506,7 +515,7 @@ evaluate: function(query, context, variables, type) {
 		if (attr.charAt(0) === '@') attr = attr.substr(1);
 	}
 
-	switch(type) {
+	switch(type) { // FIXME might be better if providers only return item or array
 	case 'text': // expr:attr or expr:.text
 		if (!node) return '';
 		switch(attr) {
@@ -785,7 +794,7 @@ evaluate: function(query, context, variables, type) {
 	var item = resultList[0];
 	var value = item && 'value' in item ? item.value : item;
 
-	switch(type) {
+	switch(type) { // FIXME might be better if providers only return item or array
 	case 'text': // expr:attr or expr:.text
 		if (value == null || value === false) return '';
 		if (value.nodeType && value.nodeType === 1) return DOM.textContent(value);
@@ -852,7 +861,7 @@ evaluate: function(query, context, variables, type) {
 
 	var value = resultList[0];
 
-	switch(type) {
+	switch(type) { // FIXME might be better if providers only return item or array
 	case 'text': // expr:attr or expr:.text
 		if (!value) return '';
 		if (value.nodeType && value.nodeType === 1) return DOM.textContent(value);
