@@ -129,8 +129,8 @@ var hazNamespace = 'haz';
 var exprNamespace = 'expr';
 var mexprNamespace = 'mexpr';
 var hazLangDefinition = 
-	'+when@test +each@select,var +if@test +unless@test +choose ' +
-	'+template@name include@name eval@select';
+	'<when@test <each@select,var <if@test <unless@test >choose ' +
+	'<template@name include@name eval@select';
 
 var hazPrefix = hazNamespace + ':';
 var exprPrefix = exprNamespace + ':';
@@ -141,13 +141,20 @@ var exprHtmlAttr = exprPrefix + htmlAttr;
 var hazLang = _.map(_.words(hazLangDefinition), function(def) {
 	def = def.split('@');
 	var tag = def[0];
-	var hasAttrShorthand = tag[0] === '+';
-	if (hasAttrShorthand) tag = tag.substr(1);
+	var attrToElement = tag.charAt(0);
+	switch (attrToElement) {
+	default: 
+		attrToElement = false; 
+		break;
+	case '<': case '>': 
+		break;
+	}
+	if (attrToElement) tag = tag.substr(1);
 	var attrs = def[1];
 	attrs = (attrs && attrs !== '') ? attrs.split(',') : [];
 	return {
 		tag: tag,
-		hasAttrShorthand: hasAttrShorthand,
+		attrToElement: attrToElement,
 		attrs: attrs
 	}
 });
@@ -203,7 +210,7 @@ loadTemplate: function(template) {
 		var tag = DOM.getTagName(el);
 		if (tag in hazLangLookup) return;
 		_.forEach(hazLang, function(def) {
-			if (!def.hasAttrShorthand) return;
+			if (!def.attrToElement) return;
 			var nsTag = def.nsTag;
 			if (!el.hasAttribute(nsTag)) return;
 			var defaultAttr = def.attrs[0];
@@ -219,14 +226,19 @@ loadTemplate: function(template) {
 				el.removeAttribute(nsAttr);
 				directiveEl.setAttribute(attr, value);
 			});
-			if (def.tag === 'choose') {
+			switch (def.attrToElement) {
+			case '>':
 				var frag = convertToFragment(el);
 				directiveEl.appendChild(frag);
 				el.appendChild(directiveEl);
-				return;
+				break;
+			case '<':
+				el.parentNode.replaceChild(directiveEl, el);
+				directiveEl.appendChild(el);
+				break;
+			default:
+				break;
 			}
-			el.parentNode.replaceChild(directiveEl, el);
-			directiveEl.appendChild(el);
 		});
 	});
 	
