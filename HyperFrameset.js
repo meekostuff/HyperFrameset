@@ -5149,8 +5149,9 @@ transformTree: function(el, provider, context, variables) {
 		return processor.transformNode(el, provider, context, variables); // NOTE return value === el
 	}
 
+	var invertTest = false; // for haz:if haz:unless
 	var def = hazLangLookup[tag];
-	var invertTest = false;
+	if (!def) def = { tag: '' }
 
 	switch (def.tag) {
 	default: // for unknown (or unhandled like template) haz: elements just process the children
