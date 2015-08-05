@@ -290,7 +290,7 @@ transformTree: function(el, provider, context, variables) {
 
 	case 'eval':
 		var selector = el.getAttribute('select');
-		var result = evalExpression(selector, provider, context, variables, 'node'); 
+		var result = evalExpression(selector, provider, context, variables, 'node');
 		return result;
 
 	case 'unless':
@@ -336,7 +336,7 @@ transformTree: function(el, provider, context, variables) {
 		var subVars = _.defaults({}, variables);
 		var subContexts;
 		try {
-			subContexts = provider.evaluate(selector, context, variables, 'array');
+			subContexts = provider.evaluate(selector, context, variables, true);
 		}
 		catch (err) {
 			Task.postError(err);
@@ -449,39 +449,43 @@ function evalExpression(expr, provider, context, variables, type) { // FIXME rob
 		(context.nodeType === 9 ? context : context.ownerDocument) : 
 		document; 
 	var exprParts = expr.split('|');
-	var value = provider.evaluate(exprParts.shift(), context, variables, type === 'array' ? 'array' : 'node'); // FIXME what's the right type here?
+	var value = provider.evaluate(exprParts.shift(), context, variables);
 
 	_.forEach(exprParts, function(scriptBody) {
 		var fn = Function('value', 'return (' + scriptBody + ');');
 		value = fn(value);
 	});
 
-	switch (type) {
-	case 'text':
-		if (value && value.nodeType) value = DOM.textContent(value);
-		break;
-	case 'node':
-		var frag = doc.createDocumentFragment();
-		if (value && value.nodeType) frag.appendChild(doc.importNode(value, true)); // NOTE no adoption
-		else {
-			var div = doc.createElement('div');
-			div.innerHTML = value;
-			var node;
-			while (node = div.firstChild) frag.appendChild(node); // NOTE no adoption
+	return cast(value, type);
+
+	function cast(value, type) {
+		switch (type) {
+		case 'text':
+			if (value && value.nodeType) value = DOM.textContent(value);
+			break;
+		case 'node':
+			var frag = doc.createDocumentFragment();
+			if (value && value.nodeType) frag.appendChild(doc.importNode(value, true)); // NOTE no adoption
+			else {
+				var div = doc.createElement('div');
+				div.innerHTML = value;
+				var node;
+				while (node = div.firstChild) frag.appendChild(node); // NOTE no adoption
+			}
+			value = frag;
+			break;
+		case 'boolean':
+			if (value == null || value === false) value = false;
+			else value = true;
+			break;
+		default: // FIXME should never occur. logger.warn !?
+			if (value && value.nodeType) value = DOM.textContent(value);
+			break;
 		}
-		value = frag;
-		break;
-	case 'boolean':
-		if (value == null || value === false) value = false;
-		else value = true;
-		break;
-	default: // FIXME should never occur. logger.warn !?
-		if (value && value.nodeType) value = DOM.textContent(value);
-		break;
+		return value;
 	}
 
 
-	return value;
 }
 
 return HazardProcessor;	
@@ -500,51 +504,47 @@ init: function(node) {
 	this.srcNode = node;
 },
 
-evaluate: function(query, context, variables, type) {
+evaluate: function(query, context, variables, wantArray) {
 	if (!context) context = this.srcNode;
 	var doc = context.nodeType === 9 ? context : context.ownerDocument; // FIXME which document??
 	var queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
 	var selector = queryParts[1];
 	var attr = queryParts[2];
-	if (type === 'array') { // haz:each
-		if (attr) logger.warn('Ignoring attribute selector because evaluate() requested array'); // FIXME should probably be an error
-		return findAll(context, selector, variables);
+	var result;
+	if (wantArray) { // haz:each
+		result = findAll(context, selector, variables);
 	}
-	var node = find(context, selector, variables);
+	else {
+		var node = find(context, selector, variables);
+		result = node ? [ node ] : [];
+	}
+
 	if (attr) {
 		attr = _.trim(attr);
 		if (attr.charAt(0) === '@') attr = attr.substr(1);
+		_.forEach(result, function(node, i) {
+			result[i] = getAttr(node, attr);
+		});
 	}
 
-	switch(type) { // FIXME might be better if providers only return item or array
-	case 'text': // expr:attr or expr:.text
-		if (!node) return '';
-		switch(attr) {
-		case null: case undefined: case '': case textAttr: return DOM.textContent(node);
-		case htmlAttr: return node.innerHTML;
-		default: return node.getAttribute(attr);
-		}
-	case 'boolean': // haz:if
-		if (!node) return false;
-		switch(attr) {
-		case null: case undefined: case '': return true;
-		case textAttr: case htmlAttr: return !/^\s*$/.test(DOM.textContent(node)); // FIXME potentially heavy. Implement as a DOM utility isEmptyNode()
-		default: return DOM.hasAttribute(node, nodeattr);
-		}
-	case 'node': // expr:.html
+	return (wantArray) ? result : result[0];
+
+	function getAttr(node, attr) {
 		switch(attr) {
 		case null: case undefined: case '': return node;
-		case textAttr: return DOM.textContent(node);
+		case textAttr: 
+			return DOM.textContent(node);
 		case htmlAttr:
 			var frag = doc.createDocumentFragment();
 			_.forEach(node.childNodes, function(child) { 
 				frag.appendChild(doc.importNode(child, true)); // TODO does `child` really need to be cloned??
 			});
 			return frag;
-		default: return node.getAttribute(attr);
+		default: 
+			return node.getAttribute(attr);
 		}
-	default: return node; // TODO shouldn't this be an error / warning??
 	}
+
 }
 
 });
@@ -751,7 +751,7 @@ init: function(node) {
 	this.view = Microdata.getView(node);
 },
 
-evaluate: function(query, context, variables, type) {
+evaluate: function(query, context, variables, wantArray) {
 	if (!context) context = this.view;
 
 	var query = _.trim(query);
@@ -759,7 +759,7 @@ evaluate: function(query, context, variables, type) {
 	var baseSchema;
 	var pathParts;
 
-	if (query === '.') return (type === 'array') ? [ context ] : context;
+	if (query === '.') return (wantArray) ? [ context ] : context;
 
 	var m = query.match(/^(?:(\^)?\[([^\]]*)\]\.)/);
 	if (m && m.length) {
@@ -790,23 +790,12 @@ evaluate: function(query, context, variables, type) {
 		return desc.value;
 	});
 
-	if (type === 'array') return resultList;
+	if (wantArray) return resultList;
 
 	var item = resultList[0];
-	var value = item && 'value' in item ? item.value : item;
+	var value = item && (typeof item === 'object') && ('value' in item) ? item.value : item;
 
-	switch(type) { // FIXME might be better if providers only return item or array
-	case 'text': // expr:attr or expr:.text
-		if (value == null || value === false) return '';
-		if (value.nodeType && value.nodeType === 1) return DOM.textContent(value);
-		return value;
-	case 'boolean': // haz:if
-		if (!value) return false;
-		return true;
-	case 'node': // expr:.html
-		return value;
-	default: return value; // TODO shouldn't this be an error / warning??
-	}
+	return value;
 }
 
 });
@@ -830,13 +819,13 @@ init: function(object) {
 	this.object = object;
 },
 
-evaluate: function(query, context, variables, type) {
+evaluate: function(query, context, variables, wantArray) {
 	if (!context) context = this.object;
 
 	var query = _.trim(query);
 	var pathParts;
 
-	if (query === '.') return (type === 'array') ? [ context ] : context;
+	if (query === '.') return (wantArray) ? [ context ] : context;
 
 	var m = query.match(/^\^/);
 	if (m && m.length) {
@@ -858,22 +847,10 @@ evaluate: function(query, context, variables, type) {
 		});
 	});
 
-	if (type === 'array') return resultList;
+	if (wantArray) return resultList;
 
 	var value = resultList[0];
-
-	switch(type) { // FIXME might be better if providers only return item or array
-	case 'text': // expr:attr or expr:.text
-		if (!value) return '';
-		if (value.nodeType && value.nodeType === 1) return DOM.textContent(value);
-		return value;
-	case 'boolean': // haz:if
-		if (!value) return false;
-		return true;
-	case 'node': // expr:.html
-		return value;
-	default: return value; // TODO shouldn't this be an error / warning??
-	}
+	return value;
 }
 
 });
