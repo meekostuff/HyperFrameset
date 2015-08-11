@@ -1258,18 +1258,20 @@ config: function(options) {
 lookup: function(url, details) {
 	var frameDef = this;
 	var options = frameDef.options;
-	if (!options.lookup) return;
+	if (!options.lookup) return false;
 	var partial = options.lookup(url, details);
-	if (!partial) return;
+	if (partial === '' || partial === true) return true;
+	if (partial == null || partial === false) return false;
 	return inferChangeset(url, partial);
 },
 
 detect: function(doc, details) {
 	var frameDef = this;
 	var options = frameDef.options;
-	if (!options.detect) return;
+	if (!options.detect) return false;
 	var partial = options.detect(doc, details);
-	if (!partial) return;
+	if (partial === '' || partial === true) return true;
+	if (partial == null || partial === false) return false;
 	return inferChangeset(details.url, partial);
 },
 
@@ -2631,7 +2633,8 @@ onRequestNavigation: function(e, frame) { // `return false` means success (so pr
 
 	function requestNavigation(frame, url, details) { // `return true` means success
 		var changeset = frame.definition.lookup(url, details);
-		if (!changeset) return false;
+		if (changeset === '' || changeset === true) return true;
+		if (changeset == null || changeset === false) return false;
 		framer.load(url, changeset, frame.isFrameset);
 		return true;
 	}
@@ -2782,7 +2785,8 @@ lookup: function(docURL) {
 	var framer = this;
 	if (!framer.options.lookup) return;
 	var result = framer.options.lookup(docURL);
-	if (result == null) return null;
+	// FIXME if (result === '' || result === true) 
+	if (result == null || result === false) return false;
 
 	// FIXME error if `result` is a relative URL
 	if (typeof result === 'string') result = implyFramesetScope(result, docURL);
@@ -2794,7 +2798,8 @@ detect: function(srcDoc) {
 	var framer = this;
 	if (!framer.options.detect) return;
 	var result = framer.options.detect(srcDoc);
-	if (result == null) return null;
+	// FIXME if (result === '' || result === true) 
+	if (result == null || result === false) return false;
 
 	// FIXME error if `result` is a relative URL
 	if (typeof result === 'string') result = implyFramesetScope(result, document.URL);
