@@ -3648,7 +3648,7 @@ role: 'layer'
 
 var zIndex = 1;
 
-_.assign(Panel, {
+_.assign(Layer, {
 
 attached: function() {
 	this.css('z-index', zIndex++);
@@ -3732,7 +3732,7 @@ enteredDocument: function() {
 	
 	function normalizeChild(node) {
 		var element = this;
-		if (DOM.matches(node, framer.definition.mkSelector('hlayout, vlayout, deck, rdeck, panel, frame'))) return; // FIXME doesn't take into account custom ns and other layout tags
+		if (DOM.matches(node, framer.definition.mkSelector('hlayout, vlayout, deck, rdeck, panel, frame'))) return; 
 		switch (node.nodeType) {
 		case 1: // hide non-layout elements
 			node.hidden = true;
