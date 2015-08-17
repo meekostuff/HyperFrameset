@@ -782,15 +782,16 @@ return urlAttributes;
 */
 var resolveAll = function(doc, baseURL) {
 
-	_.forOwn(urlAttributes, function(attrList, tag) {
-		var elts;
+	var selector = Object.keys(urlAttributes).join(', ');
+	_.forEach(DOM.findAll(selector, doc), function(el) {
+		var tag = DOM.getTagName(el);
+		var attrList = urlAttributes[tag];
 		_.forOwn(attrList, function(attrDesc, attrName) {
-			if (!elts) elts = DOM.findAll(tag, doc);
-			_.forEach(elts, function(el) {
-				attrDesc.resolve(el, baseURL);
-			});
+			if (!el.hasAttribute(attrName)) return;
+			attrDesc.resolve(el, baseURL);
 		});
 	});
+
 }
 
 
