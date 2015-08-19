@@ -4076,6 +4076,17 @@ prerender: function(dstDoc, definition) {
 	
 	return pipe(null, [
 
+	function() { // remove all link[rel~=stylesheet]
+		var dstHead = dstDoc.head;
+		_.forEach(_.toArray(dstHead.childNodes), function(node) {
+			if (node.nodeType !== 1) return;
+			if (DOM.getTagName(node) !== 'link') return;
+			// FIXME possibly should remove all <link>
+			if (_.lc(node.rel).indexOf('stylesheet') < 0) return;
+			dstHead.removeChild(node);
+		});
+	},
+
 	function() {
 		var dstBody = dstDoc.body;
 		var node;
