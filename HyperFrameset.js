@@ -5278,7 +5278,7 @@ transformTree: function(srcNode, provider, context, variables) { // srcNode is E
 	var nodeType = srcNode.nodeType;
 	if (nodeType !== 1) throw Error('transformTree() expects Element');
 	node = transformSingleElement(srcNode, provider, context, variables);
-	if (isShallow(srcNode)) return node;
+	if (getHazardDetails(srcNode).isShallow) return node;
 
 	var frag = processor.transformChildNodes(srcNode, provider, context, variables);
 	node.appendChild(frag);
@@ -5304,16 +5304,16 @@ transformChildNodes: function(srcNode, provider, context, variables) {
 
 
 function transformSingleElement(srcNode, provider, context, variables) {
-	var exprAttributes = getExprAttributes(srcNode);
+	var details = getHazardDetails(srcNode);
 
 	el = srcNode.cloneNode(false);
 
-	_.forEach(exprAttributes, function(desc) {
+	_.forEach(details.exprAttributes, function(desc) {
 		var value;
 		try {
 			value = (desc.prefix === mexprPrefix) ?
-				evalMExpression(desc.expression, provider, context, variables, desc.type) :
-				evalExpression(desc.expression, provider, context, variables, desc.type);
+				processMExpression(desc.mexpression, provider, context, variables, desc.type) :
+				processExpression(desc.expression, provider, context, variables, desc.type);
 		}
 		catch (err) {
 			Task.postError(err);
@@ -5326,17 +5326,20 @@ function transformSingleElement(srcNode, provider, context, variables) {
 	return el;
 }
 
-function isShallow(el) {
-	var exprAttributes = getExprAttributes(el);
-	return _.some(exprAttributes, function(desc) {
-		var attrName = desc.attrName;
-		if (attrName === textAttr || attrName === htmlAttr) return true;
+function getHazardDetails(el) {
+	if (el.hazardDetails) return el.hazardDetails;
+	var details = {};
+	details.exprAttributes = getExprAttributes(el);
+	details.isShallow = _.some(details.exprAttributes, function(desc) {
+		if (desc.attrName === textAttr || desc.attrName === htmlAttr) return true;
 		return false;
 	});
+
+	el.hazardDetails = details;
+	return details;
 }
 
 function getExprAttributes(el) {
-	if (el.exprAttributes) return el.exprAttributes;
 	var attrs = [];
 	_.forEach(_.toArray(el.attributes), function(attr) {
 		var attrName;
@@ -5352,12 +5355,20 @@ function getExprAttributes(el) {
 		var desc = {
 			prefix: prefix,
 			attrName: attrName,
-			type: (attrName === htmlAttr) ? 'node' : 'text',
-			expression: attr.value
+			type: (attrName === htmlAttr) ? 'node' : 'text'
+		}
+		switch (prefix) {
+		case exprPrefix:
+			desc.expression = interpretExpression(attr.value);
+			break;
+		case mexprPrefix:
+			desc.mexpression = interpretMExpression(attr.value);
+			break;
+		default: // TODO an error?
+			break;
 		}
 		attrs.push(desc);
 	});
-	el.exprAttributes = attrs;
 	return attrs;
 }
 
@@ -5386,21 +5397,68 @@ function setAttribute(el, attrName, value) {
 	}
 }
 
-function evalMExpression(mexpr, provider, context, variables, type) { // FIXME mexpr not compatible with type === 'node'
-	return mexpr.replace(/\{\{((?:[^}]|\}(?=\}\})|\}(?!\}))*)\}\}/g, function(all, expr) {
-		return evalExpression(expr, provider, context, variables, type);
+function evalMExpression(mexprText, provider, context, variables, type) {
+	var mexpr = interpretMExpression(mexprText);
+	var result = processMExpression(mexpr, provider, context, variables, type);
+	return result;
+}
+
+function evalExpression(exprText, provider, context, variables, type) {
+	var expr = interpretExpression(exprText);
+	var result = processExpression(expr, provider, context, variables, type);
+	return result;
+}
+	
+function interpretMExpression(mexprText) {
+	var expressions = [];
+	var mexpr = mexprText.replace(/\{\{((?:[^}]|\}(?=\}\})|\}(?!\}))*)\}\}/g, function(all, expr) {
+		expressions.push(expr);
+		return '{{}}';
+	});
+
+	expressions = expressions.map(function(expr) { return interpretExpression(expr); });
+	return {
+		template: mexpr,
+		expressions: expressions
+	};
+}
+
+function interpretExpression(exprText) { // FIXME robustness
+	var expression = {};
+	var exprParts = exprText.split('|');
+	expression.selector = exprParts.shift();
+	expression.filters = [];
+
+	_.forEach(exprParts, function(scriptBody) {
+		try {
+			var fn = Function('value', 'return (' + scriptBody + ');');
+		}
+		catch (err) {
+			Task.postError(err);
+			logger.error('Error in filter: ' + scriptBody);
+			return;
+		}
+		expression.filters.push(fn);
+	});
+
+	return expression;
+}
+
+
+function processMExpression(mexpr, provider, context, variables, type) { // FIXME mexpr not compatible with type === 'node'
+	var i = 0;
+	return mexpr.template.replace(/\{\{\}\}/g, function(all) {
+		return processExpression(mexpr.expressions[i++], provider, context, variables, type);
 	});
 }
 
-function evalExpression(expr, provider, context, variables, type) { // FIXME robustness
+function processExpression(expr, provider, context, variables, type) { // FIXME robustness
 	var doc = (context && context.nodeType) ? // TODO which document
 		(context.nodeType === 9 ? context : context.ownerDocument) : 
 		document; 
-	var exprParts = expr.split('|');
-	var value = provider.evaluate(exprParts.shift(), context, variables);
+	var value = provider.evaluate(expr.selector, context, variables);
 
-	_.forEach(exprParts, function(scriptBody) {
-		var fn = Function('value', 'return (' + scriptBody + ');');
+	_.forEach(expr.filters, function(fn) {
 		value = fn(value);
 	});
 
