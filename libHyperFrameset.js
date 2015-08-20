@@ -2120,18 +2120,15 @@ prerender: function(dstDoc, definition) {
 	
 	return pipe(null, [
 
-	function() { // remove all link[rel~=stylesheet]
+	function() { // remove all <link rel=stylesheet /> just in case
+		// FIXME maybe remove all <link>
 		var dstHead = dstDoc.head;
-		_.forEach(_.toArray(dstHead.childNodes), function(node) {
-			if (node.nodeType !== 1) return;
-			if (DOM.getTagName(node) !== 'link') return;
-			// FIXME possibly should remove all <link>
-			if (_.lc(node.rel).indexOf('stylesheet') < 0) return;
+		_.forEach(DOM.findAll('link[rel|=stylesheet]', dstHead), function(node) {
 			dstHead.removeChild(node);
 		});
 	},
 
-	function() {
+	function() { // empty the body
 		var dstBody = dstDoc.body;
 		var node;
 		while (node = dstBody.firstChild) dstBody.removeChild(node);
