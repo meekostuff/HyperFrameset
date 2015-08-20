@@ -5026,7 +5026,7 @@ var hazNamespace = 'haz';
 var exprNamespace = 'expr';
 var mexprNamespace = 'mexpr';
 var hazLangDefinition = 
-	'<when@test <each@select,var <if@test <unless@test >choose ' +
+	'<otherwise <when@test <each@select,var <if@test <unless@test >choose ' +
 	'<template@name include@name eval@select';
 
 var hazPrefix = hazNamespace + ':';
@@ -5098,7 +5098,7 @@ _.defaults(HazardProcessor.prototype, {
 	
 loadTemplate: function(template) {
 	var processor = this;
-	processor.top = template;
+	processor.root = template; // FIXME assert template is Fragment
 	processor.templates = {};
 
 	var doc = template.ownerDocument;
@@ -5141,19 +5141,35 @@ loadTemplate: function(template) {
 	
 	walkTree(template, true, function(el) {
 		var tag = DOM.getTagName(el);
-		if (tag !== hazPrefix + 'template') return;
+		if (tag === hazPrefix + 'template') markTemplate(el);
+		if (tag === hazPrefix + 'choose') implyOtherwise(el);
+	});
+
+	function markTemplate(el) {
 		if (!el.hasAttribute('name')) return;
 		var name = el.getAttribute('name');
 		processor.templates[name] = el;
-	});
+	}
+
+	function implyOtherwise(el) { // NOTE this slurps *any* non-<haz:when>, including <haz:otherwise>
+		var otherwise = el.ownerDocument.createElement(hazPrefix + 'otherwise');
+		_.forEach(_.toArray(el.childNodes), function(node) {
+			var tag = DOM.getTagName(node);
+			if (tag === hazPrefix + 'when') return;
+			otherwise.appendChild(node);
+		});
+		el.appendChild(otherwise);
+	}
+
 },
 
 transform: function(provider, details) { // TODO how to use details
-	var clone = this.top.cloneNode(true);
-	return this.transformNode(clone, provider, null, {});
+	var root = this.root;
+	var result = this.transformChildNodes(root, provider, null, {});
+	return result;
 },
 
-transformTree: function(el, provider, context, variables) {
+transformHazardTree: function(el, provider, context, variables) {
 	var doc = el.ownerDocument;
 	var processor = this;
 
@@ -5161,7 +5177,7 @@ transformTree: function(el, provider, context, variables) {
 	var isHazElement = tag.indexOf(hazPrefix) === 0;
 
 	if (!isHazElement) {
-		return processor.transformNode(el, provider, context, variables); // NOTE return value === el
+		return processor.transformTree(el, provider, context, variables);
 	}
 
 	var invertTest = false; // for haz:if haz:unless
@@ -5169,9 +5185,8 @@ transformTree: function(el, provider, context, variables) {
 	if (!def) def = { tag: '' }
 
 	switch (def.tag) {
-	default: // for unknown (or unhandled like template) haz: elements just process the children
-		var frag = convertToFragment(el);
-		return processor.transformNode(frag, provider, context, variables); 
+	default: // for unknown (or unhandled like `template`) haz: elements just process the children
+		return processor.transformChildNodes(el, provider, context, variables); 
 		
 	case 'include':
 		var name = el.getAttribute('name');
@@ -5181,9 +5196,7 @@ transformTree: function(el, provider, context, variables) {
 			return;
 		}
 	
-		el = template.cloneNode(true);
-		var frag = convertToFragment(el);
-		return processor.transformNode(frag, provider, context, variables); 
+		return processor.transformChildNodes(template, provider, context, variables); 
 
 	case 'eval':
 		var selector = el.getAttribute('select');
@@ -5205,27 +5218,30 @@ transformTree: function(el, provider, context, variables) {
 		}
 		if (invertTest) pass = !pass;
 		if (!pass) return;
-		var frag = convertToFragment(el);
-		return processor.transformNode(frag, provider, context, variables); 
+		return processor.transformChildNodes(el, provider, context, variables); 
 
 	case 'choose':
-		var childNodes = _.toArray(el.childNodes);
-		_.forEach(childNodes, function(child) { el.removeChild(child); });
-		var result = doc.createDocumentFragment();
-		_.some(childNodes, function(child) {
+ 		// NOTE if no successful `when` then chooses *first* `otherwise` 		
+		var otherwise;
+		var when;
+		var found = _.some(el.childNodes, function(child) {
 			var childTag = DOM.getTagName(child);
 			var childDef = hazLangLookup[childTag];
-			if (!childDef || childDef.tag !== 'when') {
-				result.appendChild(child);
+			if (!childDef) return false;
+			if (childDef.tag === 'otherwise') {
+				if (!otherwise) otherwise = child;
 				return false;
 			}
+			if (childDef.tag !== 'when') return false;
 			var testVal = child.getAttribute('test');
 			var pass = evalExpression(testVal, provider, context, variables, 'boolean');
 			if (!pass) return false;
-			result = convertToFragment(child);
+			when = child;
 			return true;
 		});
-		return processor.transformNode(result, provider, context, variables); 
+		if (!found) when = otherwise;
+		if (!when) return;
+		return processor.transformChildNodes(when, provider, context, variables); 
 
 	case 'each':
 		var selector = el.getAttribute('select');
@@ -5245,8 +5261,7 @@ transformTree: function(el, provider, context, variables) {
 		
 		_.forEach(subContexts, function(subContext) {
 			if (varName) subVars[varName] = subContext;
-			var srcFrag = convertToFragment(el.cloneNode(true));
-			var newFrag = processor.transformNode(srcFrag, provider, subContext, subVars); // NOTE newFrag === srcFrag
+			var newFrag = processor.transformChildNodes(el, provider, subContext, subVars); // NOTE newFrag === srcFrag
 			if (newFrag) result.appendChild(newFrag); // NOTE no adoption
 		});
 		
@@ -5256,32 +5271,73 @@ transformTree: function(el, provider, context, variables) {
 			
 },
 
-transformNode: function(node, provider, context, variables) {
+transformTree: function(srcNode, provider, context, variables) { // srcNode is Element
 	var processor = this;
 	
-	var nodeType = node.nodeType;
-	if (!nodeType) return node;
-	if (nodeType !== 1 && nodeType !== 11) return node;
-	var deep = true;
-	if (nodeType === 1 && (DOM.hasAttribute(node, exprTextAttr) || DOM.hasAttribute(node, exprHtmlAttr))) deep = false;
-	if (nodeType === 1) transformSingleElement(node, provider, context, variables);
-	if (!deep) return node;
+	var node;
+	var nodeType = srcNode.nodeType;
+	if (nodeType !== 1) throw Error('transformTree() expects Element');
+	node = transformSingleElement(srcNode, provider, context, variables);
+	if (isShallow(srcNode)) return node;
 
-	_.forEach(_.toArray(node.childNodes), function(current) {
-		if (current.nodeType !== 1) return;
-		var newChild = processor.transformTree(current, provider, context, variables);
-		if (newChild !== current) {
-			if (newChild && newChild.nodeType) node.replaceChild(newChild, current);
-			else node.removeChild(current); // FIXME warning if newChild not empty
-		}
-	});
+	var frag = processor.transformChildNodes(srcNode, provider, context, variables);
+	node.appendChild(frag);
+
 	return node;
+},
+
+transformChildNodes: function(srcNode, provider, context, variables) {
+	var processor = this;
+	var doc = srcNode.ownerDocument;
+	var frag = doc.createDocumentFragment();
+
+	_.forEach(srcNode.childNodes, function(current) {
+		var newChild;
+		if (current.nodeType !== 1) newChild = current.cloneNode(true); // NOTE shallow but perform deep clone anyway
+		else newChild = processor.transformHazardTree(current, provider, context, variables);
+		if (newChild && newChild.nodeType) frag.appendChild(newChild);
+	});
+	return frag;
 }
 
 });
 
 
-function transformSingleElement(el, provider, context, variables) {
+function transformSingleElement(srcNode, provider, context, variables) {
+	var exprAttributes = getExprAttributes(srcNode);
+
+	el = srcNode.cloneNode(false);
+
+	_.forEach(exprAttributes, function(desc) {
+		var value;
+		try {
+			value = (desc.prefix === mexprPrefix) ?
+				evalMExpression(desc.expression, provider, context, variables, desc.type) :
+				evalExpression(desc.expression, provider, context, variables, desc.type);
+		}
+		catch (err) {
+			Task.postError(err);
+			logger.warn('Error evaluating @' + desc.attrName + '="' + desc.expression + '". Assumed false.');
+			value = false;
+		}
+		setAttribute(el, desc.attrName, value);
+	});
+
+	return el;
+}
+
+function isShallow(el) {
+	var exprAttributes = getExprAttributes(el);
+	return _.some(exprAttributes, function(desc) {
+		var attrName = desc.attrName;
+		if (attrName === textAttr || attrName === htmlAttr) return true;
+		return false;
+	});
+}
+
+function getExprAttributes(el) {
+	if (el.exprAttributes) return el.exprAttributes;
+	var attrs = [];
 	_.forEach(_.toArray(el.attributes), function(attr) {
 		var attrName;
 		var prefix = false;
@@ -5293,21 +5349,16 @@ function transformSingleElement(el, provider, context, variables) {
 		});
 		if (!prefix) return;
 		el.removeAttribute(attr.name);
-		var expr = attr.value;
-		var type = (attrName === htmlAttr) ? 'node' : 'text';
-		var value;
-		try {
-			value = (prefix === mexprPrefix) ?
-				evalMExpression(expr, provider, context, variables, type) :
-				evalExpression(expr, provider, context, variables, type);
+		var desc = {
+			prefix: prefix,
+			attrName: attrName,
+			type: (attrName === htmlAttr) ? 'node' : 'text',
+			expression: attr.value
 		}
-		catch (err) {
-			Task.postError(err);
-			logger.warn('Error evaluating @' + attr.name + '="' + attr.value + '". Assumed false.');
-			value = false;
-		}
-		setAttribute(el, attrName, value);
+		attrs.push(desc);
 	});
+	el.exprAttributes = attrs;
+	return attrs;
 }
 
 function setAttribute(el, attrName, value) {
