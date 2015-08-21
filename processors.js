@@ -185,7 +185,6 @@ function walkTree(root, skipRoot, callback) { // always "accept" element nodes
 	}
 }
 
-
 function convertToFragment(el) {
 	var doc = el.ownerDocument;
 	var frag = doc.createDocumentFragment();
@@ -272,20 +271,39 @@ transform: function(provider, details) { // TODO how to use details
 	return result;
 },
 
+transformChildNodes: function(srcNode, provider, context, variables) {
+	var processor = this;
+	var doc = srcNode.ownerDocument;
+	var frag = doc.createDocumentFragment();
+
+	_.forEach(srcNode.childNodes, function(current) {
+		var newChild = processor.transformNode(current, provider, context, variables);
+		if (newChild && newChild.nodeType) frag.appendChild(newChild);
+	});
+	return frag;
+},
+
+transformNode: function(srcNode, provider, context, variables) {
+	var processor = this;
+
+	switch (srcNode.nodeType) {
+	default: 
+		return srcNode.cloneNode(true);
+	case 1:
+		var details = getHazardDetails(srcNode);
+		if (details.definition) return processor.transformHazardTree(srcNode, provider, context, variables);
+		else return processor.transformTree(srcNode, provider, context, variables);
+	}
+},
+
 transformHazardTree: function(el, provider, context, variables) {
 	var doc = el.ownerDocument;
 	var processor = this;
 
-	var tag = DOM.getTagName(el);
-	var isHazElement = tag.indexOf(hazPrefix) === 0;
-
-	if (!isHazElement) {
-		return processor.transformTree(el, provider, context, variables);
-	}
+	var details = getHazardDetails(el);
+	var def = details.definition;
 
 	var invertTest = false; // for haz:if haz:unless
-	var def = hazLangLookup[tag];
-	if (!def) def = { tag: '' }
 
 	switch (def.tag) {
 	default: // for unknown (or unhandled like `template`) haz: elements just process the children
@@ -387,20 +405,6 @@ transformTree: function(srcNode, provider, context, variables) { // srcNode is E
 	node.appendChild(frag);
 
 	return node;
-},
-
-transformChildNodes: function(srcNode, provider, context, variables) {
-	var processor = this;
-	var doc = srcNode.ownerDocument;
-	var frag = doc.createDocumentFragment();
-
-	_.forEach(srcNode.childNodes, function(current) {
-		var newChild;
-		if (current.nodeType !== 1) newChild = current.cloneNode(true); // NOTE shallow but perform deep clone anyway
-		else newChild = processor.transformHazardTree(current, provider, context, variables);
-		if (newChild && newChild.nodeType) frag.appendChild(newChild);
-	});
-	return frag;
 }
 
 });
@@ -432,6 +436,14 @@ function transformSingleElement(srcNode, provider, context, variables) {
 function getHazardDetails(el) {
 	if (el.hazardDetails) return el.hazardDetails;
 	var details = {};
+	var tag = DOM.getTagName(el);
+	var isHazElement = tag.indexOf(hazPrefix) === 0;
+
+	if (isHazElement) {
+		var def = hazLangLookup[tag];
+		details.definition = def || { tag: '' };
+	}
+
 	details.exprAttributes = getExprAttributes(el);
 	details.isShallow = _.some(details.exprAttributes, function(desc) {
 		if (desc.attrName === textAttr || desc.attrName === htmlAttr) return true;
@@ -565,7 +577,8 @@ function processExpression(expr, provider, context, variables, type) { // FIXME 
 		value = fn(value);
 	});
 
-	return cast(value, type);
+	result = cast(value, type);
+	return result;
 
 	function cast(value, type) {
 		switch (type) {
