@@ -2088,7 +2088,7 @@ var insertNode = function(conf, refNode, node) { // like imsertAdjacentHTML but 
 	if (doc.adoptNode) node = doc.adoptNode(node); // Safari 5 was throwing because imported nodes had been added to a document node
 	switch(conf) {
 	case 'beforebegin': refNode.parentNode.insertBefore(node, refNode); break;
-	case 'afterend': refNode.parentNode.insertBefore(node, refNode.nextSilbing); break;
+	case 'afterend': refNode.parentNode.insertBefore(node, refNode.nextSibling); break;
 	case 'afterbegin': refNode.insertBefore(node, refNode.firstChild); break;
 	case 'beforeend': refNode.appendChild(node); break;
 	case 'replace': refNode.parentNode.replaceChild(node, refNode);
