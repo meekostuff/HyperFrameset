@@ -203,24 +203,63 @@ var removeAttributes = function(node) {
 	return node;
 }
 
-var createDocument = function() { // modern browsers. IE >= 9
+var CREATE_DOCUMENT_COPIES_URL = (function() {
 	var doc = document.implementation.createHTMLDocument('');
-	doc.removeChild(doc.documentElement);
+	return doc.URL === document.URL;
+})();
+
+var CLONE_DOCUMENT_COPIES_URL = (function() {
+	try {
+		var doc = document.cloneNode(false);
+		if (doc.URL === document.URL) return true;
+	}
+	catch (err) { }
+	return false;
+})();
+		
+// NOTE we want create*Document() to have a URL
+var CREATE_DOCUMENT_WITH_CLONE = !CREATE_DOCUMENT_COPIES_URL && CLONE_DOCUMENT_COPIES_URL;
+
+var createDocument = function(srcDoc) { // modern browsers. IE >= 9
+	if (!srcDoc) srcDoc = document;
+	// TODO find doctype element??
+	var doc;
+	if (CREATE_DOCUMENT_WITH_CLONE) { 
+		doc = srcDoc.cloneNode(false);
+	}
+	else {
+		doc = srcDoc.implementation.createHTMLDocument('');
+		doc.removeChild(doc.documentElement);
+	}
 	return doc;
 }
 
-var createHTMLDocument = function(title) { // modern browsers. IE >= 9
-	return document.implementation.createHTMLDocument(title);
+var createHTMLDocument = function(title, srcDoc) { // modern browsers. IE >= 9
+	if (!srcDoc) srcDoc = document;
+	// TODO find doctype element??
+	var doc;
+	if (CREATE_DOCUMENT_WITH_CLONE) { 
+		doc = srcDoc.cloneNode(false);
+		docEl = doc.createElement('html');
+		docEl.innerHTML = '<head><title>' + title + '</title></head><body></body>';
+		doc.appendChild(docEl);
+	}
+	else {
+		doc = srcDoc.implementation.createHTMLDocument('');
+	}
+	return doc;
 }
 
-var cloneDocument = function(srcDoc, options) {
-	var doc = createDocument(options);
+var cloneDocument = function(srcDoc) {
+	var doc = createDocument(srcDoc);
 	var docEl = doc.importNode(srcDoc.documentElement, true);
 	doc.appendChild(docEl); // NOTE already adopted
 
 	// WARN sometimes IE9/IE10 doesn't read the content of inserted <style>
 	_.forEach(DOM.findAll('style', doc), function(node) {
-		if (node.styleSheet && node.styleSheet.cssText == '') styleText(node, styleText(node));
+		var sheet = node.styleSheet || node.sheet;
+		if (!sheet || sheet.cssText == null) return;
+		if (sheet.cssText == '') styleText(node, styleText(node));
 	});
 	
 	return doc;
@@ -564,7 +603,7 @@ var cache = [];
 function cacheAdd(request, response) {
 	var rq = _.defaults({}, request);
 	var resp = _.defaults({}, response);
-	resp.document = response.document.cloneNode(true); // TODO handle other response types
+	resp.document = DOM.cloneDocument(response.document); // TODO handle other response types
 	cache.push({
 		request: rq,
 		response: resp
@@ -580,7 +619,7 @@ function cacheLookup(request) {
 	});
 	if (!response) return;
 	var resp = _.defaults({}, response);
-	resp.document = response.document.cloneNode(true); // TODO handle other response types
+	resp.document = DOM.cloneDocument(response.document); // TODO handle other response types
 	return resp;
 }
 
