@@ -268,19 +268,22 @@ loadTemplate: function(template) {
 transform: function(provider, details) { // TODO how to use details
 	var root = this.root;
 	var result = this.transformChildNodes(root, provider, null, {});
-	return result;
+	var frag = root.ownerDocument.createDocumentFragment();
+	_.forEach(result, function(node) { frag.appendChild(node); });
+	return frag;
 },
 
 transformChildNodes: function(srcNode, provider, context, variables) {
 	var processor = this;
 	var doc = srcNode.ownerDocument;
-	var frag = doc.createDocumentFragment();
+	var result = [];
 
 	_.forEach(srcNode.childNodes, function(current) {
 		var newChild = processor.transformNode(current, provider, context, variables);
-		if (newChild && newChild.nodeType) frag.appendChild(newChild);
+		if (Array.isArray(newChild)) result.push.apply(result, newChild);
+		else if (newChild && newChild.nodeType) result.push(newChild);
 	});
-	return frag;
+	return result;
 },
 
 transformNode: function(srcNode, provider, context, variables) {
@@ -378,12 +381,12 @@ transformHazardTree: function(el, provider, context, variables) {
 			return;
 		}
 
-		var result = doc.createDocumentFragment(); // FIXME which is the right doc to create this frag in??
+		var result = [];
 		
 		_.forEach(subContexts, function(subContext) {
 			if (varName) subVars[varName] = subContext;
-			var newFrag = processor.transformChildNodes(el, provider, subContext, subVars); // NOTE newFrag === srcFrag
-			if (newFrag) result.appendChild(newFrag); // NOTE no adoption
+			var children = processor.transformChildNodes(el, provider, subContext, subVars);
+			result.push.apply(result, children);
 		});
 		
 		return result;
@@ -401,8 +404,8 @@ transformTree: function(srcNode, provider, context, variables) { // srcNode is E
 	node = transformSingleElement(srcNode, provider, context, variables);
 	if (getHazardDetails(srcNode).isShallow) return node;
 
-	var frag = processor.transformChildNodes(srcNode, provider, context, variables);
-	node.appendChild(frag);
+	var result = processor.transformChildNodes(srcNode, provider, context, variables);
+	_.forEach(result, function(child) { node.appendChild(child); });
 
 	return node;
 }
