@@ -5203,39 +5203,36 @@ loadTemplate: function(template) {
 
 transform: function(provider, details) { // TODO how to use details
 	var root = this.root;
-	var result = this.transformChildNodes(root, provider, null, {});
 	var frag = root.ownerDocument.createDocumentFragment();
-	_.forEach(result, function(node) { frag.appendChild(node); });
+	this.transformChildNodes(root, provider, null, {}, frag);
 	return frag;
 },
 
-transformChildNodes: function(srcNode, provider, context, variables) {
+transformChildNodes: function(srcNode, provider, context, variables, frag) {
 	var processor = this;
-	var doc = srcNode.ownerDocument;
-	var result = [];
 
 	_.forEach(srcNode.childNodes, function(current) {
-		var newChild = processor.transformNode(current, provider, context, variables);
-		if (Array.isArray(newChild)) result.push.apply(result, newChild);
-		else if (newChild && newChild.nodeType) result.push(newChild);
+		processor.transformNode(current, provider, context, variables, frag);
 	});
-	return result;
 },
 
-transformNode: function(srcNode, provider, context, variables) {
+transformNode: function(srcNode, provider, context, variables, frag) {
 	var processor = this;
 
 	switch (srcNode.nodeType) {
 	default: 
-		return srcNode.cloneNode(true);
+		var node = srcNode.cloneNode(true);
+		frag.appendChild(node);
+		break;
 	case 1:
 		var details = getHazardDetails(srcNode);
-		if (details.definition) return processor.transformHazardTree(srcNode, provider, context, variables);
-		else return processor.transformTree(srcNode, provider, context, variables);
+		if (details.definition) processor.transformHazardTree(srcNode, provider, context, variables, frag);
+		else processor.transformTree(srcNode, provider, context, variables, frag);
+		break;
 	}
 },
 
-transformHazardTree: function(el, provider, context, variables) {
+transformHazardTree: function(el, provider, context, variables, frag) {
 	var doc = el.ownerDocument;
 	var processor = this;
 
@@ -5246,7 +5243,8 @@ transformHazardTree: function(el, provider, context, variables) {
 
 	switch (def.tag) {
 	default: // for unknown (or unhandled like `template`) haz: elements just process the children
-		return processor.transformChildNodes(el, provider, context, variables); 
+		processor.transformChildNodes(el, provider, context, variables, frag); 
+		return;
 		
 	case 'include':
 		var name = el.getAttribute('name');
@@ -5256,12 +5254,14 @@ transformHazardTree: function(el, provider, context, variables) {
 			return;
 		}
 	
-		return processor.transformChildNodes(template, provider, context, variables); 
+		processor.transformChildNodes(template, provider, context, variables, frag); 
+		return;
 
 	case 'eval':
 		var selector = el.getAttribute('select');
 		var result = evalExpression(selector, provider, context, variables, 'node');
-		return result;
+		frag.appendChild(result);
+		return;
 
 	case 'unless':
 		invertTest = true;
@@ -5278,7 +5278,8 @@ transformHazardTree: function(el, provider, context, variables) {
 		}
 		if (invertTest) pass = !pass;
 		if (!pass) return;
-		return processor.transformChildNodes(el, provider, context, variables); 
+		processor.transformChildNodes(el, provider, context, variables, frag); 
+		return;
 
 	case 'choose':
  		// NOTE if no successful `when` then chooses *first* `otherwise` 		
@@ -5301,7 +5302,8 @@ transformHazardTree: function(el, provider, context, variables) {
 		});
 		if (!found) when = otherwise;
 		if (!when) return;
-		return processor.transformChildNodes(when, provider, context, variables); 
+		processor.transformChildNodes(when, provider, context, variables, frag); 
+		return;
 
 	case 'each':
 		var selector = el.getAttribute('select');
@@ -5317,33 +5319,28 @@ transformHazardTree: function(el, provider, context, variables) {
 			return;
 		}
 
-		var result = [];
-		
 		_.forEach(subContexts, function(subContext) {
 			if (varName) subVars[varName] = subContext;
-			var children = processor.transformChildNodes(el, provider, subContext, subVars);
-			result.push.apply(result, children);
+			processor.transformChildNodes(el, provider, subContext, subVars, frag);
 		});
 		
-		return result;
+		return;
 
 	}
 			
 },
 
-transformTree: function(srcNode, provider, context, variables) { // srcNode is Element
+transformTree: function(srcNode, provider, context, variables, frag) { // srcNode is Element
 	var processor = this;
 	
 	var node;
 	var nodeType = srcNode.nodeType;
 	if (nodeType !== 1) throw Error('transformTree() expects Element');
 	node = transformSingleElement(srcNode, provider, context, variables);
-	if (getHazardDetails(srcNode).isShallow) return node;
+	frag.appendChild(node);
+	if (getHazardDetails(srcNode).isShallow) return;
 
-	var result = processor.transformChildNodes(srcNode, provider, context, variables);
-	_.forEach(result, function(child) { node.appendChild(child); });
-
-	return node;
+	processor.transformChildNodes(srcNode, provider, context, variables, node);
 }
 
 });
