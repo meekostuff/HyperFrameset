@@ -5341,10 +5341,11 @@ transformTree: function(srcNode, provider, context, variables, frag) { // srcNod
 	var nodeType = srcNode.nodeType;
 	if (nodeType !== 1) throw Error('transformTree() expects Element');
 	node = transformSingleElement(srcNode, provider, context, variables);
-	frag.appendChild(node);
+	var nodeAsFrag = frag.appendChild(node); // WARN use returned value not `node` ...
+	// ... which allows a different type of output construction
 	if (getHazardDetails(srcNode).isShallow) return;
 
-	processor.transformChildNodes(srcNode, provider, context, variables, node);
+	processor.transformChildNodes(srcNode, provider, context, variables, nodeAsFrag);
 }
 
 });
