@@ -5124,11 +5124,19 @@ function walkTree(root, skipRoot, callback) { // always "accept" element nodes
 	}
 }
 
-function convertToFragment(el) {
+function childNodesToFragment(el) {
 	var doc = el.ownerDocument;
 	var frag = doc.createDocumentFragment();
 	_.forEach(_.toArray(el.childNodes), function(child) { frag.appendChild(child); });
 	return frag;
+}
+
+function htmlToFragment(html, doc) {
+	if (!doc) doc = document;
+	var div = doc.createElement('div');
+	div.innerHTML = html;
+	var result = childNodesToFragment(div);
+	return result;
 }
 
 function HazardProcessor() {
@@ -5180,7 +5188,7 @@ loadTemplate: function(template) {
 			});
 			switch (def.attrToElement) {
 			case '>':
-				var frag = convertToFragment(el);
+				var frag = childNodesToFragment(el);
 				directiveEl.appendChild(frag);
 				el.appendChild(directiveEl);
 				break;
@@ -5280,9 +5288,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 		var type = typeof value;
 		if (type === 'undefined' || type === 'boolean' || value == null) return;
 		if (!value.nodeType) { // TODO test performance
-			var div = doc.createElement('div');
-			div.innerHTML = value;
-			value = convertToFragment(div);
+			value = htmlToFragment(value, doc);
 		}
 		frag.appendChild(value);
 		return;
