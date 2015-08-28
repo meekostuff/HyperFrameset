@@ -5068,15 +5068,14 @@ var HazardProcessor = (function() {
 var hazNamespace = 'haz';
 var exprNamespace = 'expr';
 var mexprNamespace = 'mexpr';
-var hazLangDefinition = 
-	'<otherwise <when@test <each@select,var <if@test <unless@test >choose ' +
-	'<template@name include@name eval@select';
 
 var hazPrefix = hazNamespace + ':';
 var exprPrefix = exprNamespace + ':';
 var mexprPrefix = mexprNamespace + ':';
-var exprTextAttr = exprPrefix + textAttr;
-var exprHtmlAttr = exprPrefix + htmlAttr;
+
+var hazLangDefinition = 
+	'<otherwise <when@test <each@select,var <if@test <unless@test ' +
+	'>choose <template@name >eval@select include@name';
 
 var hazLang = _.map(_.words(hazLangDefinition), function(def) {
 	def = def.split('@');
@@ -5144,10 +5143,24 @@ loadTemplate: function(template) {
 	processor.templates = {};
 
 	var doc = template.ownerDocument;
+	var exprHtmlAttr = exprPrefix + htmlAttr; // NOTE this is mapped to haz:eval
+	var mexprHtmlAttr = mexprPrefix + htmlAttr; // NOTE this is invalid
+	var hazEvalTag = hazPrefix + 'eval';
 
 	walkTree(template, true, function(el) {
 		var tag = DOM.getTagName(el);
 		if (tag in hazLangLookup) return;
+
+		// pre-process @expr:_html -> @haz:eval
+		if (el.hasAttribute(exprHtmlAttr)) {
+			var val = el.getAttribute(exprHtmlAttr);
+			if (el.hasAttribute(hazEvalTag)) logger.warn('Removing @' + exprHtmlAttr + ': @' + hazEvalTag + ' present');
+			else el.setAttribute(hazEvalTag, val);
+		}
+		if (el.hasAttribute(mexprHtmlAttr)) {
+			logger.warn('Removing unsupported @' + mexprHtmlAttr);
+			el.removeAttribute(mexprHtmlAttr);
+		}
 		_.forEach(hazLang, function(def) {
 			if (!def.attrToElement) return;
 			var nsTag = def.nsTag;
@@ -5263,8 +5276,15 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 
 	case 'eval':
 		var selector = el.getAttribute('select');
-		var result = evalExpression(selector, provider, context, variables, 'node');
-		frag.appendChild(result);
+		var value = evalExpression(selector, provider, context, variables, 'node');
+		var type = typeof value;
+		if (type === 'undefined' || type === 'boolean' || value == null) return;
+		if (!value.nodeType) { // TODO test performance
+			var div = doc.createElement('div');
+			div.innerHTML = value;
+			value = convertToFragment(div);
+		}
+		frag.appendChild(value);
 		return;
 
 	case 'unless':
@@ -5342,7 +5362,8 @@ transformTree: function(srcNode, provider, context, variables, frag) { // srcNod
 	if (nodeType !== 1) throw Error('transformTree() expects Element');
 	node = transformSingleElement(srcNode, provider, context, variables);
 	var nodeAsFrag = frag.appendChild(node); // WARN use returned value not `node` ...
-	// ... which allows a different type of output construction
+	// ... this allows frag to be a custom object, which in turn 
+	// ... allows a different type of output construction
 	if (getHazardDetails(srcNode).isShallow) return;
 
 	processor.transformChildNodes(srcNode, provider, context, variables, nodeAsFrag);
@@ -5387,7 +5408,7 @@ function getHazardDetails(el) {
 
 	details.exprAttributes = getExprAttributes(el);
 	details.isShallow = _.some(details.exprAttributes, function(desc) {
-		if (desc.attrName === textAttr || desc.attrName === htmlAttr) return true;
+		if (desc.attrName === textAttr) return true;
 		return false;
 	});
 
@@ -5411,7 +5432,7 @@ function getExprAttributes(el) {
 		var desc = {
 			prefix: prefix,
 			attrName: attrName,
-			type: (attrName === htmlAttr) ? 'node' : 'text'
+			type: 'text'
 		}
 		switch (prefix) {
 		case exprPrefix:
@@ -5434,12 +5455,6 @@ function setAttribute(el, attrName, value) {
 	case textAttr:
 		if (type === 'undefined' || type === 'boolean' || value == null) value = '';
 		DOM.textContent(el, value);
-		break;
-	case htmlAttr:
-		if (type === 'undefined' || type === 'boolean' || value == null) value = '';
-		el.innerHTML = '';
-		if (value && value.nodeType) DOM.insertNode('beforeend', el, value);
-		else el.innerHTML = value;
 		break;
 	default:
 		if (type === 'undefined' || type === 'boolean' || value == null) {
