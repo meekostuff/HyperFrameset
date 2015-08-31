@@ -220,14 +220,13 @@ loadTemplate: function(template) {
 	var exprTextAttr = exprPrefix + textAttr; // NOTE this is mapped to haz:text
 	var hazTextTag = hazPrefix + 'text';
 
+	// FIXME extract exprToHazPriority from hazLang
 	var exprToHazPriority = [ exprHtmlAttr, mexprTextAttr, exprTextAttr ];
 	var exprToHazMap = {};
 	exprToHazMap[exprHtmlAttr] = hazEvalTag;
 	exprToHazMap[mexprTextAttr] = hazMTextTag;
 	exprToHazMap[exprTextAttr] = hazTextTag;
 
-	var hazCopyPriority = [ hazEvalTag, hazMTextTag, hazTextTag ];
-		
 	walkTree(template, true, function(el) {
 		var tag = DOM.getTagName(el);
 		if (tag in hazLangLookup) return;
@@ -245,22 +244,6 @@ loadTemplate: function(template) {
 			logger.warn('Removing unsupported @' + mexprHtmlAttr);
 			el.removeAttribute(mexprHtmlAttr);
 		}
-
-		// only keep highest priority copy directive
-		// FIXME this should already be taken care of by priority in element mapping
-		var hazCopyDirective = _.map(hazCopyPriority, function(tag) { 
-			return el.hasAttribute(tag);
-		});
-		_.forEach(hazCopyPriority, function(tag, pri) {
-			if (!hazCopyDirective[pri]) return;
-			for (var i=0; i<pri; i++) {
-				if (!hazCopyDirective[i]) continue;
-				logger.warn('Removing @' + tag + ': @' + hazCopyPriority[i] + ' present');
-				el.removeAttribute(tag);
-				return;
-			}
-		});
-				
 
 		_.forEach(hazLang, function(def) {
 			if (!def.attrToElement) return;
@@ -378,6 +361,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 
 	case 'eval':
 		// FIXME attributes should already be in hazardDetails
+		// FIXME log a warning if this directive has children
 		var selector = el.getAttribute('select');
 		var value = evalExpression(selector, provider, context, variables, 'node');
 		var type = typeof value;
@@ -390,6 +374,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 
 	case 'mtext':
 		// FIXME attributes should already be in hazardDetails
+		// FIXME log a warning if this directive has children
 		var mexpr = el.getAttribute('select');
 		var value = evalMExpression(mexpr, provider, context, variables);
 		// FIXME `value` should always already be "text"
@@ -402,6 +387,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 
 	case 'text':
 		// FIXME attributes should already be in hazardDetails
+		// FIXME log a warning if this directive has children
 		var expr = el.getAttribute('select');
 		var value = evalExpression(expr, provider, context, variables, 'text');
 		// FIXME `value` should always already be "text"
