@@ -5075,7 +5075,7 @@ var mexprPrefix = mexprNamespace + ':';
 
 var hazLangDefinition = 
 	'<otherwise <when@test <each@select,var <if@test <unless@test ' +
-	'>choose <template@name >eval@select include@name';
+	'>choose <template@name >eval@select >mtext@select >text@select include@name';
 
 var hazLang = _.map(_.words(hazLangDefinition), function(def) {
 	def = def.split('@');
@@ -5152,23 +5152,56 @@ loadTemplate: function(template) {
 
 	var doc = template.ownerDocument;
 	var exprHtmlAttr = exprPrefix + htmlAttr; // NOTE this is mapped to haz:eval
-	var mexprHtmlAttr = mexprPrefix + htmlAttr; // NOTE this is invalid
 	var hazEvalTag = hazPrefix + 'eval';
+	var mexprHtmlAttr = mexprPrefix + htmlAttr; // NOTE this is invalid
 
+	var mexprTextAttr = mexprPrefix + textAttr; // NOTE this is mapped to haz:mtext
+	var hazMTextTag = hazPrefix + 'mtext';
+	var exprTextAttr = exprPrefix + textAttr; // NOTE this is mapped to haz:text
+	var hazTextTag = hazPrefix + 'text';
+
+	var exprToHazPriority = [ exprHtmlAttr, mexprTextAttr, exprTextAttr ];
+	var exprToHazMap = {};
+	exprToHazMap[exprHtmlAttr] = hazEvalTag;
+	exprToHazMap[mexprTextAttr] = hazMTextTag;
+	exprToHazMap[exprTextAttr] = hazTextTag;
+
+	var hazCopyPriority = [ hazEvalTag, hazMTextTag, hazTextTag ];
+		
 	walkTree(template, true, function(el) {
 		var tag = DOM.getTagName(el);
 		if (tag in hazLangLookup) return;
 
-		// pre-process @expr:_html -> @haz:eval
-		if (el.hasAttribute(exprHtmlAttr)) {
-			var val = el.getAttribute(exprHtmlAttr);
-			if (el.hasAttribute(hazEvalTag)) logger.warn('Removing @' + exprHtmlAttr + ': @' + hazEvalTag + ' present');
-			else el.setAttribute(hazEvalTag, val);
-		}
+		// pre-process @expr:_html -> @haz:eval, etc
+		_.forEach(exprToHazPriority, function(attr) {
+			if (!el.hasAttribute(attr)) return;
+			var tag = exprToHazMap[attr];
+			var val = el.getAttribute(attr);
+			el.removeAttribute(attr);
+			el.setAttribute(tag, val);
+		});
+
 		if (el.hasAttribute(mexprHtmlAttr)) {
 			logger.warn('Removing unsupported @' + mexprHtmlAttr);
 			el.removeAttribute(mexprHtmlAttr);
 		}
+
+		// only keep highest priority copy directive
+		// FIXME this should already be taken care of by priority in element mapping
+		var hazCopyDirective = _.map(hazCopyPriority, function(tag) { 
+			return el.hasAttribute(tag);
+		});
+		_.forEach(hazCopyPriority, function(tag, pri) {
+			if (!hazCopyDirective[pri]) return;
+			for (var i=0; i<pri; i++) {
+				if (!hazCopyDirective[i]) continue;
+				logger.warn('Removing @' + tag + ': @' + hazCopyPriority[i] + ' present');
+				el.removeAttribute(tag);
+				return;
+			}
+		});
+				
+
 		_.forEach(hazLang, function(def) {
 			if (!def.attrToElement) return;
 			var nsTag = def.nsTag;
@@ -5272,6 +5305,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 		return;
 		
 	case 'include':
+		// FIXME attributes should already be in hazardDetails
 		var name = el.getAttribute('name');
 		template = processor.templates[name];
 		if (!template) {
@@ -5283,6 +5317,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 		return;
 
 	case 'eval':
+		// FIXME attributes should already be in hazardDetails
 		var selector = el.getAttribute('select');
 		var value = evalExpression(selector, provider, context, variables, 'node');
 		var type = typeof value;
@@ -5293,9 +5328,35 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 		frag.appendChild(value);
 		return;
 
+	case 'mtext':
+		// FIXME attributes should already be in hazardDetails
+		var mexpr = el.getAttribute('select');
+		var value = evalMExpression(mexpr, provider, context, variables);
+		// FIXME `value` should always already be "text"
+		if (type === 'undefined' || type === 'boolean' || value == null) return;
+		if (!value.nodeType) {
+			value = doc.createTextNode(value);
+		}
+		frag.appendChild(value);
+		return;
+
+	case 'text':
+		// FIXME attributes should already be in hazardDetails
+		var expr = el.getAttribute('select');
+		var value = evalExpression(expr, provider, context, variables, 'text');
+		// FIXME `value` should always already be "text"
+		var type = typeof value;
+		if (type === 'undefined' || type === 'boolean' || value == null) return;
+		if (!value.nodeType) {
+			value = doc.createTextNode(value);
+		}
+		frag.appendChild(value);
+		return;
+
 	case 'unless':
 		invertTest = true;
 	case 'if':
+		// FIXME attributes should already be in hazardDetails
 		var testVal = el.getAttribute('test');
 		var pass = false;
 		try {
@@ -5312,6 +5373,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 		return;
 
 	case 'choose':
+		// FIXME attributes should already be in hazardDetails
  		// NOTE if no successful `when` then chooses *first* `otherwise` 		
 		var otherwise;
 		var when;
@@ -5336,6 +5398,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 		return;
 
 	case 'each':
+		// FIXME attributes should already be in hazardDetails
 		var selector = el.getAttribute('select');
 		var varName = el.getAttribute('var');
 		var subVars = _.defaults({}, variables);
@@ -5370,7 +5433,6 @@ transformTree: function(srcNode, provider, context, variables, frag) { // srcNod
 	var nodeAsFrag = frag.appendChild(node); // WARN use returned value not `node` ...
 	// ... this allows frag to be a custom object, which in turn 
 	// ... allows a different type of output construction
-	if (getHazardDetails(srcNode).isShallow) return;
 
 	processor.transformChildNodes(srcNode, provider, context, variables, nodeAsFrag);
 }
@@ -5387,7 +5449,7 @@ function transformSingleElement(srcNode, provider, context, variables) {
 		var value;
 		try {
 			value = (desc.prefix === mexprPrefix) ?
-				processMExpression(desc.mexpression, provider, context, variables, desc.type) :
+				processMExpression(desc.mexpression, provider, context, variables) :
 				processExpression(desc.expression, provider, context, variables, desc.type);
 		}
 		catch (err) {
@@ -5407,16 +5469,12 @@ function getHazardDetails(el) {
 	var tag = DOM.getTagName(el);
 	var isHazElement = tag.indexOf(hazPrefix) === 0;
 
-	if (isHazElement) {
+	if (isHazElement) { // FIXME preprocess attrs of <haz:*>
 		var def = hazLangLookup[tag];
 		details.definition = def || { tag: '' };
 	}
 
 	details.exprAttributes = getExprAttributes(el);
-	details.isShallow = _.some(details.exprAttributes, function(desc) {
-		if (desc.attrName === textAttr) return true;
-		return false;
-	});
 
 	el.hazardDetails = details;
 	return details;
@@ -5457,26 +5515,18 @@ function getExprAttributes(el) {
 
 function setAttribute(el, attrName, value) {
 	var type = typeof value;
-	switch (attrName) {
-	case textAttr:
-		if (type === 'undefined' || type === 'boolean' || value == null) value = '';
-		DOM.textContent(el, value);
-		break;
-	default:
-		if (type === 'undefined' || type === 'boolean' || value == null) {
-			if (!value) el.removeAttribute(attrName);
-			else el.setAttribute(attrName, '');
-		}
-		else {
-			el.setAttribute(attrName, value.toString());
-		}
-		break;
+	if (type === 'undefined' || type === 'boolean' || value == null) {
+		if (!value) el.removeAttribute(attrName);
+		else el.setAttribute(attrName, '');
+	}
+	else {
+		el.setAttribute(attrName, value.toString());
 	}
 }
 
-function evalMExpression(mexprText, provider, context, variables, type) {
+function evalMExpression(mexprText, provider, context, variables) {
 	var mexpr = interpretMExpression(mexprText);
-	var result = processMExpression(mexpr, provider, context, variables, type);
+	var result = processMExpression(mexpr, provider, context, variables);
 	return result;
 }
 
@@ -5522,10 +5572,10 @@ function interpretExpression(exprText) { // FIXME robustness
 }
 
 
-function processMExpression(mexpr, provider, context, variables, type) { // FIXME mexpr not compatible with type === 'node'
+function processMExpression(mexpr, provider, context, variables) {
 	var i = 0;
 	return mexpr.template.replace(/\{\{\}\}/g, function(all) {
-		return processExpression(mexpr.expressions[i++], provider, context, variables, type);
+		return processExpression(mexpr.expressions[i++], provider, context, variables, 'text');
 	});
 }
 
