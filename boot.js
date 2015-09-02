@@ -48,19 +48,25 @@ var STAGING_DOCUMENT_IS_INERT = (function() {
 		see http://proger.i-forge.net/The_smallest_transparent_pixel/eBQ
 	*/
 	var img = doc.createElement('img');
-	if (img.complete) img.src = 'data:'; // Opera-12
-	if (img.complete) return false; // paranoia
+	if (img.complete) img.src = 'data:'; // Opera-12 and MS-Edge
 	img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=';
 	doc.body.appendChild(img);
-	if (img.width) return false; // IE9, Opera-12 will have width == 1 / height == 1 
-	if (img.complete) return false; // Opera-12 sets this immediately. IE9 sets it after a delay.
-	// Sometimes the img check isn't ready on IE9, so one more check
+
+	// Sometimes the img check isn't ready on IE9, so one intermediate check
 	var script = doc.createElement('script');
+	if (!('readyState' in script)) script.onload = function() { this.readyState = 'complte'; };
 	script.text = ';';
 	doc.body.appendChild(script);
 	if (script.readyState === 'complete') return false; // IE9
-	return true; // Presumably IE10
 
+	if (img.width) return false; // IE9, Opera-12 will have width == 1 / height == 1 
+	/* 
+	if (img.complete) return false; 
+	// Opera-12 sets this immediately. IE9 sets it after a delay, 
+	// BUT on MS Edge it is always true (when `img` created by `doc`)
+	*/
+
+	return true; // Presumably IE10,11 or Edge
 })();
 
 /*
