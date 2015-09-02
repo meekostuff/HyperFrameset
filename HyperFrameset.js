@@ -4964,6 +4964,8 @@ var Task = Meeko.Task;
 var logger = Meeko.logger;
 var framer = Meeko.framer;
 
+var FRAGMENTS_ARE_INERT = !('ActiveXObject' in window && !window.ActiveXObject); // IE11
+
 var MainProcessor = (function() {
 
 function MainProcessor() {}
@@ -5242,10 +5244,22 @@ loadTemplate: function(template) {
 
 },
 
-transform: function(provider, details) { // TODO how to use details
+transform: FRAGMENTS_ARE_INERT ?
+function(provider, details) { // TODO how to use details
 	var root = this.root;
-	var frag = root.ownerDocument.createDocumentFragment();
+	var doc = root.ownerDocument;
+	var frag = doc.createDocumentFragment();
 	this.transformChildNodes(root, provider, null, {}, frag);
+	return frag;
+} :
+
+// NOTE IE11 uses a different transform() because fragments are not inert
+function(provider, details) {
+	var root = this.root;
+	var doc = DOM.createHTMLDocument('', root.ownerDocument);
+	var frag = doc.body; // WARN don't know why this is inert but fragments aren't
+	this.transformChildNodes(root, provider, null, {}, frag);
+	frag = childNodesToFragment(frag);
 	return frag;
 },
 
@@ -5262,6 +5276,10 @@ transformNode: function(srcNode, provider, context, variables, frag) {
 
 	switch (srcNode.nodeType) {
 	default: 
+		var node = srcNode.cloneNode(true);
+		frag.appendChild(node);
+		break;
+	case 3: // NOTE text-nodes are special-cased for perf testing
 		var node = srcNode.cloneNode(true);
 		frag.appendChild(node);
 		break;
