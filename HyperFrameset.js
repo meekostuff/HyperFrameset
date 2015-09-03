@@ -147,6 +147,49 @@ var Task = Meeko.Task = (function() {
 // NOTE Task.asap could use window.setImmediate, except for
 // IE10 CPU contention bugs http://codeforhire.com/2013/09/21/setimmediate-and-messagechannel-broken-on-internet-explorer-10/
 
+var frameRate = 60; // FIXME make this a boot-option??
+var frameInterval = 1000 / frameRate;
+var frameExecutionRatio = 0.75; // FIXME another boot-option??
+var frameExecutionTimeout = frameInterval * frameExecutionRatio;
+
+var performance = window.performance || {
+
+now: function() { return (new Date).getTime(); }
+
+}
+
+var requestFrame = (function() { 
+	// See http://creativejs.com/resources/requestanimationframe/
+	var fn = window.requestAnimationFrame;
+	if (fn) return fn;
+
+	_.some(_.words('moz ms o webkit'), function(vendor) {
+		var name = vendor + 'RequestAnimationFrame';
+		if (!window[name]) return false;
+		fn = window[name];
+		return true;
+	});
+	if (fn) return fn;
+
+	var lastTime = 0;
+	var callback;
+	fn = function(cb, element) {
+		if (callback) throw 'requestFrame only allows one callback at a time';
+		callback = cb;
+		var currTime = performance.now();
+		var timeToCall = Math.max(0, frameInterval - (currTime - lastTime));
+		var id = window.setTimeout(function() { 
+			lastTime = performance.now();
+			callback(lastTime, element); 
+			callback = undefined;
+		}, timeToCall);
+		return id;
+	};
+	
+	return fn;
+})();
+
+
 var asapQueue = [];
 var deferQueue = [];
 var errorQueue = [];
@@ -182,22 +225,21 @@ function delay(fn, timeout) {
 	}, timeout);
 }
 
-// NOTE schedule used to be approx: setImmediate || postMessage || setTimeout
-var schedule = window.setTimeout;
-
 function processTasks() {
 	processing = true;
+	var startTime = performance.now();
 	var fn;
 	while (asapQueue.length) {
 		fn = asapQueue.shift();
 		if (typeof fn !== 'function') continue;
 		try { fn(); }
 		catch (error) { postError(error); }
+		if (performance.now() - startTime > frameExecutionTimeout) break;
 	}
 	scheduled = false;
 	processing = false;
 	
-	asapQueue = deferQueue;
+	asapQueue = asapQueue.concat(deferQueue);
 	deferQueue = [];
 	if (asapQueue.length) {
 		schedule(processTasks);
@@ -208,6 +250,8 @@ function processTasks() {
 	
 }
 
+
+var schedule = requestFrame;
 
 function postError(error) {
 	errorQueue.push(error);
@@ -274,6 +318,14 @@ var Promise = function(init) { // `init` is called as init(resolve, reject)
 	var promise = this;
 	promise._initialize();
 
+	if (promise._willCatch == null) promise._willCatch = false;
+	try { init(resolve, reject); }
+	catch(error) { reject(error); }
+
+	// NOTE promise is returned by `new` invocation but anyway
+	return promise;
+
+	// The following are hoisted
 	function resolve(result) {
 		if (typeof result !== 'function') {
 			promise._resolve(result);
@@ -290,22 +342,26 @@ var Promise = function(init) { // `init` is called as init(resolve, reject)
 		try { promise._reject(error()); }
 		catch (err) { promise._reject(err); }
 	}
+}
 
-	var resolver;
-	if (typeof init !== 'function') { // if `init` is not a function then assign resolve() / reject() elsewhere
-		resolver = (typeof init === 'object' && init !== null) ? init : promise;
+_.defaults(Promise, {
+
+applyTo: function(object) {
+	var resolver = {}
+	var promise = new Promise(function(resolve, reject) {
 		resolver.resolve = resolve;
 		resolver.reject = reject;
-	}
-	
-	Task.asap(function() {
-		if (promise._willCatch == null) promise._willCatch = false;
-		if (resolver) return;
-		try { init(resolve, reject); }
-		catch(error) { reject(error); }
 	});
-	// NOTE promise is returned by `new` invocation
+	if (!object) object = promise;
+	_.assign(object, resolver);
+	return promise;
+},
+
+isPromise: function(value) {
+	return value instanceof Promise; // TODO or typeof value.then === 'function' ??
 }
+
+});
 
 _.defaults(Promise.prototype, {
 
@@ -333,8 +389,8 @@ _resolve: function(value, sync) { // NOTE equivalent to 'resolve algorithm'. Ext
 	if (value != null && typeof value.then === 'function') {
 		try {
 			value.then(
-				function(result) { promise._resolve(result); },
-				function(error) { promise._reject(error); }
+				function(result) { promise._resolve(result, true); },
+				function(error) { promise._reject(error, true); }
 			);
 		}
 		catch(error) {
@@ -438,6 +494,7 @@ function wrapResolve(callback, resolve, reject) {
 _.defaults(Promise, {
 
 resolve: function(value) {
+if (Promise.isPromise(value)) return value;
 return new Promise(function(resolve, reject) {
 	resolve(value);
 });
@@ -464,10 +521,10 @@ var wait = (function() { // TODO wait() isn't used much. Can it be simpler?
 var tests = [];
 
 function wait(fn) {
-return new Promise(function(resolve, reject) {
-	var test = { fn: fn, resolve: resolve, reject: reject };
+	var test = { fn: fn };
+	var promise = Promise.applyTo(test);
 	asapTest(test);
-});
+	return promise;
 }
 
 function asapTest(test) {
@@ -500,10 +557,10 @@ return wait;
 var asap = function(fn) { return Promise.resolve().then(fn); }
 
 function delay(timeout) {
-return new Promise(function(resolve, reject) {
-	if (timeout <= 0 || timeout == null) Task.defer(resolve);
-	else Task.delay(resolve, timeout);
-});
+	return new Promise(function(resolve, reject) {
+		if (timeout <= 0 || timeout == null) Task.defer(resolve);
+		else Task.delay(resolve, timeout);
+	});
 }
 
 function pipe(startValue, fnList) {
@@ -2946,7 +3003,7 @@ return new Promise(function(resolve, reject) {
 	script.type = 'text/javascript';
 	
 	// enabledFu resolves after script is inserted
-	var enabledFu = new Promise(); 
+	var enabledFu = Promise.applyTo(); 
 	
 	var prev = queue[queue.length - 1], prevScript = prev && prev.script;
 
@@ -2959,7 +3016,7 @@ return new Promise(function(resolve, reject) {
 	
 	triggerFu.then(enable, enable);
 
-	var completeFu = new Promise();
+	var completeFu = Promise.applyTo();
 	completeFu.then(resolve, reject);
 
 	var current = { script: script, complete: completeFu, enabled: enabledFu };
@@ -4414,7 +4471,7 @@ start: function(startOptions) {
 				frameset.definition = framer.definition;
 				if (frameset.init) frameset.init();
 				frameset._ready = {};
-				frameset.ready = new Promise(frameset._ready); // FIXME should this be in the HFrameset definition?
+				frameset.ready = Promise.applyTo(frameset._ready); // FIXME should this be in the HFrameset definition?
 			}, 
 			enteredDocument: function() {
 				var frameset = this;

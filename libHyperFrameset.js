@@ -986,7 +986,7 @@ return new Promise(function(resolve, reject) {
 	script.type = 'text/javascript';
 	
 	// enabledFu resolves after script is inserted
-	var enabledFu = new Promise(); 
+	var enabledFu = Promise.applyTo(); 
 	
 	var prev = queue[queue.length - 1], prevScript = prev && prev.script;
 
@@ -999,7 +999,7 @@ return new Promise(function(resolve, reject) {
 	
 	triggerFu.then(enable, enable);
 
-	var completeFu = new Promise();
+	var completeFu = Promise.applyTo();
 	completeFu.then(resolve, reject);
 
 	var current = { script: script, complete: completeFu, enabled: enabledFu };
@@ -2454,7 +2454,7 @@ start: function(startOptions) {
 				frameset.definition = framer.definition;
 				if (frameset.init) frameset.init();
 				frameset._ready = {};
-				frameset.ready = new Promise(frameset._ready); // FIXME should this be in the HFrameset definition?
+				frameset.ready = Promise.applyTo(frameset._ready); // FIXME should this be in the HFrameset definition?
 			}, 
 			enteredDocument: function() {
 				var frameset = this;
