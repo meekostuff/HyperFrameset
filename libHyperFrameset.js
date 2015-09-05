@@ -1450,21 +1450,23 @@ render: function(resource, details) {
 	var bodyDef = this;
 	var frameset = bodyDef.frameset;
 	var cdom = frameset.cdom;
-	var fragment;
 	if (bodyDef.transforms.length <= 0) {
 		return bodyDef.element.cloneNode(true);
 	}
 	if (!resource) return null;
 	var doc = resource.document; // FIXME what if resource is a Request?
 	if (!doc) return null;
-	fragment = doc;
-	if (details.mainSelector) fragment = DOM.find(details.mainSelector, doc);
-	_.forEach(bodyDef.transforms, function(transform) {
-		fragment = transform.process(fragment, details);
+	var frag0 = doc;
+	if (details.mainSelector) frag0 = DOM.find(details.mainSelector, doc);
+
+	return Promise.reduce(bodyDef.transforms, frag0, function(fragment, transform) {
+		return transform.process(fragment, details);
+	})
+	.then(function(fragment) {
+		var el = bodyDef.element.cloneNode(false);
+		DOM.insertNode('beforeend', el, fragment);
+		return el;
 	});
-	var el = bodyDef.element.cloneNode(false);
-	DOM.insertNode('beforeend', el, fragment);
-	return el;
 }
 
 });
