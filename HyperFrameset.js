@@ -153,10 +153,10 @@ var frameExecutionTimeout = frameInterval * frameExecutionRatio;
 
 var startTime;
 var performance = window.performance || 
-Date.now ? Date :
+(Date.now ? Date :
 {
 	now: function() { return (new Date).getTime(); }
-}
+});
 
 
 var schedule = (function() { 
@@ -324,7 +324,6 @@ var Promise = function(init) { // `init` is called as init(resolve, reject)
 	var promise = this;
 	promise._initialize();
 
-	if (promise._willCatch == null) promise._willCatch = false;
 	try { init(resolve, reject); }
 	catch(error) { reject(error); }
 
@@ -389,7 +388,7 @@ _initialize: function() {
 		isRejected: false,
 		value: undefined,
 		reason: undefined,
-		_willCatch: null,
+		_willCatch: false,
 		_processing: false
 	});
 },
@@ -415,7 +414,12 @@ _fulfil: function(result, sync) { // NOTE equivalent to 'fulfil algorithm'. Exte
 _resolve: function(value, sync) { // NOTE equivalent to 'resolve algorithm'. External calls MUST NOT use sync
 	var promise = this;
 	if (!promise.isPending) return;
-	if (Promise.isThenable(value)) {
+	if (Promise.isPromise(value) && !value.isPending) {
+		if (value.isFulfilled) promise._fulfil(value.value, sync);
+		else /* if (value.isRejected) */ promise._reject(value.reason, sync);
+		return;
+	}
+	/* else */ if (Promise.isThenable(value)) {
 		try {
 			value.then(
 				function(result) { promise._resolve(result, true); },
@@ -427,8 +431,7 @@ _resolve: function(value, sync) { // NOTE equivalent to 'resolve algorithm'. Ext
 		}
 		return;
 	}
-	// else
-	promise._fulfil(value, sync);
+	/* else */ promise._fulfil(value, sync);
 },
 
 _reject: function(error, sync) { // NOTE equivalent to 'reject algorithm'. External calls MUST NOT use sync
@@ -447,6 +450,7 @@ _reject: function(error, sync) { // NOTE equivalent to 'reject algorithm'. Exter
 _requestProcessing: function(sync) { // NOTE schedule callback processing. TODO may want to disable sync option
 	var promise = this;
 	if (promise.isPending) return;
+	if (!promise._willCatch) return;
 	if (promise._processing) return;
 	if (sync) {
 		promise._processing = true;
@@ -501,7 +505,7 @@ then: function(fulfilCallback, rejectCallback) {
 		promise._fulfilCallbacks.push(fulfilWrapper);
 		promise._rejectCallbacks.push(rejectWrapper);
 	
-		if (promise._willCatch == null) promise._willCatch = true;
+		promise._willCatch = true;
 	
 		promise._requestProcessing();
 		
@@ -510,7 +514,7 @@ then: function(fulfilCallback, rejectCallback) {
 
 'catch': function(rejectCallback) { // WARN 'catch' is unexpected identifier in IE8-
 	var promise = this;
-	return promise.then(null, rejectCallback);
+	return promise.then(undefined, rejectCallback);
 }
 
 });
@@ -522,7 +526,7 @@ function wrapResolve(callback, resolve, reject) {
 		try {
 			var value = callback.apply(undefined, arguments); 
 			resolve(value);
-		} catch(error) {
+		} catch (error) {
 			reject(error);
 		}
 	}
@@ -532,13 +536,14 @@ function wrapResolve(callback, resolve, reject) {
 _.defaults(Promise, {
 
 resolve: function(value) {
-if (Promise.isPromise(value)) return value;
-return new Promise(function(resolve, reject) {
-	resolve(value);
-});
+	if (Promise.isPromise(value)) return value;
+	var promise = Object.create(Promise.prototype);
+	promise._initialize();
+	promise._resolve(value);
+	return promise;
 },
 
-reject: function(error) { // TODO what if `error` is a Promise / thenable??
+reject: function(error) { // FIXME should never be used
 return new Promise(function(resolve, reject) {
 	reject(error);
 });
@@ -592,7 +597,18 @@ return wait;
 
 })();
 
-var asap = function(fn) { return Promise.resolve().then(fn); }
+var asap = function(value) { 
+	if (typeof value === 'function') return Promise.resolve().then(value); // will defer
+	if (Promise.isPromise(value)) {
+		if (value.isPending) return value; // already deferred
+		if (Task.getTime(true) <= 0) return value.then(function(val) { return val; }); // will defer
+		return value; // not-deferred
+	}
+	if (Promise.isThenable(value)) return Promise.resolve(value); // will defer
+	// NOTE otherwise we have a non-thenable, non-function something
+	if (Task.getTime(true) <= 0) return Promise.resolve(value).then(function(val) { return val; }); // will defer
+	return Promise.resolve(value); // not-deferred
+}
 
 function delay(timeout) {
 	return new Promise(function(resolve, reject) {
@@ -620,31 +636,24 @@ return new Promise(function(resolve, reject) {
 
 	function process(acc) {
 		while (i < n) {
-			var result;
+			if (Promise.isPromise(acc)) {
+				if (!acc.isFulfilled) { 
+					acc.then(process, reject);
+					return;
+				}
+				/* else */ acc = acc.value;
+			}
+			else if (Promise.isThenable(acc)) {
+				acc.then(process, reject);
+				return;
+			}
 			try {
-				result = fn.call(context, acc, a[i], i++, a);
+				acc = fn.call(context, acc, a[i], i++, a);
 			}
 			catch (error) {
 				reject(error);
 				return;
 			}
-			if (Promise.isPromise(result)) {
-				if (result.isRejected) {
-					reject(result.reason);
-					return;
-				}
-				if (result.isPending) {
-					result.then(process, reject);
-					return;
-				}
-				acc = result.value;
-			}
-			else if (Promise.isThenable(result)) {
-				result.then(process, reject);
-				return;
-			}
-			acc = result;
-			if (Task.getTime(true) <= 0) Promise.resolve(acc).then(process);
 		}
 		resolve(acc);
 	}
@@ -5097,6 +5106,7 @@ var document = window.document;
 var _ = Meeko.stuff;
 var DOM = Meeko.DOM;
 var Task = Meeko.Task;
+var Promise = Meeko.Promise;
 var logger = Meeko.logger;
 var framer = Meeko.framer;
 
@@ -5385,8 +5395,11 @@ function(provider, details) { // TODO how to use details
 	var root = this.root;
 	var doc = root.ownerDocument;
 	var frag = doc.createDocumentFragment();
-	this.transformChildNodes(root, provider, null, {}, frag);
-	return frag;
+	var done = this.transformChildNodes(root, provider, null, {}, frag);
+	return Promise.resolve(done)
+	.then(function(result) {
+		return frag;
+	});
 } :
 
 // NOTE IE11 uses a different transform() because fragments are not inert
@@ -5394,16 +5407,19 @@ function(provider, details) {
 	var root = this.root;
 	var doc = DOM.createHTMLDocument('', root.ownerDocument);
 	var frag = doc.body; // WARN don't know why this is inert but fragments aren't
-	this.transformChildNodes(root, provider, null, {}, frag);
-	frag = childNodesToFragment(frag);
-	return frag;
+	var done = this.transformChildNodes(root, provider, null, {}, frag);
+	return Promise.resolve(done)
+	.then(function(result) {
+		frag = childNodesToFragment(frag);
+		return frag;
+	});
 },
 
 transformChildNodes: function(srcNode, provider, context, variables, frag) {
 	var processor = this;
 
-	_.forEach(srcNode.childNodes, function(current) {
-		processor.transformNode(current, provider, context, variables, frag);
+	return Promise.reduce(srcNode.childNodes, undefined, function(dummy, current) {
+		return processor.transformNode(current, provider, context, variables, frag);
 	});
 },
 
@@ -5414,16 +5430,15 @@ transformNode: function(srcNode, provider, context, variables, frag) {
 	default: 
 		var node = srcNode.cloneNode(true);
 		frag.appendChild(node);
-		break;
+		return;
 	case 3: // NOTE text-nodes are special-cased for perf testing
 		var node = srcNode.cloneNode(true);
 		frag.appendChild(node);
-		break;
+		return;
 	case 1:
 		var details = getHazardDetails(srcNode);
-		if (details.definition) processor.transformHazardTree(srcNode, provider, context, variables, frag);
-		else processor.transformTree(srcNode, provider, context, variables, frag);
-		break;
+		if (details.definition) return processor.transformHazardTree(srcNode, provider, context, variables, frag);
+		else return processor.transformTree(srcNode, provider, context, variables, frag);
 	}
 },
 
@@ -5438,8 +5453,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 
 	switch (def.tag) {
 	default: // for unknown (or unhandled like `template`) haz: elements just process the children
-		processor.transformChildNodes(el, provider, context, variables, frag); 
-		return;
+		return processor.transformChildNodes(el, provider, context, variables, frag); 
 		
 	case 'include':
 		// FIXME attributes should already be in hazardDetails
@@ -5447,11 +5461,11 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 		template = processor.templates[name];
 		if (!template) {
 			logger.warn('Hazard could not find template name=' + name);
-			return;
+			return frag;
 		}
 	
-		processor.transformChildNodes(template, provider, context, variables, frag); 
-		return;
+		var done = processor.transformChildNodes(template, provider, context, variables, frag); 
+		return Promise.asap(done); // asap forces a remaining task-time check
 
 	case 'eval':
 		// FIXME attributes should already be in hazardDetails
@@ -5509,8 +5523,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 		}
 		if (invertTest) pass = !pass;
 		if (!pass) return;
-		processor.transformChildNodes(el, provider, context, variables, frag); 
-		return;
+		return processor.transformChildNodes(el, provider, context, variables, frag); 
 
 	case 'choose':
 		// FIXME attributes should already be in hazardDetails
@@ -5534,8 +5547,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 		});
 		if (!found) when = otherwise;
 		if (!when) return;
-		processor.transformChildNodes(when, provider, context, variables, frag); 
-		return;
+		return processor.transformChildNodes(when, provider, context, variables, frag); 
 
 	case 'each':
 		// FIXME attributes should already be in hazardDetails
@@ -5552,12 +5564,11 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 			return;
 		}
 
-		_.forEach(subContexts, function(subContext) {
+		return Promise.reduce(subContexts, undefined, function(dummy, subContext) {
 			if (varName) subVars[varName] = subContext;
-			processor.transformChildNodes(el, provider, subContext, subVars, frag);
+			var done = processor.transformChildNodes(el, provider, subContext, subVars, frag);
+			return Promise.asap(done); // asap() forces a remaining task-time check.
 		});
-		
-		return;
 
 	}
 			
@@ -5574,7 +5585,7 @@ transformTree: function(srcNode, provider, context, variables, frag) { // srcNod
 	// ... this allows frag to be a custom object, which in turn 
 	// ... allows a different type of output construction
 
-	processor.transformChildNodes(srcNode, provider, context, variables, nodeAsFrag);
+	return processor.transformChildNodes(srcNode, provider, context, variables, nodeAsFrag);
 }
 
 });

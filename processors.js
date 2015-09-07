@@ -21,6 +21,7 @@ var document = window.document;
 var _ = Meeko.stuff;
 var DOM = Meeko.DOM;
 var Task = Meeko.Task;
+var Promise = Meeko.Promise;
 var logger = Meeko.logger;
 var framer = Meeko.framer;
 
@@ -309,8 +310,11 @@ function(provider, details) { // TODO how to use details
 	var root = this.root;
 	var doc = root.ownerDocument;
 	var frag = doc.createDocumentFragment();
-	this.transformChildNodes(root, provider, null, {}, frag);
-	return frag;
+	var done = this.transformChildNodes(root, provider, null, {}, frag);
+	return Promise.resolve(done)
+	.then(function(result) {
+		return frag;
+	});
 } :
 
 // NOTE IE11 uses a different transform() because fragments are not inert
@@ -318,16 +322,19 @@ function(provider, details) {
 	var root = this.root;
 	var doc = DOM.createHTMLDocument('', root.ownerDocument);
 	var frag = doc.body; // WARN don't know why this is inert but fragments aren't
-	this.transformChildNodes(root, provider, null, {}, frag);
-	frag = childNodesToFragment(frag);
-	return frag;
+	var done = this.transformChildNodes(root, provider, null, {}, frag);
+	return Promise.resolve(done)
+	.then(function(result) {
+		frag = childNodesToFragment(frag);
+		return frag;
+	});
 },
 
 transformChildNodes: function(srcNode, provider, context, variables, frag) {
 	var processor = this;
 
-	_.forEach(srcNode.childNodes, function(current) {
-		processor.transformNode(current, provider, context, variables, frag);
+	return Promise.reduce(srcNode.childNodes, undefined, function(dummy, current) {
+		return processor.transformNode(current, provider, context, variables, frag);
 	});
 },
 
@@ -338,16 +345,15 @@ transformNode: function(srcNode, provider, context, variables, frag) {
 	default: 
 		var node = srcNode.cloneNode(true);
 		frag.appendChild(node);
-		break;
+		return;
 	case 3: // NOTE text-nodes are special-cased for perf testing
 		var node = srcNode.cloneNode(true);
 		frag.appendChild(node);
-		break;
+		return;
 	case 1:
 		var details = getHazardDetails(srcNode);
-		if (details.definition) processor.transformHazardTree(srcNode, provider, context, variables, frag);
-		else processor.transformTree(srcNode, provider, context, variables, frag);
-		break;
+		if (details.definition) return processor.transformHazardTree(srcNode, provider, context, variables, frag);
+		else return processor.transformTree(srcNode, provider, context, variables, frag);
 	}
 },
 
@@ -362,8 +368,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 
 	switch (def.tag) {
 	default: // for unknown (or unhandled like `template`) haz: elements just process the children
-		processor.transformChildNodes(el, provider, context, variables, frag); 
-		return;
+		return processor.transformChildNodes(el, provider, context, variables, frag); 
 		
 	case 'include':
 		// FIXME attributes should already be in hazardDetails
@@ -371,11 +376,11 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 		template = processor.templates[name];
 		if (!template) {
 			logger.warn('Hazard could not find template name=' + name);
-			return;
+			return frag;
 		}
 	
-		processor.transformChildNodes(template, provider, context, variables, frag); 
-		return;
+		var done = processor.transformChildNodes(template, provider, context, variables, frag); 
+		return Promise.asap(done); // asap forces a remaining task-time check
 
 	case 'eval':
 		// FIXME attributes should already be in hazardDetails
@@ -433,8 +438,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 		}
 		if (invertTest) pass = !pass;
 		if (!pass) return;
-		processor.transformChildNodes(el, provider, context, variables, frag); 
-		return;
+		return processor.transformChildNodes(el, provider, context, variables, frag); 
 
 	case 'choose':
 		// FIXME attributes should already be in hazardDetails
@@ -458,8 +462,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 		});
 		if (!found) when = otherwise;
 		if (!when) return;
-		processor.transformChildNodes(when, provider, context, variables, frag); 
-		return;
+		return processor.transformChildNodes(when, provider, context, variables, frag); 
 
 	case 'each':
 		// FIXME attributes should already be in hazardDetails
@@ -476,12 +479,11 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 			return;
 		}
 
-		_.forEach(subContexts, function(subContext) {
+		return Promise.reduce(subContexts, undefined, function(dummy, subContext) {
 			if (varName) subVars[varName] = subContext;
-			processor.transformChildNodes(el, provider, subContext, subVars, frag);
+			var done = processor.transformChildNodes(el, provider, subContext, subVars, frag);
+			return Promise.asap(done); // asap() forces a remaining task-time check.
 		});
-		
-		return;
 
 	}
 			
@@ -498,7 +500,7 @@ transformTree: function(srcNode, provider, context, variables, frag) { // srcNod
 	// ... this allows frag to be a custom object, which in turn 
 	// ... allows a different type of output construction
 
-	processor.transformChildNodes(srcNode, provider, context, variables, nodeAsFrag);
+	return processor.transformChildNodes(srcNode, provider, context, variables, nodeAsFrag);
 }
 
 });
