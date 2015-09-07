@@ -2165,14 +2165,6 @@ var logger = Meeko.logger; // provided by DOMSprockets or even boot-script
 var Task = Meeko.Task;
 var Promise = Meeko.Promise;
 
-// TODO call these as Promise methods rather than with local vars
-var asap = Promise.asap;
-var delay = Promise.delay;
-var wait = Promise.wait;
-var pipe = Promise.pipe;
-
-
-
 /*
  ### DOM utility functions
  */
@@ -2799,7 +2791,7 @@ return new Promise(function(resolve, reject) {
 			reject(function() { throw Error('Unexpected status ' + xhr.status + ' for ' + url); });
 			return;
 		}
-		asap(onload); // Use delay to stop the readystatechange event interrupting other event handlers (on IE). 
+		Promise.asap(onload); // Use delay to stop the readystatechange event interrupting other event handlers (on IE). 
 	}
 	function onload() {
 		var result = handleResponse(xhr, info);
@@ -2984,7 +2976,7 @@ var HTMLParser = function() { // TODO should this receive options
 
 function nativeParser(html, details) {
 
-	return pipe(null, [
+	return Promise.pipe(null, [
 		
 	function() {
 		var doc = (new DOMParser).parseFromString(html, 'text/html');
@@ -2997,7 +2989,7 @@ function nativeParser(html, details) {
 }
 
 function innerHTMLParser(html, details) {
-	return pipe(null, [
+	return Promise.pipe(null, [
 		
 	function() {
 		var doc = createHTMLDocument('');
@@ -3316,7 +3308,7 @@ function process() {
 		return;
 	}
 	var task = queue.shift();
-	var promise = asap(task.fn);
+	var promise = Promise.asap(task.fn);
 	promise.then(process, process);
 	promise.then(task.resolve, task.reject);
 }
@@ -3337,7 +3329,7 @@ return new Promise(function(resolve, reject) {
 
 	if (max == null) max = maxSize;
 	if (queue.length > max || (queue.length === max && processing)) {
-		if (fail) asap(fail).then(resolve, reject);
+		if (fail) Promise.asap(fail).then(resolve, reject);
 		else reject(function() { throw Error('No `fail` callback passed to whenever()'); });
 		return;
 	}
@@ -4157,7 +4149,7 @@ frameLeft: function(frame) {
 
 preload: function(request) {
 	var frame = this;
-	return pipe(request, [
+	return Promise.pipe(request, [
 		
 	function(request) { return frame.definition.render(request, 'loading'); },
 	function(result) {
@@ -4172,7 +4164,7 @@ load: function(response) { // FIXME need a teardown method that releases child-f
 	var frame = this;
 	if (response) frame.src = response.url;
 	// else a no-src frame
-	return pipe(response, [
+	return Promise.pipe(response, [
 	
 	function(response) { 
 		return frame.definition.render(response, 'loaded', {
@@ -4236,7 +4228,7 @@ render: function() {
 
 	var srcBody = definition.render();
 	
-	return pipe(null, [
+	return Promise.pipe(null, [
 
 	function() {
 		mergeElement(dstBody, srcBody);
@@ -4262,7 +4254,7 @@ prerender: function(dstDoc, definition) {
 
 	var selfMarker;
 	
-	return pipe(null, [
+	return Promise.pipe(null, [
 
 	function() { // remove all <link rel=stylesheet /> just in case
 		// FIXME maybe remove all <link>
@@ -4460,7 +4452,7 @@ var notify = function(msg) { // FIXME this isn't being used called everywhere it
 	}
 
 	if (typeof listener == 'function') {
-		var promise = asap(function() { listener(msg); }); // TODO isFunction(listener)
+		var promise = Promise.asap(function() { listener(msg); }); // TODO isFunction(listener)
 		promise['catch'](function(err) { throw Error(err); });
 		return promise;
 	}
@@ -4492,10 +4484,10 @@ start: function(startOptions) {
 		});
 	});
 	
-	return pipe(null, [
+	return Promise.pipe(null, [
 		
 	function() { // sanity check
-		return wait(function() { return !!document.body; });		
+		return Promise.wait(function() { return !!document.body; });		
 	},
 
 	function() { // lookup or detect framesetURL
@@ -4629,7 +4621,7 @@ start: function(startOptions) {
 	},
 	
 	function() { // NOTE this doesn't prevent start() from resolving
-		pipe(null, [
+		Promise.pipe(null, [
 
 		function() {
 			return notify({ // FIXME should this be called before stylesheets are confirmed?
@@ -4658,7 +4650,7 @@ start: function(startOptions) {
 
 	// TODO it would be nice if <body> wasn't populated until stylesheets were loaded
 	function() {
-		return wait(function() { return checkStyleSheets(); })
+		return Promise.wait(function() { return checkStyleSheets(); })
 	}	
 	
 	]);
@@ -4735,7 +4727,7 @@ onSubmit: function(e) { // return false means success
 },
 
 triggerRequestNavigation: function(url, details) {
-	asap(function() {
+	Promise.asap(function() {
 		var event = document.createEvent('CustomEvent');
 		event.initCustomEvent('requestnavigation', true, true, details.url);
 		var acceptDefault = details.element.dispatchEvent(event);
@@ -4823,7 +4815,7 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 	var request = { method: 'get', url: nohash, responseType: 'document' }; // TODO one day may support different response-type
 	var response;
 
-	return pipe(null, [
+	return Promise.pipe(null, [
 
 	function() {
 		if (mustNotify) return notify({ // FIXME need a timeout on notify
@@ -4907,7 +4899,7 @@ frameEntered: function(frame) {
 	var hash = fullURL.hash;
 	
 	var request = { method: 'get', url: nohash, responseType: 'document'};
-	return pipe(null, [ // FIXME how to handle `hash` if present??
+	return Promise.pipe(null, [ // FIXME how to handle `hash` if present??
 	
 	function() { return frame.preload(request); },
 	function() { return httpProxy.load(nohash, request); },
