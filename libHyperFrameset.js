@@ -833,7 +833,6 @@ var resolveAll = function(doc, baseURL) {
 	},
 
 	function(nodeList) {
-		var count = 0, rollOver = 100; // FIXME configure rollOver elsewhere
 		return Promise.reduce(nodeList, undefined, function(dummy, el) {
 			var tag = DOM.getTagName(el);
 			var attrList = urlAttributes[tag];
@@ -841,9 +840,6 @@ var resolveAll = function(doc, baseURL) {
 				if (!el.hasAttribute(attrName)) return;
 				attrDesc.resolve(el, baseURL);
 			});
-			if (count++ < rollOver) return;
-			count = 0;
-			return Promise.asap(); // NOTE asap() forces a remaining task-time check 
 		});
 	},
 

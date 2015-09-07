@@ -654,6 +654,7 @@ return new Promise(function(resolve, reject) {
 				reject(error);
 				return;
 			}
+			if (Task.getTime(true) <= 0) return Promise.resolve(acc).then(process, reject);
 		}
 		resolve(acc);
 	}
@@ -2936,7 +2937,6 @@ var resolveAll = function(doc, baseURL) {
 	},
 
 	function(nodeList) {
-		var count = 0, rollOver = 100; // FIXME configure rollOver elsewhere
 		return Promise.reduce(nodeList, undefined, function(dummy, el) {
 			var tag = DOM.getTagName(el);
 			var attrList = urlAttributes[tag];
@@ -2944,9 +2944,6 @@ var resolveAll = function(doc, baseURL) {
 				if (!el.hasAttribute(attrName)) return;
 				attrDesc.resolve(el, baseURL);
 			});
-			if (count++ < rollOver) return;
-			count = 0;
-			return Promise.asap(); // NOTE asap() forces a remaining task-time check 
 		});
 	},
 
@@ -5584,8 +5581,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 
 		return Promise.reduce(subContexts, undefined, function(dummy, subContext) {
 			if (varName) subVars[varName] = subContext;
-			var done = processor.transformChildNodes(el, provider, subContext, subVars, frag);
-			return Promise.asap(done); // asap() forces a remaining task-time check.
+			return processor.transformChildNodes(el, provider, subContext, subVars, frag);
 		});
 
 	}

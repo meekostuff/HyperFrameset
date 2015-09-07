@@ -481,8 +481,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 
 		return Promise.reduce(subContexts, undefined, function(dummy, subContext) {
 			if (varName) subVars[varName] = subContext;
-			var done = processor.transformChildNodes(el, provider, subContext, subVars, frag);
-			return Promise.asap(done); // asap() forces a remaining task-time check.
+			return processor.transformChildNodes(el, provider, subContext, subVars, frag);
 		});
 
 	}
