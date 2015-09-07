@@ -631,8 +631,17 @@ add: function(response) { // NOTE this is only for the landing page
 		url: response.url
 	}
 	_.defaults(request, defaultInfo);
-	response.document = normalize(response.document, request);
-	cacheAdd(request, response);
+	return Promise.pipe(undefined, [
+
+	function() {
+		return normalize(response.document, request);
+	},
+	function(doc) {
+		response.document = doc;
+		cacheAdd(request, response);
+	}
+
+	]);
 },
 
 load: function(url, requestInfo) {
@@ -705,8 +714,11 @@ function handleResponse(xhr, info) { // TODO handle info.responseType
 		statusText: xhr.statusText
 	};
 	if (HTML_IN_XHR) {
-		response.document = normalize(xhr.response, info);
-		return response;
+		return normalize(xhr.response, info)
+		.then(function(doc) {
+			response.document = doc;
+			return response;
+		});
 	}
 	else {
 		return parseHTML(new String(xhr.responseText), info)
@@ -813,15 +825,33 @@ return urlAttributes;
 */
 var resolveAll = function(doc, baseURL) {
 
-	var selector = Object.keys(urlAttributes).join(', ');
-	_.forEach(DOM.findAll(selector, doc), function(el) {
-		var tag = DOM.getTagName(el);
-		var attrList = urlAttributes[tag];
-		_.forOwn(attrList, function(attrDesc, attrName) {
-			if (!el.hasAttribute(attrName)) return;
-			attrDesc.resolve(el, baseURL);
+	return Promise.pipe(null, [
+
+	function () {
+		var selector = Object.keys(urlAttributes).join(', ');
+		return DOM.findAll(selector, doc);
+	},
+
+	function(nodeList) {
+		var count = 0, rollOver = 100; // FIXME configure rollOver elsewhere
+		return Promise.reduce(nodeList, undefined, function(dummy, el) {
+			var tag = DOM.getTagName(el);
+			var attrList = urlAttributes[tag];
+			_.forOwn(attrList, function(attrDesc, attrName) {
+				if (!el.hasAttribute(attrName)) return;
+				attrDesc.resolve(el, baseURL);
+			});
+			if (count++ < rollOver) return;
+			count = 0;
+			return Promise.asap(); // NOTE asap() forces a remaining task-time check 
 		});
-	});
+	},
+
+	function() {
+		return doc;
+	}
+
+	]);
 
 }
 
@@ -859,9 +889,7 @@ function normalize(doc, details) {
 		if (replacements) styleText(node, text);
 	});
 
-	resolveAll(doc, baseURL, false);
-
-	return doc;	
+	return resolveAll(doc, baseURL, false);
 }
 
 var HTMLParser = Meeko.HTMLParser = (function() {
@@ -877,8 +905,7 @@ function nativeParser(html, details) {
 		
 	function() {
 		var doc = (new DOMParser).parseFromString(html, 'text/html');
-		normalize(doc, details);
-		return doc;		
+		return normalize(doc, details);
 	}
 	
 	]);
@@ -901,8 +928,7 @@ function innerHTMLParser(html, details) {
 	},
 	
 	function(doc) {
-		normalize(doc, details);
-		return doc;
+		return normalize(doc, details);
 	}
 	
 	]);
@@ -2374,7 +2400,7 @@ start: function(startOptions) {
 	framer.started = true;
 	startOptions.contentDocument
 	.then(function(doc) { // FIXME potential race condition between document finished loading and frameset rendering
-		httpProxy.add({
+		return httpProxy.add({
 			url: document.URL,
 			type: 'document',
 			document: doc
