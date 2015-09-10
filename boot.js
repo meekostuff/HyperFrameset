@@ -762,7 +762,10 @@ function start() {
 			resolve(dstDoc);
 		}) 
 	});
-	startFu.then(Viewport.unhide, Viewport.unhide);
+	startFu.then(Viewport.unhide, function(error) {
+		Viewport.unhide();
+		throw error;
+	});
 }
 
 function resolveScript(script) {
