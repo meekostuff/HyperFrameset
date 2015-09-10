@@ -1584,8 +1584,7 @@ detect: function(doc, details) {
 init: function(doc, settings) {
 	var frameset = this;
 	_.defaults(frameset, {
-		options: _.defaults({}, HFramesetDefinition.options),
-		frames: {} // all hyperframe definitions. Indexed by @id (which may be auto-generated)
+		options: _.defaults({}, HFramesetDefinition.options)
 	});
 
 	var hfNS = hfDefaultNamespace;
@@ -1601,14 +1600,7 @@ init: function(doc, settings) {
 	// NOTE first rebase scope: urls
 	var scopeURL = URL(settings.scope);
 	rebase(doc, scopeURL);
-	
-	var body = doc.body;
-	body.parentNode.removeChild(body);
-	frameset.document = doc;
-	frameset.element = body;
-	var frameElts = DOM.findAll(frameset.mkSelector('frame'), body);
-	var frameDefElts = [];
-	var frameRefElts = [];
+	var frameElts = DOM.findAll(frameset.mkSelector('frame'), doc.body);
 	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
 		// NOTE first rebase @src with scope: urls
 		var src = el.getAttribute('src');
@@ -1616,7 +1608,27 @@ init: function(doc, settings) {
 			var newSrc = rebaseURL(src, scopeURL);
 			if (newSrc != src) el.setAttribute('src', newSrc);
 		}
+	});
 		
+	var body = doc.body;
+	body.parentNode.removeChild(body);
+	frameset.document = doc;
+	frameset.element = body;
+},
+
+preprocess: function() {
+	var frameset = this;
+	var cdom = frameset.cdom;
+	var body = frameset.element;
+	_.defaults(frameset, {
+		frames: {} // all hyperframe definitions. Indexed by @id (which may be auto-generated)
+	});
+
+	var frameElts = DOM.findAll(frameset.mkSelector('frame'), body);
+	var frameDefElts = [];
+	var frameRefElts = [];
+	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
+
 		// NOTE even if the frame is only a declaration (@def && @def !== @id) it still has its content removed
 		var placeholder = el.cloneNode(false);
 		el.parentNode.replaceChild(placeholder, el); // NOTE no adoption
@@ -1659,8 +1671,6 @@ mkSelector: function(selector) {
 	var tags = selector.split(/\s*,\s*|\s+/);
 	return _.map(tags, function(tag) { return cdom.mkSelector(tag); }).join(', ');
 }
-
-
 
 });
 
@@ -2434,6 +2444,7 @@ start: function(startOptions) {
 
 	function(definition) {
 		framer.definition = definition;
+		definition.preprocess(); // TODO promisify
 		return HFrameset.prerender(document, definition);
 	},
 	
@@ -2956,7 +2967,7 @@ registerDecoder: function(type, constructor) {
 },
 
 createDecoder: function(type) {
-	return new this.decoders[type];	
+	return new this.decoders[type](this.definition);
 },
 
 processors: {},
@@ -2966,7 +2977,7 @@ registerProcessor: function(type, constructor) {
 },
 
 createProcessor: function(type) {
-	return new this.processors[type];	
+	return new this.processors[type](this.definition);
 }
 
 });

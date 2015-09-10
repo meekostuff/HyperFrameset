@@ -25,7 +25,16 @@ var Promise = Meeko.Promise;
 var logger = Meeko.logger;
 var framer = Meeko.framer;
 
-var FRAGMENTS_ARE_INERT = !('ActiveXObject' in window && !window.ActiveXObject); // IE11
+/* WARN 
+	on IE11 and Edge, certain elements (or attrs) *not* attached to a document 
+	can trash the layout engine. Examples:
+		- <custom-element>
+		- <element style="...">
+		- <li value="NaN">
+*/
+var FRAGMENTS_ARE_INERT = !(window.HTMLUnknownElement && 
+	'runtimeStyle' in window.HTMLUnknownElement.prototype);
+// NOTE actually IE10 is okay, but no reasonable feature detection has been determined
 
 var MainProcessor = (function() {
 
@@ -136,6 +145,48 @@ var hazPrefix = hazNamespace + ':';
 var exprPrefix = exprNamespace + ':';
 var mexprPrefix = mexprNamespace + ':';
 
+var PERFORMANCE_UNFRIENDLY_CONDITIONS = [
+	{
+		tag: '*', // must be present for checkElementPerformance()
+		attr: 'style',
+		description: 'an element with @style'
+	},
+	{
+		tag: 'li',
+		attr: 'value',
+		description: 'a <li> element with @value'
+	},
+	{
+		tag: undefined,
+		description: 'an unknown or custom element'
+	}
+];
+
+function checkElementPerformance(el) {
+	var outerHTML;
+	_.forEach(PERFORMANCE_UNFRIENDLY_CONDITIONS, function(cond) {
+		switch (cond.tag) {
+		case undefined: case null:
+			if (el.toString() !== '[object HTMLUnknownElement]') return;
+			break;
+		default:
+			if (DOM.getTagName(el) !== cond.tag) return;
+			// fall-thru
+		case '*': case '':
+			if (_.every(
+				['', exprPrefix, mexprPrefix], function(prefix) {
+					var attr = prefix + cond.attr;
+					return !el.hasAttribute(attr);
+				})
+			) return;
+			break;
+		}
+		if (!outerHTML) outerHTML = el.cloneNode(false).outerHTML; // FIXME caniuse outerHTML??
+		logger.info('Found ' + cond.description + ':\n\t\t' + outerHTML + '\n\t' +
+			'This can cause poor performance on IE / Edge.');
+	});
+}
+
 var hazLangDefinition = 
 	'<otherwise <when@test <each@select,var <if@test <unless@test ' +
 	'>choose <template@name >eval@select >mtext@select >text@select include@name';
@@ -202,8 +253,8 @@ function htmlToFragment(html, doc) {
 	return result;
 }
 
-function HazardProcessor() {
-
+function HazardProcessor(frameset) {
+	this.frameset = frameset;
 }
 
 _.defaults(HazardProcessor.prototype, {
@@ -287,6 +338,15 @@ loadTemplate: function(template) {
 		if (tag === hazPrefix + 'choose') implyOtherwise(el);
 	});
 
+	var hfNS = processor.frameset.cdom;
+
+	if (logger.LOG_LEVEL >= logger.levels.indexOf('debug')) walkTree(template, true, function(el) {
+		var tag = DOM.getTagName(el);
+		if (tag in hazLangLookup) return;
+		if (tag.indexOf(hfNS.prefix) === 0) return; // HyperFrameset element
+		checkElementPerformance(el);
+	});
+
 	function markTemplate(el) {
 		if (!el.hasAttribute('name')) return;
 		var name = el.getAttribute('name');
@@ -317,7 +377,7 @@ function(provider, details) { // TODO how to use details
 	});
 } :
 
-// NOTE IE11 uses a different transform() because fragments are not inert
+// NOTE IE11, Edge needs a different transform() because fragments are not inert
 function(provider, details) {
 	var root = this.root;
 	var doc = DOM.createHTMLDocument('', root.ownerDocument);
