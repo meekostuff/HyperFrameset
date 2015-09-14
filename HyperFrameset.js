@@ -719,31 +719,6 @@ return Promise;
 
 var DOM = Meeko.DOM = (function() {
 
-// FIXME *Specificity() aren't used - remove it.
-// WARN getSpecificity is for selectors, **but not** for selector-chains
-var getSpecificity = function(selector) { // NOTE this fn is small but extremely naive (and wrongly counts attrs and pseudo-attrs with element-type)
-	if (selector.indexOf(',') >= 0) throw Error('getSpecificity does not support selectors that contain COMMA (,)');
-	var idCount = selector.split('#').length - 1;
-	var classCount = selector.split('.').length - 1;
-	var typeCount =
-		selector.replace(/\*/g, '') // ignore universals
-		.replace(/[>+~]/g, ' ') // descendants don't matter
-		.replace(/:+|[#.\[\]]/g, ' ') // prepare to count pseudos and id, class, attr
-		.split(/\s+/).length - 1 - aCount - bCount; // and remove id and class counts
-	
-	return [idCount, classCount, typeCount];
-}
-
-var cmpSpecificty = function(s1, s2) { // WARN no sanity checks
-	var c1 = DOM.getSpecificity(s1), c2 = DOM.getSpecificity(c2);
-	for (var n=c1.length, i=0; i<n; i++) {
-		var a = c1[i], b = c2[i];
-		if (a > b) return 1;
-		if (a < b) return -1;
-	}
-	return 0;
-}
-
 // TODO all this node manager stuff assumes that nodes are only released on unload
 // This might need revising
 
@@ -879,7 +854,6 @@ document.documentElement.compareDocumentPosition && function(node, otherNode) { 
 function(node, otherNode) { throw Error('contains not supported'); };
 
 return {
-	getSpecificity: getSpecificity, cmpSpecificty: cmpSpecificty,
 	uniqueId: uniqueId, setData: setData, getData: getData, hasData: hasData, // FIXME releaseNodes
 	findId: findId, find: find, findAll: findAll, matches: matches, closest: closest,
 	contains: contains
@@ -1400,7 +1374,7 @@ function BindingRule(selector, bindingDefn) {
 
 var bindingRules = sprockets.rules = [];
 
-function applyRuleToEnteredElement(rule, element, callback) { // FIXME compare current and new CSS specifities
+function applyRuleToEnteredElement(rule, element, callback) {
 	var binding = Binding.getInterface(element);
 	if (binding && binding.definition !== rule.definition) {
 		logger.warn('Binding rule applied when binding already present');
@@ -1417,23 +1391,20 @@ function applyRuleToEnteredTree(rule, root, callback) {
 	_.forEach(DOM.findAll(rule.selector, root), function(el) { applyRuleToEnteredElement(rule, el, callback); });
 }
 
+
+var started = false;
+
 _.assign(sprockets, {
 
 registerElement: function(tagName, defn) { // FIXME test tagName
+	if (started) throw Error('sprockets management already started');
 	if (defn.rules) logger.warn('registerElement() does not support rules. Try registerComposite()');
 	var bindingDefn = new BindingDefinition(defn);
 	var selector = tagName + ', [is=' + tagName + ']'; // TODO why should @is be supported??
 	var rule = new BindingRule(selector, bindingDefn);
 	bindingRules.push(rule);
 	return rule;
-}
-
-});
-
-
-var started = false;
-
-_.assign(sprockets, {
+},
 
 start: function() { // FIXME find a way to allow progressive binding application
 	if (started) throw Error('sprockets management has already started');
@@ -1552,6 +1523,7 @@ var SprocketDefinition = function(prototype) {
 	constructor.prototype = prototype;
 	return constructor;
 }
+
 
 _.assign(sprockets, {
 
