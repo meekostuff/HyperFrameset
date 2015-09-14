@@ -757,6 +757,8 @@ var cmpSpecificty = function(s1, s2) { // WARN no sanity checks
 // TODO all this node manager stuff assumes that nodes are only released on unload
 // This might need revising
 
+// TODO A node-manager API would be useful elsewhere
+
 var nodeIdProperty = vendorPrefix + 'ID';
 var nodeCount = 0; // used to generated node IDs
 var nodeTable = []; // list of tagged nodes
@@ -886,20 +888,11 @@ document.documentElement.contains && function(node, otherNode) {
 document.documentElement.compareDocumentPosition && function(node, otherNode) { return (node === otherNode) || !!(node.compareDocumentPosition(otherNode) & 16); } ||
 function(node, otherNode) { throw Error('contains not supported'); };
 
-var addEventListener = // FIXME remove
-document.addEventListener && function(node, type, listener, capture) { return node.addEventListener(type, listener, capture); } ||
-function(node, type, listener, capture) { throw Error('addEventListener not supported'); };
-
-var removeEventListener = // FIXME remove
-document.removeEventListener && function(node, type, listener, capture) { return node.removeEventListener(type, listener, capture); } ||
-function(node, type, listener, capture) { throw Eror('removeEventListener not supported'); };
-
 return {
 	getSpecificity: getSpecificity, cmpSpecificty: cmpSpecificty,
 	uniqueId: uniqueId, setData: setData, getData: getData, hasData: hasData, // FIXME releaseNodes
 	findId: findId, find: find, findAll: findAll, matches: matches, closest: closest,
-	contains: contains,
-	addEventListener: addEventListener, removeEventListener: removeEventListener
+	contains: contains
 }
 
 })();
@@ -1081,7 +1074,7 @@ addHandler: function(handler) {
 	}
 	fn.type = type;
 	fn.capture = capture;
-	DOM.addEventListener(element, type, fn, capture);
+	element.addEventListener(type, fn, capture);
 	return fn;
 },
 
@@ -1092,7 +1085,7 @@ removeListener: function(fn) {
 	var type = fn.type;
 	var capture = fn.capture;
 	var target = (element === document.documentElement && _.contains(redirectedWindowEvents, type)) ? window : element; 
-	DOM.removeEventListener(target, type, fn, capture);	
+	target.removeEventListener(type, fn, capture);	
 },
 
 });
@@ -2439,18 +2432,6 @@ var scrollToId = function(id) { // FIXME this isn't being used
 	else window.scroll(0, 0);
 }
 
-// FIXME remove - use addEventListener
-var addEvent = 
-	document.addEventListener && function(node, event, fn) { return node.addEventListener(event, fn, false); } ||
-	document.attachEvent && function(node, event, fn) { return node.attachEvent('on' + event, fn); } ||
-	function(node, event, fn) { node['on' + event] = fn; }
-
-// FIXME remove - use addEventListener
-var removeEvent = 
-	document.removeEventListener && function(node, event, fn) { return node.removeEventListener(event, fn, false); } ||
-	document.detachEvent && function(node, event, fn) { return node.detachEvent('on' + event, fn); } ||
-	function(node, event, fn) { if (node['on' + event] == fn) node['on' + event] = null; }
-
 var readyStateLookup = { // used in domReady() and checkStyleSheets()
 	'uninitialized': false,
 	'loading': false,
@@ -2481,14 +2462,14 @@ var events = {
 	'load': window
 };
 
-if (!loaded) _.forOwn(events, function(node, type) { addEvent(node, type, onLoaded); });
+if (!loaded) _.forOwn(events, function(node, type) { node.addEventListener(type, onLoaded, false); });
 
 return domReady;
 
 // NOTE the following functions are hoisted
 function onLoaded(e) {
 	loaded = true;
-	_.forOwn(events, function(node, type) { removeEvent(node, type, onLoaded); });
+	_.forOwn(events, function(node, type) { node.removeEventListener(type, onLoaded, false); });
 	processQueue();
 }
 
@@ -2521,7 +2502,9 @@ NOTE:  for more details on how checkStyleSheets() works cross-browser see
 http://aaronheckmann.blogspot.com/2010/01/writing-jquery-plugin-manager-part-1.html
 TODO: does this still work when there are errors loading stylesheets??
 */
-var checkStyleSheets = function() { // TODO would be nice if this didn't need to be polled
+// TODO would be nice if this didn't need to be polled
+// TODO should be able to use <link>.onload http://stackoverflow.com/a/13610128/108354
+var checkStyleSheets = function() { 
 	// check that every <link rel="stylesheet" type="text/css" /> 
 	// has loaded
 	return _.every(DOM.findAll('link'), function(node) {
@@ -2561,7 +2544,7 @@ _.defaults(DOM, {
 	siblings: siblings, firstChild: firstChild, // selections
 	copyAttributes: copyAttributes, removeAttributes: removeAttributes, textContent: textContent, scriptText: scriptText, // attrs
 	insertNode: insertNode, // nodes
-	ready: domReady, addEvent: addEvent, removeEvent: removeEvent, // events
+	ready: domReady, // events
 	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
 	isVisible: isVisible, whenVisible: whenVisible,
 	scrollToId: scrollToId
@@ -3220,13 +3203,13 @@ return new Promise(function(resolve, reject) {
 	}
 
 	function addListeners() {
-		addEvent(script, 'load', onLoad);
-		addEvent(script, 'error', onError);
+		script.addEventListener('load', onLoad, false);
+		script.addEventListener('error', onError, false);
 	}
 	
 	function removeListeners() {
-		removeEvent(script, 'load', onLoad);
-		removeEvent(script, 'error', onError);
+		script.removeEventListener('load', onLoad, false);
+		script.removeEventListener('error', onError, false);
 	}
 	
 	function spliceItem(a, item) {

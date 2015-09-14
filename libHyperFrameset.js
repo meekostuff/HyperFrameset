@@ -271,18 +271,6 @@ var scrollToId = function(id) { // FIXME this isn't being used
 	else window.scroll(0, 0);
 }
 
-// FIXME remove - use addEventListener
-var addEvent = 
-	document.addEventListener && function(node, event, fn) { return node.addEventListener(event, fn, false); } ||
-	document.attachEvent && function(node, event, fn) { return node.attachEvent('on' + event, fn); } ||
-	function(node, event, fn) { node['on' + event] = fn; }
-
-// FIXME remove - use addEventListener
-var removeEvent = 
-	document.removeEventListener && function(node, event, fn) { return node.removeEventListener(event, fn, false); } ||
-	document.detachEvent && function(node, event, fn) { return node.detachEvent('on' + event, fn); } ||
-	function(node, event, fn) { if (node['on' + event] == fn) node['on' + event] = null; }
-
 var readyStateLookup = { // used in domReady() and checkStyleSheets()
 	'uninitialized': false,
 	'loading': false,
@@ -313,14 +301,14 @@ var events = {
 	'load': window
 };
 
-if (!loaded) _.forOwn(events, function(node, type) { addEvent(node, type, onLoaded); });
+if (!loaded) _.forOwn(events, function(node, type) { node.addEventListener(type, onLoaded, false); });
 
 return domReady;
 
 // NOTE the following functions are hoisted
 function onLoaded(e) {
 	loaded = true;
-	_.forOwn(events, function(node, type) { removeEvent(node, type, onLoaded); });
+	_.forOwn(events, function(node, type) { node.removeEventListener(type, onLoaded, false); });
 	processQueue();
 }
 
@@ -395,7 +383,7 @@ _.defaults(DOM, {
 	siblings: siblings, firstChild: firstChild, // selections
 	copyAttributes: copyAttributes, removeAttributes: removeAttributes, textContent: textContent, scriptText: scriptText, // attrs
 	insertNode: insertNode, // nodes
-	ready: domReady, addEvent: addEvent, removeEvent: removeEvent, // events
+	ready: domReady, // events
 	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
 	isVisible: isVisible, whenVisible: whenVisible,
 	scrollToId: scrollToId
@@ -1054,13 +1042,13 @@ return new Promise(function(resolve, reject) {
 	}
 
 	function addListeners() {
-		addEvent(script, 'load', onLoad);
-		addEvent(script, 'error', onError);
+		script.addEventListener('load', onLoad, false);
+		script.addEventListener('error', onError, false);
 	}
 	
 	function removeListeners() {
-		removeEvent(script, 'load', onLoad);
-		removeEvent(script, 'error', onError);
+		script.removeEventListener('load', onLoad, false);
+		script.removeEventListener('error', onError, false);
 	}
 	
 	function spliceItem(a, item) {
