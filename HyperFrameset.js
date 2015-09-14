@@ -9,6 +9,8 @@ Requires some features not implemented on older browsers:
 element.matchesSelector (or prefixed equivalent) - IE9+
 element.querySelectorAll - IE8+
 element.addEventListener - IE9+
+element.dispatchEvent - IE9+
+Object.create - IE9+
 */
 
 /* FIXME
@@ -39,7 +41,7 @@ if (!Meeko.stuff) Meeko.stuff = (function() {
 var uc = function(str) { return str ? str.toUpperCase() : ''; }
 var lc = function(str) { return str ? str.toLowerCase() : ''; }
 
-var contains = function(a, item) { // TODO Array#includes ??
+var includes = function(a, item) {
 	for (var n=a.length, i=0; i<n; i++) if (a[i] === item) return true;
 	return false;
 }
@@ -55,8 +57,8 @@ var map = function(a, fn, context) {
 	for (var n=a.length, i=0; i<n; i++) {
 		var value = a[i];
 		output[i] = fn ? 
-			fn.call(context, a[i], i, a) :
-			a[i];
+			fn.call(context, value, i, a) :
+			value;
 	}
 	return output;
 }
@@ -111,7 +113,8 @@ var assign = function(dest, src) {
 
 return {
 	uc: uc, lc: lc, words: words, // string
-	contains: contains, forEach: forEach, some: some, every: every, map: map, filter: filter, find: find, // array
+	contains: includes, // FIXME deprecated
+	includes: includes, forEach: forEach, some: some, every: every, map: map, filter: filter, find: find, // array
 	forOwn: forOwn, isEmpty: isEmpty, defaults: defaults, assign: assign, extend: assign // object
 }
 
@@ -247,11 +250,10 @@ function postError(error) {
 	errorQueue.push(error);
 }
 
-var throwErrors = (function() { // TODO maybe it isn't worth isolating on platforms that don't have dispatchEvent()
+var throwErrors = (function() {
 
 var evType = vendorPrefix + '-error';
-var throwErrors = (window.dispatchEvent) ?
-function() {
+function throwErrors() {
 	var handlers = createThrowers(errorQueue);
 	_.forEach(handlers, function(handler) {
 		window.addEventListener(evType, handler, false);
@@ -261,13 +263,6 @@ function() {
 	window.dispatchEvent(e);
 	_.forEach(handlers, function(handler) {
 		window.removeEventListener(evType, handler, false);
-	});
-	errorQueue = [];
-} :
-function() { // FIXME shouldn't need this
-	var handlers = createThrowers(errorQueue);
-	_.forEach(handlers, function(handler) {
-		setTimeout(handler);
 	});
 	errorQueue = [];
 }
@@ -977,7 +972,7 @@ leftDocumentCallback: function(element) {
 managedEvents: [],
 
 manageEvent: function(type) {
-	if (_.contains(this.managedEvents, type)) return;
+	if (_.includes(this.managedEvents, type)) return;
 	this.managedEvents.push(type);
 	window.addEventListener(type, function(event) {
 		// NOTE stopPropagation() prevents custom default-handlers from running. DOMSprockets nullifies it.
@@ -1079,7 +1074,7 @@ removeListener: function(fn) {
 	var element = object.element;
 	var type = fn.type;
 	var capture = fn.capture;
-	var target = (element === document.documentElement && _.contains(redirectedWindowEvents, type)) ? window : element; 
+	var target = (element === document.documentElement && _.includes(redirectedWindowEvents, type)) ? window : element; 
 	target.removeEventListener(type, fn, capture);	
 },
 
@@ -1279,13 +1274,13 @@ var matchesEvent = function(handler, event, ignorePhase) {
 	// MouseEvents
 	if (evType in xblMouseEvents) { // FIXME needs testing. Bound to be cross-platform issues still
 		if (handler.button && handler.button.length) {
-			if (!_.contains(handler.button, event.button) == -1) return false;
+			if (!_.includes(handler.button, event.button) == -1) return false;
 		}
 		if (handler.clickCount && handler.clickCount.length) { 
 			var count = 1;
 			// if ('dblclick' == event.type) count = 2;
 			if ('click' == event.type) count = (event.detail) ? event.detail : 1;
-			if (!_.contains(handler.clickCount, count)) return false;
+			if (!_.includes(handler.clickCount, count)) return false;
 		}
 		if (handler.modifiers) {
 			if (!modifiersMatchEvent(handler.modifiers, event)) return false;
@@ -1875,7 +1870,7 @@ hasClass: function(token) {
 	var element = this.element;
 	var text = element.getAttribute('class');
 	if (!text) return false;
-	return _.contains(_.words(text), token);
+	return _.includes(_.words(text), token);
 },
 addClass: function(token) {
 	var element = this.element;
@@ -1884,7 +1879,7 @@ addClass: function(token) {
 		element.setAttribute('class', token);
 		return;
 	}
-	if (_.contains(_.words(text), token)) return;
+	if (_.includes(_.words(text), token)) return;
 	var n = text.length,
 		space = (n && text.charAt(n-1) !== ' ') ? ' ' : '';
 	text += space + token;
@@ -2194,7 +2189,7 @@ var _ = Meeko.stuff; // provided by DOMSprockets
 var without = function(a1, a2) {
 	var result = [];
 	_.forEach(a1, function(item) {
-		if (_.contains(a2, item) || _.contains(result, item)) return;
+		if (_.includes(a2, item) || _.includes(result, item)) return;
 		result.push(item);
 	});
 	return result;
@@ -2755,7 +2750,7 @@ var httpProxy = {
 add: function(response) { // NOTE this is only for the landing page
 	var url = response.url;
 	if (!url) throw Error('Invalid url in response object');
-	if (!_.contains(responseTypes, response.type)) throw Error('Invalid type in response object');
+	if (!_.includes(responseTypes, response.type)) throw Error('Invalid type in response object');
 	var request = {
 		url: response.url
 	}
@@ -2779,8 +2774,8 @@ load: function(url, requestInfo) {
 	};
 	if (requestInfo) _.defaults(info, requestInfo);
 	_.defaults(info, defaultInfo);
-	if (!_.contains(methods, info.method)) throw Error('method not supported: ' + info.method);
-	if (!_.contains(responseTypes, info.responseType)) throw Error('responseType not supported: ' + info.responseType);
+	if (!_.includes(methods, info.method)) throw Error('method not supported: ' + info.method);
+	if (!_.includes(responseTypes, info.responseType)) throw Error('responseType not supported: ' + info.responseType);
 	return request(info);
 }
 
@@ -3480,7 +3475,7 @@ init: function(el) {
 			_.assign(frameDef.options, options);
 			return;
 		}
-		if (_.contains(hfHeadTags, tag)) return; // ignore typical <head> elements
+		if (_.includes(hfHeadTags, tag)) return; // ignore typical <head> elements
 		if (tag === cdom.mkTagName('body')) {
 			el.removeChild(node);
 			bodies.push(new HBodyDefinition(node, frameset));
@@ -3534,7 +3529,7 @@ var conditionAliases = {
 
 function normalizeCondition(condition) {
 	condition = _.lc(condition);
-	if (_.contains(conditions, condition)) return condition;
+	if (_.includes(conditions, condition)) return condition;
 	return conditionAliases[condition];
 }
 
@@ -3914,7 +3909,7 @@ enteredDocument: function() {
 	panel.ariaToggle('hidden', true);
 	if (!name) return; // being controlled by an ancestor
 	controllers.listen(name, function(values) {
-		panel.ariaToggle('hidden', !(_.contains(values, value)));
+		panel.ariaToggle('hidden', !(_.includes(values, value)));
 	});
 
 }
@@ -4045,7 +4040,7 @@ activedescendant: {
 		
 		var element = this.element;
 		var panels = this.ariaGet('owns');
-		if (item && !_.contains(panels, item)) throw Error('set activedescendant failed: item is not child of deck');
+		if (item && !_.includes(panels, item)) throw Error('set activedescendant failed: item is not child of deck');
 		_.forEach(panels, function(child) {
 			if (child === item) child.ariaToggle('hidden', false);
 			else child.ariaToggle('hidden', true);
@@ -4076,7 +4071,7 @@ enteredDocument: function() {
 		var active;
 		_.some(panels, function(child) { 
 			var value = child.getAttribute('value');
-			if (!_.contains(values, value)) return false;
+			if (!_.includes(values, value)) return false;
 			active = child;
 			return true;
 		});

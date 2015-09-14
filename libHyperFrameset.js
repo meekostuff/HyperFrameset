@@ -38,7 +38,7 @@ var _ = Meeko.stuff; // provided by DOMSprockets
 var without = function(a1, a2) {
 	var result = [];
 	_.forEach(a1, function(item) {
-		if (_.contains(a2, item) || _.contains(result, item)) return;
+		if (_.includes(a2, item) || _.includes(result, item)) return;
 		result.push(item);
 	});
 	return result;
@@ -599,7 +599,7 @@ var httpProxy = {
 add: function(response) { // NOTE this is only for the landing page
 	var url = response.url;
 	if (!url) throw Error('Invalid url in response object');
-	if (!_.contains(responseTypes, response.type)) throw Error('Invalid type in response object');
+	if (!_.includes(responseTypes, response.type)) throw Error('Invalid type in response object');
 	var request = {
 		url: response.url
 	}
@@ -623,8 +623,8 @@ load: function(url, requestInfo) {
 	};
 	if (requestInfo) _.defaults(info, requestInfo);
 	_.defaults(info, defaultInfo);
-	if (!_.contains(methods, info.method)) throw Error('method not supported: ' + info.method);
-	if (!_.contains(responseTypes, info.responseType)) throw Error('responseType not supported: ' + info.responseType);
+	if (!_.includes(methods, info.method)) throw Error('method not supported: ' + info.method);
+	if (!_.includes(responseTypes, info.responseType)) throw Error('responseType not supported: ' + info.responseType);
 	return request(info);
 }
 
@@ -1324,7 +1324,7 @@ init: function(el) {
 			_.assign(frameDef.options, options);
 			return;
 		}
-		if (_.contains(hfHeadTags, tag)) return; // ignore typical <head> elements
+		if (_.includes(hfHeadTags, tag)) return; // ignore typical <head> elements
 		if (tag === cdom.mkTagName('body')) {
 			el.removeChild(node);
 			bodies.push(new HBodyDefinition(node, frameset));
@@ -1378,7 +1378,7 @@ var conditionAliases = {
 
 function normalizeCondition(condition) {
 	condition = _.lc(condition);
-	if (_.contains(conditions, condition)) return condition;
+	if (_.includes(conditions, condition)) return condition;
 	return conditionAliases[condition];
 }
 
@@ -1758,7 +1758,7 @@ enteredDocument: function() {
 	panel.ariaToggle('hidden', true);
 	if (!name) return; // being controlled by an ancestor
 	controllers.listen(name, function(values) {
-		panel.ariaToggle('hidden', !(_.contains(values, value)));
+		panel.ariaToggle('hidden', !(_.includes(values, value)));
 	});
 
 }
@@ -1889,7 +1889,7 @@ activedescendant: {
 		
 		var element = this.element;
 		var panels = this.ariaGet('owns');
-		if (item && !_.contains(panels, item)) throw Error('set activedescendant failed: item is not child of deck');
+		if (item && !_.includes(panels, item)) throw Error('set activedescendant failed: item is not child of deck');
 		_.forEach(panels, function(child) {
 			if (child === item) child.ariaToggle('hidden', false);
 			else child.ariaToggle('hidden', true);
@@ -1920,7 +1920,7 @@ enteredDocument: function() {
 		var active;
 		_.some(panels, function(child) { 
 			var value = child.getAttribute('value');
-			if (!_.contains(values, value)) return false;
+			if (!_.includes(values, value)) return false;
 			active = child;
 			return true;
 		});
