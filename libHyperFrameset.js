@@ -1166,18 +1166,6 @@ update: function(data, callback) { // FIXME not being used. Can it be reomved?
 
 });
 
-function createState(data, title, url) { // FIXME not being used. Can it be reomved?
-	var timeStamp = +(new Date);
-	var state = {
-		title: title,
-		url: url,
-		timeStamp: timeStamp,
-		data: data
-	};
-	state[stateTag] = true;
-	return state;
-}
-
 return historyManager;
 
 })();
