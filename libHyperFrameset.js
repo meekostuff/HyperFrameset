@@ -524,7 +524,7 @@ var keys = ['source','protocol','hostname','port','pathname','search','hash'];
 var parser = /^([^:\/?#]+:)?(?:\/\/([^:\/?#]*)(?::(\d*))?)?([^?#]*)?(\?[^#]*)?(#.*)?$/;
 
 URL.prototype.parse = function parse(str) {
-	str = _.trim(str);
+	str = str.trim();
 	var	m = parser.exec(str);
 
 	for (var n=keys.length, i=0; i<n; i++) this[keys[i]] = m[i] || '';
@@ -548,7 +548,7 @@ URL.prototype.parse = function parse(str) {
 };
 
 URL.prototype.resolve = function resolve(relURL) {
-	relURL = _.trim(relURL);
+	relURL = relURL.trim();
 	if (!this.supportsResolve) return relURL;
 	var substr1 = relURL.charAt(0), substr2 = relURL.substr(0,2);
 	var absURL =
@@ -758,7 +758,7 @@ resolve: function(el, baseURL) {
 },
 
 resolveURL: function(url, baseURL) {
-	var relURL = _.trim(url);
+	var relURL = url.trim();
 	var finalURL = relURL;
 	switch (relURL.charAt(0)) {
 		case '': // empty, but not null. TODO should this be a warning??

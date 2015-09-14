@@ -779,7 +779,7 @@ evaluate: function(query, context, variables, wantArray) {
 	}
 
 	if (attr) {
-		attr = _.trim(attr);
+		attr = attr.trim();
 		if (attr.charAt(0) === '@') attr = attr.substr(1);
 		_.forEach(result, function(node, i) {
 			result[i] = getAttr(node, attr);
@@ -809,13 +809,13 @@ evaluate: function(query, context, variables, wantArray) {
 });
 
 function find(context, selectorGroup, variables) {
-	if (_.trim(selectorGroup) === '') return context;
+	if (selectorGroup.trim() === '') return context;
 	var finalSelector = expandSelector(context, selectorGroup, variables);
 	return context.querySelector(finalSelector); // FIXME DOM.find
 }
 
 function findAll(context, selectorGroup, variables) {
-	if (_.trim(selectorGroup) === '') return [ context ];
+	if (selectorGroup.trim() === '') return [ context ];
 	var finalSelector = expandSelector(context, selectorGroup, variables);
 	return context.querySelectorAll(finalSelector); // FIXME DOM.findAll
 }
@@ -832,7 +832,7 @@ function expandSelector(context, selectorGroup, variables) { // FIXME currently 
 		}
 	}
 	var selectors =	selectorGroup.split(',');
-	selectors = _.map(selectors, function(s) { return _.trim(s); });
+	selectors = _.map(selectors, function(s) { return s.trim(); });
 	selectors = _.filter(selectors, function(s) {
 			switch(s.charAt(0)) {
 			case '+': case '~': return false; // FIXME warning or error
@@ -916,7 +916,7 @@ function getItems(rootNode, type) {
 
 	var scope = getData(rootNode);
 	var typeList = 
-		(typeof type === 'string') ? _.words(_.trim(type)) :
+		(typeof type === 'string') ? _.words(type.trim()) :
 		type && type.length ? type :
 		[];
 			
@@ -1068,7 +1068,7 @@ init: function(node) {
 evaluate: function(query, context, variables, wantArray) {
 	if (!context) context = this.rootNode;
 
-	var query = _.trim(query);
+	var query = query.trim();
 	var startAtRoot = false;
 	var baseSchema;
 	var pathParts;
@@ -1079,9 +1079,9 @@ evaluate: function(query, context, variables, wantArray) {
 	if (m && m.length) {
 		query = query.substr(m[0].length);
 		startAtRoot = !!m[1];
-		baseSchema = _.words(_.trim(m[2]));
+		baseSchema = _.words(m[2].trim());
 	}
-	pathParts = _.words(_.trim(query));
+	pathParts = _.words(query.trim());
 	
 	var nodes;
 	if (baseSchema) {
@@ -1139,7 +1139,7 @@ init: function(object) {
 evaluate: function(query, context, variables, wantArray) {
 	if (!context) context = this.object;
 
-	var query = _.trim(query);
+	var query = query.trim();
 	var pathParts;
 
 	if (query === '.') return (wantArray) ? [ context ] : context;

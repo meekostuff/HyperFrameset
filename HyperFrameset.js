@@ -39,10 +39,6 @@ if (!Meeko.stuff) Meeko.stuff = (function() {
 var uc = function(str) { return str ? str.toUpperCase() : ''; }
 var lc = function(str) { return str ? str.toLowerCase() : ''; }
 
-var trim = ''.trim ? // FIXME not needed on supported browsers IE9+, etc
-function(str) { return str.trim(); } :
-function(str) { return str.replace(/^\s+/, '').replace(/\s+$/, ''); }
-
 var contains = function(a, item) { // TODO Array#includes ??
 	for (var n=a.length, i=0; i<n; i++) if (a[i] === item) return true;
 	return false;
@@ -114,7 +110,7 @@ var assign = function(dest, src) {
 var createObject = Object.create; // FIXME remove
 
 return {
-	uc: uc, lc: lc, trim: trim, words: words, // string
+	uc: uc, lc: lc, words: words, // string
 	contains: contains, toArray: toArray, forEach: forEach, some: some, every: every, map: map, filter: filter, find: find, // array
 	forOwn: forOwn, isEmpty: isEmpty, defaults: defaults, assign: assign, extend: assign, // object
 	create: createObject
@@ -2685,7 +2681,7 @@ var keys = ['source','protocol','hostname','port','pathname','search','hash'];
 var parser = /^([^:\/?#]+:)?(?:\/\/([^:\/?#]*)(?::(\d*))?)?([^?#]*)?(\?[^#]*)?(#.*)?$/;
 
 URL.prototype.parse = function parse(str) {
-	str = _.trim(str);
+	str = str.trim();
 	var	m = parser.exec(str);
 
 	for (var n=keys.length, i=0; i<n; i++) this[keys[i]] = m[i] || '';
@@ -2709,7 +2705,7 @@ URL.prototype.parse = function parse(str) {
 };
 
 URL.prototype.resolve = function resolve(relURL) {
-	relURL = _.trim(relURL);
+	relURL = relURL.trim();
 	if (!this.supportsResolve) return relURL;
 	var substr1 = relURL.charAt(0), substr2 = relURL.substr(0,2);
 	var absURL =
@@ -2919,7 +2915,7 @@ resolve: function(el, baseURL) {
 },
 
 resolveURL: function(url, baseURL) {
-	var relURL = _.trim(url);
+	var relURL = url.trim();
 	var finalURL = relURL;
 	switch (relURL.charAt(0)) {
 		case '': // empty, but not null. TODO should this be a warning??
@@ -5946,7 +5942,7 @@ evaluate: function(query, context, variables, wantArray) {
 	}
 
 	if (attr) {
-		attr = _.trim(attr);
+		attr = attr.trim();
 		if (attr.charAt(0) === '@') attr = attr.substr(1);
 		_.forEach(result, function(node, i) {
 			result[i] = getAttr(node, attr);
@@ -5976,13 +5972,13 @@ evaluate: function(query, context, variables, wantArray) {
 });
 
 function find(context, selectorGroup, variables) {
-	if (_.trim(selectorGroup) === '') return context;
+	if (selectorGroup.trim() === '') return context;
 	var finalSelector = expandSelector(context, selectorGroup, variables);
 	return context.querySelector(finalSelector); // FIXME DOM.find
 }
 
 function findAll(context, selectorGroup, variables) {
-	if (_.trim(selectorGroup) === '') return [ context ];
+	if (selectorGroup.trim() === '') return [ context ];
 	var finalSelector = expandSelector(context, selectorGroup, variables);
 	return context.querySelectorAll(finalSelector); // FIXME DOM.findAll
 }
@@ -5999,7 +5995,7 @@ function expandSelector(context, selectorGroup, variables) { // FIXME currently 
 		}
 	}
 	var selectors =	selectorGroup.split(',');
-	selectors = _.map(selectors, function(s) { return _.trim(s); });
+	selectors = _.map(selectors, function(s) { return s.trim(); });
 	selectors = _.filter(selectors, function(s) {
 			switch(s.charAt(0)) {
 			case '+': case '~': return false; // FIXME warning or error
@@ -6083,7 +6079,7 @@ function getItems(rootNode, type) {
 
 	var scope = getData(rootNode);
 	var typeList = 
-		(typeof type === 'string') ? _.words(_.trim(type)) :
+		(typeof type === 'string') ? _.words(type.trim()) :
 		type && type.length ? type :
 		[];
 			
@@ -6235,7 +6231,7 @@ init: function(node) {
 evaluate: function(query, context, variables, wantArray) {
 	if (!context) context = this.rootNode;
 
-	var query = _.trim(query);
+	var query = query.trim();
 	var startAtRoot = false;
 	var baseSchema;
 	var pathParts;
@@ -6246,9 +6242,9 @@ evaluate: function(query, context, variables, wantArray) {
 	if (m && m.length) {
 		query = query.substr(m[0].length);
 		startAtRoot = !!m[1];
-		baseSchema = _.words(_.trim(m[2]));
+		baseSchema = _.words(m[2].trim());
 	}
-	pathParts = _.words(_.trim(query));
+	pathParts = _.words(query.trim());
 	
 	var nodes;
 	if (baseSchema) {
@@ -6306,7 +6302,7 @@ init: function(object) {
 evaluate: function(query, context, variables, wantArray) {
 	if (!context) context = this.object;
 
-	var query = _.trim(query);
+	var query = query.trim();
 	var pathParts;
 
 	if (query === '.') return (wantArray) ? [ context ] : context;
