@@ -162,14 +162,14 @@ function styleText(node, text) { // TODO IE <style> can have `.sheet` independen
 }
 
 var copyAttributes = function(node, srcNode) {
-	_.forEach(_.toArray(srcNode.attributes), function(attr) {
+	_.forEach(_.map(srcNode.attributes), function(attr) {
 		node.setAttribute(attr.name, attr.value); // WARN needs to be more complex for IE <= 7
 	});
 	return node;
 }
 
 var removeAttributes = function(node) {
-	_.forEach(_.toArray(node.attributes), function(attr) {
+	_.forEach(_.map(node.attributes), function(attr) {
 		node.removeAttribute(attr.name);
 	});
 	return node;
@@ -462,7 +462,7 @@ _.forOwn(CustomDOM.namespaceStyles, function(styleInfo) {
 
 CustomDOM.getNamespaces = function(doc) { // NOTE modelled on IE8, IE9 document.namespaces interface
 	var namespaces = [];
-	_.forEach(_.toArray(doc.documentElement.attributes), function(attr) {
+	_.forEach(_.map(doc.documentElement.attributes), function(attr) {
 		var style;
 		var name;
 		var fullName = _.lc(attr.name);
@@ -1303,7 +1303,7 @@ init: function(el) {
 		mainSelector: el.getAttribute('main') // TODO consider using a hash in `@src`
     });
 	var bodies = frameDef.bodies = [];
-	_.forEach(_.toArray(el.childNodes), function(node) {
+	_.forEach(_.map(el.childNodes), function(node) {
 		var tag = getTagName(node);
 		if (!tag) return;
 		if (tag === 'script') { // TODO factor out common code with <script for=""> evaluation in <head>
@@ -1411,7 +1411,7 @@ init: function(el) {
 		condition: finalCondition,
 		transforms: []
 	});
-	_.forEach(_.toArray(el.childNodes), function(node) {
+	_.forEach(_.map(el.childNodes), function(node) {
 		if (getTagName(node) === cdom.mkTagName('transform')) {
 			el.removeChild(node);
 			bodyDef.transforms.push(new HTransformDefinition(node, frameset));
@@ -1799,7 +1799,7 @@ enteredDocument: function() {
 		else width = width.replace('%', 'vw');
 		if (width) this.css('width', width); // FIXME units
 	}
-	_.forEach(_.toArray(element.childNodes), normalizeChild, element);
+	_.forEach(_.map(element.childNodes), normalizeChild, element);
 	return;
 	
 	function normalizeChild(node) {
@@ -2124,7 +2124,7 @@ render: function() {
 	function() {
 		mergeElement(dstBody, srcBody);
 
-		_.forEach(_.toArray(srcBody.childNodes), function(node) {
+		_.forEach(_.map(srcBody.childNodes), function(node) {
 			DOM.insertNode('beforeend', dstBody, node);
 		});
 	}
@@ -2255,7 +2255,7 @@ function mergeHead(dstDoc, srcHead, isFrameset) {
 
 	separateHead(dstDoc, isFrameset);
 
-	_.forEach(_.toArray(srcHead.childNodes), function(srcNode) {
+	_.forEach(_.map(srcHead.childNodes), function(srcNode) {
 		if (srcNode.nodeType != 1) return;
 		switch (getTagName(srcNode)) {
 		case 'title':
@@ -2601,7 +2601,7 @@ onSubmit: function(e) { // return false means success
 	
 	function encode(form) {
 		var data = [];
-		_.forEach(_.toArray(form.elements), function(el) {
+		_.forEach(form.elements, function(el) {
 			if (!el.name) return;
 			data.push(el.name + '=' + encodeURIComponent(el.value));
 		});

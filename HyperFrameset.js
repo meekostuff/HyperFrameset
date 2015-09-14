@@ -44,9 +44,6 @@ var contains = function(a, item) { // TODO Array#includes ??
 	return false;
 }
 
-// FIXME Array.from()
-var toArray = function(coll) { var a = []; for (var n=coll.length, i=0; i<n; i++) a[i] = coll[i]; return a; }
-
 var forEach = function(a, fn, context) { for (var n=a.length, i=0; i<n; i++) fn.call(context, a[i], i, a); }
 
 var some = function(a, fn, context) { for (var n=a.length, i=0; i<n; i++) { if (fn.call(context, a[i], i, a)) return true; } return false; }
@@ -55,7 +52,12 @@ var every = function(a, fn, context) { for (var n=a.length, i=0; i<n; i++) { if 
 
 var map = function(a, fn, context) {
 	var output = [];
-	for (var n=a.length, i=0; i<n; i++) output[i] = fn.call(context, a[i], i, a);
+	for (var n=a.length, i=0; i<n; i++) {
+		var value = a[i];
+		output[i] = fn ? 
+			fn.call(context, a[i], i, a) :
+			a[i];
+	}
 	return output;
 }
 
@@ -109,7 +111,7 @@ var assign = function(dest, src) {
 
 return {
 	uc: uc, lc: lc, words: words, // string
-	contains: contains, toArray: toArray, forEach: forEach, some: some, every: every, map: map, filter: filter, find: find, // array
+	contains: contains, forEach: forEach, some: some, every: every, map: map, filter: filter, find: find, // array
 	forOwn: forOwn, isEmpty: isEmpty, defaults: defaults, assign: assign, extend: assign // object
 }
 
@@ -855,7 +857,7 @@ function(selector, node, scope) {
 		if (!scope.nodeType) scope = node; // `true` but not the scope element
 		selector = absolutizeSelector(selector, scope);
 	}
-	return _.toArray(node.querySelectorAll(selector));
+	return _.map(node.querySelectorAll(selector));
 } :
 function() { throw Error('findAll() not supported'); };
 
@@ -2316,14 +2318,14 @@ function styleText(node, text) { // TODO IE <style> can have `.sheet` independen
 }
 
 var copyAttributes = function(node, srcNode) {
-	_.forEach(_.toArray(srcNode.attributes), function(attr) {
+	_.forEach(_.map(srcNode.attributes), function(attr) {
 		node.setAttribute(attr.name, attr.value); // WARN needs to be more complex for IE <= 7
 	});
 	return node;
 }
 
 var removeAttributes = function(node) {
-	_.forEach(_.toArray(node.attributes), function(attr) {
+	_.forEach(_.map(node.attributes), function(attr) {
 		node.removeAttribute(attr.name);
 	});
 	return node;
@@ -2616,7 +2618,7 @@ _.forOwn(CustomDOM.namespaceStyles, function(styleInfo) {
 
 CustomDOM.getNamespaces = function(doc) { // NOTE modelled on IE8, IE9 document.namespaces interface
 	var namespaces = [];
-	_.forEach(_.toArray(doc.documentElement.attributes), function(attr) {
+	_.forEach(_.map(doc.documentElement.attributes), function(attr) {
 		var style;
 		var name;
 		var fullName = _.lc(attr.name);
@@ -3457,7 +3459,7 @@ init: function(el) {
 		mainSelector: el.getAttribute('main') // TODO consider using a hash in `@src`
     });
 	var bodies = frameDef.bodies = [];
-	_.forEach(_.toArray(el.childNodes), function(node) {
+	_.forEach(_.map(el.childNodes), function(node) {
 		var tag = getTagName(node);
 		if (!tag) return;
 		if (tag === 'script') { // TODO factor out common code with <script for=""> evaluation in <head>
@@ -3565,7 +3567,7 @@ init: function(el) {
 		condition: finalCondition,
 		transforms: []
 	});
-	_.forEach(_.toArray(el.childNodes), function(node) {
+	_.forEach(_.map(el.childNodes), function(node) {
 		if (getTagName(node) === cdom.mkTagName('transform')) {
 			el.removeChild(node);
 			bodyDef.transforms.push(new HTransformDefinition(node, frameset));
@@ -3953,7 +3955,7 @@ enteredDocument: function() {
 		else width = width.replace('%', 'vw');
 		if (width) this.css('width', width); // FIXME units
 	}
-	_.forEach(_.toArray(element.childNodes), normalizeChild, element);
+	_.forEach(_.map(element.childNodes), normalizeChild, element);
 	return;
 	
 	function normalizeChild(node) {
@@ -4278,7 +4280,7 @@ render: function() {
 	function() {
 		mergeElement(dstBody, srcBody);
 
-		_.forEach(_.toArray(srcBody.childNodes), function(node) {
+		_.forEach(_.map(srcBody.childNodes), function(node) {
 			DOM.insertNode('beforeend', dstBody, node);
 		});
 	}
@@ -4409,7 +4411,7 @@ function mergeHead(dstDoc, srcHead, isFrameset) {
 
 	separateHead(dstDoc, isFrameset);
 
-	_.forEach(_.toArray(srcHead.childNodes), function(srcNode) {
+	_.forEach(_.map(srcHead.childNodes), function(srcNode) {
 		if (srcNode.nodeType != 1) return;
 		switch (getTagName(srcNode)) {
 		case 'title':
@@ -4755,7 +4757,7 @@ onSubmit: function(e) { // return false means success
 	
 	function encode(form) {
 		var data = [];
-		_.forEach(_.toArray(form.elements), function(el) {
+		_.forEach(form.elements, function(el) {
 			if (!el.name) return;
 			data.push(el.name + '=' + encodeURIComponent(el.value));
 		});
@@ -5190,7 +5192,7 @@ _.defaults(ScriptProcessor.prototype, {
 
 loadTemplate: function(template) {
 	var script;
-	_.forEach(_.toArray(template.childNodes), function(node) {
+	_.forEach(_.map(template.childNodes), function(node) {
 		switch (node.nodeType) {
 		case 1: // Element
 			switch (DOM.getTagName(node)) {
@@ -5355,7 +5357,7 @@ function walkTree(root, skipRoot, callback) { // always "accept" element nodes
 function childNodesToFragment(el) {
 	var doc = el.ownerDocument;
 	var frag = doc.createDocumentFragment();
-	_.forEach(_.toArray(el.childNodes), function(child) { frag.appendChild(child); });
+	_.forEach(_.map(el.childNodes), function(child) { frag.appendChild(child); });
 	return frag;
 }
 
@@ -5469,7 +5471,7 @@ loadTemplate: function(template) {
 
 	function implyOtherwise(el) { // NOTE this slurps *any* non-<haz:when>, including <haz:otherwise>
 		var otherwise = el.ownerDocument.createElement(hazPrefix + 'otherwise');
-		_.forEach(_.toArray(el.childNodes), function(node) {
+		_.forEach(_.map(el.childNodes), function(node) {
 			var tag = DOM.getTagName(node);
 			if (tag === hazPrefix + 'when') return;
 			otherwise.appendChild(node);
@@ -5721,7 +5723,7 @@ function getHazardDetails(el) {
 
 function getExprAttributes(el) {
 	var attrs = [];
-	_.forEach(_.toArray(el.attributes), function(attr) {
+	_.forEach(_.map(el.attributes), function(attr) {
 		var attrName;
 		var prefix = false;
 		_.some([ exprPrefix, mexprPrefix ], function(prefixText) {

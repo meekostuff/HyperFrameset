@@ -76,7 +76,7 @@ _.defaults(ScriptProcessor.prototype, {
 
 loadTemplate: function(template) {
 	var script;
-	_.forEach(_.toArray(template.childNodes), function(node) {
+	_.forEach(_.map(template.childNodes), function(node) {
 		switch (node.nodeType) {
 		case 1: // Element
 			switch (DOM.getTagName(node)) {
@@ -241,7 +241,7 @@ function walkTree(root, skipRoot, callback) { // always "accept" element nodes
 function childNodesToFragment(el) {
 	var doc = el.ownerDocument;
 	var frag = doc.createDocumentFragment();
-	_.forEach(_.toArray(el.childNodes), function(child) { frag.appendChild(child); });
+	_.forEach(_.map(el.childNodes), function(child) { frag.appendChild(child); });
 	return frag;
 }
 
@@ -355,7 +355,7 @@ loadTemplate: function(template) {
 
 	function implyOtherwise(el) { // NOTE this slurps *any* non-<haz:when>, including <haz:otherwise>
 		var otherwise = el.ownerDocument.createElement(hazPrefix + 'otherwise');
-		_.forEach(_.toArray(el.childNodes), function(node) {
+		_.forEach(_.map(el.childNodes), function(node) {
 			var tag = DOM.getTagName(node);
 			if (tag === hazPrefix + 'when') return;
 			otherwise.appendChild(node);
@@ -607,7 +607,7 @@ function getHazardDetails(el) {
 
 function getExprAttributes(el) {
 	var attrs = [];
-	_.forEach(_.toArray(el.attributes), function(attr) {
+	_.forEach(_.map(el.attributes), function(attr) {
 		var attrName;
 		var prefix = false;
 		_.some([ exprPrefix, mexprPrefix ], function(prefixText) {
