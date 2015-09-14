@@ -2335,11 +2335,6 @@ function styleText(node, text) { // TODO IE <style> can have `.sheet` independen
 	node.textContent = text;
 }
 
-// FIXME remove
-var hasAttribute = function(node, attrName) { // WARN needs to be more complex for IE <= 7
-	return node.hasAttribute(attrName);
-}
-
 var copyAttributes = function(node, srcNode) {
 	_.forEach(_.toArray(srcNode.attributes), function(attr) {
 		node.setAttribute(attr.name, attr.value); // WARN needs to be more complex for IE <= 7
@@ -2533,7 +2528,7 @@ var checkStyleSheets = function() {
 }
 
 _.defaults(DOM, {
-	getTagName: getTagName, hasAttribute: hasAttribute, matchesElement: matchesElement, // properties
+	getTagName: getTagName, matchesElement: matchesElement, // properties
 	siblings: siblings, firstChild: firstChild, // selections
 	copyAttributes: copyAttributes, removeAttributes: removeAttributes, textContent: textContent, scriptText: scriptText, // attrs
 	insertNode: insertNode, // nodes
@@ -3149,7 +3144,7 @@ return new Promise(function(resolve, reject) {
 		script.setAttribute('async', '');
 		logger.warn('@defer not supported on scripts');
 	}
-	if (supportsSync && script.src && !DOM.hasAttribute(script, 'async')) script.async = false;
+	if (supportsSync && script.src && !script.hasAttribute('async')) script.async = false;
 	script.type = 'text/javascript';
 	
 	// enabledFu resolves after script is inserted
@@ -3159,7 +3154,7 @@ return new Promise(function(resolve, reject) {
 
 	var triggerFu; // triggerFu allows this script to be enabled, i.e. inserted
 	if (prev) {
-		if (DOM.hasAttribute(prevScript, 'async') || script.src && supportsSync && !DOM.hasAttribute(script, 'async')) triggerFu = prev.enabled;
+		if (prevScript.hasAttribute('async') || script.src && supportsSync && !script.hasAttribute('async')) triggerFu = prev.enabled;
 		else triggerFu = prev.complete; 
 	}
 	else triggerFu = Promise.resolve();
