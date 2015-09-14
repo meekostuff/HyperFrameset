@@ -103,26 +103,6 @@ var siblings = function(conf, refNode, conf2, refNode2) {
 	return nodeList;
 }
 
-// FIXME unnecessary - only used by firstChild()
-var matchesElement = function(selector, node) { // WARN only matches by tagName
-	var tag = _.lc(selector);
-	var matcher = function(el) {
-		return (el.nodeType === 1 && getTagName(el) === tag);
-	}
-	return (node) ? matcher(node) : matcher;
-}
-
-// FIXME unnecessary - use DOM.find
-var firstChild = function(parent, matcher) { // WARN only matches by tagName or matcher function
-	var fn = (typeof matcher == 'function') ? 
-		matcher : 
-		matchesElement(matcher);
-	var nodeList = parent.childNodes;
-	for (var n=nodeList.length, i=0; i<n; i++) {
-		var node = nodeList[i];
-		if (fn(node)) return node;
-	}
-}
 var insertNode = function(conf, refNode, node) { // like imsertAdjacentHTML but with a node and auto-adoption
 	var doc = refNode.ownerDocument;
 	if (doc.adoptNode) node = doc.adoptNode(node); // Safari 5 was throwing because imported nodes had been added to a document node
@@ -374,8 +354,8 @@ var checkStyleSheets = function() {
 }
 
 _.defaults(DOM, {
-	getTagName: getTagName, matchesElement: matchesElement, // properties
-	siblings: siblings, firstChild: firstChild, // selections
+	getTagName: getTagName, // properties
+	siblings: siblings, // selections
 	copyAttributes: copyAttributes, removeAttributes: removeAttributes, textContent: textContent, scriptText: scriptText, // attrs
 	insertNode: insertNode, // nodes
 	ready: domReady, // events
@@ -2318,25 +2298,16 @@ function mergeElement(dst, src) { // NOTE this removes all dst (= landing page) 
 
 var framesetRel = 'frameset'; // NOTE http://lists.w3.org/Archives/Public/www-html/1996Dec/0143.html
 var selfRel = 'self';
-var framesetRelRegex = new RegExp('\\b' + framesetRel + '\\b', 'i');
+
 function getFramesetMarker(doc) {
 	if (!doc) doc = document;
-	var marker = firstChild(doc.head, function(el) {
-		return el.nodeType == 1 &&
-			getTagName(el) == 'link' &&
-			framesetRelRegex.test(el.rel);
-	});
+	var marker = DOM.find('link[rel~=' + framesetRel + ']', doc.head);
 	return marker;
 }
 
-var selfRelRegex = new RegExp('\\b' + selfRel + '\\b', 'i');
 function getSelfMarker(doc) {
 	if (!doc) doc = document;
-	var marker = firstChild(doc.head, function(el) {
-		return el.nodeType == 1 &&
-			getTagName(el) == 'link' &&
-			selfRelRegex.test(el.rel);
-	});
+	var marker = DOM.find('link[rel~=' + selfRel + ']', doc.head); 
 	return marker;
 }
 
