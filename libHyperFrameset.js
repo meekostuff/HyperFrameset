@@ -102,6 +102,8 @@ var siblings = function(conf, refNode, conf2, refNode2) {
 	for (;node && node!==stopNode; node=node.nextSibling) nodeList.push(node);
 	return nodeList;
 }
+
+// FIXME unnecessary - only used by firstChild()
 var matchesElement = function(selector, node) { // WARN only matches by tagName
 	var tag = _.lc(selector);
 	var matcher = function(el) {
@@ -109,6 +111,8 @@ var matchesElement = function(selector, node) { // WARN only matches by tagName
 	}
 	return (node) ? matcher(node) : matcher;
 }
+
+// FIXME unnecessary - use DOM.find
 var firstChild = function(parent, matcher) { // WARN only matches by tagName or matcher function
 	var fn = (typeof matcher == 'function') ? 
 		matcher : 
@@ -177,6 +181,7 @@ function styleText(node, text) { // TODO IE <style> can have `.sheet` independen
 	node.textContent = text;
 }
 
+// FIXME remove
 var hasAttribute = function(node, attrName) { // WARN needs to be more complex for IE <= 7
 	return node.hasAttribute(attrName);
 }
@@ -247,6 +252,7 @@ var cloneDocument = function(srcDoc) {
 	var docEl = doc.importNode(srcDoc.documentElement, true);
 	doc.appendChild(docEl); // NOTE already adopted
 
+	// TODO is there a test to detect this behavior??
 	// WARN sometimes IE9/IE10 doesn't read the content of inserted <style>
 	_.forEach(DOM.findAll('style', doc), function(node) {
 		var sheet = node.styleSheet || node.sheet;
@@ -265,11 +271,13 @@ var scrollToId = function(id) { // FIXME this isn't being used
 	else window.scroll(0, 0);
 }
 
+// FIXME remove - use addEventListener
 var addEvent = 
 	document.addEventListener && function(node, event, fn) { return node.addEventListener(event, fn, false); } ||
 	document.attachEvent && function(node, event, fn) { return node.attachEvent('on' + event, fn); } ||
 	function(node, event, fn) { node['on' + event] = fn; }
 
+// FIXME remove - use addEventListener
 var removeEvent = 
 	document.removeEventListener && function(node, event, fn) { return node.removeEventListener(event, fn, false); } ||
 	document.detachEvent && function(node, event, fn) { return node.detachEvent('on' + event, fn); } ||
@@ -345,7 +353,9 @@ NOTE:  for more details on how checkStyleSheets() works cross-browser see
 http://aaronheckmann.blogspot.com/2010/01/writing-jquery-plugin-manager-part-1.html
 TODO: does this still work when there are errors loading stylesheets??
 */
-var checkStyleSheets = function() { // TODO would be nice if this didn't need to be polled
+// TODO would be nice if this didn't need to be polled
+// TODO should be able to use <link>.onload http://stackoverflow.com/a/13610128/108354
+var checkStyleSheets = function() { 
 	// check that every <link rel="stylesheet" type="text/css" /> 
 	// has loaded
 	return _.every(DOM.findAll('link'), function(node) {
@@ -798,7 +808,7 @@ _.forEach(_.words('link@<href script@<src img@<longDesc,<src,+srcset iframe@<lon
 });
 
 function resolveSrcset(urlSet, baseURL) {
-	var urlList = urlSet.split(/\s*,\s*/); // WARN this assumes URLs don't contain ','
+	var urlList = urlSet.split(/\s*,\s*/); // FIXME this assumes URLs don't contain ','
 	_.forEach(urlList, function(urlDesc, i) {
 		urlList[i] = urlDesc.replace(/^\s*(\S+)(?=\s|$)/, function(all, url) { return baseURL.resolve(url); });
 	});
@@ -972,6 +982,7 @@ return new Promise(function(resolve, reject) {
 	
 	// TODO assert node is in document
 
+	// FIXME this filtering will need reworking now we don't support older browsers
 	if (!node.type || /^text\/javascript$/i.test(node.type)) {
 		logger.info('Attempt to queue already executed script ' + node.src);
 		resolve(); // TODO should this be reject() ??
@@ -1179,7 +1190,7 @@ getData: function() {
 	return this.settings.data;
 },
 
-update: function(data, callback) {
+update: function(data, callback) { // FIXME not being used. Can it be reomved?
 	var state = this;
 	return Promise.resolve(function() {
 		if (state !== currentState) throw Error('Cannot update state: not current');
@@ -1192,7 +1203,7 @@ update: function(data, callback) {
 
 });
 
-function createState(data, title, url) {
+function createState(data, title, url) { // FIXME not being used. Can it be reomved?
 	var timeStamp = +(new Date);
 	var state = {
 		title: title,
