@@ -43,7 +43,7 @@ function MainProcessor() {}
 _.defaults(MainProcessor.prototype, {
 
 loadTemplate: function(template) {
-	if (/\S+/.test(DOM.textContent(template))) logger.warn('"main" transforms do not use templates');
+	if (/\S+/.test(template.textContent)) logger.warn('"main" transforms do not use templates');
 },
 
 transform: function(provider, details) { // TODO how to use details?
@@ -720,7 +720,7 @@ function processExpression(expr, provider, context, variables, type) { // FIXME 
 	function cast(value, type) {
 		switch (type) {
 		case 'text':
-			if (value && value.nodeType) value = DOM.textContent(value);
+			if (value && value.nodeType) value = value.textContent;
 			break;
 		case 'node':
 			var frag = doc.createDocumentFragment();
@@ -738,7 +738,7 @@ function processExpression(expr, provider, context, variables, type) { // FIXME 
 			else value = true;
 			break;
 		default: // FIXME should never occur. logger.warn !?
-			if (value && value.nodeType) value = DOM.textContent(value);
+			if (value && value.nodeType) value = value.textContent;
 			break;
 		}
 		return value;
@@ -792,7 +792,7 @@ evaluate: function(query, context, variables, wantArray) {
 		switch(attr) {
 		case null: case undefined: case '': return node;
 		case textAttr: 
-			return DOM.textContent(node);
+			return node.textContent;
 		case htmlAttr:
 			var frag = doc.createDocumentFragment();
 			_.forEach(node.childNodes, function(child) { 

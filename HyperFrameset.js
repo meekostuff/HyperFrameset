@@ -272,7 +272,7 @@ function createThrowers(list) {
 		return function() {
 			if (logger.LOG_LEVEL >= logger.levels.indexOf('debug')) {
 				if (error && error.stack) logger.error(error.stack);
-				else logger.error('Untraceable error: ' + error); // FIXME why
+				else logger.error('Untraceable error: ' + error); // FIXME why are these occuring??
 			}
 			throw error;
 		};
@@ -1406,7 +1406,7 @@ registerElement: function(tagName, defn) { // FIXME test tagName
 	return rule;
 },
 
-start: function() { // FIXME find a way to allow progressive binding application
+start: function() {
 	if (started) throw Error('sprockets management has already started');
 	started = true;
 	this.nodeInserted(document.documentElement);
@@ -1973,7 +1973,7 @@ else logger.warn('element.visibilitychange event will not be supported');
 // FIXME this should use observers, not events
 function triggerVisibilityChangeEvent(target) {
 	var visibilityState = target.hidden ? 'hidden' : 'visible';
-	sprockets.trigger(target, 'visibilitychange', { bubbles: false, cancelable: false, detail: visibilityState }); // NOTE doesn't bubble to avoid clash with same event on document
+	sprockets.trigger(target, 'visibilitychange', { bubbles: false, cancelable: false, detail: visibilityState }); // NOTE doesn't bubble to avoid clash with same event on document (and also performance)
 }
 
 })();
@@ -2239,17 +2239,7 @@ var insertNode = function(conf, refNode, node) { // like imsertAdjacentHTML but 
 	return refNode;
 }
 
-var textContent = document.documentElement.textContent ?
-function(el, text) { // NOTE https://developer.mozilla.org/en-US/docs/Web/API/Node.textContent#Differences_from_innerText
-	if (typeof text === 'undefined') return el.textContent;
-	el.textContent = text;
-} :
-function(el, text) {
-	if (typeof text === 'undefined') return el.innerText;
-	el.innerText = text;
-}
-
-var scriptText = (function() {
+var scriptText = (function() { // TODO probably can remove this
 
 var script = document.createElement('script');
 return ('text' in script) ? standard :
@@ -2346,7 +2336,7 @@ var createHTMLDocument = function(title, srcDoc) { // modern browsers. IE >= 9
 }
 
 var cloneDocument = function(srcDoc) {
-	var doc = createDocument(srcDoc);
+	var doc = DOM.createDocument(srcDoc);
 	var docEl = doc.importNode(srcDoc.documentElement, true);
 	doc.appendChild(docEl); // NOTE already adopted
 
@@ -2355,7 +2345,7 @@ var cloneDocument = function(srcDoc) {
 	_.forEach(DOM.findAll('style', doc), function(node) {
 		var sheet = node.styleSheet || node.sheet;
 		if (!sheet || sheet.cssText == null) return;
-		if (sheet.cssText == '') styleText(node, styleText(node));
+		if (sheet.cssText == '') DOM.styleText(node, DOM.styleText(node));
 	});
 	
 	return doc;
@@ -2440,7 +2430,9 @@ http://aaronheckmann.blogspot.com/2010/01/writing-jquery-plugin-manager-part-1.h
 TODO: does this still work when there are errors loading stylesheets??
 */
 // TODO would be nice if this didn't need to be polled
-// TODO should be able to use <link>.onload http://stackoverflow.com/a/13610128/108354
+// TODO should be able to use <link>.onload, see
+// http://stackoverflow.com/a/13610128/108354
+// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link
 var checkStyleSheets = function() { 
 	// check that every <link rel="stylesheet" type="text/css" /> 
 	// has loaded
@@ -2479,9 +2471,9 @@ var checkStyleSheets = function() {
 _.defaults(DOM, {
 	getTagName: getTagName, // properties
 	siblings: siblings, // selections
-	copyAttributes: copyAttributes, removeAttributes: removeAttributes, textContent: textContent, scriptText: scriptText, // attrs
+	copyAttributes: copyAttributes, removeAttributes: removeAttributes, scriptText: scriptText, styleText: styleText, // attrs
 	insertNode: insertNode, // nodes
-	ready: domReady, // events
+	ready: domReady, checkStyleSheets: checkStyleSheets, // events
 	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
 	isVisible: isVisible, whenVisible: whenVisible,
 	scrollToId: scrollToId
@@ -2817,7 +2809,7 @@ function handleResponse(xhr, info) { // TODO handle info.responseType
 		});
 	}
 	else {
-		return parseHTML(new String(xhr.responseText), info)
+		return DOM.parseHTML(new String(xhr.responseText), info)
 		.then(function(doc) {
 				response.document = doc;
 				return response;
@@ -2970,7 +2962,7 @@ function normalize(doc, details) {
 	
 	_.forEach(DOM.findAll('style', doc.head), function(node) {
 		// TODO the following rewrites url() property values but isn't robust
-		var text = styleText(node);
+		var text = DOM.styleText(node);
 		var replacements = 0;
 		text = text.replace(/\burl\(\s*(['"]?)([^\r\n]*)\1\s*\)/ig, function(match, quote, url) {
 				absURL = baseURL.resolve(url);
@@ -2978,7 +2970,7 @@ function normalize(doc, details) {
 				replacements++;
 				return "url(" + quote + absURL + quote + ")";
 			});
-		if (replacements) styleText(node, text);
+		if (replacements) DOM.styleText(node, text);
 	});
 
 	return resolveAll(doc, baseURL, false);
@@ -3008,7 +3000,7 @@ function innerHTMLParser(html, details) {
 	return Promise.pipe(null, [
 		
 	function() {
-		var doc = createHTMLDocument('');
+		var doc = DOM.createHTMLDocument('');
 		var docElement = doc.documentElement;
 		docElement.innerHTML = html;
 		var m = html.match(/<html(?=\s|>)(?:[^>]*)>/i); // WARN this assumes there are no comments containing '<html' and no attributes containing '>'.
@@ -3086,7 +3078,7 @@ return new Promise(function(resolve, reject) {
 	if (node.src) addListeners(); // WARN must use `node.src` because attrs not copied to `script` yet
 	
 	copyAttributes(script, node); 
-	scriptText(script, scriptText(node));
+	DOM.scriptText(script, DOM.scriptText(node));
 
 	if (script.getAttribute('defer')) { // @defer is not appropriate. Implement as @async
 		script.removeAttribute('defer');
@@ -3119,7 +3111,7 @@ return new Promise(function(resolve, reject) {
 
 	// The following are hoisted
 	function enable() {
-		insertNode('replace', node, script);
+		DOM.insertNode('replace', node, script);
 		enabledFu.resolve(); 
 		if (!script.src) {
 			spliceItem(queue, current);
@@ -3427,7 +3419,7 @@ init: function(el) {
     });
 	var bodies = frameDef.bodies = [];
 	_.forEach(_.map(el.childNodes), function(node) {
-		var tag = getTagName(node);
+		var tag = DOM.getTagName(node);
 		if (!tag) return;
 		if (tag === 'script') { // TODO factor out common code with <script for=""> evaluation in <head>
 			// FIXME only the first <script> should be eval'd. Latter scripts should produce warnings.
@@ -3438,7 +3430,7 @@ init: function(el) {
 			}
 			var options;
 			try {
-				options = (Function('return (' + scriptText(script) + ');'))();
+				options = (Function('return (' + DOM.scriptText(script) + ');'))();
 			}
 			catch(err) { 
 				Task.postError(err);
@@ -3535,7 +3527,7 @@ init: function(el) {
 		transforms: []
 	});
 	_.forEach(_.map(el.childNodes), function(node) {
-		if (getTagName(node) === cdom.mkTagName('transform')) {
+		if (DOM.getTagName(node) === cdom.mkTagName('transform')) {
 			el.removeChild(node);
 			bodyDef.transforms.push(new HTransformDefinition(node, frameset));
 		}	
@@ -4130,7 +4122,7 @@ framesetDef.mkSelector('rdeck') + ' > * { width: 0; height: 0; }',
 ].join('\n');
 
 var style = document.createElement('style');
-styleText(style, cssText);
+DOM.styleText(style, cssText);
 document.head.insertBefore(style, document.head.firstChild);
 
 }
@@ -4264,7 +4256,7 @@ prerender: function(dstDoc, definition) {
 
 	if (getFramesetMarker(dstDoc)) throw Error('The HFrameset has already been applied');
 
-	var srcDoc = cloneDocument(definition.document);
+	var srcDoc = DOM.cloneDocument(definition.document);
 
 	var selfMarker;
 	
@@ -4326,7 +4318,7 @@ prerender: function(dstDoc, definition) {
 			}
 			var forOptions;
 			try {
-				forOptions = (Function('return (' + scriptText(script) + ');'))();
+				forOptions = (Function('return (' + DOM.scriptText(script) + ');'))();
 			}
 			catch(err) { 
 				Task.postError(err);
@@ -4360,11 +4352,11 @@ function separateHead(dstDoc, isFrameset) {
 
 	var selfMarker = getSelfMarker(dstDoc);
 	// remove frameset / page elements except for <script type=text/javascript>
-	if (isFrameset) _.forEach(siblings('after', framesetMarker, 'before', selfMarker), remove);
-	else _.forEach(siblings('after', selfMarker), remove);
+	if (isFrameset) _.forEach(DOM.siblings('after', framesetMarker, 'before', selfMarker), remove);
+	else _.forEach(DOM.siblings('after', selfMarker), remove);
 	
 	function remove(node) {
-		if (getTagName(node) == 'script' && (!node.type || node.type.match(/^text\/javascript/i))) return;
+		if (DOM.getTagName(node) == 'script' && (!node.type || node.type.match(/^text\/javascript/i))) return;
 		dstHead.removeChild(node);
 	}
 }
@@ -4380,7 +4372,7 @@ function mergeHead(dstDoc, srcHead, isFrameset) {
 
 	_.forEach(_.map(srcHead.childNodes), function(srcNode) {
 		if (srcNode.nodeType != 1) return;
-		switch (getTagName(srcNode)) {
+		switch (DOM.getTagName(srcNode)) {
 		case 'title':
 			if (isFrameset) return; // ignore <title> in frameset. FIXME what if topic content has no <title>?
 			if (!srcNode.innerHTML) return; // IE will add a title even if non-existant
@@ -4395,9 +4387,9 @@ function mergeHead(dstDoc, srcHead, isFrameset) {
 		case 'script':  // FIXME no duplicate @src
 			break;
 		}
-		if (isFrameset) insertNode('beforebegin', selfMarker, srcNode);
-		else insertNode('beforeend', dstHead, srcNode);
-		if (getTagName(srcNode) == 'link') srcNode.href = srcNode.getAttribute('href'); // Otherwise <link title="..." /> stylesheets don't work on Chrome
+		if (isFrameset) DOM.insertNode('beforebegin', selfMarker, srcNode);
+		else DOM.insertNode('beforeend', dstHead, srcNode);
+		if (DOM.getTagName(srcNode) == 'link') srcNode.href = srcNode.getAttribute('href'); // Otherwise <link title="..." /> stylesheets don't work on Chrome
 	});
 }
 
@@ -4656,7 +4648,7 @@ start: function(startOptions) {
 
 	// TODO it would be nice if <body> wasn't populated until stylesheets were loaded
 	function() {
-		return Promise.wait(function() { return checkStyleSheets(); })
+		return Promise.wait(function() { return DOM.checkStyleSheets(); })
 	}	
 	
 	]);
@@ -4674,7 +4666,7 @@ onClick: function(e) { // return false means success
 	var linkElement = DOM.closest(e.target, 'a, [link]');
 	if (!linkElement) return;
 	var hyperlink;
-	if (getTagName(linkElement) === 'a') hyperlink = linkElement;
+	if (DOM.getTagName(linkElement) === 'a') hyperlink = linkElement;
 	else {
 		hyperlink = DOM.find('a, link', linkElement);
 		if (!hyperlink) hyperlink = DOM.closest('a', linkElement);
@@ -5126,7 +5118,7 @@ function MainProcessor() {}
 _.defaults(MainProcessor.prototype, {
 
 loadTemplate: function(template) {
-	if (/\S+/.test(DOM.textContent(template))) logger.warn('"main" transforms do not use templates');
+	if (/\S+/.test(template.textContent)) logger.warn('"main" transforms do not use templates');
 },
 
 transform: function(provider, details) { // TODO how to use details?
@@ -5803,7 +5795,7 @@ function processExpression(expr, provider, context, variables, type) { // FIXME 
 	function cast(value, type) {
 		switch (type) {
 		case 'text':
-			if (value && value.nodeType) value = DOM.textContent(value);
+			if (value && value.nodeType) value = value.textContent;
 			break;
 		case 'node':
 			var frag = doc.createDocumentFragment();
@@ -5821,7 +5813,7 @@ function processExpression(expr, provider, context, variables, type) { // FIXME 
 			else value = true;
 			break;
 		default: // FIXME should never occur. logger.warn !?
-			if (value && value.nodeType) value = DOM.textContent(value);
+			if (value && value.nodeType) value = value.textContent;
 			break;
 		}
 		return value;
@@ -5875,7 +5867,7 @@ evaluate: function(query, context, variables, wantArray) {
 		switch(attr) {
 		case null: case undefined: case '': return node;
 		case textAttr: 
-			return DOM.textContent(node);
+			return node.textContent;
 		case htmlAttr:
 			var frag = doc.createDocumentFragment();
 			_.forEach(node.childNodes, function(child) { 
