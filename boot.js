@@ -22,6 +22,9 @@ var defaults = { // NOTE defaults also define the type of the associated config 
 	"config_script": '{bootscriptdir}config.js'
 }
 
+var SELF_REL = 'self'; // TODO DRY with libHyperFrameset.js
+var FRAMESET_REL = 'frameset'; // ditto
+
 var document = window.document;
 
 var vendorPrefix = "Meeko";
@@ -671,7 +674,7 @@ if (Meeko.bootConfig) Meeko.bootConfig(); // TODO try / catch ??
 */
 
 var selfMarker = document.createElement('link');
-selfMarker.rel = 'self';
+selfMarker.rel = SELF_REL;
 selfMarker.href = document.URL;
 // FIXME should be inserted after <meta http-equiv>, before anything else
 document.head.insertBefore(selfMarker, document.head.firstChild);

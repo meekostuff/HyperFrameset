@@ -1225,6 +1225,9 @@ var sprockets = Meeko.sprockets;
 
 var framer = Meeko.framer = (function() {
 
+var FRAMESET_REL = 'frameset'; // NOTE http://lists.w3.org/Archives/Public/www-html/1996Dec/0143.html
+var SELF_REL = 'self';
+
 var hfDefaultNamespace = {
 	name: 'hf',
 	style: 'vendor'
@@ -2157,14 +2160,14 @@ prerender: function(dstDoc, definition) {
 		selfMarker = getSelfMarker(dstDoc);
 		if (selfMarker) return;
 		selfMarker = dstDoc.createElement('link');
-		selfMarker.rel = selfRel;
+		selfMarker.rel = SELF_REL;
 		selfMarker.href = dstDoc.URL;
 		dstDoc.head.insertBefore(selfMarker, dstDoc.head.firstChild); // NOTE no adoption
 	},
 
 	function() {
 		var framesetMarker = dstDoc.createElement('link');
-		framesetMarker.rel = framesetRel;
+		framesetMarker.rel = FRAMESET_REL;
 		framesetMarker.href = definition.src;
 		dstDoc.head.insertBefore(framesetMarker, selfMarker); // NOTE no adoption
 	},
@@ -2225,7 +2228,7 @@ prerender: function(dstDoc, definition) {
 function separateHead(dstDoc, isFrameset) {
 	var dstHead = dstDoc.head;
 	var framesetMarker = getFramesetMarker(dstDoc);
-	if (!framesetMarker) throw Error('No ' + framesetRel + ' marker found. ');
+	if (!framesetMarker) throw Error('No ' + FRAMESET_REL + ' marker found. ');
 
 	var selfMarker = getSelfMarker(dstDoc);
 	// remove frameset / page elements except for <script type=text/javascript>
@@ -2242,7 +2245,7 @@ function mergeHead(dstDoc, srcHead, isFrameset) {
 	var baseURL = URL(dstDoc.URL);
 	var dstHead = dstDoc.head;
 	var framesetMarker = getFramesetMarker();
-	if (!framesetMarker) throw Error('No ' + framesetRel + ' marker found. ');
+	if (!framesetMarker) throw Error('No ' + FRAMESET_REL + ' marker found. ');
 	var selfMarker = getSelfMarker();
 
 	separateHead(dstDoc, isFrameset);
@@ -2276,18 +2279,15 @@ function mergeElement(dst, src) { // NOTE this removes all dst (= landing page) 
 	dst.removeAttribute('style'); // FIXME is this appropriate? There should at least be a warning
 }
 
-var framesetRel = 'frameset'; // NOTE http://lists.w3.org/Archives/Public/www-html/1996Dec/0143.html
-var selfRel = 'self';
-
 function getFramesetMarker(doc) {
 	if (!doc) doc = document;
-	var marker = DOM.find('link[rel~=' + framesetRel + ']', doc.head);
+	var marker = DOM.find('link[rel~=' + FRAMESET_REL + ']', doc.head);
 	return marker;
 }
 
 function getSelfMarker(doc) {
 	if (!doc) doc = document;
-	var marker = DOM.find('link[rel~=' + selfRel + ']', doc.head); 
+	var marker = DOM.find('link[rel~=' + SELF_REL + ']', doc.head); 
 	return marker;
 }
 
