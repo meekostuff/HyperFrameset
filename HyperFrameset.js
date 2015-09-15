@@ -3007,7 +3007,7 @@ function innerHTMLParser(html, details) {
 		var div = document.createElement('div');
 		div.innerHTML = m[0].replace(/^<html/i, '<div');
 		var htmlElement = div.firstChild;
-		copyAttributes(docElement, htmlElement);
+		DOM.copyAttributes(docElement, htmlElement);
 		return doc;
 	},
 	
@@ -3077,7 +3077,7 @@ return new Promise(function(resolve, reject) {
 
 	if (node.src) addListeners(); // WARN must use `node.src` because attrs not copied to `script` yet
 	
-	copyAttributes(script, node); 
+	DOM.copyAttributes(script, node); 
 	DOM.scriptText(script, DOM.scriptText(node));
 
 	if (script.getAttribute('defer')) { // @defer is not appropriate. Implement as @async
@@ -4397,8 +4397,8 @@ function mergeHead(dstDoc, srcHead, isFrameset) {
 }
 
 function mergeElement(dst, src) { // NOTE this removes all dst (= landing page) attrs and imports all src (= frameset) attrs.
-	removeAttributes(dst);
-	copyAttributes(dst, src);
+	DOM.removeAttributes(dst);
+	DOM.copyAttributes(dst, src);
 	dst.removeAttribute('style'); // FIXME is this appropriate? There should at least be a warning
 }
 
