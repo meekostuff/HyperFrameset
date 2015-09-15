@@ -103,7 +103,7 @@ loadTemplate: function(template) {
 		logger.warn('No <script> found in "script" transform template');
 		return;
 	}
-	try { this.processor = (Function('return (' + DOM.scriptText(script) + ')'))(); }
+	try { this.processor = (Function('return (' + script.text + ')'))(); }
 	catch(err) { Task.postError(err); }
 	
 	if (!this.processor || !this.processor.transform) {

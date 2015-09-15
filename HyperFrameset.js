@@ -2239,36 +2239,6 @@ var insertNode = function(conf, refNode, node) { // like imsertAdjacentHTML but 
 	return refNode;
 }
 
-var scriptText = (function() { // TODO probably can remove this
-
-var script = document.createElement('script');
-return ('text' in script) ? standard :
-	('textContent' in script) ? alternate :
-	legacy;
-
-function standard(el, val) { // all IE, current non-IE
-	if (val === null) val = '';
-	if (typeof val === 'undefined') return el.text;
-	el.text = val;
-}
-
-function alternate(el, val) { // old non-IE
-	if (val === null) val = '';
-	if (typeof val === 'undefined') return el.textContent;
-	el.textContent = val;
-}
-
-function legacy(el, val) { // really old non-IE
-	if (val === null) val = '';
-	var textNode = el.firstChild;
-	if (typeof val === 'undefined') return textNode ? textNode.nodeValue : '';
-	if (textNode) el.removeChild(textNode);
-	var doc = el.ownerDocument;
-	el.appendChild(doc.createTextNode(val)); // NOTE no adoption
-}
-
-})();
-	
 function styleText(node, text) { // TODO IE <style> can have `.sheet` independent of `.textContent` (but probably not for parsed documents)
 	if (typeof text === 'undefined') return node.textContent;
 	node.textContent = text;
@@ -2471,7 +2441,7 @@ var checkStyleSheets = function() {
 _.defaults(DOM, {
 	getTagName: getTagName, // properties
 	siblings: siblings, // selections
-	copyAttributes: copyAttributes, removeAttributes: removeAttributes, scriptText: scriptText, styleText: styleText, // attrs
+	copyAttributes: copyAttributes, removeAttributes: removeAttributes, styleText: styleText, // attrs
 	insertNode: insertNode, // nodes
 	ready: domReady, checkStyleSheets: checkStyleSheets, // events
 	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
@@ -3078,7 +3048,7 @@ return new Promise(function(resolve, reject) {
 	if (node.src) addListeners(); // WARN must use `node.src` because attrs not copied to `script` yet
 	
 	DOM.copyAttributes(script, node); 
-	DOM.scriptText(script, DOM.scriptText(node));
+	script.text = node.text;
 
 	if (script.getAttribute('defer')) { // @defer is not appropriate. Implement as @async
 		script.removeAttribute('defer');
@@ -3433,7 +3403,7 @@ init: function(el) {
 			}
 			var options;
 			try {
-				options = (Function('return (' + DOM.scriptText(script) + ');'))();
+				options = (Function('return (' + script.text + ');'))();
 			}
 			catch(err) { 
 				Task.postError(err);
@@ -4321,7 +4291,7 @@ prerender: function(dstDoc, definition) {
 			}
 			var forOptions;
 			try {
-				forOptions = (Function('return (' + DOM.scriptText(script) + ');'))();
+				forOptions = (Function('return (' + script.text + ');'))();
 			}
 			catch(err) { 
 				Task.postError(err);
@@ -5178,7 +5148,7 @@ loadTemplate: function(template) {
 		logger.warn('No <script> found in "script" transform template');
 		return;
 	}
-	try { this.processor = (Function('return (' + DOM.scriptText(script) + ')'))(); }
+	try { this.processor = (Function('return (' + script.text + ')'))(); }
 	catch(err) { Task.postError(err); }
 	
 	if (!this.processor || !this.processor.transform) {
