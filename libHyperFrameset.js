@@ -68,54 +68,6 @@ var Promise = Meeko.Promise;
 
 var DOM = Meeko.DOM;
 
-var getTagName = function(el) {
-	return el && el.nodeType === 1 ? _.lc(el.tagName) : '';
-}
-
-var siblings = function(conf, refNode, conf2, refNode2) {
-	
-	conf = _.lc(conf);
-	if (conf2) {
-		conf2 = _.lc(conf2);
-		if (conf === 'ending' || conf === 'before') throw Error('siblings() startNode looks like stopNode');
-		if (conf2 === 'starting' || conf2 === 'after') throw Error('siblings() stopNode looks like startNode');
-		if (!refNode2 || refNode2.parentNode !== refNode.parentNode) throw Error('siblings() startNode and stopNode are not siblings');
-	}
-	
-	var nodeList = [];
-	if (!refNode || !refNode.parentNode) return nodeList;
-	var node, stopNode, first = refNode.parentNode.firstChild;
-
-	switch (conf) {
-	case 'starting': node = refNode; break;
-	case 'after': node = refNode.nextSibling; break;
-	case 'ending': node = first; stopNode = refNode.nextSibling; break;
-	case 'before': node = first; stopNode = refNode; break;
-	default: throw Error(conf + ' is not a valid configuration in siblings()');
-	}
-	if (conf2) switch (conf2) {
-	case 'ending': stopNode = refNode2.nextSibling; break;
-	case 'before': stopNode = refNode2; break;
-	}
-	
-	if (!node) return nodeList; // FIXME is this an error??
-	for (;node && node!==stopNode; node=node.nextSibling) nodeList.push(node);
-	return nodeList;
-}
-
-var insertNode = function(conf, refNode, node) { // like imsertAdjacentHTML but with a node and auto-adoption
-	var doc = refNode.ownerDocument;
-	if (doc.adoptNode) node = doc.adoptNode(node); // Safari 5 was throwing because imported nodes had been added to a document node
-	switch(conf) {
-	case 'beforebegin': refNode.parentNode.insertBefore(node, refNode); break;
-	case 'afterend': refNode.parentNode.insertBefore(node, refNode.nextSibling); break;
-	case 'afterbegin': refNode.insertBefore(node, refNode.firstChild); break;
-	case 'beforeend': refNode.appendChild(node); break;
-	case 'replace': refNode.parentNode.replaceChild(node, refNode);
-	}
-	return refNode;
-}
-
 function styleText(node, text) { // TODO IE <style> can have `.sheet` independent of `.textContent` (but probably not for parsed documents)
 	if (typeof text === 'undefined') return node.textContent;
 	node.textContent = text;
@@ -294,10 +246,7 @@ var checkStyleSheets = function() {
 }
 
 _.defaults(DOM, {
-	getTagName: getTagName, // properties
-	siblings: siblings, // selections
 	copyAttributes: copyAttributes, removeAttributes: removeAttributes, styleText: styleText, // attrs
-	insertNode: insertNode, // nodes
 	ready: domReady, checkStyleSheets: checkStyleSheets, // events
 	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
 	scrollToId: scrollToId
