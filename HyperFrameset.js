@@ -2922,10 +2922,6 @@ function normalize(doc, details) {
 
 	var baseURL = URL(details.url);
 
-	_.forEach(DOM.findAll('script', doc), function(node) { // FIXME is this needed anymore, now older browsers are not supported?
-		if (!node.type || /^text\/javascript$/i.test(node.type)) node.type = 'text/javascript?disabled';
-	});
-
 	_.forEach(DOM.findAll('style', doc.body), function(node) { // TODO support <style scoped>
 		doc.head.appendChild(node); // NOTE no adoption
 	});
@@ -3030,7 +3026,7 @@ return new Promise(function(resolve, reject) {
 	
 	// TODO assert node is in document
 
-	// FIXME this filtering will need reworking now we don't support older browsers
+	// TODO this filtering may need reworking now we don't support older browsers
 	if (!node.type || /^text\/javascript$/i.test(node.type)) {
 		logger.info('Attempt to queue already executed script ' + node.src);
 		resolve(); // TODO should this be reject() ??
@@ -4346,6 +4342,8 @@ function mergeHead(dstDoc, srcHead, isFrameset) {
 	_.forEach(_.map(srcHead.childNodes), function(srcNode) {
 		if (srcNode.nodeType != 1) return;
 		switch (DOM.getTagName(srcNode)) {
+		default:
+			break;
 		case 'title':
 			if (isFrameset) return; // ignore <title> in frameset. FIXME what if topic content has no <title>?
 			if (!srcNode.innerHTML) return; // IE will add a title even if non-existant
@@ -4358,6 +4356,8 @@ function mergeHead(dstDoc, srcHead, isFrameset) {
 		case 'style': 
 			break;
 		case 'script':  // FIXME no duplicate @src
+			if (!isFrameset) return; // WARN even non-js script-type is rejected
+			if (!srcNode.type || /^text\/javascript$/i.test(srcNode.type)) srcNode.type = 'text/javascript?disabled';
 			break;
 		}
 		if (isFrameset) DOM.insertNode('beforebegin', selfMarker, srcNode);
