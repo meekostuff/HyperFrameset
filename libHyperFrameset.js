@@ -1917,8 +1917,8 @@ insert: function(bodyElement) { // FIXME need a teardown method that releases ch
 	var frame = this;
 	
 	// FIXME .bodyElement will probably become .bodies[] for transition animations.
-	if (frame.bodyElement) frame.element.removeChild(frame.bodyElement);
-	DOM.insertNode('beforeend', frame.element, bodyElement);
+	if (frame.bodyElement) sprockets.removeNode(frame.bodyElement);
+	sprockets.insertNode('beforeend', frame.element, bodyElement);
 	frame.bodyElement = bodyElement;
 },
 
@@ -1968,7 +1968,7 @@ render: function() {
 		mergeElement(dstBody, srcBody);
 
 		_.forEach(_.map(srcBody.childNodes), function(node) {
-			DOM.insertNode('beforeend', dstBody, node);
+			sprockets.insertNode('beforeend', dstBody, node);
 		});
 	}
 
@@ -2345,7 +2345,7 @@ start: function(startOptions) {
 			
 			});
 
-		return sprockets.start(); // FIXME should be a promise
+		return sprockets.start({ manual: true }); // FIXME should be a promise
 	},
 	
 	function() { // NOTE this doesn't prevent start() from resolving
