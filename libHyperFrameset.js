@@ -249,28 +249,6 @@ function onLoaded(e) {
 
 })();
 
-function isVisible(element) {
-	var closestHidden = DOM.closest(element, '[hidden]');
-	return (!closestHidden);
-}
-
-
-function whenVisible(element) { // FIXME this quite possibly causes leaks if closestHidden is removed from document before removeEventListener
-	return new Promise(function(resolve, reject) {	
-		var closestHidden = DOM.closest(element, '[hidden]');
-		if (!closestHidden) {
-			resolve();
-			return;
-		}
-		var listener = function(e) {
-			if (e.target.hidden) return;
-			closestHidden.removeEventListener('visibilitychange', listener, false);
-			whenVisible(element).then(resolve);
-		}
-		closestHidden.addEventListener('visibilitychange', listener, false);
-	});
-}
-
 /* 
 NOTE:  for more details on how checkStyleSheets() works cross-browser see 
 http://aaronheckmann.blogspot.com/2010/01/writing-jquery-plugin-manager-part-1.html
@@ -322,7 +300,6 @@ _.defaults(DOM, {
 	insertNode: insertNode, // nodes
 	ready: domReady, checkStyleSheets: checkStyleSheets, // events
 	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
-	isVisible: isVisible, whenVisible: whenVisible,
 	scrollToId: scrollToId
 });
 
@@ -2191,6 +2168,7 @@ prerender: function(dstDoc, definition) {
 
 });
 
+// TODO separateHead and mergeHead are only called with isFrameset === true
 function separateHead(dstDoc, isFrameset) {
 	var dstHead = dstDoc.head;
 	var framesetMarker = getFramesetMarker(dstDoc);
