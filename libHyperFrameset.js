@@ -68,10 +68,8 @@ var Promise = Meeko.Promise;
 
 var DOM = Meeko.DOM;
 
-function styleText(node, text) { // TODO IE <style> can have `.sheet` independent of `.textContent` (but probably not for parsed documents)
-	if (typeof text === 'undefined') return node.textContent;
-	node.textContent = text;
-}
+// WARN IE <= 8 would need styleText() to get/set <style> contents
+// WARN old non-IE would need scriptText() to get/set <script> contents
 
 var copyAttributes = function(node, srcNode) {
 	_.forEach(_.map(srcNode.attributes), function(attr) {
@@ -140,11 +138,11 @@ var cloneDocument = function(srcDoc) {
 	doc.appendChild(docEl); // NOTE already adopted
 
 	// TODO is there a test to detect this behavior??
-	// WARN sometimes IE9/IE10 doesn't read the content of inserted <style>
+	// WARN sometimes IE9/IE10/IE11 doesn't read the content of inserted <style>
 	_.forEach(DOM.findAll('style', doc), function(node) {
 		var sheet = node.styleSheet || node.sheet;
 		if (!sheet || sheet.cssText == null) return;
-		if (sheet.cssText == '') DOM.styleText(node, DOM.styleText(node));
+		if (sheet.cssText == '') node.textContent = node.textContent;
 	});
 	
 	return doc;
@@ -246,7 +244,7 @@ var checkStyleSheets = function() {
 }
 
 _.defaults(DOM, {
-	copyAttributes: copyAttributes, removeAttributes: removeAttributes, styleText: styleText, // attrs
+	copyAttributes: copyAttributes, removeAttributes: removeAttributes, // attrs
 	ready: domReady, checkStyleSheets: checkStyleSheets, // events
 	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
 	scrollToId: scrollToId
@@ -731,7 +729,7 @@ function normalize(doc, details) {
 	
 	_.forEach(DOM.findAll('style', doc.head), function(node) {
 		// TODO the following rewrites url() property values but isn't robust
-		var text = DOM.styleText(node);
+		var text = node.textContent;
 		var replacements = 0;
 		text = text.replace(/\burl\(\s*(['"]?)([^\r\n]*)\1\s*\)/ig, function(match, quote, url) {
 				absURL = baseURL.resolve(url);
@@ -739,7 +737,7 @@ function normalize(doc, details) {
 				replacements++;
 				return "url(" + quote + absURL + quote + ")";
 			});
-		if (replacements) DOM.styleText(node, text);
+		if (replacements) node.textContent = text;
 	});
 
 	return resolveAll(doc, baseURL, false);
@@ -1850,7 +1848,7 @@ framesetDef.mkSelector('rdeck') + ' > * { width: 0; height: 0; }',
 ].join('\n');
 
 var style = document.createElement('style');
-DOM.styleText(style, cssText);
+style.textContent = cssText;
 document.head.insertBefore(style, document.head.firstChild);
 
 }
