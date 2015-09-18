@@ -91,10 +91,6 @@ var SUPPORTS_MUTATION_OBSERVERS = (function() {
 /*
  ### JS utilities
  */
-function forOwn(object, fn, context) { // WARN doesn't check hasOwnProperty()
-	for (var slot in object) fn.call(context, object[slot], slot, object);
-}
-
 function some(a, fn, context) { 
 	for (var n=a.length, i=0; i<n; i++) if (fn.call(context, a[i], i, a)) return true;
 	return false;
@@ -297,16 +293,6 @@ function resolveURL(url, params) { // works for all browsers including IE < 8
 	return div.firstChild.href;
 }
 
-var addEvent = 
-	document.addEventListener && function(node, event, fn) { return node.addEventListener(event, fn, false); } ||
-	document.attachEvent && function(node, event, fn) { return node.attachEvent("on" + event, fn); } ||
-	function(node, event, fn) { node["on" + event] = fn; };
-
-var removeEvent = 
-	document.removeEventListener && function(node, event, fn) { return node.removeEventListener(event, fn, false); } ||
-	document.detachEvent && function(node, event, fn) { try { return node.detachEvent("on" + event, fn); } catch(error) {} } ||
-	function(node, event, fn) { if (node["on" + event] == fn) node["on" + event] = null; };
-
 var domReady = (function() {
 // WARN this function assumes document.readyState is available
 
@@ -324,37 +310,15 @@ function processQueue() {
 	queue.length = 0;
 }
 
-var events = {
-	'readystatechange': document,
-	'DOMContentLoaded': document,
-	'load': window
-}
-
 if (document.readyState === 'complete') loaded = true;
-else addListeners(events, onChange);
+else document.addEventListener('DOMContentLoaded', onChange, false);
 
 return domReady;
 
 function onChange(e) {
-	switch(e.type) {
-	case "DOMContentLoaded": case "load": 
-		loaded = true;
-		break;
-	case "readystatechange":
-		if (/loaded|complete/.test(document.readyState)) loaded = true;
-		break;
-	}
-	if (!loaded) return;
-	removeListeners(events, onChange);
+	loaded = true;
+	document.removeEventListener('DOMContentLoaded', onChange, false);
 	processQueue();
-}
-
-function addListeners(events, handler) {
-	forOwn(events, function(node, type) { addEvent(node, type, handler); });
-}
-
-function removeListeners(node, types, handler) {
-	forOwn(events, function(node, type) { removeEvent(node, type, handler); });
 }
 
 })();
