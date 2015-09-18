@@ -5380,6 +5380,17 @@ function checkElementPerformance(el, namespaces) {
 	});
 }
 
+/*
+ - items in hazLangDefinition are element@list-of-attrs
+ - if element is prefixed with '<' or '>' then it can be defined 
+    as an attribute on a normal HTML element. 
+ - in preprocessing the attr is promoted to an element
+    either above or below the HTML element. 
+ - the attr value is used as the "default" attr of the created element. 
+    The "default" attr is the first attr-name in the list-of-attrs.  
+ - the order of items in hazLangDefinition is the order of promoting 
+    attrs to elements.
+*/
 var hazLangDefinition = 
 	'<otherwise <when@test <each@select,var <if@test <unless@test ' +
 	'>choose <template@name >eval@select >mtext@select >text@select include@name';
@@ -5407,7 +5418,7 @@ var hazLang = _.map(_.words(hazLangDefinition), function(def) {
 
 var hazLangLookup = {};
 
-_.forEach(hazLang, function(directive) { // should happen in loadTemplate
+_.forEach(hazLang, function(directive) {
 	var tag = directive.tag; 
 	hazLangLookup[tag] = directive;
 });
@@ -5421,11 +5432,10 @@ function walkTree(root, skipRoot, callback) { // always "accept" element nodes
 		);
 	
 	var el;
-	while (el = walker.nextNode());
+	while (el = walker.nextNode()) callback(el);
 
 	function acceptNode(el) {
 		if (skipRoot && el === root) return NodeFilter.FILTER_SKIP;
-		callback(el);
 		return NodeFilter.FILTER_ACCEPT;
 	}
 }
@@ -5547,20 +5557,22 @@ loadTemplate: function(template) {
 		if (tag === hazPrefix + 'choose') implyOtherwise(el);
 	});
 
-	var hfNS = processor.frameset.namespace;
+	// finally, preprocess all elements to extract hazardDetails
+	walkTree(template, true, function(el) {
+		el.hazardDetails = getHazardDetails(el, processor.frameset);
+	});
+	
+	if (logger.LOG_LEVEL < logger.levels.indexOf('debug')) return;
 
-	if (logger.LOG_LEVEL >= logger.levels.indexOf('debug')) walkTree(template, true, function(el) {
+	// if debugging then warn about PERFORMANCE_UNFRIENDLY_CONDITIONS (IE11 / Edge)
+	var hfNS = processor.frameset.namespace;
+	walkTree(template, true, function(el) {
 		var tag = DOM.getTagName(el);
 		if (tag.indexOf(hazPrefix) === 0) return;
 		if (tag.indexOf(hfNS.prefix) === 0) return; // HyperFrameset element
 		checkElementPerformance(el, framesetDef);
 	});
 
-	// finally, preprocess all elements to extract hazardDetails
-	walkTree(template, true, function(el) {
-		el.hazardDetails = getHazardDetails(el, processor.frameset);
-	});
-	
 
 	function markTemplate(el) {
 		if (!el.hasAttribute('name')) return;
@@ -5766,10 +5778,9 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 transformTree: function(srcNode, provider, context, variables, frag) { // srcNode is Element
 	var processor = this;
 	
-	var node;
 	var nodeType = srcNode.nodeType;
 	if (nodeType !== 1) throw Error('transformTree() expects Element');
-	node = processor.transformSingleElement(srcNode, provider, context, variables);
+	var node = processor.transformSingleElement(srcNode, provider, context, variables);
 	var nodeAsFrag = frag.appendChild(node); // WARN use returned value not `node` ...
 	// ... this allows frag to be a custom object, which in turn 
 	// ... allows a different type of output construction
