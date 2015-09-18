@@ -283,14 +283,15 @@ function getBootScript() {
 	return script;
 }
 
-function resolveURL(url, params) { // works for all browsers including IE < 8
+function resolveURL(url, params) {
 	if (url.substr(0,2) == '//') url = location.protocol + url;
 	for (var name in params) {
 		url = url.replace('{' + name + '}', params[name]); // WARN max of one reolace per param
 	}
-	var div = document.createElement('div');
-	div.innerHTML = '<a href="' + url + '"></a>';
-	return div.firstChild.href;
+	// needs to be more complex for IE < 8
+	var a = document.createElement('a');
+	a.setAttribute('href', url);
+	return a.href;
 }
 
 var domReady = (function() {
