@@ -49,7 +49,6 @@ var STAGING_DOCUMENT_IS_INERT = (function() {
 		see http://proger.i-forge.net/The_smallest_transparent_pixel/eBQ
 	*/
 	var img = doc.createElement('img');
-	if (img.complete) img.src = 'data:'; // Opera-12 and MS-Edge
 	img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=';
 	doc.body.appendChild(img);
 
