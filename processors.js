@@ -137,14 +137,30 @@ var htmlAttr = '_html';
 
 var HazardProcessor = (function() {
 
-var hazNamespace = 'haz';
-var exprNamespace = 'expr';
-var mexprNamespace = 'mexpr';
+var HAZARD_TRANSFORM_URN = 'HazardTransform';
+var hazDefaultNS = {
+	urn: HAZARD_TRANSFORM_URN,
+	name: 'haz',
+	style: 'xml'
+}
+var HAZARD_EXPRESSION_URN = 'HazardExpression';
+var exprDefaultNS = {
+	urn: HAZARD_EXPRESSION_URN,
+	name: 'expr',
+	style: 'xml'
+}
+var HAZARD_MEXPRESSION_URN = 'HazardMExpression';
+var mexprDefaultNS = {
+	urn: HAZARD_MEXPRESSION_URN,
+	name: 'mexpr',
+	style: 'xml'
+}
 
-var hazPrefix = hazNamespace + ':';
-var exprPrefix = exprNamespace + ':';
-var mexprPrefix = mexprNamespace + ':';
-
+/* 
+ NOTE IE11 / Edge has a bad performance regression with DOM fragments 
+ containing certain elements / attrs, see
+     https://connect.microsoft.com/IE/feedback/details/1776195/ie11-edge-performance-regression-with-dom-fragments
+*/
 var PERFORMANCE_UNFRIENDLY_CONDITIONS = [
 	{
 		tag: '*', // must be present for checkElementPerformance()
@@ -162,7 +178,10 @@ var PERFORMANCE_UNFRIENDLY_CONDITIONS = [
 	}
 ];
 
-function checkElementPerformance(el) {
+function checkElementPerformance(el, namespaces) {
+	var exprPrefix = namespaces.lookupPrefix(HAZARD_EXPRESSION_URN);
+	var mexprPrefix = namespaces.lookupPrefix(HAZARD_MEXPRESSION_URN);
+
 	var outerHTML;
 	_.forEach(PERFORMANCE_UNFRIENDLY_CONDITIONS, function(cond) {
 		switch (cond.tag) {
@@ -212,12 +231,11 @@ var hazLang = _.map(_.words(hazLangDefinition), function(def) {
 	}
 });
 
-hazLangLookup = {};
+var hazLangLookup = {};
 
 _.forEach(hazLang, function(directive) { // should happen in loadTemplate
-	var nsTag = hazPrefix + directive.tag; 
-	directive.nsTag = nsTag;
-	hazLangLookup[nsTag] = directive;
+	var tag = directive.tag; 
+	hazLangLookup[tag] = directive;
 });
 
 function walkTree(root, skipRoot, callback) { // always "accept" element nodes
@@ -255,6 +273,9 @@ function htmlToFragment(html, doc) {
 
 function HazardProcessor(frameset) {
 	this.frameset = frameset;
+	frameset.addDefaultNamespace(hazDefaultNS);
+	frameset.addDefaultNamespace(exprDefaultNS);
+	frameset.addDefaultNamespace(mexprDefaultNS);
 }
 
 _.defaults(HazardProcessor.prototype, {
@@ -264,7 +285,11 @@ loadTemplate: function(template) {
 	processor.root = template; // FIXME assert template is Fragment
 	processor.templates = {};
 
-	var doc = template.ownerDocument;
+	var framesetDef = processor.frameset;
+	var hazPrefix = framesetDef.lookupPrefix(HAZARD_TRANSFORM_URN);
+	var exprPrefix = framesetDef.lookupPrefix(HAZARD_EXPRESSION_URN);
+	var mexprPrefix = framesetDef.lookupPrefix(HAZARD_MEXPRESSION_URN);
+
 	var exprHtmlAttr = exprPrefix + htmlAttr; // NOTE this is mapped to haz:eval
 	var hazEvalTag = hazPrefix + 'eval';
 	var mexprHtmlAttr = mexprPrefix + htmlAttr; // NOTE this is invalid
@@ -281,9 +306,12 @@ loadTemplate: function(template) {
 	exprToHazMap[mexprTextAttr] = hazMTextTag;
 	exprToHazMap[exprTextAttr] = hazTextTag;
 
+	var doc = template.ownerDocument;
+
+	// rewrite the template if necessary
 	walkTree(template, true, function(el) {
 		var tag = DOM.getTagName(el);
-		if (tag in hazLangLookup) return;
+		if (tag.indexOf(hazPrefix) === 0) return;
 
 		// pre-process @expr:_html -> @haz:eval, etc
 		_.forEach(exprToHazPriority, function(attr) {
@@ -299,15 +327,21 @@ loadTemplate: function(template) {
 			el.removeAttribute(mexprHtmlAttr);
 		}
 
+		// promote applicable hazard attrs to elements
 		_.forEach(hazLang, function(def) {
 			if (!def.attrToElement) return;
-			var nsTag = def.nsTag;
+			var nsTag = hazPrefix + def.tag;
 			if (!el.hasAttribute(nsTag)) return;
+
+			// create <haz:element> ...
+			var directiveEl = doc.createElement(nsTag);
+			// with default attr set from @haz:attr on original element
 			var defaultAttr = def.attrs[0];
 			var value = el.getAttribute(nsTag);
 			el.removeAttribute(nsTag);
-			var directiveEl = doc.createElement(nsTag);
 			if (defaultAttr) directiveEl.setAttribute(defaultAttr, value);
+
+			// copy non-default hazard attrs
 			_.forEach(def.attrs, function(attr, i) {
 				if (i === 0) return; // the defaultAttr
 				var nsAttr = hazPrefix + attr;
@@ -316,6 +350,7 @@ loadTemplate: function(template) {
 				el.removeAttribute(nsAttr);
 				directiveEl.setAttribute(attr, value);
 			});
+			// insert the hazard element goes below or above the current element
 			switch (def.attrToElement) {
 			case '>':
 				var frag = childNodesToFragment(el);
@@ -338,14 +373,20 @@ loadTemplate: function(template) {
 		if (tag === hazPrefix + 'choose') implyOtherwise(el);
 	});
 
-	var hfNS = processor.frameset.cdom;
+	var hfNS = processor.frameset.namespace;
 
 	if (logger.LOG_LEVEL >= logger.levels.indexOf('debug')) walkTree(template, true, function(el) {
 		var tag = DOM.getTagName(el);
-		if (tag in hazLangLookup) return;
+		if (tag.indexOf(hazPrefix) === 0) return;
 		if (tag.indexOf(hfNS.prefix) === 0) return; // HyperFrameset element
-		checkElementPerformance(el);
+		checkElementPerformance(el, framesetDef);
 	});
+
+	// finally, preprocess all elements to extract hazardDetails
+	walkTree(template, true, function(el) {
+		el.hazardDetails = getHazardDetails(el, processor.frameset);
+	});
+	
 
 	function markTemplate(el) {
 		if (!el.hasAttribute('name')) return;
@@ -411,17 +452,17 @@ transformNode: function(srcNode, provider, context, variables, frag) {
 		frag.appendChild(node);
 		return;
 	case 1:
-		var details = getHazardDetails(srcNode);
+		var details = srcNode.hazardDetails;
 		if (details.definition) return processor.transformHazardTree(srcNode, provider, context, variables, frag);
 		else return processor.transformTree(srcNode, provider, context, variables, frag);
 	}
 },
 
 transformHazardTree: function(el, provider, context, variables, frag) {
-	var doc = el.ownerDocument;
 	var processor = this;
+	var doc = el.ownerDocument;
 
-	var details = getHazardDetails(el);
+	var details = el.hazardDetails;
 	var def = details.definition;
 
 	var invertTest = false; // for haz:if haz:unless
@@ -505,9 +546,9 @@ transformHazardTree: function(el, provider, context, variables, frag) {
  		// NOTE if no successful `when` then chooses *first* `otherwise` 		
 		var otherwise;
 		var when;
-		var found = _.some(el.childNodes, function(child) {
-			var childTag = DOM.getTagName(child);
-			var childDef = hazLangLookup[childTag];
+		var found = _.some(el.childNodes, function(child) { // TODO .children??
+			if (child.nodeType !== 1) return false;
+			var childDef = child.hazardDetails.definition;
 			if (!childDef) return false;
 			if (childDef.tag === 'otherwise') {
 				if (!otherwise) otherwise = child;
@@ -554,26 +595,24 @@ transformTree: function(srcNode, provider, context, variables, frag) { // srcNod
 	var node;
 	var nodeType = srcNode.nodeType;
 	if (nodeType !== 1) throw Error('transformTree() expects Element');
-	node = transformSingleElement(srcNode, provider, context, variables);
+	node = processor.transformSingleElement(srcNode, provider, context, variables);
 	var nodeAsFrag = frag.appendChild(node); // WARN use returned value not `node` ...
 	// ... this allows frag to be a custom object, which in turn 
 	// ... allows a different type of output construction
 
 	return processor.transformChildNodes(srcNode, provider, context, variables, nodeAsFrag);
-}
+},
 
-});
-
-
-function transformSingleElement(srcNode, provider, context, variables) {
-	var details = getHazardDetails(srcNode);
+transformSingleElement: function(srcNode, provider, context, variables) {
+	var processor = this;
+	var details = srcNode.hazardDetails;
 
 	el = srcNode.cloneNode(false);
 
 	_.forEach(details.exprAttributes, function(desc) {
 		var value;
 		try {
-			value = (desc.prefix === mexprPrefix) ?
+			value = (desc.namespaceURI === HAZARD_MEXPRESSION_URN) ?
 				processMExpression(desc.mexpression, provider, context, variables) :
 				processExpression(desc.expression, provider, context, variables, desc.type);
 		}
@@ -588,46 +627,49 @@ function transformSingleElement(srcNode, provider, context, variables) {
 	return el;
 }
 
-function getHazardDetails(el) {
-	if (el.hazardDetails) return el.hazardDetails;
+});
+
+function getHazardDetails(el, namespaces) {
 	var details = {};
 	var tag = DOM.getTagName(el);
+	var hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
 	var isHazElement = tag.indexOf(hazPrefix) === 0;
 
 	if (isHazElement) { // FIXME preprocess attrs of <haz:*>
+		tag = tag.substr(hazPrefix.length);
 		var def = hazLangLookup[tag];
 		details.definition = def || { tag: '' };
 	}
 
-	details.exprAttributes = getExprAttributes(el);
-
-	el.hazardDetails = details;
+	details.exprAttributes = getExprAttributes(el, namespaces);
 	return details;
 }
 
-function getExprAttributes(el) {
+function getExprAttributes(el, namespaces) {
 	var attrs = [];
+	
+	var exprNS = namespaces.lookupNamespace(HAZARD_EXPRESSION_URN);
+	var mexprNS = namespaces.lookupNamespace(HAZARD_MEXPRESSION_URN);
 	_.forEach(_.map(el.attributes), function(attr) {
-		var attrName;
-		var prefix = false;
-		_.some([ exprPrefix, mexprPrefix ], function(prefixText) {
-			if (attr.name.indexOf(prefixText) !== 0) return false;
-			prefix = prefixText;
-			attrName = attr.name.substr(prefixText.length);
-			return true;
+		var ns = _.find([ exprNS, mexprNS ], function(ns) {
+			return (attr.name.indexOf(ns.prefix) === 0);
 		});
-		if (!prefix) return;
+		if (!ns) return;
+		var prefix = ns.prefix;
+		var namespaceURI = ns.urn;
+		var attrName = attr.name.substr(prefix.length);
 		el.removeAttribute(attr.name);
 		var desc = {
+			namespaceURI: namespaceURI,
 			prefix: prefix,
 			attrName: attrName,
 			type: 'text'
 		}
-		switch (prefix) {
-		case exprPrefix:
+		switch (namespaceURI) {
+		case HAZARD_EXPRESSION_URN:
 			desc.expression = interpretExpression(attr.value);
 			break;
-		case mexprPrefix:
+		case HAZARD_MEXPRESSION_URN:
 			desc.mexpression = interpretMExpression(attr.value);
 			break;
 		default: // TODO an error?
@@ -637,6 +679,7 @@ function getExprAttributes(el) {
 	});
 	return attrs;
 }
+
 
 function setAttribute(el, attrName, value) {
 	var type = typeof value;

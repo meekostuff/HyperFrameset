@@ -308,10 +308,12 @@ var CustomNS = Meeko.CustomNS = (function() {
 function CustomNS(options) {
 	if (!(this instanceof CustomNS)) return new CustomNS(options);
 	var style = options.style = _.lc(options.style);
-	var styleInfo = CustomNS.namespaceStyles[style];
+	var styleInfo = _.find(CustomNS.namespaceStyles, function(styleInfo) {
+		return styleInfo.style === style;
+	});
 	if (!styleInfo) throw Error('Unexpected namespace style: ' + style);
-	var ns = options.name = _.lc(options.name);
-	if (!ns) throw Error('Unexpected name: ' + ns);
+	var name = options.name = _.lc(options.name);
+	if (!name) throw Error('Unexpected name: ' + name);
 	
 	var nsDef = this;
 	_.assign(nsDef, options);
@@ -327,16 +329,18 @@ lookupSelector: function(name) { return this.selectorPrefix + name; }
 
 });
 
-CustomNS.namespaceStyles = {
-	'vendor': {
+CustomNS.namespaceStyles = [
+	{
+		style: 'vendor',
 		configNamespace: 'custom',
 		separator: '-'
 	},
-	'xml': {
+	{
+		style: 'xml',
 		configNamespace: 'xmlns',
 		separator: ':'
 	}
-}
+];
 
 _.forOwn(CustomNS.namespaceStyles, function(styleInfo) {
 	styleInfo.configPrefix = styleInfo.configNamespace + styleInfo.separator;
@@ -345,8 +349,6 @@ _.forOwn(CustomNS.namespaceStyles, function(styleInfo) {
 CustomNS.getNamespaces = function(doc) { // NOTE modelled on IE8, IE9 document.namespaces interface
 	var namespaces = [];
 	_.forEach(_.map(doc.documentElement.attributes), function(attr) {
-		var style;
-		var name;
 		var fullName = _.lc(attr.name);
 		var styleInfo = _.find(CustomNS.namespaceStyles, function(styleInfo) {
 			return (fullName.indexOf(styleInfo.configPrefix) === 0);
@@ -356,7 +358,7 @@ CustomNS.getNamespaces = function(doc) { // NOTE modelled on IE8, IE9 document.n
 		var nsDef = new CustomNS({
 			urn: attr.value,
 			name: name,
-			style: style
+			style: styleInfo.style
 		});
 		namespaces.push(nsDef);
 	});
@@ -1520,11 +1522,11 @@ addDefaultNamespace: function(nsSpec) {
 	var nsDef = new CustomNS(nsSpec);
 	var matchingNS = _.find(framesetDef.defaultNamespaces, function(def) {
 		if (def.urn === nsDef.urn) {
-			logger.warn('Attempted to add default namespace with same urn as one already present: ' + def.urn);
+			if (def.prefix !== nsDef.prefix) logger.warn('Attempted to add default namespace with same urn as one already present: ' + def.urn);
 			return true;
 		}
 		if (def.prefix === nsDef.prefix) {
-			logger.warn('Attempted to add default namespace with same prefix as one already present: ' + def.prefix);
+			if (def.urn !== nsDef.urn) logger.warn('Attempted to add default namespace with same prefix as one already present: ' + def.prefix);
 			return true;
 		}
 	});
@@ -1540,11 +1542,11 @@ addNamespace: function(nsDef) {
 
 	var matchingNS = _.find(framesetDef.namespaces, function(def) {
 		if (def.urn === nsDef.urn) {
-			logger.warn('Attempted to add default namespace with same urn as one already present: ' + def.urn);
+			if (def.prefix !== nsDef.prefix) logger.warn('Attempted to add default namespace with same urn as one already present: ' + def.urn);
 			return true;
 		}
 		if (def.prefix === nsDef.prefix) {
-			logger.warn('Attempted to add default namespace with same prefix as one already present: ' + def.prefix);
+			if (def.urn !== nsDef.prefix) logger.warn('Attempted to add default namespace with same prefix as one already present: ' + def.prefix);
 			return true;
 		}
 	});
@@ -1556,7 +1558,7 @@ lookupNamespace: function(urn) {
 	var framesetDef = this;
 	urn = _.lc(urn);
 	var nsDef = _.find(framesetDef.namespaces, function(def) {
-		return (def.urn === urn);
+		return (_.lc(def.urn) === urn);
 	});
 	return nsDef;
 },
