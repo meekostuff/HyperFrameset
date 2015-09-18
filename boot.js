@@ -5,11 +5,9 @@
 
 (function() { // NOTE throwing an error or returning from this wrapper function prematurely aborts booting
 
-var require_pushState = true; // NOTE being non-commital, otherwise this would be hard-wired, not over-rideable
-
 var defaults = { // NOTE defaults also define the type of the associated config option
 	"no_boot": false, 
-	"no_frameset": require_pushState ? !history.pushState : false, // NOTE !(window.XMLHttpRequest && window.sessionStorage && window.JSON && 'readyState' in document) is enforced anyway
+	"no_frameset": false, // NOTE !(history.pushState && window.XMLHttpRequest && window.sessionStorage && window.JSON && 'readyState' in document) is enforced anyway
 	"no_style": false,
 	"capturing": true,
 	"log_level": "warn",
@@ -706,8 +704,10 @@ if (isSet('no_style')) {
 
 var no_frameset = isSet('no_frameset');
 if (no_frameset) return; // TODO logger.info()
-if (!(window.XMLHttpRequest && sessionOptions && 'readyState' in document && STAGING_DOCUMENT_IS_INERT && SUPPORTS_MUTATION_OBSERVERS)) {
-	throw 'HyperFrameset depends on native XMLHttpRequest, sessionStorage, JSON and MutationObserver';
+if (!(history.pushState && window.XMLHttpRequest && 'readyState' in document && 
+	window.sessionStorage && window.JSON &&
+	STAGING_DOCUMENT_IS_INERT && SUPPORTS_MUTATION_OBSERVERS)) {
+	logger.debug('HyperFrameset depends on native XMLHttpRequest, history.pushState, sessionStorage, JSON and MutationObserver');
 }
 
 
