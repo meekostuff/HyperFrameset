@@ -263,7 +263,7 @@ function nextSiblings(el, callback) {
 	return nodeList;
 }
 
-document.head = $$('head')[0];
+if (!document.head) document.head = $$('head')[0];
 if (!document.head) throw 'ABORT: <head> not found. This implies a legacy browser.';
 
 function getBootScript() {
@@ -311,14 +311,20 @@ function processQueue() {
 	queue.length = 0;
 }
 
-if (document.readyState === 'complete') loaded = true;
-else document.addEventListener('DOMContentLoaded', onChange, false);
+// See https://gist.github.com/shogun70/5388420 
+// for testing document.readyState in different browsers
+if (/loaded|complete/.test(document.readyState)) loaded = true;
+else {
+	document.addEventListener('DOMContentLoaded', onLoaded, false);
+	window.addEventListener('load', onLoaded, false);
+}
 
 return domReady;
 
-function onChange(e) {
+function onLoaded(e) {
 	loaded = true;
-	document.removeEventListener('DOMContentLoaded', onChange, false);
+	document.removeEventListener('DOMContentLoaded', onLoaded, false);
+	window.removeEventListener('load', onLoaded, false);
 	processQueue();
 }
 
