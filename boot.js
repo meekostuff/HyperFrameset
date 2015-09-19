@@ -672,6 +672,7 @@ if (!(history.pushState && window.XMLHttpRequest && 'readyState' in document &&
 	window.sessionStorage && window.JSON &&
 	STAGING_DOCUMENT_IS_INERT && SUPPORTS_MUTATION_OBSERVERS)) {
 	logger.debug('HyperFrameset depends on native XMLHttpRequest, history.pushState, sessionStorage, JSON and MutationObserver');
+	return;
 }
 
 
