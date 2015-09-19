@@ -29,8 +29,35 @@ var vendorPrefix = "Meeko";
 
 var Meeko = window.Meeko || (window.Meeko = {});
 
-// TODO up-front feature testing to prevent boot on unsupportable platorms
-// e.g. where script.onload can't be used or faked
+/* 
+	HyperFrameset requires support for many DOM APIs. 
+	Ideally we would test directly for them all up-front, 
+	but many of them can be assumed based on presence of newer DOM APIs.
+	Conveniently, window.requestAnimationFrame (including prefixed versions)
+	is a good proxy for many of the other features. See 
+		http://caniuse.com/#feat=requestanimationframe
+
+	Some of the required features are:
+		- native XMLHttpRequest
+		- history.pushState
+		- inert staging documents (created by XMLHttpRequest, DOMParser, etc)
+			We don't want <img> and <script> in staging documents to download 
+			or run when they may be removed or changed before entering the view
+		- MutationObservers or 'DOMAttrModified' events
+			+ Webkit never supported 'DOMAttrModified'
+		- sessionStorage for saving state during reload
+		- document.readyState for determining whether all landing page content
+			is available.
+
+	These features rule out browsers older than IE10, Safari6. 
+	This allows us to assume the presence of features such as:
+		- Node.addEventListener
+		- <script>.onload
+		- Object.create, etc
+
+	TODO up-front feature testing to prevent boot on unsupportable platorms
+	e.g. where script.onload can't be used or faked
+*/
 
 /*
 	STAGING_DOCUMENT_IS_INERT indicates that resource URLs - like img@src -
