@@ -13,7 +13,7 @@ var defaults = { // NOTE defaults also define the type of the associated config 
 	"log_level": "warn",
 	"hidden_timeout": 3000,
 	"startup_timeout": 10000, // abort if startup takes longer than this
-	"polling_interval": 50,
+	"polling_interval": 1000/60,
 	"html5_block_elements": 'article aside figcaption figure footer header hgroup main nav section',
 	"html5_inline_elements": 'abbr mark output time audio video picture',
 	"main_script": '{bootscriptdir}HyperFrameset.js',
@@ -34,7 +34,8 @@ var Meeko = window.Meeko || (window.Meeko = {});
 	Ideally we would test directly for them all up-front, 
 	but many of them can be assumed based on presence of newer DOM APIs.
 	Conveniently, window.requestAnimationFrame (including prefixed versions)
-	is a good proxy for many of the other features. See 
+	is a good proxy for many of the other features, 
+	even if not technically required. See 
 		http://caniuse.com/#feat=requestanimationframe
 
 	Some of the required features are:
@@ -60,21 +61,38 @@ var Meeko = window.Meeko || (window.Meeko = {});
 */
 
 /*
+	SUPPORTS_REQUEST_ANIMATION_FRAME is a good proxy for many other features
+*/
+var SUPPORTS_REQUEST_ANIMATION_FRAME = (function() {
+
+	if (window.requestAnimationFrame) return true;
+
+	var prefix, vendors = 'moz ms o webkit'.split(/\s+/);
+	while (prefix = vendors.shift()) {
+		var name = prefix + 'RequestAnimationFrame';
+		if (window[name]) return true;
+	};
+	
+	return false;
+})();
+
+/*
 	STAGING_DOCUMENT_IS_INERT indicates that resource URLs - like img@src -
 	WILL NOT start downloading when the document they are in is parsed.
 	If this is false then the `no_frameset` option applies.
 */
 
+/* 
+// NOTE requestAnimationFrame is a good proxy for this, ruling out Opera12, IE9 
 var STAGING_DOCUMENT_IS_INERT = (function() {
 
 	try { var doc = document.implementation.createHTMLDocument(''); }
 	catch (error) { return false; } // IE <= 8
 	if (doc.URL !== document.URL) return true; // FF, Webkit, Chrome
-	/*
-		Use a data-uri image to see if browser will try to fetch.
-		The smallest such image might be a 1x1 white gif,
-		see http://proger.i-forge.net/The_smallest_transparent_pixel/eBQ
-	*/
+
+	// Use a data-uri image to see if browser will try to fetch.
+	// The smallest such image might be a 1x1 white gif,
+	// see http://proger.i-forge.net/The_smallest_transparent_pixel/eBQ
 	var img = doc.createElement('img');
 	img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=';
 	doc.body.appendChild(img);
@@ -87,14 +105,10 @@ var STAGING_DOCUMENT_IS_INERT = (function() {
 	if (script.readyState === 'complete') return false; // IE9
 
 	if (img.width) return false; // IE9, Opera-12 will have width == 1 / height == 1 
-	/* 
-	if (img.complete) return false; 
-	// Opera-12 sets this immediately. IE9 sets it after a delay, 
-	// BUT on MS Edge it is always true (when `img` created by `doc`)
-	*/
 
 	return true; // Presumably IE10,11 or Edge
 })();
+*/
 
 /*
 	SUPPORTS_MUTATION_OBSERVERS indicates that DOM mutation can be adequately observed.
@@ -703,7 +717,7 @@ var no_frameset = isSet('no_frameset');
 if (no_frameset) return; // TODO logger.info()
 if (!(history.pushState && window.XMLHttpRequest && 'readyState' in document && 
 	window.sessionStorage && window.JSON &&
-	STAGING_DOCUMENT_IS_INERT && SUPPORTS_MUTATION_OBSERVERS)) {
+	SUPPORTS_REQUEST_ANIMATION_FRAME && SUPPORTS_MUTATION_OBSERVERS)) {
 	logger.debug('HyperFrameset depends on native XMLHttpRequest, history.pushState, sessionStorage, JSON and MutationObserver');
 	return;
 }
