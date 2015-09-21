@@ -1435,6 +1435,7 @@ detect: function(doc, details) {
 init: function(doc, settings) {
 	var frameset = this;
 	_.defaults(frameset, {
+		url: settings.framesetURL,
 		options: _.defaults({}, HFramesetDefinition.options)
 	});
 
@@ -1460,7 +1461,25 @@ init: function(doc, settings) {
 			if (newSrc != src) el.setAttribute('src', newSrc);
 		}
 	});
-		
+
+	var scripts = DOM.findAll('script', doc);
+	_.forEach(scripts, function(script, i) {
+		if (script.hasAttribute('src')) return;
+		if (script.hasAttribute('sourceurl')) return;
+		var id = script.id;
+		// TODO generating ID always has a chance of duplicating IDs
+		if (!id) id = script.id = 'script[' + i + ']';
+		var sourceURL = frameset.url + '#' + id;
+		script.setAttribute('sourceurl', sourceURL);
+	});
+
+	
+	var firstChild = doc.body.firstChild;
+	_.forEach(DOM.findAll('script[for]', doc.head), function(script) {
+		doc.body.insertBefore(script, firstChild);
+		logger.info('Moved <script for> in frameset <head> to <body>');
+	});
+
 	var body = doc.body;
 	body.parentNode.removeChild(body);
 	frameset.document = doc;
@@ -1472,8 +1491,60 @@ preprocess: function() {
 	var hfNS = frameset.namespace;
 	var body = frameset.element;
 	_.defaults(frameset, {
+		callbackObjects: [],
 		frames: {} // all hyperframe definitions. Indexed by @id (which may be auto-generated)
 	});
+
+	var scripts = DOM.findAll('script', body);
+	_.forEach(scripts, function(script, i) {
+		if (script.hasAttribute('src')) {
+			logger.warn('Frameset <body> may not contain external scripts: \n' +
+				script.cloneNode(false).outerHTML);
+			script.parentNode.removeChild(script);
+			return;
+		}
+
+		var scriptFor = script;
+		while (scriptFor = scriptFor.previousSibling) {
+			if (scriptFor.nodeType !== 1) continue;
+			var tag = DOM.getTagName(scriptFor);
+			if (tag !== 'script' && tag !== 'style') break;
+		}
+		if (!scriptFor) scriptFor = script.parentNode;
+		
+		// FIXME @scriptIndex shouldn't be hard-wired here
+		var scriptIndex = scriptFor.hasAttribute('scriptIndex') ? 
+			scriptFor.getAttribute('scriptIndex') :
+			'';
+		scriptIndex = scriptIndex ?
+			scriptIndex.replace(/\s*$/, ' ' + i) :
+			i;
+		scriptFor.setAttribute('scriptIndex', scriptIndex);
+
+		// FIXME temporary work-around for hf-frame, hf-transform implementation
+		if (!DOM.matches(scriptFor, frameset.lookupSelector('frame, transform'))) 
+			script.parentNode.removeChild(script);
+
+		var fnText = 'return (' + script.text + ');';
+		if (script.hasAttribute('sourceurl')) 
+			fnText += '\n//# sourceURL=' + script.getAttribute('sourceURL');
+
+		try {
+			var fn = Function(fnText);
+			var object = fn();
+			frameset.callbackObjects[i] = object;
+		}
+		catch(err) { 
+			logger.warn('Error evaluating inline script in frameset:\n' +
+				frameset.url + '#' + script.id); // FIXME
+			Task.postError(err);
+		}
+
+		if (scriptFor === body) { // FIXME ASAP temp work-around
+			frameset.config(object);
+		}
+	});
+
 
 	var frameElts = DOM.findAll(frameset.lookupSelector('frame'), body);
 	var frameDefElts = [];
@@ -2095,46 +2166,14 @@ prerender: function(dstDoc, definition) {
 		mergeElement(dstDoc.head, srcDoc.head);
 		mergeHead(dstDoc, srcDoc.head, true);
 		// allow scripts to run. FIXME scripts should always be appended to document.head
-		var forScripts = [];
 		_.forEach(DOM.findAll('script', dstDoc.head), function(script) {
-			var forAttr = script.getAttribute('for');
-			if (forAttr) { // TODO possibly we want to evaluate forScripts in document order
-				forScripts.push(script);
-				return;
+			if (!script.hasAttribute('src') && script.hasAttribute('sourceurl')) {
+				// FIXME what about non-JS scripts??
+				script.text += '\n//# sourceURL=' + script.getAttribute('sourceurl');
 			}
 			scriptQueue.push(script);
 		});
-		return scriptQueue.empty().then(function() { return forScripts; });
-	},
-	
-	function(forScripts) {
-		_.forEach(forScripts, function(script) {
-			var forAttr = script.getAttribute('for');
-			if (script.src) {
-				logger.warn('Ignoring <script> declaration - @for not compatible with @src');
-				return;
-			}
-			var forOptions;
-			try {
-				forOptions = (Function('return (' + script.text + ');'))();
-			}
-			catch(err) { 
-				Task.postError(err);
-				return; 
-			}
-			
-			var hfNS = definition.namespace;
-			switch(forAttr) {
-			case hfNS.lookupTagName('frameset'):
-				definition.config(forOptions);
-				break;
-			case hfNS.lookupTagName('frame'):
-				_.assign(HFrameDefinition.options, forOptions);
-				break;
-			default:
-				logger.warn('Unsupported value of @for on <script>: ' + forAttr);
-			}
-		}); // FIXME this breaks if a script inserts other scripts
+		return scriptQueue.empty();
 	}
 	
 	]);
@@ -2302,7 +2341,7 @@ start: function(startOptions) {
 		framer.scope = framerConfig.scope; // FIXME shouldn't set this until loadFramesetDefinition() returns success
 		var framesetURL = URL(framerConfig.framesetURL);
 		if (framesetURL.hash) logger.info('Ignoring hash component of frameset URL: ' + framesetURL.hash);
-		framer.framesetURL = framesetURL.nohash;
+		framer.framesetURL = framerConfig.framesetURL = framesetURL.nohash;
 		return httpProxy.load(framer.framesetURL, { responseType: 'document' })
 		.then(function(response) {
 			var framesetDoc = response.document;
@@ -2311,9 +2350,18 @@ start: function(startOptions) {
 	},
 
 	function(definition) {
-		framer.definition = definition;
-		definition.preprocess(); // TODO promisify
-		return HFrameset.prerender(document, definition);
+		return Promise.pipe(definition, [
+		
+		function() {
+			framer.definition = definition;
+			return HFrameset.prerender(document, definition)
+		},
+
+		function() { 
+			return definition.preprocess();
+		}
+
+		]);
 	},
 	
 	function () {
