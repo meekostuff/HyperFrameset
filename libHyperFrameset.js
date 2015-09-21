@@ -1521,12 +1521,12 @@ addDefaultNamespace: function(nsSpec) {
 	var framesetDef = this;
 	var nsDef = new CustomNS(nsSpec);
 	var matchingNS = _.find(framesetDef.defaultNamespaces, function(def) {
-		if (def.urn === nsDef.urn) {
+		if (_.lc(def.urn) === _.lc(nsDef.urn)) {
 			if (def.prefix !== nsDef.prefix) logger.warn('Attempted to add default namespace with same urn as one already present: ' + def.urn);
 			return true;
 		}
 		if (def.prefix === nsDef.prefix) {
-			if (def.urn !== nsDef.urn) logger.warn('Attempted to add default namespace with same prefix as one already present: ' + def.prefix);
+			if (_.lc(def.urn) !== _.lc(nsDef.urn)) logger.warn('Attempted to add default namespace with same prefix as one already present: ' + def.prefix);
 			return true;
 		}
 	});
@@ -1541,12 +1541,12 @@ addNamespace: function(nsDef) {
 	if (!framesetDef.namespaces) return;
 
 	var matchingNS = _.find(framesetDef.namespaces, function(def) {
-		if (def.urn === nsDef.urn) {
-			if (def.prefix !== nsDef.prefix) logger.warn('Attempted to add default namespace with same urn as one already present: ' + def.urn);
+		if (_.lc(def.urn) === _.lc(nsDef.urn)) {
+			if (def.prefix !== nsDef.prefix) logger.warn('Attempted to add namespace with same urn as one already present: ' + def.urn);
 			return true;
 		}
 		if (def.prefix === nsDef.prefix) {
-			if (def.urn !== nsDef.prefix) logger.warn('Attempted to add default namespace with same prefix as one already present: ' + def.prefix);
+			if (_.lc(def.urn) !== _.lc(nsDef.urn)) logger.warn('Attempted to add namespace with same prefix as one already present: ' + def.prefix);
 			return true;
 		}
 	});
