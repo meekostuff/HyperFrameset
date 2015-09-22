@@ -1462,13 +1462,17 @@ init: function(doc, settings) {
 		}
 	});
 
+	// Add @id and @sourceurl to inline <script type="text/javascript">
 	var scripts = DOM.findAll('script', doc);
 	_.forEach(scripts, function(script, i) {
+		// ignore non-javascript scripts
+		if (script.type && !/^text\/javascript/.test(script.type)) return;
+		// ignore external scripts
 		if (script.hasAttribute('src')) return;
-		if (script.hasAttribute('sourceurl')) return;
 		var id = script.id;
 		// TODO generating ID always has a chance of duplicating IDs
 		if (!id) id = script.id = 'script[' + i + ']';
+		if (script.hasAttribute('sourceurl')) return;
 		var sourceURL = frameset.url + '#' + id;
 		script.setAttribute('sourceurl', sourceURL);
 	});
@@ -1536,7 +1540,7 @@ preprocess: function() {
 		}
 		catch(err) { 
 			logger.warn('Error evaluating inline script in frameset:\n' +
-				frameset.url + '#' + script.id); // FIXME
+				frameset.url + '#' + script.id);
 			Task.postError(err);
 		}
 
