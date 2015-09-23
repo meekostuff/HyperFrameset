@@ -3691,7 +3691,13 @@ init: function(el) {
 	var frag = doc.createDocumentFragment();
 	var node;
 	while (node = el.firstChild) frag.appendChild(node); // NOTE no adoption
-	var processor = transform.processor = framer.createProcessor(transform.type);
+
+	var options;
+	if (el.hasAttribute('configid')) {
+		var configID = _.words(el.getAttribute('configid'))[0];
+		options = frameset.configData[configID];
+	}
+	var processor = transform.processor = framer.createProcessor(transform.type, options);
 	processor.loadTemplate(frag);
 },
 
@@ -3832,7 +3838,10 @@ preprocess: function() {
 
 	var scripts = DOM.findAll('script', body);
 	_.forEach(scripts, function(script, i) {
-		if (script.hasAttribute('src')) {
+		// Ignore non-javascript scripts
+		if (script.type && !/^text\/javascript/.test(script.type)) return;
+
+		if (script.hasAttribute('src')) { // external javascript in <body> is invalid
 			logger.warn('Frameset <body> may not contain external scripts: \n' +
 				script.cloneNode(false).outerHTML);
 			script.parentNode.removeChild(script);
@@ -3858,10 +3867,6 @@ preprocess: function() {
 			sourceURL;
 		scriptFor.setAttribute('configID', configID);
 
-		// FIXME temporary work-around for hf-transform implementation
-		if (!DOM.matches(scriptFor, frameset.lookupSelector('transform'))) 
-			script.parentNode.removeChild(script);
-
 		var fnText = 'return (' + script.text + ');';
 		if (script.hasAttribute('sourceurl')) 
 			fnText += '\n//# sourceURL=' + script.getAttribute('sourceURL');
@@ -3877,6 +3882,7 @@ preprocess: function() {
 			Task.postError(err);
 		}
 
+		script.parentNode.removeChild(script); // physical <script> no longer needed
 	});
 
 
@@ -5225,8 +5231,8 @@ registerDecoder: function(type, constructor) {
 	this.decoders[type] = constructor;
 },
 
-createDecoder: function(type) {
-	return new this.decoders[type](this.definition);
+createDecoder: function(type, options) {
+	return new this.decoders[type](options, this.definition);
 },
 
 processors: {},
@@ -5235,8 +5241,8 @@ registerProcessor: function(type, constructor) {
 	this.processors[type] = constructor;
 },
 
-createProcessor: function(type) {
-	return new this.processors[type](this.definition);
+createProcessor: function(type, options) {
+	return new this.processors[type](options, this.definition);
 }
 
 });
@@ -5304,7 +5310,7 @@ var FRAGMENTS_ARE_INERT = !(window.HTMLUnknownElement &&
 
 var MainProcessor = (function() {
 
-function MainProcessor() {}
+function MainProcessor(options, framesetDef) {}
 
 _.defaults(MainProcessor.prototype, {
 
@@ -5336,7 +5342,10 @@ framer.registerProcessor('main', MainProcessor);
 
 var ScriptProcessor = (function() {
 
-function ScriptProcessor() {}
+function ScriptProcessor(options, framesetDef) {
+	this.frameset = framesetDef;
+	this.processor = options;
+}
 
 _.defaults(ScriptProcessor.prototype, {
 
@@ -5366,6 +5375,8 @@ loadTemplate: function(template) {
 		}
 	});
 	if (!script) {
+		// no problem if already a processor defined in new ScriptProcessor(options)
+		if (this.processor) return;
 		logger.warn('No <script> found in "script" transform template');
 		return;
 	}
@@ -5380,7 +5391,6 @@ loadTemplate: function(template) {
 
 transform: function(provider, details) {
 	var srcNode = provider.srcNode;
-	var processor = this.processor;
 	if (!this.processor || !this.processor.transform) {
 		logger.warn('"script" transform template did not produce valid transform object');
 		return;
@@ -5467,7 +5477,7 @@ function checkElementPerformance(el, namespaces) {
 			break;
 		}
 		if (!outerHTML) outerHTML = el.cloneNode(false).outerHTML; // FIXME caniuse outerHTML??
-		logger.info('Found ' + cond.description + ':\n\t\t' + outerHTML + '\n\t' +
+		logger.debug('Found ' + cond.description + ':\n\t\t' + outerHTML + '\n\t' +
 			'This can cause poor performance on IE / Edge.');
 	});
 }
@@ -5547,7 +5557,7 @@ function htmlToFragment(html, doc) {
 	return result;
 }
 
-function HazardProcessor(frameset) {
+function HazardProcessor(options, frameset) {
 	this.frameset = frameset;
 	frameset.addDefaultNamespace(hazDefaultNS);
 	frameset.addDefaultNamespace(exprDefaultNS);
@@ -6075,7 +6085,7 @@ framer.registerProcessor('hazard', HazardProcessor);
 
 var CSSDecoder = (function() {
 
-function CSSDecoder() {}
+function CSSDecoder(options, framesetDef) {}
 
 _.defaults(CSSDecoder.prototype, {
 
@@ -6376,7 +6386,7 @@ getValue: getValue
 
 var MicrodataDecoder = (function() {
 
-function MicrodataDecoder() {}
+function MicrodataDecoder(options, framesetDef) {}
 
 _.defaults(MicrodataDecoder.prototype, {
 
@@ -6447,7 +6457,7 @@ var JSONDecoder = (function() {
 // FIXME not really a JSON decoder since expects JSON input and 
 // doesn't use JSON paths
 
-function JSONDecoder() {}
+function JSONDecoder(options, framesetDef) {}
 
 _.defaults(JSONDecoder.prototype, {
 

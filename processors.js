@@ -38,7 +38,7 @@ var FRAGMENTS_ARE_INERT = !(window.HTMLUnknownElement &&
 
 var MainProcessor = (function() {
 
-function MainProcessor() {}
+function MainProcessor(options, framesetDef) {}
 
 _.defaults(MainProcessor.prototype, {
 
@@ -70,7 +70,10 @@ framer.registerProcessor('main', MainProcessor);
 
 var ScriptProcessor = (function() {
 
-function ScriptProcessor() {}
+function ScriptProcessor(options, framesetDef) {
+	this.frameset = framesetDef;
+	this.processor = options;
+}
 
 _.defaults(ScriptProcessor.prototype, {
 
@@ -100,6 +103,8 @@ loadTemplate: function(template) {
 		}
 	});
 	if (!script) {
+		// no problem if already a processor defined in new ScriptProcessor(options)
+		if (this.processor) return;
 		logger.warn('No <script> found in "script" transform template');
 		return;
 	}
@@ -114,7 +119,6 @@ loadTemplate: function(template) {
 
 transform: function(provider, details) {
 	var srcNode = provider.srcNode;
-	var processor = this.processor;
 	if (!this.processor || !this.processor.transform) {
 		logger.warn('"script" transform template did not produce valid transform object');
 		return;
@@ -201,7 +205,7 @@ function checkElementPerformance(el, namespaces) {
 			break;
 		}
 		if (!outerHTML) outerHTML = el.cloneNode(false).outerHTML; // FIXME caniuse outerHTML??
-		logger.info('Found ' + cond.description + ':\n\t\t' + outerHTML + '\n\t' +
+		logger.debug('Found ' + cond.description + ':\n\t\t' + outerHTML + '\n\t' +
 			'This can cause poor performance on IE / Edge.');
 	});
 }
@@ -281,7 +285,7 @@ function htmlToFragment(html, doc) {
 	return result;
 }
 
-function HazardProcessor(frameset) {
+function HazardProcessor(options, frameset) {
 	this.frameset = frameset;
 	frameset.addDefaultNamespace(hazDefaultNS);
 	frameset.addDefaultNamespace(exprDefaultNS);
@@ -809,7 +813,7 @@ framer.registerProcessor('hazard', HazardProcessor);
 
 var CSSDecoder = (function() {
 
-function CSSDecoder() {}
+function CSSDecoder(options, framesetDef) {}
 
 _.defaults(CSSDecoder.prototype, {
 
@@ -1110,7 +1114,7 @@ getValue: getValue
 
 var MicrodataDecoder = (function() {
 
-function MicrodataDecoder() {}
+function MicrodataDecoder(options, framesetDef) {}
 
 _.defaults(MicrodataDecoder.prototype, {
 
@@ -1181,7 +1185,7 @@ var JSONDecoder = (function() {
 // FIXME not really a JSON decoder since expects JSON input and 
 // doesn't use JSON paths
 
-function JSONDecoder() {}
+function JSONDecoder(options, framesetDef) {}
 
 _.defaults(JSONDecoder.prototype, {
 
