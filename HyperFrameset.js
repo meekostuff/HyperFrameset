@@ -3856,14 +3856,15 @@ preprocess: function() {
 		}
 		if (!scriptFor) scriptFor = script.parentNode;
 		
-		// FIXME @scriptIndex shouldn't be hard-wired here
-		var scriptIndex = scriptFor.hasAttribute('scriptIndex') ? 
-			scriptFor.getAttribute('scriptIndex') :
+		// FIXME @configID shouldn't be hard-wired here
+		var sourceURL = script.getAttribute('sourceurl'); // assuming @sourceurl preset
+		var configID = scriptFor.hasAttribute('configID') ? 
+			scriptFor.getAttribute('configID') :
 			'';
-		scriptIndex = scriptIndex ?
-			scriptIndex.replace(/\s*$/, ' ' + i) :
-			i;
-		scriptFor.setAttribute('scriptIndex', scriptIndex);
+		configID = configID ?
+			configID.replace(/\s*$/, ' ' + sourceURL) :
+			sourceURL;
+		scriptFor.setAttribute('configID', configID);
 
 		// FIXME temporary work-around for hf-frame, hf-transform implementation
 		if (!DOM.matches(scriptFor, frameset.lookupSelector('frame, transform'))) 
