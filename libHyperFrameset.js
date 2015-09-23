@@ -1154,6 +1154,7 @@ _.defaults(HFrameDefinition.prototype, {
 
 config: function(options) {
 	var frameDef = this;
+	if (!options) return;
 	_.assign(frameDef.options, options);
 },
 
@@ -1192,24 +1193,6 @@ init: function(el) {
 	_.forEach(_.map(el.childNodes), function(node) {
 		var tag = DOM.getTagName(node);
 		if (!tag) return;
-		if (tag === 'script') { // TODO factor out common code with <script for=""> evaluation in <head>
-			// FIXME only the first <script> should be eval'd. Latter scripts should produce warnings.
-			var script = node;
-			if (script.src) {
-				logger.warn('Ignoring <script> declaration - @src not compatible with HFrame options scripts');
-				return;
-			}
-			var options;
-			try {
-				options = (Function('return (' + script.text + ');'))();
-			}
-			catch(err) { 
-				Task.postError(err);
-				return; 
-			}
-			_.assign(frameDef.options, options);
-			return;
-		}
 		if (_.includes(hfHeadTags, tag)) return; // ignore typical <head> elements
 		if (tag === hfNS.lookupTagName('body')) {
 			el.removeChild(node);
@@ -1219,11 +1202,18 @@ init: function(el) {
 		logger.warn('Unexpected element in HFrame: ' + tag);
 		return;
 	});
+
+	if (el.hasAttribute('configid')) { // TODO multiple configurations??
+		var configID = _.words(el.getAttribute('configid'))[0];
+		var options = frameset.configData[configID];
+		frameDef.config(options);
+	}
+
 	// FIXME create fallback bodies
 },
 
 render: function(resource, condition, details) {
-	var frameDef = this;
+var frameDef = this;
 	var frameset = frameDef.frameset;
 	var hfNS = frameset.namespace;
 	if (!details) details = {};
@@ -1411,6 +1401,7 @@ _.defaults(HFramesetDefinition.prototype, {
 
 config: function(options) {
 	var frameset = this;
+	if (!options) return;
 	_.assign(frameset.options, options);
 },
 
@@ -1521,13 +1512,14 @@ preprocess: function() {
 		var configID = scriptFor.hasAttribute('configID') ? 
 			scriptFor.getAttribute('configID') :
 			'';
+		// TODO we can add more than one configID to an element but only first is used
 		configID = configID ?
 			configID.replace(/\s*$/, ' ' + sourceURL) :
 			sourceURL;
 		scriptFor.setAttribute('configID', configID);
 
-		// FIXME temporary work-around for hf-frame, hf-transform implementation
-		if (!DOM.matches(scriptFor, frameset.lookupSelector('frame, transform'))) 
+		// FIXME temporary work-around for hf-transform implementation
+		if (!DOM.matches(scriptFor, frameset.lookupSelector('transform'))) 
 			script.parentNode.removeChild(script);
 
 		var fnText = 'return (' + script.text + ');';
@@ -1545,9 +1537,6 @@ preprocess: function() {
 			Task.postError(err);
 		}
 
-		if (scriptFor === body) { // FIXME ASAP temp work-around
-			frameset.config(object);
-		}
 	});
 
 
@@ -1586,6 +1575,12 @@ preprocess: function() {
 			logger.warn('HyperFrame references non-existant frame #' + defId);
 		}
 	});
+
+	if (body.hasAttribute('configid')) { // TODO multiple configurations??
+		var configID = _.words(body.getAttribute('configid'))[0];
+		var options = frameset.configData[configID];
+		frameset.config(options);
+	}
 },
 
 render: function() {
@@ -2875,6 +2870,7 @@ options: {
 
 config: function(options) {
 	var framer = this;
+	if (!options) return;
 	_.assign(framer.options, options);
 }
 
