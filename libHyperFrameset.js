@@ -1964,14 +1964,12 @@ enteredDocument: function() {
 	}
 	controllers.listen(name, function(values) {
 		var panels = deck.ariaGet('owns');
-		var active;
-		_.some(panels, function(child) { 
+		var activePanel = _.find(panels, function(child) { 
 			var value = child.getAttribute('value');
 			if (!_.includes(values, value)) return false;
-			active = child;
 			return true;
 		});
-		if (active) deck.ariaSet('activedescendant', active);
+		if (activePanel) deck.ariaSet('activedescendant', activePanel);
 	});
 
 }
@@ -1997,16 +1995,11 @@ enteredDocument: function() {
 	Deck.enteredDocument.call(this);
 	var width = parseFloat(window.getComputedStyle(this.element, null).width);
 	var panels = this.ariaGet('owns');
-	var activePanel;
-	_.some(panels, function(panel) {
+	var activePanel = _.find(panels, function(panel) {
 		var minWidth = window.getComputedStyle(panel, null).minWidth;
-		if (minWidth == null || minWidth === '' || minWidth === '0px') {
-			activePanel = panel;
-			return true;
-		}
+		if (minWidth == null || minWidth === '' || minWidth === '0px') return true;
 		minWidth = parseFloat(minWidth); // FIXME minWidth should be "NNNpx" but need to test
 		if (minWidth > width) return false;
-		activePanel = panel;
 		return true;
 	});
 	if (activePanel) {
