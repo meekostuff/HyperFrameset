@@ -4363,43 +4363,6 @@ return ResponsiveDeck;
 })();
 
 
-function registerLayoutElements() {
-
-var framesetDef = framer.definition;
-
-sprockets.registerElement(framesetDef.lookupSelector('layer'), Layer);
-sprockets.registerElement(framesetDef.lookupSelector('panel'), Panel);
-sprockets.registerElement(framesetDef.lookupSelector('vlayout'), VLayout);
-sprockets.registerElement(framesetDef.lookupSelector('hlayout'), HLayout);
-sprockets.registerElement(framesetDef.lookupSelector('deck'), Deck);
-sprockets.registerElement(framesetDef.lookupSelector('rdeck'), ResponsiveDeck);
-
-var cssText = [
-'*[hidden] { display: none !important; }', // TODO maybe not !important
-'html, body { margin: 0; padding: 0; }',
-'html { width: 100%; height: 100%; }',
-framesetDef.lookupSelector('layer, hlayout, vlayout, deck, rdeck, panel, frame, body') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
-framesetDef.lookupSelector('layer') + ' { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; overflow: visible; }',
-framesetDef.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { display: block; width: 0; height: 0; overflow: hidden; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
-framesetDef.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { width: 100%; height: 100%; }', // FIXME should be 0,0 before manual calculations
-framesetDef.lookupSelector('frame, panel') + ' { display: block; width: auto; height: auto; overflow: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
-framesetDef.lookupSelector('body') + ' { display: block; width: auto; height: auto; overflow: hidden; margin: 0; }',
-framesetDef.lookupSelector('vlayout') + ' { height: 100%; overflow: hidden; }',
-framesetDef.lookupSelector('hlayout') + ' { width: 100%; overflow: hidden; }',
-framesetDef.lookupSelector('vlayout') + ' > * { display: block; float: left; width: 100%; height: auto; text-align: left; }',
-framesetDef.lookupSelector('vlayout') + ' > *::after { clear: both; }',
-framesetDef.lookupSelector('hlayout') + ' > * { display: block; float: left; width: auto; height: 100%; vertical-align: top; }',
-framesetDef.lookupSelector('hlayout') + '::after { clear: both; }',
-framesetDef.lookupSelector('deck') + ' > * { width: 100%; height: 100%; }',
-framesetDef.lookupSelector('rdeck') + ' > * { width: 0; height: 0; }',
-].join('\n');
-
-var style = document.createElement('style');
-style.textContent = cssText;
-document.head.insertBefore(style, document.head.firstChild);
-
-} // END registerLayoutElements()
-
 var HFrame = (function() {
 
 var HFrame = sprockets.evolve(sprockets.RoleType, {
@@ -4471,7 +4434,43 @@ insert: function(bodyElement) { // FIXME need a teardown method that releases ch
 
 _.assign(HFrame, {
 
-attached: Panel.attached
+attached: function() {
+	Panel.attached.call(this);
+	var frame = this;
+	var defId = frame.attr('def');
+	frame.definition = framer.definition.frames[defId];
+	if (frame.init) frame.init();
+},
+enteredDocument: function() {
+	var frame = this;
+	var parentFrame;
+	var parentElement = DOM.closest(frame.element.parentNode, framer.definition.lookupSelector('frame')); // TODO frame.element.parentNode.ariaClosest('frame')
+	if (parentElement) parentFrame = HFrame(parentElement);
+	else {
+		parentElement = document.body; // TODO  frame.elenent.parentNode.ariaClosest('frameset'); 
+		parentFrame = HFrameset(parentElement);
+	}
+	frame.parentFrame = parentFrame;
+	parentFrame.frameEntered(frame);
+	framer.frameEntered(frame);
+},
+leftDocument: function() {
+	var frame = this;
+	frame.parentFrame.frameLeft(frame);
+	delete frame.parentFrame;
+	// FIXME notify framer
+},
+
+handlers: [
+{
+	type: 'requestnavigation',
+	action: function(e) {
+		if (e.defaultPrevented) return;
+		var acceptDefault = framer.onRequestNavigation(e, this);
+		if (acceptDefault === false) e.preventDefault();
+	}
+}
+]
 
 });
 
@@ -4657,8 +4656,81 @@ function getSelfMarker(doc) {
 	return marker;
 }
 
+_.assign(HFrameset, {
+
+attached: function() {
+	var frameset = this;
+	frameset.definition = framer.definition;
+	if (frameset.init) frameset.init();
+}, 
+enteredDocument: function() {
+	var frameset = this;
+	framer.frameset = frameset;
+	var _ready = {};
+	var ready = Promise.applyTo(_ready);
+	frameset.ready = ready;
+	frameset.render()
+	.then(function() { _ready.resolve(); }); 
+},
+leftDocument: function() { // FIXME should never be called??
+	delete framer.frameset;
+},
+handlers: [
+{
+	type: 'requestnavigation',
+	action: function(e) {
+		if (e.defaultPrevented) return;
+		var acceptDefault = framer.onRequestNavigation(e, this);
+		if (acceptDefault === false) e.preventDefault();
+	}
+}
+]
+	
+});
+
 return HFrameset;
 })();
+
+
+function registerHyperFramesetElements() {
+
+var framesetDef = framer.definition;
+
+sprockets.registerElement('body', HFrameset);
+sprockets.registerElement(framesetDef.lookupSelector('frame'), HFrame);
+
+sprockets.registerElement(framesetDef.lookupSelector('layer'), Layer);
+sprockets.registerElement(framesetDef.lookupSelector('panel'), Panel);
+sprockets.registerElement(framesetDef.lookupSelector('vlayout'), VLayout);
+sprockets.registerElement(framesetDef.lookupSelector('hlayout'), HLayout);
+sprockets.registerElement(framesetDef.lookupSelector('deck'), Deck);
+sprockets.registerElement(framesetDef.lookupSelector('rdeck'), ResponsiveDeck);
+
+var cssText = [
+'*[hidden] { display: none !important; }', // TODO maybe not !important
+'html, body { margin: 0; padding: 0; }',
+'html { width: 100%; height: 100%; }',
+framesetDef.lookupSelector('layer, hlayout, vlayout, deck, rdeck, panel, frame, body') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
+framesetDef.lookupSelector('layer') + ' { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; overflow: visible; }',
+framesetDef.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { display: block; width: 0; height: 0; overflow: hidden; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+framesetDef.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { width: 100%; height: 100%; }', // FIXME should be 0,0 before manual calculations
+framesetDef.lookupSelector('frame, panel') + ' { display: block; width: auto; height: auto; overflow: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+framesetDef.lookupSelector('body') + ' { display: block; width: auto; height: auto; overflow: hidden; margin: 0; }',
+framesetDef.lookupSelector('vlayout') + ' { height: 100%; overflow: hidden; }',
+framesetDef.lookupSelector('hlayout') + ' { width: 100%; overflow: hidden; }',
+framesetDef.lookupSelector('vlayout') + ' > * { display: block; float: left; width: 100%; height: auto; text-align: left; }',
+framesetDef.lookupSelector('vlayout') + ' > *::after { clear: both; }',
+framesetDef.lookupSelector('hlayout') + ' > * { display: block; float: left; width: auto; height: 100%; vertical-align: top; }',
+framesetDef.lookupSelector('hlayout') + '::after { clear: both; }',
+framesetDef.lookupSelector('deck') + ' > * { width: 100%; height: 100%; }',
+framesetDef.lookupSelector('rdeck') + ' > * { width: 0; height: 0; }',
+].join('\n');
+
+var style = document.createElement('style');
+style.textContent = cssText;
+document.head.insertBefore(style, document.head.firstChild);
+
+} // END registerLayoutElements()
 
 
 var notify = function(msg) { // FIXME this isn't being used called everywhere it should
@@ -4793,82 +4865,7 @@ start: function(startOptions) {
 		}, false);
 		
 		registerFormElements();
-		registerLayoutElements();
-
-		var _ready = {};
-		var ready = Promise.applyTo(_ready);
-
-		sprockets.registerElement('body', { // FIXME should target the body using 'hf-frameset' as @is
-			prototype: HFrameset.prototype, 
-			attached: function() {
-				var frameset = this;
-				frameset.definition = framer.definition;
-				if (frameset.init) frameset.init();
-				frameset.ready = ready; // FIXME should this be in the HFrameset definition?
-			}, 
-			enteredDocument: function() {
-				var frameset = this;
-				framer.frameset = frameset;
-				frameset.render()
-				.then(function() { _ready.resolve(); }); 
-			},
-			leftDocument: function() { // FIXME should never be called??
-				delete framer.frameset;
-			},
-			handlers: [
-			{
-				type: 'requestnavigation',
-				action: function(e) {
-					if (e.defaultPrevented) return;
-					var acceptDefault = framer.onRequestNavigation(e, this);
-					if (acceptDefault === false) e.preventDefault();
-				}
-			}
-			]
-			
-			});
-
-		sprockets.registerElement(framer.definition.lookupSelector('frame'), {
-			prototype: HFrame.prototype,
-			attached: function() {
-				HFrame.attached.call(this);
-				var frame = this;
-				var defId = frame.attr('def');
-				frame.definition = framer.definition.frames[defId];
-				if (frame.init) frame.init();
-			},
-			enteredDocument: function() {
-				var frame = this;
-				var parentFrame;
-				var parentElement = DOM.closest(frame.element.parentNode, framer.definition.lookupSelector('frame')); // TODO frame.element.parentNode.ariaClosest('frame')
-				if (parentElement) parentFrame = HFrame(parentElement);
-				else {
-					parentElement = document.body; // TODO  frame.elenent.parentNode.ariaClosest('frameset'); 
-					parentFrame = HFrameset(parentElement);
-				}
-				frame.parentFrame = parentFrame;
-				parentFrame.frameEntered(frame);
-				framer.frameEntered(frame);
-			},
-			leftDocument: function() {
-				var frame = this;
-				frame.parentFrame.frameLeft(frame);
-				delete frame.parentFrame;
-				// FIXME notify framer
-			},
-			
-			handlers: [
-			{
-				type: 'requestnavigation',
-				action: function(e) {
-					if (e.defaultPrevented) return;
-					var acceptDefault = framer.onRequestNavigation(e, this);
-					if (acceptDefault === false) e.preventDefault();
-				}
-			}
-			]
-			
-			});
+		registerHyperFramesetElements();
 
 		return sprockets.start({ manual: true }); // FIXME should be a promise
 	},
