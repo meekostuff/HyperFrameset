@@ -3465,6 +3465,63 @@ var hfDefaultNamespace = {
 	urn: HYPERFRAMESET_URN
 }
 
+
+function registerFormElements() {
+
+var eventConfig = 'form@submit,reset,input,change,invalid input,textarea@input,change,invalid,focus,blur select,fieldset@change,invalid,focus,blur button@click';
+
+var eventTable = (function(config) {
+
+var table = {};
+_.forEach(config.split(/\s+/), function(combo) {
+	var m = combo.split('@');
+	var tags = m[0].split(',');
+	var events = m[1].split(',');
+	_.forEach(tags, function(tag) {
+		table[tag] = _.map(events);
+	});
+});
+
+return table;
+
+})(eventConfig);
+
+
+_.forOwn(eventTable, function(events, tag) {
+
+var Interface = sprockets.evolve(sprockets.RoleType, {});
+_.assign(Interface, {
+
+attached: function(handlers) {
+	var object = this;
+	var element = object.element;
+	if (!element.hasAttribute('configid')) return;
+	var configID = _.words(element.getAttribute('configid'))[0];	
+	var options = framer.definition.configData[configID];
+	if (!options) return;
+	_.forEach(events, function(type) {
+		var ontype = 'on' + type;
+		var callback = options[ontype];
+		if (!callback) return;
+
+		var fn = function() { callback.apply(object, arguments); };
+		object[ontype] = fn;
+		handlers.push({
+			type: type,
+			action: fn
+		});
+	});
+}
+
+});
+
+sprockets.registerElement(tag, Interface);
+
+});
+
+} // END registerFormElements()
+
+
 var hfHeadTags = _.words('title meta link style script');
 
 var HFrameDefinition = (function() {
@@ -4341,65 +4398,7 @@ var style = document.createElement('style');
 style.textContent = cssText;
 document.head.insertBefore(style, document.head.firstChild);
 
-}
-
-function registerFormElements() {
-
-var eventConfig = 'form@submit,reset,input,change,invalid input,textarea@input,change,invalid,focus,blur select,fieldset@change,invalid,focus,blur button@click';
-
-var eventTable = (function(config) {
-
-var table = {};
-_.forEach(config.split(/\s+/), function(combo) {
-	var m = combo.split('@');
-	var tags = m[0].split(',');
-	var events = m[1].split(',');
-	_.forEach(tags, function(tag) {
-		table[tag] = _.map(events);
-	});
-});
-
-return table;
-
-})(eventConfig);
-
-
-_.forOwn(eventTable, function(events, tag) {
-
-var Interface = sprockets.evolve(sprockets.RoleType, {});
-_.assign(Interface, {
-
-attached: function(handlers) {
-	var object = this;
-	var element = object.element;
-	if (!element.hasAttribute('configid')) return;
-	var configID = _.words(element.getAttribute('configid'))[0];	
-	var options = framer.definition.configData[configID];
-	if (!options) return;
-	_.forEach(events, function(type) {
-		var ontype = 'on' + type;
-		var callback = options[ontype];
-		if (!callback) return;
-
-		var fn = function() { callback.apply(object, arguments); };
-		object[ontype] = fn;
-		handlers.push({
-			type: type,
-			action: fn
-		});
-	});
-}
-
-});
-
-sprockets.registerElement(tag, Interface);
-
-});
-
-
-}
-
-
+} // END registerLayoutElements()
 
 var HFrame = (function() {
 
