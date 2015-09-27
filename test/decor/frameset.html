@@ -31,7 +31,7 @@ nav li { display: inline; list-style: outside none; margin: 0.1em; padding: 0.25
 .style-in-body-fail { display: none; }
 </style>
 
-<hf-frame name="hf_top" src="scope:./index.html" type="html">
+<hf-frame targetname="hf_top" src="scope:./index.html" type="html">
 	<hf-body>
 		<hf-transform type="hazard" format="css">
 			<h1 expr:_text=".title {_text}">{{title}}</h1>
@@ -54,7 +54,7 @@ If you can see this then &lt;style&gt; elements
 in the &lt;body&gt; of the frameset document aren't being imported.
 </div> 
 
-<hf-frame name="hf_main" src="scope:./normal.html" type="html">
+<hf-frame targetname="hf_main" src="scope:./normal.html" type="html">
 	<hf-body>
 		<hf-transform type="hazard" format="css">
 		

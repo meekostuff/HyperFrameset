@@ -1180,6 +1180,9 @@ sprockets.registerElement(tag, Interface);
 
 } // END registerFormElements()
 
+/*
+ * HyperFrameset definitions
+ */
 
 var hfHeadTags = _.words('title meta link style script');
 
@@ -1756,10 +1759,63 @@ function rebaseURL(url, baseURL) {
 
 return HFramesetDefinition;	
 })();
- 
+
+
+/*
+ * HyperFrameset sprockets
+ */
+
+// All HyperFrameset sprockets inherit from Base
+var Base = (function() {
+
+var Base = sprockets.evolve(sprockets.RoleType, {
+
+});
+
+_.assign(Base, {
+
+iAttached: function() {
+	var object = this;
+	object.options = {};
+	var element = object.element;
+	if (!element.hasAttribute('configid')) return;
+	var configID = _.words(element.getAttribute('configid'))[0];	
+	var options = framer.definition.configData[configID];
+	object.options = options;
+}
+
+});
+
+return Base;
+})();
+
+// Almost all HyperFrameset sprockets inherit from Link
+var Link = (function() {
+
+var Link = sprockets.evolve(Base, {
+
+role: 'link', // FIXME probably doesn't match functionality of aria "link"
+
+lookup: function(url, details) {
+	var link = this;
+	var options = link.options;
+	if (!options || !options.lookup) return false;
+	var partial = options.lookup(url, details);
+	if (partial === '' || partial === true) return true;
+	if (partial == null || partial === false) return false;
+	return inferChangeset(url, partial);
+}
+
+});
+
+return Link;
+})();
+
+
+
 var Layer = (function() {
 
-var Layer = sprockets.evolve(sprockets.RoleType, {
+var Layer = sprockets.evolve(Base, {
 
 role: 'layer'
 
@@ -1769,8 +1825,13 @@ var zIndex = 1;
 
 _.assign(Layer, {
 
-attached: function() {
+iAttached: function() {
 	this.css('z-index', zIndex++);
+},
+
+attached: function() {
+	Base.iAttached.call(this);
+	Layer.iAttached.call(this);
 }
 
 });
@@ -1780,7 +1841,7 @@ return Layer;
 
 var Panel = (function() {
 
-var Panel = sprockets.evolve(sprockets.RoleType, {
+var Panel = sprockets.evolve(Link, {
 
 role: 'panel',
 
@@ -1788,7 +1849,7 @@ role: 'panel',
 
 _.assign(Panel, {
 
-attached: function() {
+iAttached: function() {
 	var height = this.attr('height');
 	if (height) this.css('height', height); // FIXME units
 	var width = this.attr('width');
@@ -1797,7 +1858,12 @@ attached: function() {
 	if (minWidth) this.css('min-width', minWidth); // FIXME units
 }, 
 
-enteredDocument: function() {
+attached: function() {
+	Base.iAttached.call(this);
+	Panel.iAttached.call(this);
+},
+
+iEnteredDocument: function() {
 	var panel = this;
 	var name = panel.attr('name'); 
 	var value = panel.attr('value'); 
@@ -1807,7 +1873,10 @@ enteredDocument: function() {
 	controllers.listen(name, function(values) {
 		panel.ariaToggle('hidden', !(_.includes(values, value)));
 	});
+},
 
+enteredDocument: function() {
+	Panel.iEnteredDocument.call(this);
 }
 
 });
@@ -1817,7 +1886,7 @@ return Panel;
 
 var Layout = (function() { // a Layout is a list of Panel (or other Layout) and perhaps separators for hlayout, vlayout
 
-var Layout = sprockets.evolve(sprockets.RoleType, {
+var Layout = sprockets.evolve(Link, {
 
 role: 'group',
 
@@ -1830,12 +1899,15 @@ owns: {
 _.assign(Layout, {
 
 attached: function() {
-	Panel.attached.call(this);
+	Base.iAttached.call(this);
+	Panel.iAttached.call(this);
 },
 
-enteredDocument: function() {
+iEnteredDocument: function() {
 	var element = this.element;
 	var parent = element.parentNode;
+
+	// FIXME dimension setting should occur before becoming visible
 	if (DOM.matches(parent, framer.definition.lookupSelector('layer'))) { // TODO vh, vw not tested on various platforms
 		var height = this.attr('height'); // TODO css unit parsing / validation
 		if (!height) height = '100vh';
@@ -1870,6 +1942,11 @@ enteredDocument: function() {
 			return;
 		}
 	}
+},
+
+enteredDocument: function() {
+	Panel.iEnteredDocument.call(this);
+	Layout.iEnteredDocument.call(this);
 }
 
 });
@@ -1884,17 +1961,21 @@ var VLayout = sprockets.evolve(Layout, {
 
 _.assign(VLayout, {
 
-attached: function() {
-	Layout.attached.call(this);
+iAttached: function() {
 	var hAlign = this.attr('align'); // FIXME assert left/center/right/justify - also start/end (stretch?)
 	if (hAlign) this.css('text-align', hAlign); // NOTE defaults defined in <style> above
 },
 
+attached: function() {
+	Base.iAttached.call(this);
+	Panel.iAttached.call(this);
+	Layout.iAttached.call(this);
+	VLayout.iAttached.call(this);
+},
+
 enteredDocument: function() {
-	Panel.enteredDocument.call(this);
-	Layout.enteredDocument.call(this);
-	_.forEach(this.ariaGet('owns'), function(panel) {
-	});
+	Panel.iEnteredDocument.call(this);
+	Layout.iEnteredDocument.call(this);
 }
 
 });
@@ -1910,16 +1991,22 @@ var HLayout = sprockets.evolve(Layout, {
 _.assign(HLayout, {
 
 attached: function() {
-	Layout.attached.call(this);
+	Base.iAttached.call(this);
+	Panel.iAttached.call(this);
+	Layout.iAttached.call(this);
 },
 
-enteredDocument: function() {
-	Panel.enteredDocument.call(this);
-	Layout.enteredDocument.call(this);
+iEnteredDocument: function() {
 	var vAlign = this.attr('align'); // FIXME assert top/middle/bottom/baseline - also start/end (stretch?)
 	_.forEach(this.ariaGet('owns'), function(panel) {
 		if (vAlign) panel.$.css('vertical-align', vAlign);
 	});
+},
+
+enteredDocument: function() {
+	Panel.iEnteredDocument.call(this);
+	Layout.iEnteredDocument.call(this);
+	HLayout.iEnteredDocument.call(this);
 }
 
 });
@@ -1951,11 +2038,12 @@ activedescendant: {
 _.assign(Deck, {
 
 attached: function() {
-	Layout.attached.call(this);
+	Base.iAttached.call(this);
+	Panel.iAttached.call(this);
+	Layout.iAttached.call(this);
 },
 
-enteredDocument: function() {
-	Layout.enteredDocument.call(this);
+iEnteredDocument: function() {
 	var deck = this;
 	var name = deck.attr('name'); 
 	if (!name) {
@@ -1972,6 +2060,11 @@ enteredDocument: function() {
 		if (activePanel) deck.ariaSet('activedescendant', activePanel);
 	});
 
+},
+
+enteredDocument: function() {
+	Layout.iEnteredDocument.call(this);
+	Deck.iEnteredDocument.call(this);
 }
 
 });
@@ -1988,11 +2081,13 @@ var ResponsiveDeck = sprockets.evolve(Deck, {
 _.assign(ResponsiveDeck, {
 
 attached: function() {
-	Deck.attached.call(this);
+	Base.iAttached.call(this);
+	Panel.iAttached.call(this);
+	Layout.iAttached.call(this);
+	Deck.iAttached.call(this);
 },
 
-enteredDocument: function() {
-	Deck.enteredDocument.call(this);
+iEnteredDocument: function() {
 	var width = parseFloat(window.getComputedStyle(this.element, null).width);
 	var panels = this.ariaGet('owns');
 	var activePanel = _.find(panels, function(panel) {
@@ -2007,6 +2102,13 @@ enteredDocument: function() {
 		activePanel.$.css('width', '100%');
 		this.ariaSet('activedescendant', activePanel);
 	}
+},
+
+enteredDocument: function() {
+	Layout.iEnteredDocument.call(this);
+	Panel.iEnteredDocument.call(this);
+	Deck.iEnteredDocument.call(this);
+	ResponsiveDeck.iEnteredDocument.call(this);
 }
 
 });
@@ -2017,7 +2119,7 @@ return ResponsiveDeck;
 
 var HFrame = (function() {
 
-var HFrame = sprockets.evolve(sprockets.RoleType, {
+var HFrame = sprockets.evolve(Panel, {
 
 role: 'frame',
 
@@ -2027,6 +2129,7 @@ init: function() {
 		frames: [],
 		bodyElement: null,
 		name: frame.attr('name'),
+		targetname: frame.attr('targetname'),
 		src: frame.attr('src'),
 		mainSelector: frame.attr('main') // TODO consider using a hash in `@src`
     });
@@ -2086,14 +2189,18 @@ insert: function(bodyElement) { // FIXME need a teardown method that releases ch
 
 _.assign(HFrame, {
 
-attached: function() {
-	Panel.attached.call(this);
+iAttached: function() {
 	var frame = this;
 	var defId = frame.attr('def');
 	frame.definition = framer.definition.frames[defId];
 	if (frame.init) frame.init();
 },
-enteredDocument: function() {
+attached: function() {
+	Base.iAttached.call(this);
+	Panel.iAttached.call(this);
+	HFrame.iAttached.call(this);
+},
+iEnteredDocument: function() {
 	var frame = this;
 	var parentFrame;
 	var parentElement = DOM.closest(frame.element.parentNode, framer.definition.lookupSelector('frame')); // TODO frame.element.parentNode.ariaClosest('frame')
@@ -2106,11 +2213,18 @@ enteredDocument: function() {
 	parentFrame.frameEntered(frame);
 	framer.frameEntered(frame);
 },
-leftDocument: function() {
+enteredDocument: function() {
+	Panel.iEnteredDocument.call(this);
+	HFrame.iEnteredDocument.call(this);
+},
+iLeftDocument: function() {
 	var frame = this;
 	frame.parentFrame.frameLeft(frame);
 	delete frame.parentFrame;
 	// FIXME notify framer
+},
+leftDocument: function() {
+	this.iLeftDocument();
 },
 
 handlers: [
@@ -2132,7 +2246,7 @@ return HFrame;
 
 var HFrameset = (function() {
 	
-var HFrameset = sprockets.evolve(sprockets.RoleType, {
+var HFrameset = sprockets.evolve(Link, {
 
 role: 'frameset',
 isFrameset: true,
@@ -2161,8 +2275,6 @@ render: function() {
 	return Promise.pipe(null, [
 
 	function() {
-		mergeElement(dstBody, srcBody);
-
 		_.forEach(_.map(srcBody.childNodes), function(node) {
 			sprockets.insertNode('beforeend', dstBody, node);
 		});
@@ -2176,7 +2288,7 @@ render: function() {
 
 _.defaults(HFrameset, {
 	
-prerender: function(dstDoc, definition) {
+prepare: function(dstDoc, definition) {
 
 	if (getFramesetMarker(dstDoc)) throw Error('The HFrameset has already been applied');
 
@@ -2233,6 +2345,12 @@ prerender: function(dstDoc, definition) {
 	
 	]);
 
+},
+
+prerender: function(dstDoc, definition) { // FIXME where does this go
+	var srcBody = definition.element;
+	var dstBody = document.body;
+	mergeElement(dstBody, srcBody);
 }
 
 });
@@ -2310,12 +2428,16 @@ function getSelfMarker(doc) {
 
 _.assign(HFrameset, {
 
-attached: function() {
+iAttached: function() {
 	var frameset = this;
 	frameset.definition = framer.definition;
 	if (frameset.init) frameset.init();
 }, 
-enteredDocument: function() {
+attached: function() {
+	Base.iAttached.call(this);
+	HFrameset.iAttached.call(this);
+},
+iEnteredDocument: function() {
 	var frameset = this;
 	framer.frameset = frameset;
 	var _ready = {};
@@ -2324,8 +2446,14 @@ enteredDocument: function() {
 	frameset.render()
 	.then(function() { _ready.resolve(); }); 
 },
-leftDocument: function() { // FIXME should never be called??
+enteredDocument: function() {
+	HFrameset.iEnteredDocument.call(this);
+},
+iLeftDocument: function() { // FIXME should never be called??
 	delete framer.frameset;
+},
+leftDocument: function() {
+	HFrameset.iLeftDocument.call(this);
 },
 handlers: [
 {
@@ -2482,11 +2610,15 @@ start: function(startOptions) {
 		
 		function() {
 			framer.definition = definition;
-			return HFrameset.prerender(document, definition)
+			return HFrameset.prepare(document, definition)
 		},
 
 		function() { 
 			return definition.preprocess();
+		},
+
+		function() {
+			return HFrameset.prerender(document, definition)
 		}
 
 		]);
@@ -2494,6 +2626,7 @@ start: function(startOptions) {
 	
 	function () {
 		var url = document.URL;
+		// FIXME HFrameset(document.body).lookup(...)
 		var changeset = framer.currentChangeset = framer.definition.lookup(url, {
 			referrer: document.referrer
 		});
@@ -2533,7 +2666,7 @@ start: function(startOptions) {
 				url: document.URL
 			});
 		},
-		
+
 		function() {
 			return HFrameset(document.body).ready;
 		},
@@ -2680,7 +2813,7 @@ onRequestNavigation: function(e, frame) { // `return false` means success (so pr
 	return;
 
 	function requestNavigation(frame, url, details) { // `return true` means success
-		var changeset = frame.definition.lookup(url, details);
+		var changeset = frame.lookup(url, details);
 		if (changeset === '' || changeset === true) return true;
 		if (changeset == null || changeset === false) return false;
 		framer.load(url, changeset, frame.isFrameset);
@@ -2706,7 +2839,7 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 	var target = changeset.target;
 	var frames = [];
 	recurseFrames(frameset, function(frame) {
-		if (frame.name !== target) return;
+		if (frame.targetname !== target) return;
 		frames.push(frame);
 		return true;
 	});
@@ -2780,7 +2913,7 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 },
 
 frameEntered: function(frame) {
-	if (frame.name === framer.currentChangeset.target) { // FIXME should only be used at startup
+	if (frame.targetname === framer.currentChangeset.target) { // FIXME should only be used at startup
 		frame.attr('src', framer.currentChangeset.url);
 	}
 
