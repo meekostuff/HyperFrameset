@@ -1881,7 +1881,6 @@ iAttached: function() {
 attached: function() {
 	Base.iAttached.call(this);
 	Panel.iAttached.call(this);
-	Layout.iAttached.call(this);
 	VLayout.iAttached.call(this);
 },
 
@@ -1905,7 +1904,6 @@ _.assign(HLayout, {
 attached: function() {
 	Base.iAttached.call(this);
 	Panel.iAttached.call(this);
-	Layout.iAttached.call(this);
 },
 
 iEnteredDocument: function() {
@@ -1952,7 +1950,6 @@ _.assign(Deck, {
 attached: function() {
 	Base.iAttached.call(this);
 	Panel.iAttached.call(this);
-	Layout.iAttached.call(this);
 },
 
 iEnteredDocument: function() {
@@ -1995,7 +1992,6 @@ _.assign(ResponsiveDeck, {
 attached: function() {
 	Base.iAttached.call(this);
 	Panel.iAttached.call(this);
-	Layout.iAttached.call(this);
 	Deck.iAttached.call(this);
 },
 
