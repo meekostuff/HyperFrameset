@@ -555,7 +555,7 @@ return new Promise(function(resolve, reject) {
 			reject(function() { throw Error('Unexpected status ' + xhr.status + ' for ' + url); });
 			return;
 		}
-		Promise.asap(onload); // Use delay to stop the readystatechange event interrupting other event handlers (on IE). 
+		Promise.defer(onload); // Use delay to stop the readystatechange event interrupting other event handlers (on IE). 
 	}
 	function onload() {
 		var result = handleResponse(xhr, info);
@@ -1070,7 +1070,7 @@ function process() {
 		return;
 	}
 	var task = queue.shift();
-	var promise = Promise.asap(task.fn);
+	var promise = Promise.defer(task.fn);
 	promise.then(process, process);
 	promise.then(task.resolve, task.reject);
 }
@@ -1091,7 +1091,7 @@ return new Promise(function(resolve, reject) {
 
 	if (max == null) max = maxSize;
 	if (queue.length > max || (queue.length === max && processing)) {
-		if (fail) Promise.asap(fail).then(resolve, reject);
+		if (fail) Promise.defer(fail).then(resolve, reject);
 		else reject(function() { throw Error('No `fail` callback passed to whenever()'); });
 		return;
 	}
@@ -2431,7 +2431,7 @@ var notify = function(msg) { // FIXME this isn't being used called everywhere it
 	}
 
 	if (typeof listener == 'function') {
-		var promise = Promise.asap(function() { listener(msg); }); // TODO isFunction(listener)
+		var promise = Promise.defer(function() { listener(msg); }); // TODO isFunction(listener)
 		promise['catch'](function(err) { throw Error(err); });
 		return promise;
 	}
@@ -2698,7 +2698,7 @@ onSubmit: function(e) { // return false means success
 },
 
 triggerRequestNavigation: function(url, details) {
-	Promise.asap(function() {
+	Promise.defer(function() {
 		var event = document.createEvent('CustomEvent');
 		event.initCustomEvent('requestnavigation', true, true, details.url);
 		var acceptDefault = details.element.dispatchEvent(event);

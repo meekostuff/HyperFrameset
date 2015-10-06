@@ -496,8 +496,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 			return frag;
 		}
 	
-		var done = processor.transformChildNodes(template, provider, context, variables, frag); 
-		return Promise.asap(done); // asap forces a remaining task-time check
+		return processor.transformChildNodes(template, provider, context, variables, frag); 
 
 	case 'eval':
 		// FIXME attributes should already be in hazardDetails

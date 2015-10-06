@@ -668,20 +668,30 @@ return wait;
 })();
 
 var asap = function(value) { // FIXME asap(fn) should execute immediately
-	if (typeof value === 'function') return Promise.resolve().then(value); // will defer
 	if (Promise.isPromise(value)) {
 		if (value.isPending) return value; // already deferred
-		if (Task.getTime(true) <= 0) return value.then(function(val) { return val; }); // will defer
+		if (Task.getTime(true) <= 0) return value.then(); // will defer
 		return value; // not-deferred
 	}
 	if (Promise.isThenable(value)) return Promise.resolve(value); // will defer
+	if (typeof value === 'function') {
+		if (Task.getTime(true) <= 0) return Promise.resolve().then(value);
+		return new Promise(function(resolve) { resolve(value); }); // WARN relies on Meeko.Promise behavior
+	}
 	// NOTE otherwise we have a non-thenable, non-function something
-	if (Task.getTime(true) <= 0) return Promise.resolve(value).then(function(val) { return val; }); // will defer
+	if (Task.getTime(true) <= 0) return Promise.resolve(value).then(); // will defer
 	return Promise.resolve(value); // not-deferred
 }
 
-// FIXME implement Promise.defer(value_or_fn_or_promise)
-
+var defer = function(value) {
+	if (Promise.isPromise(value)) {
+		if (value.isPending) return value; // already deferred
+		return value.then();
+	}
+	if (Promise.isThenable(value)) return Promise.resolve(value);
+	if (typeof value === 'function') return Promise.resolve().then(value);
+	return Promise.resolve(value).then();
+}
 
 function delay(timeout) { // FIXME delay(timeout, value_or_fn_or_promise)
 	return new Promise(function(resolve, reject) {
@@ -795,7 +805,7 @@ getTimeoutCount: function(remainingTime) {
 });
 
 _.defaults(Promise, {
-	asap: asap, delay: delay, wait: wait, pipe: pipe, reduce: reduce
+	asap: asap, defer: defer, delay: delay, wait: wait, pipe: pipe, reduce: reduce
 });
 
 return Promise;
@@ -2896,7 +2906,7 @@ return new Promise(function(resolve, reject) {
 			reject(function() { throw Error('Unexpected status ' + xhr.status + ' for ' + url); });
 			return;
 		}
-		Promise.asap(onload); // Use delay to stop the readystatechange event interrupting other event handlers (on IE). 
+		Promise.defer(onload); // Use delay to stop the readystatechange event interrupting other event handlers (on IE). 
 	}
 	function onload() {
 		var result = handleResponse(xhr, info);
@@ -3411,7 +3421,7 @@ function process() {
 		return;
 	}
 	var task = queue.shift();
-	var promise = Promise.asap(task.fn);
+	var promise = Promise.defer(task.fn);
 	promise.then(process, process);
 	promise.then(task.resolve, task.reject);
 }
@@ -3432,7 +3442,7 @@ return new Promise(function(resolve, reject) {
 
 	if (max == null) max = maxSize;
 	if (queue.length > max || (queue.length === max && processing)) {
-		if (fail) Promise.asap(fail).then(resolve, reject);
+		if (fail) Promise.defer(fail).then(resolve, reject);
 		else reject(function() { throw Error('No `fail` callback passed to whenever()'); });
 		return;
 	}
@@ -4772,7 +4782,7 @@ var notify = function(msg) { // FIXME this isn't being used called everywhere it
 	}
 
 	if (typeof listener == 'function') {
-		var promise = Promise.asap(function() { listener(msg); }); // TODO isFunction(listener)
+		var promise = Promise.defer(function() { listener(msg); }); // TODO isFunction(listener)
 		promise['catch'](function(err) { throw Error(err); });
 		return promise;
 	}
@@ -5039,7 +5049,7 @@ onSubmit: function(e) { // return false means success
 },
 
 triggerRequestNavigation: function(url, details) {
-	Promise.asap(function() {
+	Promise.defer(function() {
 		var event = document.createEvent('CustomEvent');
 		event.initCustomEvent('requestnavigation', true, true, details.url);
 		var acceptDefault = details.element.dispatchEvent(event);
@@ -5844,8 +5854,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 			return frag;
 		}
 	
-		var done = processor.transformChildNodes(template, provider, context, variables, frag); 
-		return Promise.asap(done); // asap forces a remaining task-time check
+		return processor.transformChildNodes(template, provider, context, variables, frag); 
 
 	case 'eval':
 		// FIXME attributes should already be in hazardDetails
