@@ -699,7 +699,7 @@ function pipe(startValue, fnList) { // TODO make more efficient with sync intros
 	return promise;
 }
 
-function reduce(a, accumulator, fn, context) {
+function reduce(accumulator, a, fn, context) {
 return new Promise(function(resolve, reject) {
 	var length = a.length;
 	var i = 0;
@@ -3032,7 +3032,7 @@ var resolveAll = function(doc, baseURL) {
 	},
 
 	function(nodeList) {
-		return Promise.reduce(nodeList, undefined, function(dummy, el) {
+		return Promise.reduce(null, nodeList, function(dummy, el) {
 			var tag = DOM.getTagName(el);
 			var attrList = urlAttributes[tag];
 			_.forOwn(attrList, function(attrDesc, attrName) {
@@ -3664,7 +3664,7 @@ render: function(resource, details) {
 	var frag0 = doc;
 	if (details.mainSelector) frag0 = DOM.find(details.mainSelector, doc);
 
-	return Promise.reduce(bodyDef.transforms, frag0, function(fragment, transform) {
+	return Promise.reduce(frag0, bodyDef.transforms, function(fragment, transform) {
 		return transform.process(fragment, details);
 	})
 	.then(function(fragment) {
@@ -5798,7 +5798,7 @@ function(provider, details) {
 transformChildNodes: function(srcNode, provider, context, variables, frag) {
 	var processor = this;
 
-	return Promise.reduce(srcNode.childNodes, undefined, function(dummy, current) {
+	return Promise.reduce(null, srcNode.childNodes, function(dummy, current) {
 		return processor.transformNode(current, provider, context, variables, frag);
 	});
 },
@@ -5944,7 +5944,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 			return;
 		}
 
-		return Promise.reduce(subContexts, undefined, function(dummy, subContext) {
+		return Promise.reduce(null, subContexts, function(dummy, subContext) {
 			if (varName) subVars[varName] = subContext;
 			return processor.transformChildNodes(el, provider, subContext, subVars, frag);
 		});

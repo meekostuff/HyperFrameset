@@ -691,7 +691,7 @@ var resolveAll = function(doc, baseURL) {
 	},
 
 	function(nodeList) {
-		return Promise.reduce(nodeList, undefined, function(dummy, el) {
+		return Promise.reduce(null, nodeList, function(dummy, el) {
 			var tag = DOM.getTagName(el);
 			var attrList = urlAttributes[tag];
 			_.forOwn(attrList, function(attrDesc, attrName) {
@@ -1323,7 +1323,7 @@ render: function(resource, details) {
 	var frag0 = doc;
 	if (details.mainSelector) frag0 = DOM.find(details.mainSelector, doc);
 
-	return Promise.reduce(bodyDef.transforms, frag0, function(fragment, transform) {
+	return Promise.reduce(frag0, bodyDef.transforms, function(fragment, transform) {
 		return transform.process(fragment, details);
 	})
 	.then(function(fragment) {

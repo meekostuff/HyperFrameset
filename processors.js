@@ -450,7 +450,7 @@ function(provider, details) {
 transformChildNodes: function(srcNode, provider, context, variables, frag) {
 	var processor = this;
 
-	return Promise.reduce(srcNode.childNodes, undefined, function(dummy, current) {
+	return Promise.reduce(null, srcNode.childNodes, function(dummy, current) {
 		return processor.transformNode(current, provider, context, variables, frag);
 	});
 },
@@ -596,7 +596,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 			return;
 		}
 
-		return Promise.reduce(subContexts, undefined, function(dummy, subContext) {
+		return Promise.reduce(null, subContexts, function(dummy, subContext) {
 			if (varName) subVars[varName] = subContext;
 			return processor.transformChildNodes(el, provider, subContext, subVars, frag);
 		});
