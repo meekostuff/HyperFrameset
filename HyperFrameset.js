@@ -2478,12 +2478,13 @@ var cloneDocument = function(srcDoc) {
 	var docEl = doc.importNode(srcDoc.documentElement, true);
 	doc.appendChild(docEl); // NOTE already adopted
 
-	// TODO is there a test to detect this behavior??
 	// WARN sometimes IE9/IE10/IE11 doesn't read the content of inserted <style>
+	// NOTE this doesn't seem to matter on IE10+. The following is precautionary
 	_.forEach(DOM.findAll('style', doc), function(node) {
 		var sheet = node.styleSheet || node.sheet;
 		if (!sheet || sheet.cssText == null) return;
-		if (sheet.cssText == '') node.textContent = node.textContent;
+		if (sheet.cssText != '') return;
+		node.textContent = node.textContent;
 	});
 	
 	return doc;
