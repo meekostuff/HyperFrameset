@@ -5308,6 +5308,46 @@ config: function(options) {
 
 });
 
+framer.filters = (function() {
+
+var items = {};
+
+return {
+
+register: function(name, fn) {
+	if (!/^[_a-zA-Z][_a-zA-Z0-9]*$/.test(name)) { // TODO should be in filters.register()
+		logger.error('registerFilter called with invalid name: ' + name);
+		return; // TODO throw??
+	}
+	if (this.has(name)) {
+		logger.warn('A filter by that name already exists: ' + name);
+		return; // TODO throw??
+	}
+	items[name] = fn;
+},
+
+has: function(name) {
+	return (name in items);
+},
+
+get: function(name) { 
+	if (!this.has(name)) throw name + ' is not a registered controller';
+	return items[name];
+},
+
+evaluate: function(name, value, params) {
+	var fn = this.get(name);
+	// NOTE filter functions should only accept string_or_number_or_boolean
+	// FIXME Need to wrap fn() to assert / cast supplied value and accept params
+	return fn.apply(value, params);
+}
+
+
+};
+
+})();
+
+
 
 _.defaults(framer, {
 
@@ -5331,16 +5371,8 @@ createProcessor: function(type, options) {
 	return new this.processors[type](options, this.definition, this.filters);
 },
 
-filters: {},
-
 registerFilter: function(name, fn) {
-	if (!/^[_a-zA-Z][_a-zA-Z0-9]*$/.test(name)) {
-		logger.error('registerFilter called with invalid name: ' + name);
-		return;
-	}
-	// NOTE filter functions should only accept string_or_number_or_boolean
-	// FIXME Need to wrap fn() to assert / cast supplied value and accept params
-	this.filters[name] = fn;
+	this.filters.register(name, fn);
 }
 
 });
@@ -6297,9 +6329,8 @@ function processExpression(expr, filters, provider, context, variables, type) { 
 			if (value.nodeType === 1) value = value.textContent;
 			else value = '';
 		}
-		var fn = filters[filter.name];
 		try {
-			value = fn.apply(value, filter.params);
+			value = filters.evaluate(filter.name, value, filter.params);
 			return true;
 		}
 		catch (err) {

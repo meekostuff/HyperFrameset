@@ -799,9 +799,8 @@ function processExpression(expr, filters, provider, context, variables, type) { 
 			if (value.nodeType === 1) value = value.textContent;
 			else value = '';
 		}
-		var fn = filters[filter.name];
 		try {
-			value = fn.apply(value, filter.params);
+			value = filters.evaluate(filter.name, value, filter.params);
 			return true;
 		}
 		catch (err) {
