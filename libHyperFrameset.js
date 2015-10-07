@@ -2977,7 +2977,19 @@ registerProcessor: function(type, constructor) {
 },
 
 createProcessor: function(type, options) {
-	return new this.processors[type](options, this.definition);
+	return new this.processors[type](options, this.definition, this.filters);
+},
+
+filters: {},
+
+registerFilter: function(name, fn) {
+	if (!/^[_a-zA-Z][_a-zA-Z0-9]*$/.test(name)) {
+		logger.error('registerFilter called with invalid name: ' + name);
+		return;
+	}
+	// NOTE filter functions should only accept string_or_number_or_boolean
+	// FIXME Need to wrap fn() to assert / cast supplied value and accept params
+	this.filters[name] = fn;
 }
 
 });

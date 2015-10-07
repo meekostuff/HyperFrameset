@@ -285,8 +285,9 @@ function htmlToFragment(html, doc) {
 	return result;
 }
 
-function HazardProcessor(options, frameset) {
+function HazardProcessor(options, frameset, filters) {
 	this.frameset = frameset;
+	this.filters = filters;
 	frameset.addDefaultNamespace(hazDefaultNS);
 	frameset.addDefaultNamespace(exprDefaultNS);
 	frameset.addDefaultNamespace(mexprDefaultNS);
@@ -424,10 +425,12 @@ loadTemplate: function(template) {
 
 transform: FRAGMENTS_ARE_INERT ?
 function(provider, details) { // TODO how to use details
-	var root = this.root;
+	var processor = this;
+	processor.provider = provider;
+	var root = processor.root;
 	var doc = root.ownerDocument;
 	var frag = doc.createDocumentFragment();
-	var done = this.transformChildNodes(root, provider, null, {}, frag);
+	var done = processor.transformChildNodes(root, null, {}, frag);
 	return Promise.resolve(done)
 	.then(function(result) {
 		return frag;
@@ -436,10 +439,12 @@ function(provider, details) { // TODO how to use details
 
 // NOTE IE11, Edge needs a different transform() because fragments are not inert
 function(provider, details) {
-	var root = this.root;
+	var processor = this;
+	processor.provider = provider;
+	var root = processor.root;
 	var doc = DOM.createHTMLDocument('', root.ownerDocument);
 	var frag = doc.body; // WARN don't know why this is inert but fragments aren't
-	var done = this.transformChildNodes(root, provider, null, {}, frag);
+	var done = processor.transformChildNodes(root, null, {}, frag);
 	return Promise.resolve(done)
 	.then(function(result) {
 		frag = childNodesToFragment(frag);
@@ -447,15 +452,15 @@ function(provider, details) {
 	});
 },
 
-transformChildNodes: function(srcNode, provider, context, variables, frag) {
+transformChildNodes: function(srcNode, context, variables, frag) {
 	var processor = this;
 
 	return Promise.reduce(null, srcNode.childNodes, function(dummy, current) {
-		return processor.transformNode(current, provider, context, variables, frag);
+		return processor.transformNode(current, context, variables, frag);
 	});
 },
 
-transformNode: function(srcNode, provider, context, variables, frag) {
+transformNode: function(srcNode, context, variables, frag) {
 	var processor = this;
 
 	switch (srcNode.nodeType) {
@@ -469,12 +474,12 @@ transformNode: function(srcNode, provider, context, variables, frag) {
 		return;
 	case 1:
 		var details = srcNode.hazardDetails;
-		if (details.definition) return processor.transformHazardTree(srcNode, provider, context, variables, frag);
-		else return processor.transformTree(srcNode, provider, context, variables, frag);
+		if (details.definition) return processor.transformHazardTree(srcNode, context, variables, frag);
+		else return processor.transformTree(srcNode, context, variables, frag);
 	}
 },
 
-transformHazardTree: function(el, provider, context, variables, frag) {
+transformHazardTree: function(el, context, variables, frag) {
 	var processor = this;
 	var doc = el.ownerDocument;
 
@@ -485,7 +490,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 
 	switch (def.tag) {
 	default: // for unknown (or unhandled like `template`) haz: elements just process the children
-		return processor.transformChildNodes(el, provider, context, variables, frag); 
+		return processor.transformChildNodes(el, context, variables, frag); 
 		
 	case 'include':
 		// FIXME attributes should already be in hazardDetails
@@ -496,13 +501,13 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 			return frag;
 		}
 	
-		return processor.transformChildNodes(template, provider, context, variables, frag); 
+		return processor.transformChildNodes(template, context, variables, frag); 
 
 	case 'eval':
 		// FIXME attributes should already be in hazardDetails
 		// FIXME log a warning if this directive has children
 		var selector = el.getAttribute('select');
-		var value = evalExpression(selector, provider, context, variables, 'node');
+		var value = evalExpression(selector, processor.filters, processor.provider, context, variables, 'node');
 		var type = typeof value;
 		if (type === 'undefined' || type === 'boolean' || value == null) return;
 		if (!value.nodeType) { // TODO test performance
@@ -515,7 +520,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 		// FIXME attributes should already be in hazardDetails
 		// FIXME log a warning if this directive has children
 		var mexpr = el.getAttribute('select');
-		var value = evalMExpression(mexpr, provider, context, variables);
+		var value = evalMExpression(mexpr, processor.filters, processor.provider, context, variables);
 		// FIXME `value` should always already be "text"
 		if (type === 'undefined' || type === 'boolean' || value == null) return;
 		if (!value.nodeType) {
@@ -528,7 +533,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 		// FIXME attributes should already be in hazardDetails
 		// FIXME log a warning if this directive has children
 		var expr = el.getAttribute('select');
-		var value = evalExpression(expr, provider, context, variables, 'text');
+		var value = evalExpression(expr, processor.filters, processor.provider, context, variables, 'text');
 		// FIXME `value` should always already be "text"
 		var type = typeof value;
 		if (type === 'undefined' || type === 'boolean' || value == null) return;
@@ -545,7 +550,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 		var testVal = el.getAttribute('test');
 		var pass = false;
 		try {
-			pass = evalExpression(testVal, provider, context, variables, 'boolean');
+			pass = evalExpression(testVal, processor.filters, processor.provider, context, variables, 'boolean');
 		}
 		catch (err) {
 			Task.postError(err);
@@ -554,7 +559,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 		}
 		if (invertTest) pass = !pass;
 		if (!pass) return;
-		return processor.transformChildNodes(el, provider, context, variables, frag); 
+		return processor.transformChildNodes(el, context, variables, frag); 
 
 	case 'choose':
 		// FIXME attributes should already be in hazardDetails
@@ -571,14 +576,14 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 			}
 			if (childDef.tag !== 'when') return false;
 			var testVal = child.getAttribute('test');
-			var pass = evalExpression(testVal, provider, context, variables, 'boolean');
+			var pass = evalExpression(testVal, processor.filters, processor.provider, context, variables, 'boolean');
 			if (!pass) return false;
 			when = child;
 			return true;
 		});
 		if (!found) when = otherwise;
 		if (!when) return;
-		return processor.transformChildNodes(when, provider, context, variables, frag); 
+		return processor.transformChildNodes(when, context, variables, frag); 
 
 	case 'each':
 		// FIXME attributes should already be in hazardDetails
@@ -587,7 +592,7 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 		var subVars = _.defaults({}, variables);
 		var subContexts;
 		try {
-			subContexts = provider.evaluate(selector, context, variables, true);
+			subContexts = processor.provider.evaluate(selector, context, variables, true);
 		}
 		catch (err) {
 			Task.postError(err);
@@ -597,27 +602,27 @@ transformHazardTree: function(el, provider, context, variables, frag) {
 
 		return Promise.reduce(null, subContexts, function(dummy, subContext) {
 			if (varName) subVars[varName] = subContext;
-			return processor.transformChildNodes(el, provider, subContext, subVars, frag);
+			return processor.transformChildNodes(el, subContext, subVars, frag);
 		});
 
 	}
 			
 },
 
-transformTree: function(srcNode, provider, context, variables, frag) { // srcNode is Element
+transformTree: function(srcNode, context, variables, frag) { // srcNode is Element
 	var processor = this;
 	
 	var nodeType = srcNode.nodeType;
 	if (nodeType !== 1) throw Error('transformTree() expects Element');
-	var node = processor.transformSingleElement(srcNode, provider, context, variables);
+	var node = processor.transformSingleElement(srcNode, context, variables);
 	var nodeAsFrag = frag.appendChild(node); // WARN use returned value not `node` ...
 	// ... this allows frag to be a custom object, which in turn 
 	// ... allows a different type of output construction
 
-	return processor.transformChildNodes(srcNode, provider, context, variables, nodeAsFrag);
+	return processor.transformChildNodes(srcNode, context, variables, nodeAsFrag);
 },
 
-transformSingleElement: function(srcNode, provider, context, variables) {
+transformSingleElement: function(srcNode, context, variables) {
 	var processor = this;
 	var details = srcNode.hazardDetails;
 
@@ -627,8 +632,8 @@ transformSingleElement: function(srcNode, provider, context, variables) {
 		var value;
 		try {
 			value = (desc.namespaceURI === HAZARD_MEXPRESSION_URN) ?
-				processMExpression(desc.mexpression, provider, context, variables) :
-				processExpression(desc.expression, provider, context, variables, desc.type);
+				processMExpression(desc.mexpression, processor.filters, processor.provider, context, variables) :
+				processExpression(desc.expression, processor.filters, processor.provider, context, variables, desc.type);
 		}
 		catch (err) {
 			Task.postError(err);
@@ -706,15 +711,15 @@ function setAttribute(el, attrName, value) {
 	}
 }
 
-function evalMExpression(mexprText, provider, context, variables) {
+function evalMExpression(mexprText, filters, provider, context, variables) {
 	var mexpr = interpretMExpression(mexprText);
-	var result = processMExpression(mexpr, provider, context, variables);
+	var result = processMExpression(mexpr, filters, provider, context, variables);
 	return result;
 }
 
-function evalExpression(exprText, provider, context, variables, type) {
+function evalExpression(exprText, filters, provider, context, variables, type) {
 	var expr = interpretExpression(exprText);
-	var result = processExpression(expr, provider, context, variables, type);
+	var result = processExpression(expr, filters, provider, context, variables, type);
 	return result;
 }
 	
@@ -734,41 +739,77 @@ function interpretMExpression(mexprText) {
 
 function interpretExpression(exprText) { // FIXME robustness
 	var expression = {};
-	var exprParts = exprText.split('|');
+	expression.text = exprText;
+	var exprParts = exprText.split(/\s+\|\s+/);
 	expression.selector = exprParts.shift();
 	expression.filters = [];
 
-	_.forEach(exprParts, function(scriptBody) {
+	_.forEach(exprParts, function(filterSpec) {
+		filterSpec = filterSpec.trim();
+		var text = filterSpec;
+		var m = text.match(/^([_a-zA-Z][_a-zA-Z0-9]*)\s*(:?)/);
+		if (!m) {
+			logger.warn('Syntax Error in filter call: ' + filterSpec);
+			return false;
+		}
+		var filterName = m[1];
+		var hasParams = m[2];
+		text = text.substr(m[0].length);
+		if (!hasParams && /\S+/.test(text)) {
+			logger.warn('Syntax Error in filter call: ' + filterSpec);
+			return false;
+		}
+
 		try {
-			var fn = Function('value', 'return (' + scriptBody + ');');
+			var filterParams = (Function('return [' + text + '];'))();
 		}
 		catch (err) {
-			Task.postError(err);
-			logger.error('Error in filter: ' + scriptBody);
-			return;
+			logger.warn('Syntax Error in filter call: ' + filterSpec);
+			return false;
 		}
-		expression.filters.push(fn);
+
+		expression.filters.push({
+			text: filterSpec,
+			name: filterName,
+			params: filterParams
+		});
+		return true;
 	});
 
 	return expression;
 }
 
 
-function processMExpression(mexpr, provider, context, variables) {
+function processMExpression(mexpr, filters, provider, context, variables) {
 	var i = 0;
 	return mexpr.template.replace(/\{\{\}\}/g, function(all) {
-		return processExpression(mexpr.expressions[i++], provider, context, variables, 'text');
+		return processExpression(mexpr.expressions[i++], filters, provider, context, variables, 'text');
 	});
 }
 
-function processExpression(expr, provider, context, variables, type) { // FIXME robustness
+function processExpression(expr, filters, provider, context, variables, type) { // FIXME robustness
 	var doc = (context && context.nodeType) ? // TODO which document
 		(context.nodeType === 9 ? context : context.ownerDocument) : 
 		document; 
 	var value = provider.evaluate(expr.selector, context, variables);
 
-	_.forEach(expr.filters, function(fn) {
-		value = fn(value);
+	_.every(expr.filters, function(filter) {
+		if (value == null) value = '';
+		if (value.nodeType) {
+			if (value.nodeType === 1) value = value.textContent;
+			else value = '';
+		}
+		var fn = filters[filter.name];
+		try {
+			value = fn.apply(value, filter.params);
+			return true;
+		}
+		catch (err) {
+			Task.postError(err);
+			logger.warn('Failure processing filter call: "' + filter.text + '" with input: "' + value + '"');
+			value = '';
+			return false;
+		}
 	});
 
 	result = cast(value, type);
@@ -1234,6 +1275,71 @@ return JSONDecoder;
 
 framer.registerDecoder('json', JSONDecoder);
 
+// FIXME filters need sanity checking
+framer.registerFilter('lowercase', function(text) {
+	var value = this;
+	return value.toLowerCase();
+});
+
+framer.registerFilter('uppercase', function(text) {
+	var value = this;
+	return value.toUpperCase();
+});
+
+framer.registerFilter('if', function(yep) {
+	var value = this;
+	return (!!value) ? yep : value;
+});
+
+framer.registerFilter('unless', function(nope) {
+	var value = this;
+	return (!value) ? nope : value;
+});
+
+framer.registerFilter('if_unless', function(yep, nope) {
+	var value = this;
+	return (!!value) ? yep : nope;
+});
+
+framer.registerFilter('map', function(dict) { // dict can be {} or []
+	var value = this;
+
+	if (Array.isArray(dict)) {
+		var patterns = _.filter(dict, function(item, i) { return !(i % 2); });
+		var results = _.filter(dict, function(item, i) { return !!(i % 2); });
+		_.some(patterns, function(pattern, i) {
+			// FIXME what if pattern not RegExp && not string??
+			if (!(pattern instanceof RegExp)) pattern = new RegExp('^' + pattern + '$');
+			if (!pattern.test(value)) return false;
+			value = results[i];
+			return true;
+		});
+		return value;
+	}
+
+	if (value in dict) return dict[value]; // TODO sanity check before returning
+	return value;
+});
+
+framer.registerFilter('match', function(pattern, yep, nope) {
+	var value = this;
+	// FIXME what if pattern not RegExp && not string??
+	if (!(pattern instanceof RegExp)) pattern = new RegExp('^' + pattern + '$'); // FIXME sanity TODO case-insensitive??
+	var bMatch = pattern.test(value);
+	if (yep != null && bMatch) return yep;
+	if (nope != null && !bMatch) return nope;
+	return bMatch;
+});
+
+framer.registerFilter('replace', function(pattern, text) {
+	var value = this;
+	return value.replace(pattern, text); // TODO sanity check before returning
+});
+
+if (_.dateFormat) framer.registerFilter('date', function(format, utc) {
+	var value = this;
+	return _.dateFormat(value, format, utc);
+});
 
 _.assign(classnamespace, {
 
