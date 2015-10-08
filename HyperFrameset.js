@@ -3807,6 +3807,7 @@ init: function(doc, settings) {
 	var firstChild = doc.body.firstChild;
 	_.forEach(DOM.findAll('script[for]', doc.head), function(script) {
 		doc.body.insertBefore(script, firstChild);
+		script.setAttribute('for', '');
 		logger.info('Moved <script for> in frameset <head> to <body>');
 	});
 
@@ -3830,8 +3831,33 @@ preprocess: function() {
 		// Ignore non-javascript scripts
 		if (script.type && !/^text\/javascript/.test(script.type)) return;
 
+		var sourceURL = script.getAttribute('sourceurl'); // assuming @sourceurl preset
+
 		if (script.hasAttribute('src')) { // external javascript in <body> is invalid
 			logger.warn('Frameset <body> may not contain external scripts: \n' +
+				script.cloneNode(false).outerHTML);
+			script.parentNode.removeChild(script);
+			return;
+		}
+
+		if (!script.hasAttribute('for')) {
+			var fnText = script.text;
+			fnText += '\n//# sourceURL=' + sourceURL;
+
+			try {
+				var fn = Function(fnText);
+			}
+			catch(err) { 
+				logger.warn('Error evaluating inline script in frameset:\n' +
+					frameset.url + '#' + script.id);
+				Task.postError(err);
+			}
+			script.parentNode.removeChild(script); // physical <script> no longer needed
+			return;
+		}
+
+		if (script.getAttribute('for') !== '') {
+			logger.warn('<script> may only contain EMPTY @for: \n' +
 				script.cloneNode(false).outerHTML);
 			script.parentNode.removeChild(script);
 			return;
@@ -3846,7 +3872,6 @@ preprocess: function() {
 		if (!scriptFor) scriptFor = script.parentNode;
 		
 		// FIXME @configID shouldn't be hard-wired here
-		var sourceURL = script.getAttribute('sourceurl'); // assuming @sourceurl preset
 		var configID = scriptFor.hasAttribute('configID') ? 
 			scriptFor.getAttribute('configID') :
 			'';
@@ -3857,8 +3882,8 @@ preprocess: function() {
 		scriptFor.setAttribute('configID', configID);
 
 		var fnText = 'return (' + script.text + ');';
-		if (script.hasAttribute('sourceurl')) 
-			fnText += '\n//# sourceURL=' + script.getAttribute('sourceURL');
+
+		fnText += '\n//# sourceURL=' + sourceURL;
 
 		try {
 			var fn = Function(fnText);
