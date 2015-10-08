@@ -66,7 +66,7 @@ A BETTER UNDERSTANDING WILL BE GAINED THROUGH EXPLORING A DEMO - VIEW SOURCE IS 
 </ul></li>
 <li><p>Source the HyperFrameset boot-script into your pages with this line in the <code>&lt;head&gt;</code> of each page </p>
 
-<pre><code>`&lt;script src="/path/to/HyperFrameset/boot.js"&gt;&lt;/script&gt;`
+<pre><code>&lt;script src="/path/to/HyperFrameset/boot.js"&gt;&lt;/script&gt;
 </code></pre>
 
 <p>The boot-script </p>
@@ -146,14 +146,14 @@ will appear as the final page without the page specific content. </p>
 
     &lt;nav&gt;
         &lt;label&gt;Navigation&lt;/label&gt;
-        &lt;hf-frame name="hf_nav" type="html" src="scope:./index.html" main="nav"&gt;
+        &lt;hf-frame targetname="hf_nav" type="html" src="scope:./index.html" main="nav"&gt;
             &lt;hf-body&gt;&lt;/hf-body&gt;
         &lt;/hf-frame&gt;
     &lt;/nav&gt;
 
     &lt;main&gt;
         &lt;label&gt;Primary Content&lt;/label&gt;
-        &lt;hf-frame name="hf_main" type="html" main="main"&gt;
+        &lt;hf-frame targetname="hf_main" type="html" main="main"&gt;
             &lt;hf-body"&gt;&lt;/hf-body&gt;
         &lt;/hf-frame&gt;
     &lt;/main&gt;
@@ -190,7 +190,7 @@ inserting the <code>&lt;main&gt;</code> content from page.html into the <code>hf
 
     &lt;nav&gt;
         &lt;label&gt;Navigation&lt;/label&gt;
-        &lt;hf-frame name="hf_nav" type="html" src="/index.html" main="nav"&gt;
+        &lt;hf-frame targetname="hf_nav" type="html" src="/index.html" main="nav"&gt;
             &lt;hf-body&gt;
                 &lt;a href="/page.html"&gt;Page One&lt;/a&gt;&lt;br /&gt;
                 &lt;a href="/page2.html"&gt;Page Two&lt;/a&gt;
@@ -200,7 +200,7 @@ inserting the <code>&lt;main&gt;</code> content from page.html into the <code>hf
 
     &lt;main&gt;
         &lt;label&gt;Primary Content&lt;/label&gt;
-        &lt;hf-frame name="hf_main" type="html" main="main"&gt;
+        &lt;hf-frame targetname="hf_main" type="html" main="main"&gt;
             &lt;hf-body&gt;
                 &lt;h1&gt;Page One&lt;h1&gt;
                 &lt;div class="styled-from-frameset"&gt;
@@ -628,7 +628,13 @@ For this reason HyperFrameset reads <code>sessionStorage</code> and <code>localS
 
 <p>Config options are read from JSON stored in the <code>Meeko.options</code> key. Thus the following would disable hiding of the landing-page and turn on <code>debug</code> logging.</p>
 
-<pre><code>sessionStorage.setItem('Meeko.options', JSON.stringify({ hidden_timeout: 0, log_level: "debug" }) );
+<pre><code>sessionStorage.setItem(
+    'Meeko.options', 
+    JSON.stringify({ 
+        hidden_timeout: 0, 
+        log_level: "debug" 
+    }) 
+);
 </code></pre>
 
 <p><em>Note</em> that the page would require a refresh after these settings were made.</p>
@@ -668,10 +674,10 @@ provides a short description and discussion of this approach.</p>
 
 <h2>The Frameset Overseer</h2>
 
-<p>Before a frameset document can be loaded, <br />
+<p>Before a frameset document can be loaded, 
 HyperFrameset must discover which frameset document is right for the landing-page.</p>
 
-<p>Before responding to a hyperlink activation, <br />
+<p>Before responding to a hyperlink activation, 
 HyperFrameset must determine whether the hyperlinked page can share the currently applied frameset document.</p>
 
 <p>The entity which oversees the frameset and frames is called the <code>framer</code>, and it has a JS reference object <code>Meeko.framer</code>.
@@ -725,31 +731,44 @@ After this replacement the window state should be as though the frameset documen
 <li>changing the namespace for HyperFrameset</li>
 </ul>
 
+<p><a id="script-handling"></a></p>
+
 <h3><code>&lt;script&gt;</code> handling</h3>
 
 <ul>
-<li><p>Scripts containing a <code>for</code> attribute are configuration scripts with special handling not documented in this section.
-These scripts MUST NOT have a <code>src</code> attribute. For example:</p>
-
-<script for="hf-frameset">
-({
-    lookup: function(url) { }
-})
-</script></li>
-<li><p>Scripts in the <code>&lt;head&gt;</code> of the frameset document are executed via dynamic script insertion, 
-but behave <strong>like</strong> scripts that are part of a landing page.
+<li><p>Scripts in the <code>&lt;head&gt;</code> of the frameset document 
+are executed via dynamic script insertion, 
+but behave <strong>like</strong> scripts that are part of a landing page. 
 So earlier scripts block later scripts 
 unless the earlier script has the <code>src</code> <strong>and</strong> <code>async</code> attributes. </p>
 
-<p><code>&lt;script src="..." async&gt;&lt;/script&gt;</code></p></li>
-</ul>
+<pre><code>&lt;script src="..." async&gt;&lt;/script&gt;
+</code></pre>
 
-<p>These scripts are <strong>enabled</strong> AFTER all the content in the <code>&lt;head&gt;</code> of the frameset is INSERTED INTO the page.</p>
+<p>These scripts are <strong>enabled</strong> AFTER all the content in the <code>&lt;head&gt;</code> of the frameset 
+is INSERTED INTO the page.</p></li>
+<li><p>Scripts in the <code>&lt;body&gt;</code> of the frameset document MUST NOT have a <code>src</code> attribute. 
+They are ignored if they do.</p></li>
+<li><p>Scripts containing an empty <code>for</code> attribute are options scripts attached to 
+the previous non-<code>&lt;script&gt;</code>, non-<code>&lt;style&gt;</code> element 
+(either a previous sibling or the parent of the script). 
+The script MUST NOT have a <code>src</code> attribute, and is evaluated with  </p>
 
-<ul>
-<li><p>Scripts that are children of <code>&lt;hf-frame&gt;</code> elements are configuration scripts with special handling not documented in this section.
-These scripts MUST NOT have a <code>src</code> attribute.</p></li>
-<li><p>Other scripts in the body of the frameset document are ignored.</p></li>
+<pre><code>(Function('return (' + script.text + ');'))()
+</code></pre>
+
+<p>For example:</p>
+
+<pre><code>&lt;script for&gt;
+({
+    lookup: function(url) { }
+})
+&lt;/script&gt;
+</code></pre>
+
+<p>This is a valid yet inert script when not handled by HyperFrameset.</p></li>
+<li><p>Scripts containing a non-empty <code>for</code> attribute are ignored.</p></li>
+<li>Other scripts are executed via dynamic script insertion.</li>
 </ul>
 
 <h2>Frameset Definition</h2>
@@ -773,40 +792,47 @@ These renderings may insert more frame declarations which are again automaticall
 
 <h3>Configuration</h3>
 
-<p>Any <code>&lt;script for="hf-frameset"&gt;</code> in the <code>&lt;head&gt;</code> is used for configuring the frameset definition.
-The script MUST NOT have a <code>src</code> attribute, and is evaluated with</p>
+<p>Any <code>&lt;script for&gt;</code> in the <code>&lt;body&gt;</code> is used to 
+to generate an options object for the "associated element", see
+<a href="#script-handling">script-handling</a>.</p>
 
-<pre><code>(Function('return (' + script.text + ');'))()
-</code></pre>
+<p>The script SHOULD have a format like</p>
 
-<p>to generate an options object for the frameset definition.
-The script SHOULD have a format like</p>
-
-<pre><code>&lt;script for="hf-frameset"&gt;
+<pre><code>&lt;script for&gt;
 ({
     lookup: function(url) { }
 })
 &lt;/script&gt;
 </code></pre>
 
-<p>This is a valid yet inert script when not handled by HyperFrameset.</p>
+<p>This options object will configure how HyperFrameset determines 
+the appropriate frame target for <code>requestnavigation</code> events 
+triggered by clicks on hyperlinks or form-submission (GET only).</p>
 
-<p>The options object will configure how HyperFrameset determines the appropriate frame target
-for the landing-page URL and <code>requestnavigation</code> events.
-The following callbacks can be configured</p>
+<p>The following callbacks can be configured</p>
 
 <ul>
 <li><strong><code>lookup(url, details)</code></strong>
-return the target frame <code>name</code> for the landing-page URL or a <code>requestnavigation</code> event. <br />
-For the landing-page there is no <code>details</code> object. <br />
+return the target frame <code>targetname</code> for the landing-page URL or a <code>requestnavigation</code> event. <br />
 For <code>requestnavigation</code> events the <code>details</code> object has the following fields:
     + url: the URL to be navigated to
     + element: the source element for the event (<code>&lt;a href&gt;</code> or <code>&lt;form method="get"&gt;</code>)
     + referrer: the current document.URL
-If this method returns a valid target frame <code>name</code> then pushState-assisted-navigation is initiated
-and frames with that target <code>name</code> are loaded with the hyperlinked resource. <br />
-Otherwise normal browser navigation is performed.</li>
+If this method returns a valid target frame <code>targetname</code> then 
+pushState-assisted-navigation is initiated
+and frames with that target <code>targetname</code> are loaded with the hyperlinked resource. <br />
+If it returns <code>true</code> then the <code>requestnavigation</code> event is cancelled.
+Otherwise the <code>requestnavigation</code> event continues to bubble, 
+where it might be handled elsewhere or eventually 
+result in a normal browser navigation being performed.</li>
 </ul>
+
+<p>The <code>lookup()</code> callback can be configured for any of
+<code>&lt;hf-frame&gt;</code>, <code>&lt;hf-panel&gt;</code>, <code>&lt;hf-vlayout&gt;</code>, <code>&lt;hf-hlayout&gt;</code>, <code>&lt;hf-deck&gt;</code>, <code>&lt;hf-rdeck&gt;</code>. </p>
+
+<p>It can also be configured for <code>&lt;body&gt;</code>, which means that it is used for 
+determining the target-frame of the landing-page URL, and
+for <code>requestnavigation</code> events will result in the document URL being changed. </p>
 
 <h2>Frame Definition</h2>
 
@@ -865,7 +891,7 @@ If <code>@main</code> is not defined then a sequential search is performed with 
 <p>The transform SHOULD have a format like</p>
 
 <pre><code>&lt;hf-transform type="script"&gt;
-&lt;script&gt;
+&lt;script for&gt;
 ({
     transform: function(fragment) { }
 })
@@ -891,53 +917,111 @@ and must return a document-fragment. </p>
 <pre><code>&lt;hf-transform type="hazard" format="css"&gt;
 &lt;!-- Your HTML template here --&gt;
 &lt;nav&gt;
-  &lt;div haz:each=".navigation ul li"&gt;
-    &lt;span expr:_html="a"&gt;&lt;/span&gt;&lt;!-- span.innerHTML = a.outerHTML --&gt;
-  &lt;/div&gt;
+  &lt;haz:each select=".navigation ul li"&gt;
+    &lt;div&gt;
+      &lt;span expr:_html="a"&gt;&lt;/span&gt;&lt;!-- span.innerHTML = a.outerHTML --&gt;
+    &lt;/div&gt;
+  &lt;/haz:each&gt;
 &lt;/nav&gt;
 &lt;/hf-transform&gt;
 </code></pre>
 
 <p>This provides a simple templating service.
-The content will be HTML with special templating attributes,
-which include directives such as <code>@haz:if</code>
+The content will be HTML with special templating elements and attributes,
+which include directives such as <code>&lt;haz:if&gt;</code>
 and data expressions such as <code>@expr:href</code>.</p>
 
 <p>Directives and data expressions are interpreted using a data provider
-which is selected by <code>@format</code>. Currently the only <code>format</code> option is <code>css</code>.</p>
+which is selected by <code>@format</code>. Current <code>format</code> options are <code>css</code>, <code>microdata</code>, <code>json</code>.</p>
 
 <h5>Directives</h5>
 
-<h6><code>@haz:if</code></h6>
+<h6><code>&lt;haz:if&gt;</code></h6>
 
-<pre><code>&lt;element haz:if="expression"&gt;
+<pre><code>&lt;haz:if test="expression"&gt;...&lt;/haz:if&gt;
 </code></pre>
 
-<p>The element will be part of the output only if the expression evaluates to <code>true</code>.</p>
+<p>The contents of this element will be part of the output only if the expression evaluates to <code>true</code>.</p>
 
-<h6><code>@haz:unless</code></h6>
+<h6><code>&lt;haz:unless&gt;</code></h6>
 
-<pre><code>&lt;element haz:unless="expression"&gt;
+<pre><code>&lt;haz:unless test="expression"&gt;...&lt;/haz:unless&gt;
 </code></pre>
 
-<p>The element will be part of the output only if the expression evaluates to <code>false</code>.</p>
+<p>The contents of this element will be part of the output only if the expression evaluates to <code>false</code>.</p>
 
-<h6><code>@haz:each</code></h6>
+<h6><code>&lt;haz:choose&gt;</code>, <code>&lt;haz:when&gt;</code>, <code>&lt;haz:otherwise&gt;</code></h6>
 
-<pre><code>&lt;element haz:each="expression"&gt;
+<pre><code>&lt;haz:choose&gt;
+    &lt;haz:when test="expression1"&gt;...&lt;/haz:when&gt;
+    &lt;haz:when test="expression2"&gt;...&lt;/haz:when&gt;
+    &lt;haz:otherwise&gt;...&lt;/haz:otherwise&gt;
+&lt;/haz:choose&gt;
 </code></pre>
 
-<p>The element will be repeated in the output for each item found by the expression.
-If zero items are found then the element will not be in the output at all.</p>
+<p>The <code>&lt;haz:choose&gt;</code> element will be replaced by the contents of 
+the first child <code>&lt;haz:when&gt;</code> whose expression evaluates to <code>true</code>, 
+or (if none of them do) the contents of <code>&lt;haz-otherwise&gt;</code> child elements.</p>
 
-<h6><code>@haz:template</code></h6>
+<h6><code>&lt;haz:each&gt;</code></h6>
 
-<pre><code>&lt;element haz:template="ID"&gt;
+<pre><code>&lt;haz:each select="expression"&gt;
 </code></pre>
 
-<p>The element will be <em>replaced</em> with the element identified by <code>ID</code>.
-This template must be in the <em>current</em> hazard transform.
-Directives are stripped from the template and any directives on the current element are applied.</p>
+<p>The contents of this element will be repeated in the output 
+for each item found by the expression. 
+If zero items are found then the contents will not be in the output at all.</p>
+
+<h6><code>&lt;haz:template&gt;</code></h6>
+
+<pre><code>&lt;haz:template name="ID"&gt;
+</code></pre>
+
+<p>The element will be used to <em>replace</em> an <code>&lt;haz:include&gt;</code> element identified by <code>ID</code>.</p>
+
+<h6><code>&lt;haz:include&gt;</code></h6>
+
+<pre><code>&lt;haz:include name="ID"&gt;
+</code></pre>
+
+<p>The element will be <em>replaced</em> with 
+the contents of the <code>&lt;haz:template&gt;</code> element identified by <code>ID</code>.
+This template must be in the <em>current</em> hazard transform.</p>
+
+<p><strong>TODO:</strong> <code>&lt;haz:eval&gt;</code>, <code>&lt;haz:text&gt;</code>, <code>&lt;haz:mtext&gt;</code></p>
+
+<h5>Directives as attributes</h5>
+
+<p>There are a few HTML elements which cannot be wrapped inside arbitrary elements.
+For example, when parsing a HTML table any unexpected non-table-tags 
+between <code>&lt;table&gt;</code> and <code>&lt;td&gt;</code> are dropped from the output.</p>
+
+<p>In this situation you cannot markup with Hazard elements, 
+but most of them can be implemented with attribute markup. 
+These Hazard attributes are promoted to elements after parsing,
+according to the following rules in order:</p>
+
+<pre><code>&lt;element haz:otherwise /&gt; -&gt; 
+    &lt;haz:otherwise&gt;&lt;element /&gt;&lt;/haz:otherwise&gt;
+
+&lt;element haz:when="expression" /&gt; -&gt; 
+    &lt;haz:when test="expression"&gt;&lt;element /&gt;&lt;/haz:when&gt;
+
+&lt;element haz:each="expression" /&gt; -&gt;
+    &lt;haz:each select="expression"&gt;&lt;element /&gt;&lt;/haz:each&gt;
+
+&lt;element haz:if="expression" /&gt; -&gt; 
+    &lt;haz:if test="expression"&gt;&lt;element /&gt;&lt;/haz:if&gt;
+
+&lt;element haz:unless="expression" /&gt; -&gt; 
+    &lt;haz:unless test="expression"&gt;&lt;element /&gt;&lt;/haz:unless&gt;
+
+&lt;element haz:choose /&gt; -&gt; 
+    &lt;element&gt;&lt;haz:choose /&gt;&lt;/element&gt;
+
+&lt;element haz:template="id" /&gt; -&gt; 
+    &lt;haz:template name="id"&gt;&lt;element /&gt;&lt;/haz:template&gt;
+</code></pre>
 
 <h5>Data Expressions</h5>
 
@@ -960,61 +1044,37 @@ After processing the unprefixed attribute is set to the returned value.</p>
 
 <p><em><code>expr:</code></em> attribute values have the form (FIXME BNF or something)</p>
 
-<pre><code>css-selector {attribute-name} | javascript-snippet | javascript-snippet
+<pre><code>css-selector {attribute-name} | filter-name: params | filter-name: params
 </code></pre>
 
-<p><code>javascript-snippet</code>s are optional as is the <code>{attribute-name}</code>.</p>
+<p>Filters are optional as is the <code>{attribute-name}</code>.</p>
 
 <p><code>attribute-name</code> can be a regular attribute or <code>_html</code> (for <code>innerHTML</code>) or <code>_text</code> (for <code>textContent</code>).</p>
 
-<p><code>javascript-snippet</code>s are evaluated with</p>
+<p>Filters can be registered with the (as yet undocumented) 
+<code>Meeko.framer.registerFilter()</code> call.</p>
 
-<pre><code>(Function("value", 'return (' + snippet + ');'))()
-</code></pre>
+<p>The base filters are:</p>
 
-<p>so the snippet can use <code>value</code> as the input and must evaluate to the desired result.</p>
+<ul>
+<li><code>lowercase</code></li>
+<li><code>uppercase</code></li>
+<li><code>if: &lt;value-if-input-trueish&gt;</code></li>
+<li><code>unless: &lt;value-if-input-falseish&gt;</code></li>
+<li><code>if_unless: &lt;value-if-input-trueish&gt;, &lt;value-if-input-falseish&gt;</code></li>
+<li><code>match: &lt;comparsion-text-or-regexp&gt;, &lt;value-if-match&gt;, &lt;value-if-not-match&gt;</code></li>
+<li><code>replace: &lt;text-or-regex-pattern&gt;, &lt;replacement-text&gt;</code></li>
+<li><code>map: &lt;array-of-regexp-output-pairs-or-dict-of-text-output-fields&gt;</code></li>
+<li><code>date: &lt;date-format&gt;, &lt;timezone&gt;</code></li>
+</ul>
+
+<p><strong>TODO:</strong> pad this out</p>
 
 <p><em><code>mexpr:</code></em> attribute values are plain-text with sections bounded by <code>{{</code> and <code>}}</code> being interpolated by the algorithm of <code>expr:</code> attributes.</p>
 
-<h3>Configuration</h3>
-
-<p>Any <code>&lt;script&gt;</code> which is a child of the <code>&lt;hf-frame&gt;</code> is used for configuring the frame definition.
-The script MUST NOT have a <code>src</code> attribute, and is evaluated with</p>
-
-<pre><code>(Function('return (' + script.text + ');'))()
-</code></pre>
-
-<p>to generate an options object for the frame definition.
-The script SHOULD have a format like</p>
-
-<pre><code>&lt;script&gt;
-({
-    lookup: function(url) { }
-})
-&lt;/script&gt;
-</code></pre>
-
-<p>This is a valid yet inert script when not handled by HyperFrameset.</p>
-
-<p>The options object will configure how HyperFrameset determines the appropriate frame target
-for the landing-page URL and <code>requestnavigation</code> events.
-The following callbacks can be configured</p>
-
-<ul>
-<li><strong><code>lookup(url, details)</code></strong>
-return the target frame <code>name</code> for a <code>requestnavigation</code> event. <br />
-The <code>details</code> object has the following fields:
-    + url: the URL to be navigated to
-    + element: the source element for the event (<code>&lt;a href&gt;</code> or <code>&lt;form method="get"&gt;</code>)
-    + referrer: the current document.URL
-If this method returns a valid target frame <code>name</code> then frames with that <code>name</code>
-are loaded with the hyperlinked resource.
-Otherwise the <code>requestnavigation</code> event bubbles up to ancestor frames or the frameset. </li>
-</ul>
-
 <h2>Frame Declaration</h2>
 
-<pre><code>&lt;hf-frame def="hfdef_frameX" name="hf_frame1" src="scope:./index.html" main="main"&gt;&lt;/hf-frame&gt;
+<pre><code>&lt;hf-frame def="hfdef_frameX" targetname="hf_frame1" src="scope:./index.html" main="main"&gt;&lt;/hf-frame&gt;
 </code></pre>
 
 <p>When a frame declaration enters the browser view, its <code>src</code> attribute is interpreted as a URL and fetched.
@@ -1023,7 +1083,8 @@ and produce a rendering for the frame.</p>
 
 <h3>Frame naming</h3>
 
-<p>Just like <code>&lt;frame&gt;</code> and <code>&lt;iframe&gt;</code>, a frame declaration can have a <code>name</code> attribute,
+<p>Similar to <code>&lt;frame&gt;</code> and <code>&lt;iframe&gt;</code>, 
+a frame declaration can have a <code>targetname</code> attribute,
 which allows it to be a target for <code>requestnavigation</code> events.</p>
 
 <h2>Navigation Requests</h2>
@@ -1087,13 +1148,13 @@ This will mimic standard browser behavior.</p>
 
 <h3><code>requestnavigation</code> handling</h3>
 
-<p>The <code>requestnavigation</code> event bubbles up from the hyperlink or form, potentially passing through frames and then to the frameset.</p>
+<p>The <code>requestnavigation</code> event bubbles up from the hyperlink or form, potentially passing through frames (or other HyperFrameset elements) and then to the frameset.</p>
 
-<p>Each frame can potentially handle the event, if its <code>lookup()</code> callback returns a valid frame target <code>name</code>.
+<p>Each element can potentially handle the event, if its <code>lookup()</code> callback returns a valid frame target <code>targetname</code>.
 If it does then the <code>framer</code> takes charge of loading the resource and updating the target frame (or frames).
 Panning is NOT used in this case - potentially cross-site URLs can be loaded. </p>
 
-<p>If no frames handle the event then the <code>framer</code> determines whether to perform panning or normal browser navigation. </p>
+<p>If no elements handle the event then the <code>framer</code> determines whether to perform panning or normal browser navigation. </p>
 
 <p>Some hyperlinks are not appropriate for panning and immediately trigger normal navigation:</p>
 
@@ -1121,9 +1182,10 @@ The most useful of these are include:</p>
 
 <ul>
 <li><p><code>Meeko.Promise</code>
-This is a JS implementation of ES6 Promises</p></li>
-<li><p><code>Meeko.URL</code>
-This provides overlapping functionality with the <a href="http://url.spec.whatwg.org/#api">proposed URL API</a>. 
+This is a JS implementation of ES6 Promises <br />
+<strong>TODO:</strong> <code>asap()</code>, <code>defer()</code>, <code>delay()</code>, <code>pipe()</code>, <code>reduce()</code></p></li>
+<li><p><code>Meeko.URL</code> <br />
+This provides overlapping functionality with the <a href="http://url.spec.whatwg.org/#api">proposed URL API</a>. <br />
 <code>Meeko.URL(absoluteURL)</code> will return a URL object with the following (read-only) fields:  </p>
 
 <ul>
@@ -1139,13 +1201,25 @@ fast conversion of a relative URL to absolute, using itself for the <code>baseUR
 <p>By default, HyperFrameset logs error and warning messages to the browser console.
 The logger can be configured to provide info and debug messages (see Configuration).</p>
 
+<p>If the <code>log_level</code> is set to "debug" then when errors occur the 
+<a href="https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/Stack">error stack</a>
+is also dumped to the console.</p>
+
+<p>Inline scripts in the frameset document are automatically given 
+a <a href="https://developer.chrome.com/devtools/docs/javascript-debugging#@sourceurl-and%20displayname%20in%20action">sourceURL</a>
+on platforms which support it. 
+Thist should help finding the source of errors.</p>
+
+<p><strong>FIXME:</strong> more guidance, particularly about asynchronous programming and error logging</p>
+
 <h2>Notes and Warnings</h2>
 
 <ul>
 <li>the configuration options and mechanism may change in future releases</li>
 <li>unlike CSS, frameset documents SHOULD be in the same domain as the content page otherwise the browsers cross-site restrictions will apply.
 Detection for this hasn't been implemented yet. </li>
-<li>all stylesheets in the content document are removed before applying the frameset document. 
+<li>all stylesheets in the content document are removed 
+before applying the frameset document. 
 This allows for a fallback styling option of frameset-less pages. </li>
 <li>There are no compatibility checks and warnings between the content and frameset documents (charset, etc)</li>
 </ul>
