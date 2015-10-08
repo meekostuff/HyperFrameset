@@ -4038,7 +4038,7 @@ var Base = sprockets.evolve(sprockets.RoleType, {
 
 _.assign(Base, {
 
-iAttached: function() {
+iAttached: function(handlers) {
 	var object = this;
 	object.options = {};
 	var element = object.element;
@@ -4072,6 +4072,25 @@ lookup: function(url, details) {
 
 });
 
+_.assign(Link, {
+
+iAttached: function(handlers) {
+	var object = this;
+	var options = object.options;
+	if (!options.lookup) return;
+
+	handlers.push({
+		type: 'requestnavigation',
+		action: function(e) {
+			if (e.defaultPrevented) return;
+			var acceptDefault = framer.onRequestNavigation(e, this);
+			if (acceptDefault === false) e.preventDefault();
+		}
+	});
+}
+
+});
+
 return Link;
 })();
 
@@ -4089,13 +4108,13 @@ var zIndex = 1;
 
 _.assign(Layer, {
 
-iAttached: function() {
+iAttached: function(handlers) {
 	this.css('z-index', zIndex++);
 },
 
-attached: function() {
-	Base.iAttached.call(this);
-	Layer.iAttached.call(this);
+attached: function(handlers) {
+	Base.iAttached.call(this, handlers);
+	Layer.iAttached.call(this, handlers);
 }
 
 });
@@ -4113,7 +4132,7 @@ role: 'panel',
 
 _.assign(Panel, {
 
-iAttached: function() {
+iAttached: function(handlers) {
 	var height = this.attr('height');
 	if (height) this.css('height', height); // FIXME units
 	var width = this.attr('width');
@@ -4122,9 +4141,10 @@ iAttached: function() {
 	if (minWidth) this.css('min-width', minWidth); // FIXME units
 }, 
 
-attached: function() {
-	Base.iAttached.call(this);
-	Panel.iAttached.call(this);
+attached: function(handlers) {
+	Base.iAttached.call(this, handlers);
+	Link.iAttached.call(this, handlers);
+	Panel.iAttached.call(this, handlers);
 },
 
 iEnteredDocument: function() {
@@ -4161,11 +4181,6 @@ owns: {
 });
 
 _.assign(Layout, {
-
-attached: function() {
-	Base.iAttached.call(this);
-	Panel.iAttached.call(this);
-},
 
 iEnteredDocument: function() {
 	var element = this.element;
@@ -4230,10 +4245,11 @@ iAttached: function() {
 	if (hAlign) this.css('text-align', hAlign); // NOTE defaults defined in <style> above
 },
 
-attached: function() {
-	Base.iAttached.call(this);
-	Panel.iAttached.call(this);
-	VLayout.iAttached.call(this);
+attached: function(handlers) {
+	Base.iAttached.call(this, handlers);
+	Link.iAttached.call(this, handlers);
+	Panel.iAttached.call(this, handlers);
+	VLayout.iAttached.call(this, handlers);
 },
 
 enteredDocument: function() {
@@ -4253,9 +4269,10 @@ var HLayout = sprockets.evolve(Layout, {
 
 _.assign(HLayout, {
 
-attached: function() {
-	Base.iAttached.call(this);
-	Panel.iAttached.call(this);
+attached: function(handlers) {
+	Base.iAttached.call(this, handlers);
+	Link.iAttached.call(this, handlers);
+	Panel.iAttached.call(this, handlers);
 },
 
 iEnteredDocument: function() {
@@ -4299,9 +4316,10 @@ activedescendant: {
 
 _.assign(Deck, {
 
-attached: function() {
-	Base.iAttached.call(this);
-	Panel.iAttached.call(this);
+attached: function(handlers) {
+	Base.iAttached.call(this, handlers);
+	Link.iAttached.call(this, handlers);
+	Panel.iAttached.call(this, handlers);
 },
 
 iEnteredDocument: function() {
@@ -4341,10 +4359,11 @@ var ResponsiveDeck = sprockets.evolve(Deck, {
 
 _.assign(ResponsiveDeck, {
 
-attached: function() {
-	Base.iAttached.call(this);
-	Panel.iAttached.call(this);
-	Deck.iAttached.call(this);
+attached: function(handlers) {
+	Base.iAttached.call(this, handlers);
+	Link.iAttached.call(this, handlers);
+	Panel.iAttached.call(this, handlers);
+	Deck.iAttached.call(this, handlers);
 },
 
 iEnteredDocument: function() {
@@ -4449,10 +4468,11 @@ iAttached: function() {
 		mainSelector: frame.attr('main') // TODO consider using a hash in `@src`
     });
 },
-attached: function() {
-	Base.iAttached.call(this);
-	Panel.iAttached.call(this);
-	HFrame.iAttached.call(this);
+attached: function(handlers) {
+	Base.iAttached.call(this, handlers);
+	Link.iAttached.call(this, handlers);
+	Panel.iAttached.call(this, handlers);
+	HFrame.iAttached.call(this, handlers);
 },
 iEnteredDocument: function() {
 	var frame = this;
@@ -4468,18 +4488,7 @@ iLeftDocument: function() {
 },
 leftDocument: function() {
 	this.iLeftDocument();
-},
-
-handlers: [
-{
-	type: 'requestnavigation',
-	action: function(e) {
-		if (e.defaultPrevented) return;
-		var acceptDefault = framer.onRequestNavigation(e, this);
-		if (acceptDefault === false) e.preventDefault();
-	}
 }
-]
 
 });
 
@@ -4534,9 +4543,10 @@ iAttached: function() {
 		frames: []
 	});
 }, 
-attached: function() {
-	Base.iAttached.call(this);
-	HFrameset.iAttached.call(this);
+attached: function(handlers) {
+	Base.iAttached.call(this, handlers);
+	Link.iAttached.call(this, handlers);
+	HFrameset.iAttached.call(this, handlers);
 },
 iEnteredDocument: function() {
 	var frameset = this;
@@ -4552,18 +4562,8 @@ iLeftDocument: function() { // FIXME should never be called??
 },
 leftDocument: function() {
 	HFrameset.iLeftDocument.call(this);
-},
-handlers: [
-{
-	type: 'requestnavigation',
-	action: function(e) {
-		if (e.defaultPrevented) return;
-		var acceptDefault = framer.onRequestNavigation(e, this);
-		if (acceptDefault === false) e.preventDefault();
-	}
 }
-]
-	
+
 });
 
 
@@ -5339,7 +5339,9 @@ evaluate: function(name, value, params) {
 	var fn = this.get(name);
 	// NOTE filter functions should only accept string_or_number_or_boolean
 	// FIXME Need to wrap fn() to assert / cast supplied value and accept params
-	return fn.apply(value, params);
+	var args = params.slice(0);
+	args.unshift(value);
+	return fn.apply(undefined, args);
 }
 
 
@@ -6805,33 +6807,27 @@ return JSONDecoder;
 framer.registerDecoder('json', JSONDecoder);
 
 // FIXME filters need sanity checking
-framer.registerFilter('lowercase', function(text) {
-	var value = this;
+framer.registerFilter('lowercase', function(value, text) {
 	return value.toLowerCase();
 });
 
-framer.registerFilter('uppercase', function(text) {
-	var value = this;
+framer.registerFilter('uppercase', function(value, text) {
 	return value.toUpperCase();
 });
 
-framer.registerFilter('if', function(yep) {
-	var value = this;
+framer.registerFilter('if', function(value, yep) {
 	return (!!value) ? yep : value;
 });
 
-framer.registerFilter('unless', function(nope) {
-	var value = this;
+framer.registerFilter('unless', function(value, nope) {
 	return (!value) ? nope : value;
 });
 
-framer.registerFilter('if_unless', function(yep, nope) {
-	var value = this;
+framer.registerFilter('if_unless', function(value, yep, nope) {
 	return (!!value) ? yep : nope;
 });
 
-framer.registerFilter('map', function(dict) { // dict can be {} or []
-	var value = this;
+framer.registerFilter('map', function(value, dict) { // dict can be {} or []
 
 	if (Array.isArray(dict)) {
 		var patterns = _.filter(dict, function(item, i) { return !(i % 2); });
@@ -6850,8 +6846,7 @@ framer.registerFilter('map', function(dict) { // dict can be {} or []
 	return value;
 });
 
-framer.registerFilter('match', function(pattern, yep, nope) {
-	var value = this;
+framer.registerFilter('match', function(value, pattern, yep, nope) {
 	// FIXME what if pattern not RegExp && not string??
 	if (!(pattern instanceof RegExp)) pattern = new RegExp('^' + pattern + '$'); // FIXME sanity TODO case-insensitive??
 	var bMatch = pattern.test(value);
@@ -6860,13 +6855,11 @@ framer.registerFilter('match', function(pattern, yep, nope) {
 	return bMatch;
 });
 
-framer.registerFilter('replace', function(pattern, text) {
-	var value = this;
+framer.registerFilter('replace', function(value, pattern, text) {
 	return value.replace(pattern, text); // TODO sanity check before returning
 });
 
-if (_.dateFormat) framer.registerFilter('date', function(format, utc) {
-	var value = this;
+if (_.dateFormat) framer.registerFilter('date', function(value, format, utc) {
 	return _.dateFormat(value, format, utc);
 });
 
