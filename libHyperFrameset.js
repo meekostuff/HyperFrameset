@@ -2852,7 +2852,9 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 	function loadFrames(frames, response) { // TODO promisify
 		_.forEach(frames, function(frame) {
 			frame.attr('src', response.url);
-			if (DOM.isVisible(frame.element)) frame.load(response); // FIXME if !isVisible then **probably** handled by framer.frameEntered code
+			DOM.whenVisible(frame.element).then(function() {
+				frame.load(response); // FIXME this can potentially clash with framer.frameEntered code
+			});
 		});
 	}
 	
