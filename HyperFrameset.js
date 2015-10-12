@@ -3905,34 +3905,34 @@ preprocess: function() {
 	var frameRefElts = [];
 	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
 
-		// NOTE even if the frame is only a declaration (@def && @def !== @id) it still has its content removed
+		// NOTE even if the frame is only a declaration (@def && @def !== @defid) it still has its content removed
 		var placeholder = el.cloneNode(false);
 		el.parentNode.replaceChild(placeholder, el); // NOTE no adoption
 
-		var id = el.getAttribute('id');
-		var defId = el.getAttribute('def');
-		if (defId && defId !== id) {
+		var defId = el.getAttribute('defid');
+		var def = el.getAttribute('def');
+		if (def && def !== defId) {
 			frameRefElts.push(el);
 			return;
 		}
-		if (!id) {
-			id = '__frame_' + index + '__'; // FIXME not guaranteed to be unique. Should be a function at top of module
-			el.setAttribute('id', id);
-		}
 		if (!defId) {
-			defId = id;
-			placeholder.setAttribute('def', defId);
+			defId = '__frame_' + index + '__'; // FIXME not guaranteed to be unique. Should be a function at top of module
+			el.setAttribute('defid', defId);
+		}
+		if (!def) {
+			def = defId;
+			placeholder.setAttribute('def', def);
 		}
 		frameDefElts.push(el);
 	});
 	_.forEach(frameDefElts, function(el) {
-		var id = el.getAttribute('id');
-		frameset.frames[id] = new HFrameDefinition(el, frameset);
+		var defId = el.getAttribute('defid');
+		frameset.frames[defId] = new HFrameDefinition(el, frameset);
 	});
 	_.forEach(frameRefElts, function(el) {
-		var defId = el.getAttribute('def');
-		if (!frameset.frames[defId]) {
-			logger.warn('HyperFrame references non-existant frame #' + defId);
+		var def = el.getAttribute('def');
+		if (!frameset.frames[def]) {
+			logger.warn('HyperFrame references non-existant frame: ' + def);
 		}
 	});
 
@@ -4483,8 +4483,8 @@ _.assign(HFrame, {
 
 iAttached: function() {
 	var frame = this;
-	var defId = frame.attr('def');
-	frame.definition = framer.definition.frames[defId];
+	var def = frame.attr('def');
+	frame.definition = framer.definition.frames[def];
 	_.defaults(frame, {
 		frames: [],
 		bodyElement: null,

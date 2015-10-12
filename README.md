@@ -357,15 +357,15 @@ a definition for other frame instances.
 
 For the purpose of illustration:
 A frame *definition* would have both a frame-body (without which it doesn't define anything)
-and an ID (so it can be referenced). For example
+and a definition ID (so it can be referenced). For example
 
-    <hf-frame id="hf_frame1">
+    <hf-frame defid="hf_frame1">
 		<hf-body>
 		...
 		</hf-body>
 	</hf-frame>
 
-A frame *declaration* (which isn't also a definition) would have no body and would reference a frame definition by ID.
+A frame *declaration* (which isn't also a definition) would have no body and would reference a frame definition by definition ID.
 For example
 
 	<hf-frame def="hf_frame1"></hf-frame>
@@ -789,7 +789,7 @@ for `requestnavigation` events will result in the document URL being changed.
 Frame Definition
 ----------------
 
-    <hf-frame id="hfdef_frameX">
+    <hf-frame defid="hfdef_frameX">
 		<hf-body condition="loaded">
 			<hf-transform type="main">
 			</hf-transform>

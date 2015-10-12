@@ -373,16 +373,16 @@ a definition for other frame instances.</p>
 
 <p>For the purpose of illustration:
 A frame <em>definition</em> would have both a frame-body (without which it doesn't define anything)
-and an ID (so it can be referenced). For example</p>
+and a definition ID (so it can be referenced). For example</p>
 
-<pre><code>&lt;hf-frame id="hf_frame1"&gt;
+<pre><code>&lt;hf-frame defid="hf_frame1"&gt;
     &lt;hf-body&gt;
     ...
     &lt;/hf-body&gt;
 &lt;/hf-frame&gt;
 </code></pre>
 
-<p>A frame <em>declaration</em> (which isn't also a definition) would have no body and would reference a frame definition by ID.
+<p>A frame <em>declaration</em> (which isn't also a definition) would have no body and would reference a frame definition by definition ID.
 For example</p>
 
 <pre><code>&lt;hf-frame def="hf_frame1"&gt;&lt;/hf-frame&gt;
@@ -836,7 +836,7 @@ for <code>requestnavigation</code> events will result in the document URL being 
 
 <h2>Frame Definition</h2>
 
-<pre><code>&lt;hf-frame id="hfdef_frameX"&gt;
+<pre><code>&lt;hf-frame defid="hfdef_frameX"&gt;
     &lt;hf-body condition="loaded"&gt;
         &lt;hf-transform type="main"&gt;
         &lt;/hf-transform&gt;
