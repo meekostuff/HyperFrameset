@@ -4145,7 +4145,42 @@ attached: function(handlers) {
 });
 
 return Layer;
+})();
+
+var Popup = (function() {
+
+var Popup = sprockets.evolve(Base, {
+
+role: 'popup',
+
 });
+
+_.assign(Popup, {
+
+attached: function(handlers) {
+	Base.iAttached.call(this, handlers);
+},
+
+iEnteredDocument: function() {
+	var panel = this;
+	var name = panel.attr('name'); 
+	var value = panel.attr('value'); 
+	if (!name && !value) return;
+	panel.ariaToggle('hidden', true);
+	if (!name) return; // being controlled by an ancestor
+	controllers.listen(name, function(values) {
+		panel.ariaToggle('hidden', !(_.includes(values, value)));
+	});
+},
+
+enteredDocument: function() {
+	Popup.iEnteredDocument.call(this);
+}
+
+});
+
+return Popup;
+})();
 
 var Panel = (function() {
 
@@ -4158,6 +4193,8 @@ role: 'panel',
 _.assign(Panel, {
 
 iAttached: function(handlers) {
+	var overflow = this.attr('overflow');
+	if (overflow) this.css('overflow', overflow); // FIXME sanity check
 	var height = this.attr('height');
 	if (height) this.css('height', height); // FIXME units
 	var width = this.attr('width');
@@ -4744,6 +4781,7 @@ sprockets.registerElement('body', HFrameset);
 sprockets.registerElement(framesetDef.lookupSelector('frame'), HFrame);
 
 sprockets.registerElement(framesetDef.lookupSelector('layer'), Layer);
+sprockets.registerElement(framesetDef.lookupSelector('popup'), Popup);
 sprockets.registerElement(framesetDef.lookupSelector('panel'), Panel);
 sprockets.registerElement(framesetDef.lookupSelector('vlayout'), VLayout);
 sprockets.registerElement(framesetDef.lookupSelector('hlayout'), HLayout);
@@ -4754,14 +4792,16 @@ var cssText = [
 '*[hidden] { display: none !important; }', // TODO maybe not !important
 'html, body { margin: 0; padding: 0; }',
 'html { width: 100%; height: 100%; }',
-framesetDef.lookupSelector('layer, hlayout, vlayout, deck, rdeck, panel, frame, body') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
-framesetDef.lookupSelector('layer') + ' { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; overflow: visible; }',
-framesetDef.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { display: block; width: 0; height: 0; overflow: hidden; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+framesetDef.lookupSelector('layer, popup, hlayout, vlayout, deck, rdeck, panel, frame, body') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
+framesetDef.lookupSelector('layer') + ' { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; }',
+framesetDef.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { display: block; width: 0; height: 0; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
 framesetDef.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { width: 100%; height: 100%; }', // FIXME should be 0,0 before manual calculations
-framesetDef.lookupSelector('frame, panel') + ' { display: block; width: auto; height: auto; overflow: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
-framesetDef.lookupSelector('body') + ' { display: block; width: auto; height: auto; overflow: hidden; margin: 0; }',
-framesetDef.lookupSelector('vlayout') + ' { height: 100%; overflow: hidden; }',
-framesetDef.lookupSelector('hlayout') + ' { width: 100%; overflow: hidden; }',
+framesetDef.lookupSelector('frame, panel') + ' { display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+framesetDef.lookupSelector('body') + ' { display: block; width: auto; height: auto; margin: 0; }',
+framesetDef.lookupSelector('popup') + ' { display: block; position: relative; width: 0; height: 0; }',
+framesetDef.lookupSelector('popup') + ' > * { position: absolute; top: 0; left: 0; }', // TODO or change 'body' styling above
+framesetDef.lookupSelector('vlayout') + ' { height: 100%; }',
+framesetDef.lookupSelector('hlayout') + ' { width: 100%; }',
 framesetDef.lookupSelector('vlayout') + ' > * { display: block; float: left; width: 100%; height: auto; text-align: left; }',
 framesetDef.lookupSelector('vlayout') + ' > *::after { clear: both; }',
 framesetDef.lookupSelector('hlayout') + ' > * { display: block; float: left; width: auto; height: 100%; vertical-align: top; }',
