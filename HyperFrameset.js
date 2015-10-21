@@ -3532,6 +3532,55 @@ sprockets.registerElement(tag, Interface);
 
 } // END registerFormElements()
 
+// NOTE handlers are registered for "body@submit,reset,input,change" in HFrameset
+function registerBodyAsPseudoForm(object, handlers) {
+	var element = object.element;
+	if (!element.hasAttribute('configid')) return;
+	var configID = _.words(element.getAttribute('configid'))[0];	
+	var options = framer.definition.configData[configID];
+	if (!options) return;
+
+	var events = _.words('submit reset change input');
+	var needClickWatcher = false;
+
+	_.forEach(events, function(type) {
+		var ontype = 'on' + type;
+		var callback = options[ontype];
+		if (!callback) return;
+
+		var fn = function(e) { 
+			if (DOM.closest(e.target, 'form')) return;
+			callback.apply(object, arguments); 
+		};
+		object[ontype] = fn;
+		handlers.push({
+			type: type,
+			action: fn
+		});
+		
+		switch (type) {
+		default: break;
+		case 'submit': case 'reset': needClickWatcher = true;
+		}
+	});
+
+	if (needClickWatcher) {
+		document.addEventListener('click', function(e) { 
+			if (DOM.closest(e.target, 'form')) return;
+			var type = e.target.type;
+			if (!(type === 'submit' || type === 'reset')) return;
+			Task.asap(function() {
+				var pseudoEvent = document.createEvent('CustomEvent');
+				// NOTE pseudoEvent.detail = e.target
+				pseudoEvent.initCustomEvent(type, true, true, e.target);
+				pseudoEvent.preventDefault();
+				element.dispatchEvent(pseudoEvent);
+			});
+		}, false);
+	}
+}
+
+
 /*
  * HyperFrameset definitions
  */
@@ -3846,6 +3895,7 @@ preprocess: function() {
 
 			try {
 				var fn = Function(fnText);
+console.log(fn.toString());
 			}
 			catch(err) { 
 				logger.warn('Error evaluating inline script in frameset:\n' +
@@ -3887,6 +3937,7 @@ preprocess: function() {
 
 		try {
 			var fn = Function(fnText);
+console.log(fn.toString());
 			var object = fn();
 			frameset.configData[sourceURL] = object;
 		}
@@ -4609,6 +4660,7 @@ attached: function(handlers) {
 	Base.iAttached.call(this, handlers);
 	Link.iAttached.call(this, handlers);
 	HFrameset.iAttached.call(this, handlers);
+	registerBodyAsPseudoForm(this, handlers); // NOTE not .call()
 },
 iEnteredDocument: function() {
 	var frameset = this;
