@@ -1495,10 +1495,14 @@ init: function(doc, settings) {
 		if (script.hasAttribute('src')) return;
 		var id = script.id;
 		// TODO generating ID always has a chance of duplicating IDs
-		if (!id) id = script.id = 'script[' + i + ']';
-		if (script.hasAttribute('sourceurl')) return;
-		var sourceURL = frameset.url + '#' + id;
-		script.setAttribute('sourceurl', sourceURL);
+		if (!id) id = script.id = 'script[' + i + ']'; // FIXME doc that i is zero-indexed
+		var sourceURL;
+		if (script.hasAttribute('sourceurl')) sourceURL = script.getAttribute('sourceurl');
+		else {
+			sourceURL = frameset.url + '__' + id; // FIXME this should be configurable
+			script.setAttribute('sourceurl', sourceURL);
+		}
+		script.text += '\n//# sourceURL=' + sourceURL;
 	});
 
 	
@@ -1529,8 +1533,6 @@ preprocess: function() {
 		// Ignore non-javascript scripts
 		if (script.type && !/^text\/javascript/.test(script.type)) return;
 
-		var sourceURL = script.getAttribute('sourceurl'); // assuming @sourceurl preset
-
 		if (script.hasAttribute('src')) { // external javascript in <body> is invalid
 			logger.warn('Frameset <body> may not contain external scripts: \n' +
 				script.cloneNode(false).outerHTML);
@@ -1538,14 +1540,15 @@ preprocess: function() {
 			return;
 		}
 
+		var sourceURL = script.getAttribute('sourceurl');
+
 		if (!script.hasAttribute('for')) {
-			var fnText = script.text;
-			fnText += '\n//# sourceURL=' + sourceURL;
+			var newScript = script.cloneNode(true);
 
 			try {
-				var fn = Function(fnText);
+				DOM.insertNode('beforeend', document.head, newScript);
 			}
-			catch(err) { 
+			catch(err) { // TODO test if this actually catches script errors
 				logger.warn('Error evaluating inline script in frameset:\n' +
 					frameset.url + '#' + script.id);
 				Task.postError(err);
@@ -1579,9 +1582,7 @@ preprocess: function() {
 			sourceURL;
 		scriptFor.setAttribute('configID', configID);
 
-		var fnText = 'return (' + script.text + ');';
-
-		fnText += '\n//# sourceURL=' + sourceURL;
+		var fnText = 'return (' + script.text + '\n);';
 
 		try {
 			var fn = Function(fnText);
@@ -2376,10 +2377,6 @@ prepare: function(dstDoc, definition) {
 		mergeHead(dstDoc, srcDoc.head, true);
 		// allow scripts to run. FIXME scripts should always be appended to document.head
 		_.forEach(DOM.findAll('script', dstDoc.head), function(script) {
-			if (!script.hasAttribute('src') && script.hasAttribute('sourceurl')) {
-				// FIXME what about non-JS scripts??
-				script.text += '\n//# sourceURL=' + script.getAttribute('sourceurl');
-			}
 			scriptQueue.push(script);
 		});
 		return scriptQueue.empty();

@@ -359,8 +359,8 @@ function createThrowers(list) {
 	return _.map(list, function(error) {
 		return function() {
 			if (logger.LOG_LEVEL >= logger.levels.indexOf('debug')) {
-				if (error && error.stack) logger.error(error.stack);
-				else logger.error('Untraceable error: ' + error); // FIXME why are these occuring??
+				if (error && error.stack) logger.debug(error.stack);
+				else logger.debug('Untraceable error: ' + error); // FIXME why are these occuring??
 			}
 			throw error;
 		};
@@ -1238,8 +1238,8 @@ manageEvent: function(type) {
 	this.managedEvents.push(type);
 	window.addEventListener(type, function(event) {
 		// NOTE stopPropagation() prevents custom default-handlers from running. DOMSprockets nullifies it.
-		event.stopPropagation = function() { logger.warn('event.stopPropagation() is a no-op'); }
-		event.stopImmediatePropagation = function() { logger.warn('event.stopImmediatePropagation() is a no-op'); }
+		event.stopPropagation = function() { logger.debug('event.stopPropagation() is a no-op'); }
+		event.stopImmediatePropagation = function() { logger.debug('event.stopImmediatePropagation() is a no-op'); }
 	}, true);
 }
 
@@ -1322,7 +1322,13 @@ addHandler: function(handler) {
 	Binding.manageEvent(type);
 	var fn = function(event) {
 		if (fn.normalize) event = fn.normalize(event);
-		return handleEvent.call(object, event, handler);
+		try {
+			return handleEvent.call(object, event, handler);
+		}
+		catch (error) {
+			Task.postError(error);
+			throw error;
+		}
 	}
 	fn.type = type;
 	fn.capture = capture;
@@ -3846,10 +3852,14 @@ init: function(doc, settings) {
 		if (script.hasAttribute('src')) return;
 		var id = script.id;
 		// TODO generating ID always has a chance of duplicating IDs
-		if (!id) id = script.id = 'script[' + i + ']';
-		if (script.hasAttribute('sourceurl')) return;
-		var sourceURL = frameset.url + '#' + id;
-		script.setAttribute('sourceurl', sourceURL);
+		if (!id) id = script.id = 'script[' + i + ']'; // FIXME doc that i is zero-indexed
+		var sourceURL;
+		if (script.hasAttribute('sourceurl')) sourceURL = script.getAttribute('sourceurl');
+		else {
+			sourceURL = frameset.url + '__' + id; // FIXME this should be configurable
+			script.setAttribute('sourceurl', sourceURL);
+		}
+		script.text += '\n//# sourceURL=' + sourceURL;
 	});
 
 	
@@ -3880,8 +3890,6 @@ preprocess: function() {
 		// Ignore non-javascript scripts
 		if (script.type && !/^text\/javascript/.test(script.type)) return;
 
-		var sourceURL = script.getAttribute('sourceurl'); // assuming @sourceurl preset
-
 		if (script.hasAttribute('src')) { // external javascript in <body> is invalid
 			logger.warn('Frameset <body> may not contain external scripts: \n' +
 				script.cloneNode(false).outerHTML);
@@ -3889,15 +3897,15 @@ preprocess: function() {
 			return;
 		}
 
+		var sourceURL = script.getAttribute('sourceurl');
+
 		if (!script.hasAttribute('for')) {
-			var fnText = script.text;
-			fnText += '\n//# sourceURL=' + sourceURL;
+			var newScript = script.cloneNode(true);
 
 			try {
-				var fn = Function(fnText);
-console.log(fn.toString());
+				DOM.insertNode('beforeend', document.head, newScript);
 			}
-			catch(err) { 
+			catch(err) { // TODO test if this actually catches script errors
 				logger.warn('Error evaluating inline script in frameset:\n' +
 					frameset.url + '#' + script.id);
 				Task.postError(err);
@@ -3931,13 +3939,10 @@ console.log(fn.toString());
 			sourceURL;
 		scriptFor.setAttribute('configID', configID);
 
-		var fnText = 'return (' + script.text + ');';
-
-		fnText += '\n//# sourceURL=' + sourceURL;
+		var fnText = 'return (' + script.text + '\n);';
 
 		try {
 			var fn = Function(fnText);
-console.log(fn.toString());
 			var object = fn();
 			frameset.configData[sourceURL] = object;
 		}
@@ -4729,10 +4734,6 @@ prepare: function(dstDoc, definition) {
 		mergeHead(dstDoc, srcDoc.head, true);
 		// allow scripts to run. FIXME scripts should always be appended to document.head
 		_.forEach(DOM.findAll('script', dstDoc.head), function(script) {
-			if (!script.hasAttribute('src') && script.hasAttribute('sourceurl')) {
-				// FIXME what about non-JS scripts??
-				script.text += '\n//# sourceURL=' + script.getAttribute('sourceurl');
-			}
 			scriptQueue.push(script);
 		});
 		return scriptQueue.empty();
