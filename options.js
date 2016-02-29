@@ -1,4 +1,4 @@
-/* START HTMLDecor boot options */
+/* START HyperFrameset boot options */
 
 /*
 This code MUST run before the boot-script.
@@ -24,4 +24,4 @@ Meeko.options = { // these are the default values
 	"config_script": '{bootscriptdir}config.js' // can be a script-url OR a function
 };
 
-/* END HTMLDecor boot options */
+/* END HyperFrameset boot options */
