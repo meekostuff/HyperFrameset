@@ -7,7 +7,7 @@
 
 var defaults = { // NOTE defaults also define the type of the associated config option
 	"no_boot": false, 
-	"no_frameset": false, // NOTE !(history.pushState && window.XMLHttpRequest && window.sessionStorage && window.JSON && 'readyState' in document) is enforced anyway
+	"no_frameset": false, // NOTE !(history.pushState && window.XMLHttpRequest && && 'readyState' in document) is enforced anyway
 	"no_style": false,
 	"capturing": true,
 	"log_level": "warn",
@@ -187,7 +187,18 @@ this.LOG_LEVEL = levels[defaults['log_level']]; // DEFAULT. Options are read lat
  TODO It would be nice if all data sources had the same API
 */
 
-var sessionOptions = window.sessionStorage && window.JSON && (function() {
+var useSessionOptions = (function() {
+	if (!('JSON' in window)) return false;
+	try {
+		if (!('sessionStorage' in window)) return false;
+	}
+	catch (error) {
+		return false;
+	}
+	return true;
+})();
+
+var sessionOptions = useSessionOptions && (function() {
 
 var optionsKey = 'Meeko.options';
 var text = sessionStorage.getItem(optionsKey);
@@ -716,15 +727,17 @@ if (isSet('no_style')) {
 var no_frameset = isSet('no_frameset');
 if (no_frameset) return; // TODO logger.info()
 if (!(history.pushState && window.XMLHttpRequest && 'readyState' in document && 
-	window.sessionStorage && window.JSON &&
 	SUPPORTS_REQUEST_ANIMATION_FRAME && SUPPORTS_MUTATION_OBSERVERS)) {
-	logger.debug('HyperFrameset depends on native XMLHttpRequest, history.pushState, sessionStorage, JSON and MutationObserver');
+	logger.debug('HyperFrameset depends on native XMLHttpRequest, history.pushState, and MutationObserver');
 	return;
 }
 
 
 var capturing = bootOptions['capturing'];
 if (capturing === 'auto') capturing = !document.body;
+// WARN startup failure will reload the page (if capturing is enabled)
+// but without sessionOptions the reload will (probably) cause the same failure again.
+if (!sessionOptions) capturing = false; 
 
 if (capturing) {
 	Capture.start(capturing === 'strict');
