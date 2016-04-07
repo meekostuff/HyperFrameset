@@ -547,7 +547,13 @@ return new Promise(function(resolve, reject) {
 	var xhr = new XMLHttpRequest;
 	xhr.onreadystatechange = onchange;
 	xhr.open(method, url, true);
-	if (HTML_IN_XHR) xhr.responseType = info.responseType;
+	if (HTML_IN_XHR) {
+		xhr.responseType = info.responseType;
+		// WARN overrideMimeType is needed for file:/// on Firefox
+		// TODO test cross-browser
+		// FIXME shouldn't be assuming text/html
+		if (info.responseType === 'document' && xhr.overrideMimeType) xhr.overrideMimeType('text/html');
+	}
 	xhr.send(sendText);
 	function onchange() {
 		if (xhr.readyState != 4) return;
