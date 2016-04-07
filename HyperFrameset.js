@@ -2914,7 +2914,10 @@ return new Promise(function(resolve, reject) {
 	xhr.send(sendText);
 	function onchange() {
 		if (xhr.readyState != 4) return;
-		if (xhr.status != 200) { // FIXME what about other status codes?
+		if (!(
+			new URL(url).protocol === 'file:' && xhr.status === 0 ||
+			xhr.status === 200 // FIXME what about other status codes?
+			)) { 
 			reject(function() { throw Error('Unexpected status ' + xhr.status + ' for ' + url); });
 			return;
 		}
