@@ -4854,10 +4854,10 @@ framesetDef.lookupSelector('body') + ' { display: block; width: auto; height: au
 framesetDef.lookupSelector('popup') + ' { display: block; position: relative; width: 0; height: 0; }',
 framesetDef.lookupSelector('popup') + ' > * { position: absolute; top: 0; left: 0; }', // TODO or change 'body' styling above
 framesetDef.lookupSelector('vlayout') + ' { height: 100%; }',
-framesetDef.lookupSelector('hlayout') + ' { width: 100%; }',
+framesetDef.lookupSelector('hlayout') + ' { width: 100%; overflow-y: hidden; }',
 framesetDef.lookupSelector('vlayout') + ' > * { display: block; float: left; width: 100%; height: auto; text-align: left; }',
 framesetDef.lookupSelector('vlayout') + ' > *::after { clear: both; }',
-framesetDef.lookupSelector('hlayout') + ' > * { display: block; float: left; width: auto; height: 100%; vertical-align: top; }',
+framesetDef.lookupSelector('hlayout') + ' > * { display: block; float: left; width: auto; height: 100%; vertical-align: top; overflow-y: auto; }',
 framesetDef.lookupSelector('hlayout') + '::after { clear: both; }',
 framesetDef.lookupSelector('deck') + ' > * { width: 100%; height: 100%; }',
 framesetDef.lookupSelector('rdeck') + ' > * { width: 0; height: 0; }',
