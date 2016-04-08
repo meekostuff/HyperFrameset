@@ -555,15 +555,30 @@ return new Promise(function(resolve, reject) {
 		if (info.responseType === 'document' && xhr.overrideMimeType) xhr.overrideMimeType('text/html');
 	}
 	xhr.send(sendText);
-	function onchange() {
+	function onchange() { // FIXME rewrite this to use onload/onerror/onabort/ontimeout
 		if (xhr.readyState != 4) return;
-		if (!(
-			new URL(url).protocol === 'file:' && xhr.status === 0 ||
-			xhr.status === 200 // FIXME what about other status codes?
-			)) { 
-			reject(function() { throw Error('Unexpected status ' + xhr.status + ' for ' + url); });
-			return;
+		var protocol = new URL(url).protocol;
+		switch (protocol) {
+		case 'http:': case 'https:':
+			switch (xhr.status) {
+			default:
+				reject(function() { throw Error('Unexpected status ' + xhr.status + ' for ' + url); });
+				return;
+				
+			// FIXME what about other status codes?
+			case 200:
+				break; // successful so just continue
+			}
+			break;
+
+		default:
+			if (HTML_IN_XHR ? !xhr.response : !xhr.responseText) {
+				reject(function() { throw Error('No response for ' + url); });
+				return;
+			}
+			break;
 		}
+		
 		Promise.defer(onload); // Use delay to stop the readystatechange event interrupting other event handlers (on IE). 
 	}
 	function onload() {
