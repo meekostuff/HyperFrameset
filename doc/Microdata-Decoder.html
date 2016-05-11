@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=utf-8" />
+    <meta content="initial-scale=1.0, width=device-width"
+          name="viewport" />
+    <script src="../boot.js">
+    </script>
+    <link href="./frameset.html"
+          rel="frameset" />
+    <link href="./basic.css"
+          rel="stylesheet" />
+    <title></title>
+  </head>
+  <body>
+    <nav role="navigation">
+      Location: <a href="./"
+           title="Home"
+           rel="home">HyperFrameset</a> / <a href="Decoders.html"
+           rel="directory">Decoders</a> / <a href="Microdata-Decoder.html"
+           rel="self">Microdata Decoder</a><br />
+      Previous: <a href="CSS-Decoder.html"
+           title="Previous">CSS Decoder</a> , Next: <a href="JSON-Decoder.html"
+           title="Next">JSON Decoder</a>
+    </nav>
+    <main id="mk_main"
+          role="main">
+      <h2>
+        Microdata Decoder
+      </h2>
+      <p>
+        The microdata-decoder is only appropriate for DOM-documents or
+        DOM-fragments which are annotated with <a href=
+        "https://www.w3.org/TR/microdata/">microdata</a>.
+      </p>
+      <p>
+        A microdata query will look something like:
+      </p>
+      <pre><code>^[http://schema.org/Thing] name1 name2 ...
+</code></pre>
+      <p>
+        that is, an <em>optional</em> prefix followed by a path which is a
+        SPACE ( ) separated list of item-names.
+      </p>
+      <p>
+        The path is scoped (by default) to the context-node.
+      </p>
+      <p>
+        If the query is a DOT (.) then it returns the context-node.
+      </p>
+      <p>
+        If the query begins with a CARET (^) then the path is scoped to the
+        whole document or fragment.
+      </p>
+      <p>
+        If the query begins with a schema-url enclosed by SQUARE-BRACKETS '[',
+        ']' then a query is evaluated for each node that matches that
+        schema-url which is a descendant of the context-node (or whole document
+        if there is a CARET first).
+      </p>
+      <p>
+        <strong>TODO:</strong>
+      </p>
+      <ul>
+        <li>explain path evaluation
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>

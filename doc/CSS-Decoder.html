@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=utf-8" />
+    <meta content="initial-scale=1.0, width=device-width"
+          name="viewport" />
+    <script src="../boot.js">
+    </script>
+    <link href="./frameset.html"
+          rel="frameset" />
+    <link href="./basic.css"
+          rel="stylesheet" />
+    <title></title>
+  </head>
+  <body>
+    <nav role="navigation">
+      Location: <a href="./"
+           title="Home"
+           rel="home">HyperFrameset</a> / <a href="Decoders.html"
+           rel="directory">Decoders</a> / <a href="CSS-Decoder.html"
+           rel="self">CSS Decoder</a><br />
+      Next: <a href="Microdata-Decoder.html"
+           title="Next">Microdata Decoder</a>
+    </nav>
+    <main id="mk_main"
+          role="main">
+      <h2>
+        CSS Decoder
+      </h2>
+      <p>
+        The css-decoder is only appropriate for DOM-document or DOM-fragment.
+      </p>
+      <p>
+        The query has the following format
+      </p>
+      <pre><code>css-selector {attribute-name}
+</code></pre>
+      <p>
+        where:
+      </p>
+      <ul>
+        <li>
+          <code>css-selector</code> is a css-selector which is scoped to the
+          context-node
+        </li>
+        <li>
+          <code>attribute-name</code> can be a regular attribute or
+          <code>_html</code> (for <code>innerHTML</code>) or <code>_text</code>
+          (for <code>textContent</code>)
+        </li>
+      </ul>
+      <p>
+        <strong>TODO:</strong>
+      </p>
+      <ul>
+        <li>more details on css-selector scoping
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>

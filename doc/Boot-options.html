@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=utf-8" />
+    <meta content="initial-scale=1.0, width=device-width"
+          name="viewport" />
+    <script src="../boot.js">
+    </script>
+    <link href="./frameset.html"
+          rel="frameset" />
+    <link href="./basic.css"
+          rel="stylesheet" />
+    <title></title>
+  </head>
+  <body>
+    <nav role="navigation">
+      <a href="Introduction.html"
+           title="Previous">Introduction</a><a href="./"
+           rel="alternate directory">HyperFrameset Documentation</a> / <a href=
+           "Config-options.html"
+           title="Next">Config options</a>
+    </nav>
+    <main id="mk_main"
+          role="main">
+      <h2>
+        Boot options
+      </h2>
+      <p>
+        These options aren't specifically related to the operation of
+        HyperFrameset. The boot-script has the following options (default
+        values in <strong>bold</strong>).
+      </p>
+      <ul>
+        <li>log_level: "none", "error", <strong>"warn"</strong>, "info",
+        "debug"
+        </li>
+        <li>polling_interval: <strong>50</strong> (milliseconds)
+        </li>
+        <li>no_style: <strong>false</strong>, true
+        </li>
+        <li>no_frameset: <strong>false</strong>, true
+        </li>
+        <li>capturing: false, "auto", <strong>true</strong>, "strict"
+        </li>
+        <li>hidden_timeout: <strong>3000</strong> (milliseconds)
+        </li>
+        <li>startup_timeout: <strong>10000</strong> (milliseconds)
+        </li>
+        <li>html5_block_elements: <strong>"article aside figcaption figure
+        footer header hgroup main nav section"</strong>
+        </li>
+        <li>html5_inline_elements: <strong>"abbr mark output time audio video
+        picture"</strong>
+        </li>
+        <li>config_script: <strong>"{bootscriptdir}config.js"</strong>
+        </li>
+        <li>main_script: <strong>"{bootscriptdir}HyperFrameset.js"</strong>
+        </li>
+      </ul>
+      <p>
+        Sources for options are detailed below.
+      </p>
+      <h3>
+        From <code>Meeko.options</code>
+      </h3>
+      <p>
+        <strong>NOTE</strong> this is how options are set in
+        <code>options.js</code>.<br />
+        Options can be <strong>preset</strong> by script, like this:
+      </p>
+      <pre><code class="html">&lt;script&gt;
+var Meeko = window.Meeko || (window.Meeko = {});
+Meeko.options = {
+    log_level: "info",
+    hidden_timeout: 1000
+};
+&lt;/script&gt;
+</code></pre>
+      <p>
+        This tells HyperFrameset to - log 'info', 'warn' and 'error' messages -
+        hide the page until all frameset-resources are loaded <em>or</em> 1000
+        milliseconds (1 second) have elapsed, whichever comes <em>first</em>.
+      </p>
+      <h3>
+        From localStorage and sessionStorage
+      </h3>
+      <p>
+        When debugging a page you probably don't want to modify the page source
+        to change HyperFrameset options, especially as you may have to change
+        them back after you've found the problem. For this reason HyperFrameset
+        reads <code>sessionStorage</code> and <code>localStorage</code> at
+        startup, looking for config options. <code>sessionStorage</code>
+        options override those found in <code>localStorage</code>, which in
+        turn override those in data-attributes.
+      </p>
+      <p>
+        Config options are read from JSON stored in the
+        <code>Meeko.options</code> key. Thus the following would disable hiding
+        of the landing-page and turn on <code>debug</code> logging.
+      </p>
+      <pre><code class="html">sessionStorage.setItem(
+    'Meeko.options', 
+    JSON.stringify({ 
+        hidden_timeout: 0, 
+        log_level: "debug" 
+    }) 
+);
+</code></pre>
+      <p>
+        <em>Note</em> that the page would require a refresh after these
+        settings were made.
+      </p>
+      <h2>
+        Capturing the Landing Page
+      </h2>
+      <p>
+        The <strong>capturing</strong> <a href="#boot-options">boot option</a>
+        prevents normal browser parsing of the <em>landing page</em>.<br />
+        This allows HyperFrameset to manage parsing in the same way that AJAXed
+        pages are handled. The main benefits of this would be:
+      </p>
+      <ul>
+        <li>
+          <p>
+            other <code>&lt;script&gt;</code>s in the landing-page are disabled
+          </p>
+        </li>
+        <li>
+          <p>
+            because <code>&lt;link&gt;</code> and <code>&lt;img&gt;</code>
+            resources aren't automatically downloaded they can be changed (or
+            removed) with no penalty.
+          </p>
+        </li>
+      </ul>
+      <p>
+        The drawbacks are:
+      </p>
+      <ul>
+        <li>parsing and displaying of content doesn't begin until the
+        landing-page has fully down-loaded. On long pages over slow networks
+        this will have quite a noticeable delay before any content is viewable.
+        </li>
+      </ul>
+      <p>
+        The article "<a href=
+        "https://hacks.mozilla.org/2013/03/capturing-improving-performance-of-the-adaptive-web/">Capturing
+        - Improving Performance of the Adaptive Web</a>" provides a short
+        description and discussion of this approach.
+      </p>
+      <h3>
+        Restrictions
+      </h3>
+      <ol>
+        <li>The boot-script must be within - or before -
+        <code>&lt;head&gt;</code>.
+        </li>
+        <li>The boot-script should be the first <code>&lt;script&gt;</code> in
+        the page.
+        </li>
+        <li>If within <code>&lt;head&gt;</code> the boot-script should only be
+        preceded by <code>&lt;meta http-equiv&gt;</code> elements.
+        </li>
+      </ol>
+      <p>
+        Capturing should be enabled by setting the <strong>capturing</strong>
+        boot option to "strict". This enforces all the preceding restrictions.
+      </p>
+      <p>
+        Setting the option to true only enforces the first restriction, with
+        warnings given about the other two.
+      </p>
+    </main>
+  </body>
+</html>

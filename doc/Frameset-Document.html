@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=utf-8" />
+    <meta content="initial-scale=1.0, width=device-width"
+          name="viewport" />
+    <script src="../boot.js">
+    </script>
+    <link href="./frameset.html"
+          rel="frameset" />
+    <link href="./basic.css"
+          rel="stylesheet" />
+    <title></title>
+  </head>
+  <body>
+    <nav role="navigation">
+      Location: <a href="./"
+           title="Home"
+           rel="home">HyperFrameset</a> / <a href="Frameset-Document.html"
+           rel="self">Frameset Document</a><br />
+      Previous: <a href="Config-options.html"
+           title="Previous">Config options</a> , Next: <a href=
+           "Frameset-Definition.html"
+           title="Next">Frameset Definition</a>
+    </nav>
+    <main id="mk_main"
+          role="main">
+      <h2>
+        Frameset Document
+      </h2>
+      <p>
+        When the frameset document has loaded, the <code>&lt;body&gt;</code> is
+        separated and used to create the frameset definition. The remainder of
+        the document - the <code>&lt;html&gt;</code>, <code>&lt;head&gt;</code>
+        and children - replaces the landing-page in the browser view. After
+        this replacement the window state should be as though the frameset
+        document was the landing-page.
+      </p>
+      <p>
+        <strong>TODO:</strong>
+      </p>
+      <ul>
+        <li>xml and custom namespaces on <code>&lt;html&gt;</code>
+        </li>
+        <li>changing the namespace for HyperFrameset
+        </li>
+      </ul>
+      <h3 id="script-handling">
+        <code>&lt;script&gt;</code> handling
+      </h3>
+      <ul>
+        <li>
+          <p>
+            Scripts in the <code>&lt;head&gt;</code> of the frameset document
+            are executed via dynamic script insertion, but behave
+            <strong>like</strong> scripts that are part of a landing page. So
+            earlier scripts block later scripts unless the earlier script has
+            the <code>src</code> <strong>and</strong> <code>async</code>
+            attributes.
+          </p>
+          <pre><code class="html">&lt;script src="..." async&gt;&lt;/script&gt;
+</code></pre>
+          <p>
+            These scripts are <strong>enabled</strong> AFTER all the content in
+            the <code>&lt;head&gt;</code> of the frameset is INSERTED INTO the
+            page.
+          </p>
+        </li>
+        <li>
+          <p>
+            Scripts in the <code>&lt;body&gt;</code> of the frameset document
+            MUST NOT have a <code>src</code> attribute. They are ignored if
+            they do.
+          </p>
+        </li>
+        <li>
+          <p>
+            Scripts containing an empty <code>for</code> attribute are options
+            scripts attached to the previous non-<code>&lt;script&gt;</code>,
+            non-<code>&lt;style&gt;</code> element (either a previous sibling
+            or the parent of the script). The script MUST NOT have a
+            <code>src</code> attribute, and is evaluated with
+          </p>
+          <pre><code class="js">(Function('return (' + script.text + ');'))()
+</code></pre>
+          <p>
+            For example:
+          </p>
+          <pre><code class="html">&lt;script for&gt;
+({
+    lookup: function(url) { }
+})
+&lt;/script&gt;
+</code></pre>
+          <p>
+            This is a valid yet inert script when not handled by HyperFrameset.
+          </p>
+        </li>
+        <li>
+          <p>
+            Scripts containing a non-empty <code>for</code> attribute are
+            ignored.
+          </p>
+        </li>
+        <li>Other scripts are executed via dynamic script insertion.
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=utf-8" />
+    <meta content="initial-scale=1.0, width=device-width"
+          name="viewport" />
+    <script src="../boot.js">
+    </script>
+    <link href="./frameset.html"
+          rel="frameset" />
+    <link href="./basic.css"
+          rel="stylesheet" />
+    <title></title>
+  </head>
+  <body>
+    <nav role="navigation">
+      Location: <a href="./"
+           title="Home"
+           rel="home">HyperFrameset</a> / <a href="Introduction.html"
+           rel="self">Introduction</a><br />
+      Next: <a href="Overview.html"
+           title="Next">Overview</a>
+    </nav>
+    <main id="mk_main"
+          role="main">
+      <h2>
+        Introduction
+      </h2>
+      <blockquote>
+        <p>
+          HyperFramesets are the way HTMLFramesets were meant to work -
+          super-stylesheets with seamless frames, document transforms and
+          configurable routing. And history.pushState.
+        </p>
+      </blockquote>
+      <p>
+        HyperFrameset is a light-weight Javascript <a href=
+        "http://en.wikipedia.org/wiki/Transclusion">transclusion</a> and layout
+        engine which runs in the browser. Whilst the implementation relies on
+        AJAX and <code>history.pushState</code>, conceptually the design is an
+        evolution of HTMLFramesets.
+      </p>
+      <p>
+        The primary advance is that the landing page initiates loading of the
+        frameset document, not the other way round. HyperFrameset is consistent
+        with the principles of <a href=
+        "http://en.wikipedia.org/wiki/Progressive_enhancement">Progressive
+        Enhancement</a> and <a href="http://roca-style.org/"
+           title="ROCA">Resource Oriented Client Architecture</a>.
+      </p>
+      <p>
+        <strong>WARNING:</strong> THIS PROJECT IS ALPHA SOFTWARE. ONLY USE IT
+        FOR EXPERIMENTATION.
+      </p>
+      <h3>
+        Browser support
+      </h3>
+      <p>
+        HyperFrameset requires features only available in recent versions of
+        popular browsers, but sites that adapt well to HyperFrameset will
+        (probably) have full functionality when HyperFrameset doesn't run.
+      </p>
+      <p>
+        HyperFrameset can run on browsers which support
+        <code>history.pushState</code> and <code>MutationObserver</code>. These
+        are available on most browsers in significant use today. Since
+        <code>MutationObserver</code> is NOT supported on IE10, HyperFrameset
+        uses <code>MutationEvents</code> on that platform.
+      </p>
+      <h3>
+        License
+      </h3>
+      <p>
+        HyperFrameset is available under <a href=
+        "http://www.mozilla.org/MPL/2.0/"
+           title="Mozilla Public License version 2.0">MPL 2.0</a>. See the
+           <a href="http://www.mozilla.org/MPL/2.0/FAQ.html"
+           title="Frequently Asked Questions">MPL 2.0 FAQ</a> for your
+           obligations if you intend to modify or distribute HyperFrameset or
+           part thereof.
+      </p>
+      <h3>
+        Contact
+      </h3>
+      <p>
+        If you have any questions or comments, don't hesitate to contact the
+        author via <a href="http://meekostuff.net/">web</a>, <a href=
+        "mailto:shogun70@gmail.com">email</a> or <a href=
+        "http://twitter.com/meekostuff">twitter</a>.
+      </p>
+      <p>
+        <strong>WARNING:</strong> THIS DOCUMENTATION IS A WORK-IN-PROGRESS.
+        SOME OF IT MAY BE OUT-OF-DATE. MOSTLY IT IS JUST TOO LONG AND
+        DISORGANISED. A BETTER UNDERSTANDING WILL BE GAINED THROUGH EXPLORING A
+        DEMO - VIEW SOURCE IS YOUR FRIEND.
+      </p>
+    </main>
+  </body>
+</html>

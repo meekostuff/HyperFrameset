@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=utf-8" />
+    <meta content="initial-scale=1.0, width=device-width"
+          name="viewport" />
+    <script src="../boot.js">
+    </script>
+    <link href="./frameset.html"
+          rel="frameset" />
+    <link href="./basic.css"
+          rel="stylesheet" />
+    <title></title>
+  </head>
+  <body>
+    <nav role="navigation">
+      Location: <a href="./"
+           title="Home"
+           rel="home">HyperFrameset</a> / <a href="Frame-Definition.html"
+           rel="self">Frame Definition</a><br />
+      Previous: <a href="Frameset-Definition.html"
+           title="Previous">Frameset Definition</a> , Next: <a href=
+           "Processors.html"
+           title="Next">Processors</a>
+    </nav>
+    <main id="mk_main"
+          role="main">
+      <h2>
+        Frame Definition
+      </h2>
+      <pre><code class="html">&lt;hf-frame defid="hfdef_frameX"&gt;
+    &lt;hf-body condition="loaded"&gt;
+        &lt;hf-transform type="main"&gt;
+        &lt;/hf-transform&gt;
+    &lt;/hf-body&gt;
+&lt;/hf-frame&gt;
+</code></pre>
+      <h3>
+        <code>&lt;hf-frame&gt;</code>
+      </h3>
+      <p>
+        A frame definition must contain one or more
+        <code>&lt;hf-body&gt;</code> elements.
+      </p>
+      <p>
+        If it is to be referenced by other frame declarations then it must also
+        have an <code>@id</code>.
+      </p>
+      <p>
+        Since a frame definition is also a frame declaration it will typically
+        contain other attributes detailed in the <a href=
+        "./Frame-Declaration.html">Frame Declaration</a> section.
+      </p>
+      <h3>
+        <code>&lt;hf-body&gt;</code>
+      </h3>
+      <p>
+        A frame body is a container for frame content.
+      </p>
+      <p>
+        Within a frame definition it will contain one or more
+        <code>&lt;hf-transform&gt;</code> child elements.
+      </p>
+      <p>
+        Within the browser view it will contain a processed representation of
+        the document fetched from the frame's <code>@src</code>. The processing
+        involves applying each of the child transforms in turn - the first
+        transform is applied to the <code>@src</code> document, subsequent
+        transforms are fed the output of the previous transform.
+      </p>
+      <p>
+        <strong>TODO:</strong>
+      </p>
+      <ul>
+        <li>
+          <code>@condition</code>: <code>loaded</code>, <code>loading</code>,
+          <code>uninitialized</code>
+        </li>
+        <li>transition details
+        </li>
+      </ul>
+      <h3>
+        <code>&lt;hf-transform&gt;</code>
+      </h3>
+      <p>
+        The type of the transform is selected with <code>@type</code>. The type
+        must be compatible with the input format.
+      </p>
+      <p>
+        There are three built-in transform types:
+      </p>
+      <ul>
+        <li>
+          <a href="Main-Processor.html"><code>main</code></a>: compatible with
+          "html" input
+        </li>
+        <li>
+          <a href="Script-Processor.html"><code>script</code></a>: compatible
+          with "html" or "json" input
+        </li>
+        <li>
+          <a href="Hazard-Processor.html"><code>hazard</code></a>:
+          compatibility depends on the "provider"
+        </li>
+      </ul>
+      <p>
+        Some types of transform (e.g. <code>hazard</code>) support programmable
+        querying of the input content. In this case the transform processor
+        will use a "provider" which is responsible for decoding the input
+        content and processing specific queries. The provider is specified with
+        <code>@format</code> which must be compatible with the type of
+        transform and the input format.
+      </p>
+      <p>
+        There are three built-in providers:
+      </p>
+      <ul>
+        <li>
+          <a href="CSS-Decoder.html"><code>css</code></a>: compatible with
+          <code>hazard</code> transform and "html" input
+        </li>
+        <li>
+          <a href="Microdata-Decoder.html"><code>microdata</code></a>:
+          compatible with <code>hazard</code> transform and "html" input
+        </li>
+        <li>
+          <a href="JSON-Decoder"><code>json</code></a>: compatible with
+          <code>hazard</code> transform and "json" input
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>

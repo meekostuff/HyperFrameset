@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=utf-8" />
+    <meta content="initial-scale=1.0, width=device-width"
+          name="viewport" />
+    <script src="../boot.js">
+    </script>
+    <link href="./frameset.html"
+          rel="frameset" />
+    <link href="./basic.css"
+          rel="stylesheet" />
+    <title></title>
+  </head>
+  <body>
+    <nav role="navigation">
+      Location: <a href="./"
+           title="Home"
+           rel="home">HyperFrameset</a> / <a href="Decoders.html"
+           rel="self">Decoders</a><br />
+      Previous: <a href="Processors.html"
+           title="Previous">Processors</a> , Next: <a href=
+           "Frameset-Layout.html"
+           title="Next">Frameset Layout</a>
+    </nav>
+    <main id="mk_main"
+          role="main">
+      <h2>
+        Decoders
+      </h2>
+      <p>
+        A decoder executes queries on a DOM (or other) tree.
+      </p>
+      <p>
+        A decoder is a javascript "class" which is registered with the
+        frame-overseer by calling
+      </p>
+      <pre><code class="javascript">Meeko.framer.registerDecoder(name, decoder)
+</code></pre>
+      <p>
+        where
+      </p>
+      <ul>
+        <li>
+          <code>name</code> is a string-identifier for the decoder
+        </li>
+        <li>
+          <code>decoder</code> is the decoder class constructor function
+        </li>
+      </ul>
+      <p>
+        The frame-overseer will create a decoder instance by calling
+      </p>
+      <pre><code class="javascript">new decoder()
+</code></pre>
+      <p>
+        The decoder prototype MUST have two methods:
+      </p>
+      <pre><code class="javascript">init: function(srcTree)
+
+evaluate: function(query, context, variables, wantArray)
+</code></pre>
+      <p>
+        <code>init(srcTree)</code> is called to assign <code>srcTree</code> to
+        the decoder. Preparsing (if appropriate) should be done in this method.
+        <code>srcTree</code> is typically a DOM-document or DOM-fragment, but
+        can be any JS tree.
+      </p>
+      <p>
+        <code>evaluate(query, context, variables, wantArray)</code> is called
+        to process a query, where:
+      </p>
+      <ul>
+        <li>query: the query string
+        </li>
+        <li>context: the context "node" for the query
+        </li>
+        <li>variables: a map of variable-names and values
+        </li>
+        <li>wantArray: whether the query should return all matches or just the
+        first
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>

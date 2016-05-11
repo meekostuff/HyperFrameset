@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=utf-8" />
+    <meta content="initial-scale=1.0, width=device-width"
+          name="viewport" />
+    <script src="../boot.js">
+    </script>
+    <link href="./frameset.html"
+          rel="frameset" />
+    <link href="./basic.css"
+          rel="stylesheet" />
+    <title></title>
+  </head>
+  <body>
+    <nav role="navigation">
+      Location: <a href="./"
+           title="Home"
+           rel="home">HyperFrameset</a> / <a href="Processors.html"
+           rel="directory">Processors</a> / <a href="Main-Processor.html"
+           rel="self">Main Processor</a><br />
+      Next: <a href="Script-Processor.html"
+           title="Next">Script Processor</a>
+    </nav>
+    <main id="mk_main"
+          role="main">
+      <h2>
+        Main Processor
+      </h2>
+      <pre><code class="html">&lt;hf-transform type="main" main=".content"&gt;
+&lt;/hf-transform&gt;
+</code></pre>
+      <p>
+        The <code>main</code> processor identifies a single element in the
+        source document that contains the primary content - the identified
+        element is not included in the primary content. This element can be
+        identified with a CSS selector in the <code>main</code> attribute, e.g.
+        <code>main=".content"</code>. If <code>@main</code> is not defined then
+        a sequential search is performed with <code>main</code>, then
+        <code>[role=main]</code>, then <code>body</code>.
+      </p>
+      <p>
+        <strong>NOTES:</strong>
+      </p>
+      <ul>
+        <li>The transform element will contain no markup.
+        </li>
+        <li>This is a built-in processor.
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>

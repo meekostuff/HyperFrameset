@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=utf-8" />
+    <meta content="initial-scale=1.0, width=device-width"
+          name="viewport" />
+    <script src="../boot.js">
+    </script>
+    <link href="./frameset.html"
+          rel="frameset" />
+    <link href="./basic.css"
+          rel="stylesheet" />
+    <title></title>
+  </head>
+  <body>
+    <nav role="navigation">
+      Location: <a href="./"
+           title="Home"
+           rel="home">HyperFrameset</a> / <a href="Frame-Declaration.html"
+           rel="self">Frame Declaration</a><br />
+      Previous: <a href="Frameset-Layout.html"
+           title="Previous">Frameset Layout</a> , Next: <a href=
+           "Debugging.html"
+           title="Next">Debugging</a>
+    </nav>
+    <main id="mk_main"
+          role="main">
+      <h2>
+        Frame Declaration
+      </h2>
+      <pre><code class=
+      "html">&lt;hf-frame def="hfdef_frameX" targetname="hf_frame1" src="scope:./index.html" main="main"&gt;&lt;/hf-frame&gt;
+</code></pre>
+      <p>
+        When a frame declaration enters the browser view, its <code>src</code>
+        attribute is interpreted as a URL and fetched. Its <code>def</code>
+        attribute is used to lookup a frame definition which will process the
+        fetched document and produce a rendering for the frame.
+      </p>
+      <h3>
+        Frame naming
+      </h3>
+      <p>
+        Similar to <code>&lt;frame&gt;</code> and <code>&lt;iframe&gt;</code>,
+        a frame declaration can have a <code>targetname</code> attribute, which
+        allows it to be a target for <code>requestnavigation</code> events.
+      </p>
+    </main>
+  </body>
+</html>

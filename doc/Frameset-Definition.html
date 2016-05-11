@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=utf-8" />
+    <meta content="initial-scale=1.0, width=device-width"
+          name="viewport" />
+    <script src="../boot.js">
+    </script>
+    <link href="./frameset.html"
+          rel="frameset" />
+    <link href="./basic.css"
+          rel="stylesheet" />
+    <title></title>
+  </head>
+  <body>
+    <nav role="navigation">
+      Location: <a href="./"
+           title="Home"
+           rel="home">HyperFrameset</a> / <a href="Frameset-Definition.html"
+           rel="self">Frameset Definition</a><br />
+      Previous: <a href="Frameset-Document.html"
+           title="Previous">Frameset Document</a> , Next: <a href=
+           "Frame-Definition.html"
+           title="Next">Frame Definition</a>
+    </nav>
+    <main id="mk_main"
+          role="main">
+      <h2>
+        Frameset Definition
+      </h2>
+      <p>
+        The frameset definition is created by processing the
+        <code>&lt;body&gt;</code> of the frameset document. Every
+        <code>&lt;hf-frame&gt;</code> is <strong>both</strong> a frame
+        definition and a frame declaration, unless it has a <code>def</code>
+        attribute in which case it is only a declaration - <code>@def</code>
+        will contain the ID of a frame definition.
+      </p>
+      <p>
+        Each frame definition is added to the list of definitions maintained in
+        the frameset definition.
+      </p>
+      <p>
+        Each frame declaration has its children - if any - removed.
+      </p>
+      <p>
+        The result of this processing is list of frame definitions which
+        contain zero or more frame declarations as descendants. Likewise, the
+        <code>&lt;body&gt;</code> will contain one or more frame declarations
+        as descendants.
+      </p>
+      <p>
+        After processing, the <code>&lt;body&gt;</code> is inserted into the
+        browser view. Its contained frame declarations are automatically
+        handled, typically by fetching and rendering the frame
+        <code>@src</code>. These renderings may insert more frame declarations
+        which are again automatically handled.
+      </p>
+      <h3>
+        Configuration
+      </h3>
+      <p>
+        Any <code>&lt;script for&gt;</code> in the <code>&lt;body&gt;</code> is
+        used to to generate an options object for the "associated element", see
+        <a href="./Frameset-Document.html#script-handling">script-handling</a>.
+      </p>
+      <p>
+        The script SHOULD have a format like
+      </p>
+      <pre><code class="html">&lt;script for&gt;
+({
+    lookup: function(url) { }
+})
+&lt;/script&gt;
+</code></pre>
+      <p>
+        This options object will configure how HyperFrameset determines the
+        appropriate frame target for <code>requestnavigation</code> events
+        triggered by clicks on hyperlinks or form-submission (GET only).
+      </p>
+      <p>
+        The following callbacks can be configured
+      </p>
+      <ul>
+        <li>
+          <p>
+            <strong><code>lookup(url, details)</code></strong> return the
+            target frame <code>targetname</code> for the landing-page URL or a
+            <code>requestnavigation</code> event.<br />
+            For <code>requestnavigation</code> events the <code>details</code>
+            object has the following fields: + url: the URL to be navigated to
+            + element: the source element for the event ( <code>&lt;a
+            href&gt;</code> or <code>&lt;form method="get"&gt;</code> ) +
+            referrer: the current document.URL
+          </p>
+          <p>
+            If this method returns a valid target frame <code>targetname</code>
+            then pushState-assisted-navigation is initiated and frames with
+            that target <code>targetname</code> are loaded with the hyperlinked
+            resource.<br />
+            If it returns <code>true</code> then the
+            <code>requestnavigation</code> event is cancelled. Otherwise the
+            <code>requestnavigation</code> event continues to bubble, where it
+            might be handled elsewhere or eventually result in a normal browser
+            navigation being performed.
+          </p>
+        </li>
+      </ul>
+      <p>
+        The <code>lookup()</code> callback can be configured for any of
+        <code>&lt;hf-frame&gt;</code>, <code>&lt;hf-panel&gt;</code>,
+        <code>&lt;hf-vlayout&gt;</code>, <code>&lt;hf-hlayout&gt;</code>,
+        <code>&lt;hf-deck&gt;</code>, <code>&lt;hf-rdeck&gt;</code>.
+      </p>
+      <p>
+        It can also be configured for <code>&lt;body&gt;</code>, which means
+        that it is used for determining the target-frame of the landing-page
+        URL, and for <code>requestnavigation</code> events will result in the
+        document URL being changed.
+      </p>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=utf-8" />
+    <meta content="initial-scale=1.0, width=device-width"
+          name="viewport" />
+    <script src="../boot.js">
+    </script>
+    <link href="./frameset.html"
+          rel="frameset" />
+    <link href="./basic.css"
+          rel="stylesheet" />
+    <title></title>
+  </head>
+  <body>
+    <nav role="navigation">
+      Location: <a href="./"
+           title="Home"
+           rel="home">HyperFrameset</a> / <a href="Frameset-Layout.html"
+           rel="self">Frameset Layout</a><br />
+      Previous: <a href="Decoders.html"
+           title="Previous">Decoders</a> , Next: <a href=
+           "Frame-Declaration.html"
+           title="Next">Frame Declaration</a>
+    </nav>
+    <main id="mk_main"
+          role="main">
+      <h2>
+        Frameset Layout
+      </h2>
+      <p>
+        HyperFrameset provides several custom-elements which effect
+        view-layout.
+      </p>
+      <p>
+        <code>&lt;hf-panel&gt;</code>, <code>&lt;hf-frame&gt;</code>,
+        <code>&lt;hf-body&gt;</code>, <code>&lt;hf-hlayout&gt;</code>,
+        <code>&lt;hf-vlayout&gt;</code>, <code>&lt;hf-deck&gt;</code>,
+        <code>&lt;hf-rdeck&gt;</code>, <code>&lt;hf-layer&gt;</code>,
+        <code>&lt;hf-popup&gt;</code>
+      </p>
+      <p>
+        These elements will have either <code>static</code> or
+        <code>fixed</code> <em>positioning</em>, and either
+        <code>vertical</code> or <code>horizontal</code> <em>orientation</em>
+        of children.
+      </p>
+      <p>
+        Static positioned elements can also have controlled <em>visibility</em>
+        by using <code>name</code> and <code>value</code> attributes to
+        co-ordinate with pre-declared framer controllers.
+      </p>
+      <h3>
+        Positioning
+      </h3>
+      <p>
+        Elements with <code>static</code> positioning are normal block
+        elements. This is the default.
+      </p>
+      <p>
+        Elements with <code>fixed</code> positioning create a new rendering box
+        which doesn't contribute to the layout of their parent tree. Fixed
+        position elements are: <code>&lt;hf-layer&gt;</code>,
+        <code>&lt;hf-popup&gt;</code>
+      </p>
+      <h3>
+        Orientation
+      </h3>
+      <p>
+        The children of HyperFrameset elements are block elements which are
+        oriented vertically by default.
+      </p>
+      <p>
+        If a HyperFrameset element is horizontally oriented then its children
+        are floated. Horizontally oriented elements are:
+        <code>&lt;hf-hlayout&gt;</code>
+      </p>
+      <h3>
+        Attributes
+      </h3>
+      <p>
+        HyperFrameset elements can have attributes which affect CSS layout.
+        When the element enters the view the value in these attribute are
+        conditionally copied to the equivalent CSS style attribute.
+      </p>
+      <p>
+        Implemented: <code>height</code>, <code>width</code>,
+        <code>minwidth</code>, <code>overflow</code>
+      </p>
+      <h3>
+        Elements
+      </h3>
+      <h4>
+        <code>&lt;hf-layer&gt;</code>
+      </h4>
+      <p>
+        This is a <code>fixed</code> position element that creates a new layer
+        (implemented with a unique <code>z-index</code>) above the current
+        layer and anchored to the top-left corner of the screen. The element
+        itself has zero width and height so it doesn't prevent clicks from
+        targetting lower layers.
+      </p>
+      <p>
+        This element can only have one child which MUST be a 'static'
+        positioned HyperFrameset element.
+      </p>
+      <h4>
+        <code>&lt;hf-panel&gt;</code>
+      </h4>
+      <p>
+        This is a <code>static</code> position element. The element's
+        dimensions default to 100% of its parent's unless the parent is
+        <code>&lt;hf-layer&gt;</code> in which case it will be 100% of the
+        viewport height and width.
+      </p>
+      <p>
+        If it has <code>@name</code> and <code>@value</code> then visibility is
+        controlled by the framer controller of the same name.
+      </p>
+      <p>
+        If it only has <code>@value</code> then it is assumed to be controlled
+        according to the <code>@name</code> of its parent element (which MUST
+        be <code>&lt;hf-deck&gt;</code>).
+      </p>
+      <p>
+        All other <code>static</code> position elements inherit behavior from
+        this element.
+      </p>
+      <p>
+        This may only contain one child element which MUST be
+        <code>&lt;hf-body&gt;</code>.
+      </p>
+      <h4>
+        <code>&lt;hf-frame&gt;</code>
+      </h4>
+      <p>
+        This is a <code>static</code> position element like
+        <code>&lt;hf-panel&gt;</code>. It's transclusion behavior is detailed
+        in <a href="./Frame-Declaration.html">Frame-Declaration</a>.
+      </p>
+      <p>
+        The only visible elements of this child MUST be one-or-more
+        <code>&lt;hf-body&gt;</code>.
+      </p>
+      <h4>
+        <code>&lt;hf-vlayout&gt;</code>
+      </h4>
+      <p>
+        This is a <code>static</code> position element whose children (which
+        MUST be <code>static</code> position HyperFrameset elements) will be
+        oriented vertically. The parent element MUST be a HyperFrameset
+        element. The parent element may override the element's dimensions.
+      </p>
+      <h4>
+        <code>&lt;hf-hlayout&gt;</code>
+      </h4>
+      <p>
+        This is a <code>static</code> position element whose children (which
+        MUST be <code>static</code> position HyperFrameset elements) will be
+        oriented horizontally. The parent element MUST be a HyperFrameset
+        element. The parent element may override the element's dimensions.
+      </p>
+      <h4>
+        <code>&lt;hf-deck&gt;</code>
+      </h4>
+      <p>
+        This is a <code>static</code> position element that controls the
+        visibility of its children (which MUST be <code>static</code> position
+        HyperFrameset elements) so that at most one is visible. If the element
+        has <code>@name</code> then it reads <code>@value</code> on child
+        elements to co-ordinate visibility with the framer controller of the
+        same name.
+      </p>
+      <h4>
+        <code>&lt;hf-rdeck&gt;</code>
+      </h4>
+      <p>
+        This is a <code>static</code> position element that controls the
+        visibility of its children (which MUST be <code>static</code> position
+        HyperFrameset elements) so that at most one is visible. The visible
+        child is the first one whose <code>@minwidth</code> satisfies the width
+        of the element.
+      </p>
+      <h4>
+        <code>&lt;hf-popup&gt;</code>
+      </h4>
+      <p>
+        This is a <code>fixed</code> position element that is anchored to the
+        top-left corner of where-ever the element would appear if it had normal
+        layout.
+      </p>
+      <p>
+        If it has <code>@name</code> and <code>@value</code> then visibility is
+        controlled by the framer controller of the same name.
+      </p>
+      <p>
+        This may only contain one child element which MUST be
+        <code>&lt;hf-body&gt;</code>.
+      </p>
+      <h4>
+        <code>&lt;hf-body&gt;</code>
+      </h4>
+      <p>
+        This element is required as a child of <code>&lt;hf-panel&gt;</code>,
+        <code>&lt;hf-frame&gt;</code> and <code>&lt;hf-popup&gt;</code>.
+      </p>
+    </main>
+  </body>
+</html>

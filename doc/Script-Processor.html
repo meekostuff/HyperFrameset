@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=utf-8" />
+    <meta content="initial-scale=1.0, width=device-width"
+          name="viewport" />
+    <script src="../boot.js">
+    </script>
+    <link href="./frameset.html"
+          rel="frameset" />
+    <link href="./basic.css"
+          rel="stylesheet" />
+    <title></title>
+  </head>
+  <body>
+    <nav role="navigation">
+      Location: <a href="./"
+           title="Home"
+           rel="home">HyperFrameset</a> / <a href="Processors.html"
+           rel="directory">Processors</a> / <a href="Script-Processor.html"
+           rel="self">Script Processor</a><br />
+      Previous: <a href="Main-Processor.html"
+           title="Previous">Main Processor</a> , Next: <a href=
+           "Hazard-Processor.html"
+           title="Next">Hazard Processor</a>
+    </nav>
+    <main id="mk_main"
+          role="main">
+      <h2>
+        Script Processor
+      </h2>
+      <p>
+        The <code>script</code> processor provides maximal flexibility by
+        allowing a user-supplied function to perform the transformation.
+      </p>
+      <p>
+        The transform MUST be declared like this:
+      </p>
+      <pre><code class="html">&lt;hf-transform type="script"&gt;
+    &lt;script for&gt;
+    ({
+        transform: function(fragment) { }
+    })
+    &lt;/script&gt;
+&lt;/hf-transform&gt;
+</code></pre>
+      <p>
+        The script MUST NOT have a <code>src</code> attribute, and is evaluated
+        with
+      </p>
+      <pre><code class="js">(Function('return (' + script.text + ');'))()
+</code></pre>
+      <p>
+        to generate a <code>processingObject</code> for the transform. The
+        transformation is performed by calling
+      </p>
+      <pre><code class="js">processingObject.transform(fragment);
+</code></pre>
+      <p>
+        which is typically passed either the source document or a DOM-fragment,
+        and typically returns a DOM-fragment.
+      </p>
+    </main>
+  </body>
+</html>

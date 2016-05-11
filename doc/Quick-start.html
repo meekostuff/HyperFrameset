@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=utf-8" />
+    <meta content="initial-scale=1.0, width=device-width"
+          name="viewport" />
+    <script src="../boot.js">
+    </script>
+    <link href="./frameset.html"
+          rel="frameset" />
+    <link href="./basic.css"
+          rel="stylesheet" />
+    <title></title>
+  </head>
+  <body>
+    <nav role="navigation">
+      Location: <a href="./"
+           title="Home"
+           rel="home">HyperFrameset</a> / <a href="Quick-start.html"
+           rel="self">Quick start</a><br />
+      Previous: <a href="Overview.html"
+           title="Previous">Overview</a> , Next: <a href="Best-practices.html"
+           title="Next">Best practices</a>
+    </nav>
+    <main id="mk_main"
+          role="main">
+      <h2>
+        Quick Start
+      </h2>
+      <p>
+        A HyperFrameset enabled site is similar to a HTMLFrameset based site.
+        It has separate HTML documents for
+      </p>
+      <ul>
+        <li>the primary content
+        </li>
+        <li>the "frameset"
+        </li>
+        <li>auxiliary content
+        </li>
+      </ul>
+      <p>
+        Create a HTML document (page.html) with some page specific content. Any
+        page specific scripts, styles or meta-data should go in
+        <code>&lt;head&gt;</code>. The <code>&lt;body&gt;</code> may also
+        contain fallback content, which is only displayed if HyperFrameset is
+        NOT enabled.
+      </p>
+      <pre><code class="html">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;!-- source the HyperFrameset boot-script --&gt;
+    &lt;script src="/path/to/HyperFrameset/boot.js"&gt;&lt;/script&gt;
+    &lt;title&gt;Content&lt;/title&gt;
+    &lt;!-- create a link to the frameset document. All attributes are needed --&gt;
+    &lt;link rel="frameset" type="text/html" href="/frameset.html" /&gt;
+    &lt;!-- include fallback stylesheets for when HyperFrameset doesn't run. --&gt;
+    &lt;style&gt;
+    .styled-from-page { background-color: red; color: white; }
+    &lt;/style&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;header&gt;
+    This fallback header will be removed from the page
+    &lt;/header&gt;
+
+    &lt;main&gt;&lt;!-- Primary content --&gt;
+        &lt;h1&gt;Page One&lt;h1&gt;
+        &lt;div class="styled-from-frameset"&gt;
+        This content is styled by the frameset stylesheet
+        &lt;/div&gt;  
+        &lt;div class="styled-from-page"&gt;
+        This content is styled by the page stylesheet which will not apply in the frameset view. 
+        &lt;/div&gt;  
+    &lt;/main&gt;
+
+    &lt;footer&gt;
+    This fallback footer will be removed from the page
+    &lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+      <p>
+        Create the frameset document (frameset.html). This is a normal page of
+        HTML that, when viewed in the browser, will appear as the final page
+        without the page specific content.
+      </p>
+      <pre><code class="html">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;style&gt;
+    .styled-from-frameset { border: 2px solid blue; }
+    &lt;/style&gt;
+    &lt;script for="hf-frameset"&gt;
+    ({
+        lookup: function(url) { return 'hf_main'; } // the target for all same-scope hyperlinks
+    })
+    &lt;/script&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;header&gt;
+    #header in frameset
+    &lt;/header&gt;
+
+    &lt;nav&gt;
+        &lt;label&gt;Navigation&lt;/label&gt;
+        &lt;hf-frame targetname="hf_nav" type="html" src="scope:./index.html" main="nav"&gt;
+            &lt;hf-body&gt;&lt;/hf-body&gt;
+        &lt;/hf-frame&gt;
+    &lt;/nav&gt;
+
+    &lt;main&gt;
+        &lt;label&gt;Primary Content&lt;/label&gt;
+        &lt;hf-frame targetname="hf_main" type="html" main="main"&gt;
+            &lt;hf-body&gt;&lt;/hf-body&gt;
+        &lt;/hf-frame&gt;
+    &lt;/main&gt;
+
+    &lt;footer&gt;
+    #footer in frameset
+    &lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+      <p>
+        When page.html is loaded into the browser, HyperFrameset will load
+        frameset.html and apply it to the view, inserting the
+        <code>&lt;main&gt;</code> content from page.html into the
+        <code>hf_main</code> frame.
+      </p>
+      <p>
+        This process results in a DOM tree something like this:
+      </p>
+      <pre><code class="html">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+    &lt;!-- source the HyperFrameset boot-script --&gt;
+    &lt;script src="/path/to/HyperFrameset/boot.js"&gt;&lt;/script&gt;
+    &lt;!-- create a link to the frameset document. All attributes are needed --&gt;
+    &lt;link rel="frameset" type="text/html" href="/frameset.html" /&gt;
+    &lt;title&gt;Content&lt;/title&gt;
+    &lt;style&gt;
+    .styled-from-frameset { border: 2px solid blue; }
+    &lt;/style&gt;
+    &lt;!-- NOTE: no page specific style --&gt;
+&lt;/head&gt;
+&lt;body&gt;
+    &lt;header&gt;
+    #header in frameset
+    &lt;/header&gt;
+
+    &lt;nav&gt;
+        &lt;label&gt;Navigation&lt;/label&gt;
+        &lt;hf-frame targetname="hf_nav" type="html" src="/index.html" main="nav"&gt;
+            &lt;hf-body&gt;
+                &lt;a href="/page.html"&gt;Page One&lt;/a&gt;&lt;br /&gt;
+                &lt;a href="/page2.html"&gt;Page Two&lt;/a&gt;
+            &lt;/hf-body&gt;
+        &lt;/hf-frame&gt;
+    &lt;/nav&gt;
+
+    &lt;main&gt;
+        &lt;label&gt;Primary Content&lt;/label&gt;
+        &lt;hf-frame targetname="hf_main" type="html" main="main"&gt;
+            &lt;hf-body&gt;
+                &lt;h1&gt;Page One&lt;h1&gt;
+                &lt;div class="styled-from-frameset"&gt;
+                This content is styled by the frameset stylesheet
+                &lt;/div&gt;  
+                &lt;div class="styled-from-page"&gt;
+                This content is styled by the page stylesheet which will not apply in the frameset view. 
+                &lt;/div&gt;  
+            &lt;/hf-body&gt;
+        &lt;/hf-frame&gt;
+    &lt;/main&gt;
+
+    &lt;footer&gt;
+    #footer in frameset
+    &lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+      <p>
+        <strong>Although this is not the preferred way of specifying the
+        hyperframeset document, it is still the default and is conceptually
+        easiest to understand.</strong><br />
+        <strong>TODO:</strong> A better quick start would be copying a demo
+        site.
+      </p>
+      <h3>
+        How it works (approximately)
+      </h3>
+      <p>
+        When the browser first visits a page in a HyperFrameset enabled site,
+        the following startup sequence is applied:
+      </p>
+      <ol>
+        <li>a small boot-script is loaded
+        </li>
+        <li>if the browser can't support HyperFrameset then startup is
+        abandoned (leaving the page unframed)
+        </li>
+        <li>the HyperFrameset script and config-script are loaded
+        </li>
+        <li>the frameset document for the site is detected and loaded
+        </li>
+        <li>the unframed landing-page in the browser view is replaced by the
+        frameset document
+        </li>
+        <li>the main content of the unframed page (and that of any other pages
+        referenced by frames in the frameset document) is inserted into the
+        view
+        </li>
+      </ol>
+      <p>
+        When a hyperlink in the view is activated the following navigation
+        sequence is applied:
+      </p>
+      <ol>
+        <li>If the hyperlink is to an external site then abandon scripted
+        navigation and allow normal browser navigation
+        </li>
+        <li>Examine the hyperlink URL and event-source to find the appropriate
+        target frame and whether the address-bar URL needs updating.
+        </li>
+        <li>Load the hyperlinked page and insert into the appropriate target
+        frame.
+        </li>
+        <li>If the address-bar URL needs updating then call
+        <code>history.pushState</code>
+        </li>
+      </ol>
+    </main>
+  </body>
+</html>

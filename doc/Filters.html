@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=utf-8" />
+    <meta content="initial-scale=1.0, width=device-width"
+          name="viewport" />
+    <script src="../boot.js">
+    </script>
+    <link href="./frameset.html"
+          rel="frameset" />
+    <link href="./basic.css"
+          rel="stylesheet" />
+    <title></title>
+  </head>
+  <body>
+    <nav role="navigation">
+      Location:<br />
+    </nav>
+    <main id="mk_main"
+          role="main">
+      <h2>
+        Filters
+      </h2>
+      <p>
+        A filter is a JS function which is registered with the frame-overseer
+        by calling
+      </p>
+      <pre><code class="javascript">Meeko.framer.registerFilter(name, fn)
+</code></pre>
+      <p>
+        where
+      </p>
+      <ul>
+        <li>
+          <code>name</code> is a string-identifier for the filter
+        </li>
+        <li>
+          <p>
+            <code>fn</code> is a function implementing the filter which will be
+            called as
+          </p>
+          <pre><code class="javascript">fn(value, param1, param2, ...)
+</code></pre>
+          <p>
+            where <code>value</code> is the input value - either a DOM fragment
+            or JS object and <code>param1</code>, etc are other parameters.
+          </p>
+        </li>
+      </ul>
+      <p>
+        The built-in filters are:
+      </p>
+      <ul>
+        <li>
+          <code>lowercase</code>
+        </li>
+        <li>
+          <code>uppercase</code>
+        </li>
+        <li>
+          <code>if: &lt;value-if-input-trueish&gt;</code>
+        </li>
+        <li>
+          <code>unless: &lt;value-if-input-falseish&gt;</code>
+        </li>
+        <li>
+          <code>if_unless: &lt;value-if-input-trueish&gt;,
+          &lt;value-if-input-falseish&gt;</code>
+        </li>
+        <li>
+          <code>match: &lt;comparsion-text-or-regexp&gt;,
+          &lt;value-if-match&gt;, &lt;value-if-not-match&gt;</code>
+        </li>
+        <li>
+          <code>replace: &lt;text-or-regex-pattern&gt;,
+          &lt;replacement-text&gt;</code>
+        </li>
+        <li>
+          <code>map:
+          &lt;array-of-regexp-output-pairs-or-dict-of-text-output-fields&gt;</code>
+        </li>
+        <li>
+          <code>date: &lt;date-format&gt;, &lt;timezone&gt;</code>
+        </li>
+      </ul>
+      <p>
+        <strong>TODO:</strong>
+      </p>
+      <ul>
+        <li>details for built-in filters
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>

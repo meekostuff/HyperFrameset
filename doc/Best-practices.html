@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=utf-8" />
+    <meta content="initial-scale=1.0, width=device-width"
+          name="viewport" />
+    <script src="../boot.js">
+    </script>
+    <link href="./frameset.html"
+          rel="frameset" />
+    <link href="./basic.css"
+          rel="stylesheet" />
+    <title></title>
+  </head>
+  <body>
+    <nav role="navigation">
+      Location: <a href="./"
+           title="Home"
+           rel="home">HyperFrameset</a> / <a href="Best-practices.html"
+           rel="self">Best practices</a><br />
+      Previous: <a href="Quick-start.html"
+           title="Previous">Quick start</a> , Next: <a href="Installation.html"
+           title="Next">Installation</a>
+    </nav>
+    <main id="mk_main"
+          role="main">
+      <h2>
+        Best practices
+      </h2>
+      <blockquote>
+        <p>
+          Perfection is achieved not when there is nothing left to add, but
+          when there is nothing left to take away. -- <cite>Antoine de
+          Saint-Exupery</cite>
+        </p>
+      </blockquote>
+      <p>
+        An important goal of HyperFrameset is to facilitate really-simple
+        site-layouts and content-pages that are fully functional <strong>even
+        if</strong> HyperFrameset fails to run. These best-practices are for
+        making your site and pages fully usable (even if a little ugly) in all
+        browsers (even older ones) without HyperFrameset.
+      </p>
+      <p>
+        <small><strong>HyperFrameset can be used for a whole site, or for a
+        section within a site (say a documentation set). In the following,
+        "site" can also refer to a section within a site.</strong></small>
+      </p>
+      <p>
+        A general reminder when developing a site is to stop adding stuff to
+        individual pages:
+      </p>
+      <ul>
+        <li>don't add site navigation or contact forms to pages - they need
+        their own page
+        </li>
+        <li>don't add placeholder tags to pages
+        </li>
+        <li>don't add presentation classes to elements
+        </li>
+        <li>don't add inline styles to elements
+        </li>
+      </ul>
+      <h3>
+        Site Design
+      </h3>
+      <p>
+        <strong>HINT:</strong> Think <a href=
+        "http://thinkbda.com/journal/the-long-web/">API first</a>, HTML
+        payload.
+      </p>
+      <ul>
+        <li>Site navigation (or a Table-of-Contents) is a resource. It should
+        have its own page.
+        </li>
+        <li>Anything requiring a form submission is a resource. It should have
+        its own page.
+        </li>
+        <li>You should be able to (eventually) navigate to any resource by
+        starting at the home page (or Table-of-Contents page).
+        </li>
+        <li>If every page has a link to the home page then you can navigate
+        (eventually) from any entry point to any other resource.
+        </li>
+        <li>Don't forget Search Engine Optimization. (<strong>TODO:</strong>
+        expand on this)
+        </li>
+      </ul>
+      <p>
+        A reasonable illustration of a simple site is the <a href=
+        "http://www.gnu.org/software/make/manual/html_node/">GNU make
+        manual</a>. - The table-of-contents has its own URL - Each page
+        contains only primary content and some minimal contextual links -
+        Contents / Index / Up / Previous / Next - There is (nearly) no inline
+        styling - If you remove all styling it is still readable
+      </p>
+      <h3>
+        Page Design
+      </h3>
+      <p>
+        To work with HyperFrameset, an individual page only needs to contain
+        the primary content for its URL.
+      </p>
+      <p>
+        But sometimes HyperFrameset will not be able to apply the frameset
+        document to the page. This can occur because
+      </p>
+      <ul>
+        <li>Javascript is disabled
+        </li>
+        <li>HyperFrameset does not support the browser
+        </li>
+        <li>the HyperFrameset script failed to download
+        </li>
+        <li>HyperFrameset is configured to NOT start
+        </li>
+        <li>the frameset document failed to download
+        </li>
+      </ul>
+      <p>
+        In this scenario you would like the content-page to have some auxiliary
+        content and basic styling - something that can be dispensed with if
+        HyperFrameset takes over.
+      </p>
+      <h4>
+        Auxiliary content
+      </h4>
+      <p>
+        Any landing-page content that isn't referenced by the frameset document
+        will be removed from the page when the frameset is applied.
+      </p>
+      <p>
+        <strong>RECOMMENDATIONS:</strong>
+      </p>
+      <ul>
+        <li>
+          <p>
+            Wrap the <em>primary content</em> of content pages in a
+            <code>&lt;main&gt;</code> or <code>&lt;div role="main"&gt;</code>
+            element. The default processing of content pages (a
+            <code>&lt;hf-frame&gt;</code> with no
+            <code>&lt;hf-transform&gt;</code>) is to crop to this "main"
+            element (or the <code>&lt;body&gt;</code> if this element isn't
+            found).
+          </p>
+        </li>
+        <li>
+          <p>
+            Add a short navigation section near the top of the
+            <code>&lt;body&gt;</code> using <code>&lt;nav&gt;</code> or
+            <code>&lt;div role="navigation"&gt;</code>. Include hyperlinks to
+            the site-home, parent-directories of the page, and next and
+            previous pages as appropriate.
+          </p>
+        </li>
+      </ul>
+      <p>
+        (<strong>TODO:</strong> point to some demo markup. Mention appropriate
+        hyperlinks and how they can be used in scoping)
+      </p>
+      <h4>
+        Stylesheets
+      </h4>
+      <p>
+        All <code>&lt;link rel="stylesheet"&gt;</code> or
+        <code>&lt;style&gt;</code> elements in the content page will be removed
+        when the frameset document is applied, so you can use them for fallback
+        presentation without worrying about clashes with styling provided by
+        the frameset document.
+      </p>
+      <p>
+        <strong>RECOMMENDATIONS:</strong>
+      </p>
+      <ul>
+        <li>
+          <p>
+            Use one external stylesheet - it can be updated without
+            regenerating the page
+          </p>
+        </li>
+        <li>
+          <p>
+            Use simple styling that would be supported even on old browsers.
+          </p>
+        </li>
+        <li>
+          <p>
+            A single column design is easier to implement and is more likely to
+            be compatible with older browsers.
+          </p>
+        </li>
+      </ul>
+      <p>
+        <strong>WARNING:</strong> Inline styles are not removed by
+        HyperFrameset and SHOULD NOT be used in content pages.
+      </p>
+      <h4>
+        Scripts
+      </h4>
+      <p>
+        Scripts in content pages are NEVER run by HyperFrameset so they COULD
+        be used for fallback actions. If HyperFrameset does apply
+        <strong>and</strong> <code>capturing</code> of the landing-page is
+        enabled, then scripts in the landing page are disabled anyway. However,
+        if HyperFrameset does apply but <code>capturing</code> is not enabled,
+        then there is a potential clash between the actions of the landing page
+        scripts and HyperFrameset processing.
+      </p>
+      <p>
+        <strong>RECOMMENDATIONS:</strong>
+      </p>
+      <ul>
+        <li>Content-pages do not need and SHOULD NOT have scripts, even for
+        fallback.
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>

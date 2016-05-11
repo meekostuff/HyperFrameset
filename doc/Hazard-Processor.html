@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=utf-8" />
+    <meta content="initial-scale=1.0, width=device-width"
+          name="viewport" />
+    <script src="../boot.js">
+    </script>
+    <link href="./frameset.html"
+          rel="frameset" />
+    <link href="./basic.css"
+          rel="stylesheet" />
+    <title></title>
+  </head>
+  <body>
+    <nav role="navigation">
+      Location: <a href="./"
+           title="Home"
+           rel="home">HyperFrameset</a> / <a href="Processors.html"
+           rel="directory">Processors</a> / <a href="Hazard-Processor.html"
+           rel="self">Hazard Processor</a><br />
+      Previous: <a href="Script-Processor.html"
+           title="Previous">Script Processor</a>
+    </nav>
+    <main id="mk_main"
+          role="main">
+      <h2>
+        Hazard Processor
+      </h2>
+      <pre><code class="html">&lt;hf-transform type="hazard" format="css"&gt;
+&lt;!-- Your HTML template here --&gt;
+    &lt;nav&gt;
+        &lt;haz:each select=".navigation ul li"&gt;
+            &lt;div&gt;
+                &lt;span expr:_html="a"&gt;&lt;/span&gt;&lt;!-- span.innerHTML = a.outerHTML --&gt;
+            &lt;/div&gt;
+        &lt;/haz:each&gt;
+    &lt;/nav&gt;
+&lt;/hf-transform&gt;
+</code></pre>
+      <p>
+        The <code>hazard</code> processor provides a simple templating service.
+        The content will be HTML with special templating elements and
+        attributes, which include directives such as
+        <code>&lt;haz:if&gt;</code> and data expressions such as
+        <code>@expr:href</code>.
+      </p>
+      <p>
+        Directives and data expressions are interpreted using an input data
+        decoder which is selected by <code>@format</code>. Current
+        <code>format</code> options are <code>css</code>,
+        <code>microdata</code>, <code>json</code>.
+      </p>
+      <h3>
+        Directives
+      </h3>
+      <h4>
+        <code>&lt;haz:if&gt;</code>
+      </h4>
+      <pre><code class=
+      "html">&lt;haz:if test="expression"&gt;...&lt;/haz:if&gt;
+</code></pre>
+      <p>
+        The contents of this element will be part of the output only if the
+        expression evaluates to <code>true</code>.
+      </p>
+      <h4>
+        <code>&lt;haz:unless&gt;</code>
+      </h4>
+      <pre><code class=
+      "html">&lt;haz:unless test="expression"&gt;...&lt;/haz:unless&gt;
+</code></pre>
+      <p>
+        The contents of this element will be part of the output only if the
+        expression evaluates to <code>false</code>.
+      </p>
+      <h4>
+        <code>&lt;haz:choose&gt;</code>, <code>&lt;haz:when&gt;</code>,
+        <code>&lt;haz:otherwise&gt;</code>
+      </h4>
+      <pre><code class="html">&lt;haz:choose&gt;
+    &lt;haz:when test="expression1"&gt;...&lt;/haz:when&gt;
+    &lt;haz:when test="expression2"&gt;...&lt;/haz:when&gt;
+    &lt;haz:otherwise&gt;...&lt;/haz:otherwise&gt;
+&lt;/haz:choose&gt;
+</code></pre>
+      <p>
+        The <code>&lt;haz:choose&gt;</code> element will be replaced by the
+        contents of the first child <code>&lt;haz:when&gt;</code> whose
+        expression evaluates to <code>true</code>, or (if none of them do) the
+        contents of <code>&lt;haz-otherwise&gt;</code> child elements.
+      </p>
+      <h4>
+        <code>&lt;haz:each&gt;</code>
+      </h4>
+      <pre><code class="html">&lt;haz:each select="expression"&gt;
+</code></pre>
+      <p>
+        The contents of this element will be repeated in the output for each
+        item found by the expression. If zero items are found then the contents
+        will not be in the output at all.
+      </p>
+      <h4>
+        <code>&lt;haz:template&gt;</code>
+      </h4>
+      <pre><code class="html">&lt;haz:template name="ID"&gt;
+</code></pre>
+      <p>
+        The element will be used to <em>replace</em> an
+        <code>&lt;haz:include&gt;</code> element identified by <code>ID</code>.
+      </p>
+      <h4>
+        <code>&lt;haz:include&gt;</code>
+      </h4>
+      <pre><code class="html">&lt;haz:include name="ID"&gt;
+</code></pre>
+      <p>
+        The element will be <em>replaced</em> with the contents of the
+        <code>&lt;haz:template&gt;</code> element identified by
+        <code>ID</code>. This template must be in the <em>current</em> hazard
+        transform.
+      </p>
+      <p>
+        <strong>TODO:</strong> <code>&lt;haz:eval&gt;</code>,
+        <code>&lt;haz:text&gt;</code>, <code>&lt;haz:mtext&gt;</code>
+      </p>
+      <h3>
+        Directives as attributes
+      </h3>
+      <p>
+        There are a few HTML elements which cannot be wrapped inside arbitrary
+        elements. For example, when parsing a HTML table any unexpected
+        non-table-tags between <code>&lt;table&gt;</code> and
+        <code>&lt;td&gt;</code> are dropped from the output.
+      </p>
+      <p>
+        In this situation you cannot markup with Hazard elements, but most of
+        them can be implemented with attribute markup. These Hazard attributes
+        are promoted to elements after parsing, according to the following
+        rules in order:
+      </p>
+      <pre><code class="html">&lt;element haz:otherwise /&gt; -&gt; 
+    &lt;haz:otherwise&gt;&lt;element /&gt;&lt;/haz:otherwise&gt;
+
+&lt;element haz:when="expression" /&gt; -&gt; 
+    &lt;haz:when test="expression"&gt;&lt;element /&gt;&lt;/haz:when&gt;
+
+&lt;element haz:each="expression" /&gt; -&gt;
+    &lt;haz:each select="expression"&gt;&lt;element /&gt;&lt;/haz:each&gt;
+
+&lt;element haz:if="expression" /&gt; -&gt; 
+    &lt;haz:if test="expression"&gt;&lt;element /&gt;&lt;/haz:if&gt;
+
+&lt;element haz:unless="expression" /&gt; -&gt; 
+    &lt;haz:unless test="expression"&gt;&lt;element /&gt;&lt;/haz:unless&gt;
+
+&lt;element haz:choose /&gt; -&gt; 
+    &lt;element&gt;&lt;haz:choose /&gt;&lt;/element&gt;
+
+&lt;element haz:template="id" /&gt; -&gt; 
+    &lt;haz:template name="id"&gt;&lt;element /&gt;&lt;/haz:template&gt;
+</code></pre>
+      <h3>
+        Data Expressions
+      </h3>
+      <p>
+        These attributes have a name composed of a prefix then a colon (:) then
+        a regular attribute name, e.g.
+      </p>
+      <pre><code>expr:href
+</code></pre>
+      <p>
+        The prefix determines how the expression given in the attribute value
+        is processed. After processing the unprefixed attribute is set to the
+        returned value.
+      </p>
+      <p>
+        If the returned value is <code>boolean</code> then the attribute is
+        either removed (<code>false</code>) or added as an empty attribute
+        (<code>true</code>).
+      </p>
+      <p>
+        If the attribute name is <code>_html</code> then the
+        <code>innerHTML</code> of the element is set to the returned value (or
+        if a node is returned then all current children of the element are
+        reoved and the node is appended to the element).
+      </p>
+      <p>
+        If the attribute name is <code>_text</code> then the
+        <code>textContent</code> of the element is set to the returned value.
+      </p>
+      <p>
+        There are two possible prefixes: <code>expr</code> and
+        <code>mexpr</code>.
+      </p>
+      <p>
+        <em><code>expr:</code></em> attribute values have the form (FIXME BNF
+        or something)
+      </p>
+      <pre><code>query | filter-name: params | filter-name: params
+</code></pre>
+      <p>
+        where - <code>query</code> is a string in the specified decoder format
+        - <code>filter-name</code> identifies a registered filter function -
+        <code>params</code> is a COMMA (,) separated list of JSON-like objects.
+        It is evaluated with <code>(Function('return [' + params +
+        '];'))()</code> to create an <code>arguments</code> array to pass to
+        the <code>filter</code> function
+      </p>
+      <p>
+        Filters are optional
+      </p>
+      <p>
+        <em><code>mexpr:</code></em> attribute values are plain-text with
+        sections bounded by <code>{{</code> and <code>}}</code> being
+        interpolated by the algorithm of <code>expr:</code> attributes.
+      </p>
+    </main>
+  </body>
+</html>

@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=utf-8" />
+    <meta content="initial-scale=1.0, width=device-width"
+          name="viewport" />
+    <script src="../boot.js">
+    </script>
+    <link href="./frameset.html"
+          rel="frameset" />
+    <link href="./basic.css"
+          rel="stylesheet" />
+    <title></title>
+  </head>
+  <body>
+    <nav role="navigation">
+      <a href="Introduction.html"
+           title="Previous">Introduction</a><a href="./"
+           rel="alternate directory">HyperFrameset Documentation</a> / <a href=
+           "Frameset-Document.html"
+           title="Next">Frameset Document</a>
+    </nav>
+    <main id="mk_main"
+          role="main">
+      <h2>
+        Config options
+      </h2>
+      <p>
+        Before a frameset document can be loaded, HyperFrameset must discover
+        which frameset document is right for the landing-page.
+      </p>
+      <p>
+        In the same way, before responding to a hyperlink activation
+        HyperFrameset must determine whether the hyperlinked page can share the
+        currently applied frameset document.
+      </p>
+      <p>
+        The entity which oversees the frameset and frames is called the
+        <code>framer</code>, and it has a JS reference object
+        <code>Meeko.framer</code>. This object is available once the
+        HyperFrameset script has loaded.
+      </p>
+      <p>
+        <code>framer</code> options are stored in
+        <code>Meeko.framer.options</code>, which can be accessed directly or
+        preferably by calling
+      </p>
+      <pre><code>Meeko.framer.config(options);
+</code></pre>
+      <p>
+        where <code>options</code> is an object containing key / value pairs
+        that will overwrite current values.
+      </p>
+      <p>
+        Configuration should be done before HyperFrameset starts. This can be
+        achieved by editing the site-specific <code>config.js</code> created
+        during <a href="./Installation.html">Installation</a>.
+      </p>
+      <p>
+        Usually you only want to configure how HyperFrameset determines the
+        appropriate frameset-document for a page. Do this by providing one of
+        the following options:
+      </p>
+      <ul>
+        <li>
+          <p>
+            <strong><code>detect(doc)</code></strong> MUST return the
+            frameset-URL by inspecting the landing-page document when
+            HyperFrameset starts (this doesn't allow panning)
+          </p>
+        </li>
+        <li>
+          <p>
+            <strong><code>lookup(url)</code></strong> MUST return the
+            frameset-URL for any URL in the site, either the landing-page
+            <code>document.URL</code>, or the URL of a different page that is
+            to be panned in.
+          </p>
+        </li>
+      </ul>
+      <p>
+        <code>lookup(url)</code> is the recommended option.
+        <code>detect(doc)</code> is mainly provided for backwards
+        compatibility, as can be seen in the default <code>config.js</code>
+        script.
+      </p>
+      <p>
+        <strong>TODO:</strong>
+      </p>
+      <ul>
+        <li>Explain <code>scope</code> and how it is implied
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>

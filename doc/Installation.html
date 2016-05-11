@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=utf-8" />
+    <meta content="initial-scale=1.0, width=device-width"
+          name="viewport" />
+    <script src="../boot.js">
+    </script>
+    <link href="./frameset.html"
+          rel="frameset" />
+    <link href="./basic.css"
+          rel="stylesheet" />
+    <title></title>
+  </head>
+  <body>
+    <nav role="navigation">
+      Location: <a href="./"
+           title="Home"
+           rel="home">HyperFrameset</a> / <a href="Installation.html"
+           rel="self">Installation</a><br />
+      Previous: <a href="Best-practices.html"
+           title="Previous">Best practices</a> , Next: <a href=
+           "Boot-options.html"
+           title="Next">Boot options</a>
+    </nav>
+    <main id="mk_main"
+          role="main">
+      <h2>
+        Installation
+      </h2>
+      <ol>
+        <li>
+          <p>
+            Copy or clone the HyperFrameset project files to a directory on
+            your server, say
+          </p>
+          <pre><code>/path/to/HyperFrameset/
+</code></pre>
+        </li>
+        <li>
+          <p>
+            Open a <strong>modern</strong> browser and navigate to the
+            following page
+          </p>
+          <pre>
+          <code>http://your.domain.com/path/to/HyperFrameset/test/normal.html
+</code></pre>
+          <p>
+            Visually inspect the displayed page for the following possible
+            failures:
+          </p>
+          <ul>
+            <li>boxes with <strong>red</strong> background or borders.
+            </li>
+            <li>boxes that claim to be styled with colored borders but just
+            have the default border.
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p>
+            Copy <code>options.js</code> <strong>and</strong>
+            <code>config.js</code> from the HyperFrameset directory to the root
+            directory of your domain.
+          </p>
+          <p>
+            If you have unix shell access to the domain's server
+          </p>
+          <pre><code>cd /directory/of/your/domain
+cp path/to/HyperFrameset/options.js path/to/HyperFrameset/config.js .
+</code></pre>
+        </li>
+        <li>
+          <p>
+            Edit your copy of <code>options.js</code> to change the following
+            lines
+          </p>
+          <pre><code>"main_script": '{bootscriptdir}HyperFrameset.js',
+"config_script": '{bootscriptdir}config.js'
+</code></pre>
+          <p>
+            to be
+          </p>
+          <pre><code>"main_script": '/path/to/HyperFrameset/HyperFrameset.js',
+"config_script": '/config.js'
+</code></pre>
+        </li>
+        <li>
+          <p>
+            Concatenate your modified <code>options.js</code> with
+            <code>boot.js</code> from the HyperFrameset directory and store in
+            <code>boot.js</code> of the root directory.
+          </p>
+          <pre><code>cat options.js path/to/HyperFrameset/boot.js &gt; boot.js
+</code></pre>
+        </li>
+        <li>
+          <p>
+            Source the modified HyperFrameset boot-script into your pages -
+            preferably before any stylesheets - with this line in the
+            <code>&lt;head&gt;</code> of each page
+          </p>
+          <pre><code class="html">&lt;script src="/boot.js"&gt;&lt;/script&gt;
+</code></pre>
+        </li>
+        <li>
+          <p>
+            Make sure to test the modifications.<br />
+            You could symlink to the test directory from the root directory
+          </p>
+          <pre><code>ln -s path/to/HyperFrameset/test
+</code></pre>
+          <p>
+            then navigate in the browser to
+          </p>
+          <pre><code>http://your.domain.com/test/normal.html
+</code></pre>
+        </li>
+      </ol>
+      <p>
+        Now you have a simple setup allowing you to:
+      </p>
+      <ul>
+        <li>modify your options without affecting the HyperFrameset
+        installation, and
+        </li>
+        <li>update HyperFrameset without overwriting your options.
+        </li>
+      </ul>
+      <p>
+        When you want to:
+      </p>
+      <ul>
+        <li>
+          <p>
+            modify options
+          </p>
+          <ul>
+            <li>edit your copy of <code>options.js</code>
+            </li>
+            <li>repeat step 3 to rebuild your boot-script
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p>
+            update HyperFrameset
+          </p>
+          <ul>
+            <li>overwrite the HyperFrameset directory with the latest version
+            </li>
+            <li>repeat step 3
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p>
+            minify HyperFrameset.js
+          </p>
+          <ul>
+            <li>minify HyperFrameset.js to HyperFrameset.min.js in the
+            /path/to/HyperFrameset directory
+            </li>
+            <li>change <code>main_script</code> to
+            <code>/path/to/HyperFrameset/HyperFrameset.min.js</code> in your
+            copy of the <code>options.js</code> file
+            </li>
+            <li>repeat step 3
+            </li>
+          </ul>
+        </li>
+        <li>
+          <p>
+            minify boot.js
+          </p>
+          <ul>
+            <li>minify boot.js to boot.min.js in the /path/to/HyperFrameset
+            directory
+            </li>
+            <li>repeat step 3 with
+            <code>path/to/HyperFrameset/boot.min.js</code>
+            </li>
+          </ul>
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>

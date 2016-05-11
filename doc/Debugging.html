@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+  <head>
+    <meta http-equiv="Content-Type"
+          content="text/html; charset=utf-8" />
+    <meta content="initial-scale=1.0, width=device-width"
+          name="viewport" />
+    <script src="../boot.js">
+    </script>
+    <link href="./frameset.html"
+          rel="frameset" />
+    <link href="./basic.css"
+          rel="stylesheet" />
+    <title></title>
+  </head>
+  <body>
+    <nav role="navigation">
+      Location: <a href="./"
+           title="Home"
+           rel="home">HyperFrameset</a> / <a href="Debugging.html"
+           rel="self">Debugging</a><br />
+      Previous: <a href="Frame-Declaration.html"
+           title="Previous">Frame Declaration</a>
+    </nav>
+    <main id="mk_main"
+          role="main">
+      <h2>
+        Debugging
+      </h2>
+      <p>
+        By default, HyperFrameset logs error and warning messages to the
+        browser console. The logger can be configured to provide info and debug
+        messages (see <a href="./Boot-options.html">Boot options</a>).
+      </p>
+      <p>
+        If the <code>log_level</code> is set to "debug" then when errors occur
+        the <a href=
+        "https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Error/Stack">
+        error stack</a> is also dumped to the console.
+      </p>
+      <p>
+        Inline scripts in the frameset document are automatically given a
+        <a href=
+        "https://developer.chrome.com/devtools/docs/javascript-debugging#@sourceurl-and%20displayname%20in%20action">
+        sourceURL</a> on platforms which support it. Thist should help finding
+        the source of errors.
+      </p>
+      <p>
+        <strong>TODO:</strong>
+      </p>
+      <ul>
+        <li>more guidance, particularly about asynchronous programming and
+        error logging
+        </li>
+      </ul>
+    </main>
+  </body>
+</html>
