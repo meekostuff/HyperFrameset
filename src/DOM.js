@@ -407,6 +407,137 @@ var checkStyleSheets = function() {
 	});
 }
 
+// WARN IE <= 8 would need styleText() to get/set <style> contents
+// WARN old non-IE would need scriptText() to get/set <script> contents
+
+var copyAttributes = function(node, srcNode) {
+	_.forEach(_.map(srcNode.attributes), function(attr) {
+		node.setAttribute(attr.name, attr.value); // WARN needs to be more complex for IE <= 7
+	});
+	return node;
+}
+
+var removeAttributes = function(node) {
+	_.forEach(_.map(node.attributes), function(attr) {
+		node.removeAttribute(attr.name);
+	});
+	return node;
+}
+
+var CREATE_DOCUMENT_COPIES_URL = (function() {
+	var doc = document.implementation.createHTMLDocument('');
+	return doc.URL === document.URL;
+})();
+
+var CLONE_DOCUMENT_COPIES_URL = (function() {
+	try {
+		var doc = document.cloneNode(false);
+		if (doc.URL === document.URL) return true;
+	}
+	catch (err) { }
+	return false;
+})();
+		
+// NOTE we want create*Document() to have a URL
+var CREATE_DOCUMENT_WITH_CLONE = !CREATE_DOCUMENT_COPIES_URL && CLONE_DOCUMENT_COPIES_URL;
+
+var createDocument = function(srcDoc) { // modern browsers. IE >= 9
+	if (!srcDoc) srcDoc = document;
+	// TODO find doctype element??
+	var doc;
+	if (CREATE_DOCUMENT_WITH_CLONE) { 
+		doc = srcDoc.cloneNode(false);
+	}
+	else {
+		doc = srcDoc.implementation.createHTMLDocument('');
+		doc.removeChild(doc.documentElement);
+	}
+	return doc;
+}
+
+var createHTMLDocument = function(title, srcDoc) { // modern browsers. IE >= 9
+	if (!srcDoc) srcDoc = document;
+	// TODO find doctype element??
+	var doc;
+	if (CREATE_DOCUMENT_WITH_CLONE) { 
+		doc = srcDoc.cloneNode(false);
+		docEl = doc.createElement('html');
+		docEl.innerHTML = '<head><title>' + title + '</title></head><body></body>';
+		doc.appendChild(docEl);
+	}
+	else {
+		doc = srcDoc.implementation.createHTMLDocument('');
+	}
+	return doc;
+}
+
+var cloneDocument = function(srcDoc) {
+	var doc = DOM.createDocument(srcDoc);
+	var docEl = doc.importNode(srcDoc.documentElement, true);
+	doc.appendChild(docEl); // NOTE already adopted
+
+	// WARN sometimes IE9/IE10/IE11 doesn't read the content of inserted <style>
+	// NOTE this doesn't seem to matter on IE10+. The following is precautionary
+	_.forEach(DOM.findAll('style', doc), function(node) {
+		var sheet = node.styleSheet || node.sheet;
+		if (!sheet || sheet.cssText == null) return;
+		if (sheet.cssText != '') return;
+		node.textContent = node.textContent;
+	});
+	
+	return doc;
+}
+
+var scrollToId = function(id) { // FIXME this isn't being used
+	if (id) {
+		var el = DOM.findId(id);
+		if (el) el.scrollIntoView(true);
+	}
+	else window.scroll(0, 0);
+}
+
+var readyStateLookup = { // used in domReady() and checkStyleSheets()
+	'uninitialized': false,
+	'loading': false,
+	'interactive': false,
+	'loaded': true,
+	'complete': true
+}
+
+var domReady = (function() { // WARN this assumes that document.readyState is valid or that content is ready...
+
+var readyState = document.readyState;
+var loaded = readyState ? readyStateLookup[readyState] : true;
+var queue = [];
+
+function domReady(fn) {
+	if (typeof fn !== 'function') return;
+	queue.push(fn);
+	if (loaded) processQueue();
+}
+
+function processQueue() {
+	_.forEach(queue, function(fn) { setTimeout(fn); });
+	queue.length = 0;
+}
+
+var events = {
+	'DOMContentLoaded': document,
+	'load': window
+};
+
+if (!loaded) _.forOwn(events, function(node, type) { node.addEventListener(type, onLoaded, false); });
+
+return domReady;
+
+// NOTE the following functions are hoisted
+function onLoaded(e) {
+	loaded = true;
+	_.forOwn(events, function(node, type) { node.removeEventListener(type, onLoaded, false); });
+	processQueue();
+}
+
+})();
 
 return {
 	uniqueId: uniqueId, setData: setData, getData: getData, hasData: hasData, // FIXME releaseNodes
@@ -418,7 +549,11 @@ return {
 	SUPPORTS_ATTRMODIFIED: SUPPORTS_ATTRMODIFIED, 
 	isVisible: isVisible, whenVisible: whenVisible,
 	insertNode: insertNode, 
-	checkStyleSheets: checkStyleSheets
+	checkStyleSheets: checkStyleSheets,
+	copyAttributes: copyAttributes, removeAttributes: removeAttributes, // attrs
+	ready: domReady, // events
+	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
+	scrollToId: scrollToId
 }
 
 })();

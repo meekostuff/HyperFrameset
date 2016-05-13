@@ -694,7 +694,7 @@ getDocument: function() { // WARN this assumes HyperFrameset is ready
 		});
 	})
 	.then(function(text) {
-		return Meeko.DOM.parseHTML(text, { url: document.URL, mustResolve: false });
+		return Meeko.htmlParser.parse(text, { url: document.URL, mustResolve: false });
 	});
 }
 

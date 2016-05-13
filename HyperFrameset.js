@@ -1416,6 +1416,137 @@ var checkStyleSheets = function() {
 	});
 }
 
+// WARN IE <= 8 would need styleText() to get/set <style> contents
+// WARN old non-IE would need scriptText() to get/set <script> contents
+
+var copyAttributes = function(node, srcNode) {
+	_.forEach(_.map(srcNode.attributes), function(attr) {
+		node.setAttribute(attr.name, attr.value); // WARN needs to be more complex for IE <= 7
+	});
+	return node;
+}
+
+var removeAttributes = function(node) {
+	_.forEach(_.map(node.attributes), function(attr) {
+		node.removeAttribute(attr.name);
+	});
+	return node;
+}
+
+var CREATE_DOCUMENT_COPIES_URL = (function() {
+	var doc = document.implementation.createHTMLDocument('');
+	return doc.URL === document.URL;
+})();
+
+var CLONE_DOCUMENT_COPIES_URL = (function() {
+	try {
+		var doc = document.cloneNode(false);
+		if (doc.URL === document.URL) return true;
+	}
+	catch (err) { }
+	return false;
+})();
+		
+// NOTE we want create*Document() to have a URL
+var CREATE_DOCUMENT_WITH_CLONE = !CREATE_DOCUMENT_COPIES_URL && CLONE_DOCUMENT_COPIES_URL;
+
+var createDocument = function(srcDoc) { // modern browsers. IE >= 9
+	if (!srcDoc) srcDoc = document;
+	// TODO find doctype element??
+	var doc;
+	if (CREATE_DOCUMENT_WITH_CLONE) { 
+		doc = srcDoc.cloneNode(false);
+	}
+	else {
+		doc = srcDoc.implementation.createHTMLDocument('');
+		doc.removeChild(doc.documentElement);
+	}
+	return doc;
+}
+
+var createHTMLDocument = function(title, srcDoc) { // modern browsers. IE >= 9
+	if (!srcDoc) srcDoc = document;
+	// TODO find doctype element??
+	var doc;
+	if (CREATE_DOCUMENT_WITH_CLONE) { 
+		doc = srcDoc.cloneNode(false);
+		docEl = doc.createElement('html');
+		docEl.innerHTML = '<head><title>' + title + '</title></head><body></body>';
+		doc.appendChild(docEl);
+	}
+	else {
+		doc = srcDoc.implementation.createHTMLDocument('');
+	}
+	return doc;
+}
+
+var cloneDocument = function(srcDoc) {
+	var doc = DOM.createDocument(srcDoc);
+	var docEl = doc.importNode(srcDoc.documentElement, true);
+	doc.appendChild(docEl); // NOTE already adopted
+
+	// WARN sometimes IE9/IE10/IE11 doesn't read the content of inserted <style>
+	// NOTE this doesn't seem to matter on IE10+. The following is precautionary
+	_.forEach(DOM.findAll('style', doc), function(node) {
+		var sheet = node.styleSheet || node.sheet;
+		if (!sheet || sheet.cssText == null) return;
+		if (sheet.cssText != '') return;
+		node.textContent = node.textContent;
+	});
+	
+	return doc;
+}
+
+var scrollToId = function(id) { // FIXME this isn't being used
+	if (id) {
+		var el = DOM.findId(id);
+		if (el) el.scrollIntoView(true);
+	}
+	else window.scroll(0, 0);
+}
+
+var readyStateLookup = { // used in domReady() and checkStyleSheets()
+	'uninitialized': false,
+	'loading': false,
+	'interactive': false,
+	'loaded': true,
+	'complete': true
+}
+
+var domReady = (function() { // WARN this assumes that document.readyState is valid or that content is ready...
+
+var readyState = document.readyState;
+var loaded = readyState ? readyStateLookup[readyState] : true;
+var queue = [];
+
+function domReady(fn) {
+	if (typeof fn !== 'function') return;
+	queue.push(fn);
+	if (loaded) processQueue();
+}
+
+function processQueue() {
+	_.forEach(queue, function(fn) { setTimeout(fn); });
+	queue.length = 0;
+}
+
+var events = {
+	'DOMContentLoaded': document,
+	'load': window
+};
+
+if (!loaded) _.forOwn(events, function(node, type) { node.addEventListener(type, onLoaded, false); });
+
+return domReady;
+
+// NOTE the following functions are hoisted
+function onLoaded(e) {
+	loaded = true;
+	_.forOwn(events, function(node, type) { node.removeEventListener(type, onLoaded, false); });
+	processQueue();
+}
+
+})();
 
 return {
 	uniqueId: uniqueId, setData: setData, getData: getData, hasData: hasData, // FIXME releaseNodes
@@ -1427,7 +1558,11 @@ return {
 	SUPPORTS_ATTRMODIFIED: SUPPORTS_ATTRMODIFIED, 
 	isVisible: isVisible, whenVisible: whenVisible,
 	insertNode: insertNode, 
-	checkStyleSheets: checkStyleSheets
+	checkStyleSheets: checkStyleSheets,
+	copyAttributes: copyAttributes, removeAttributes: removeAttributes, // attrs
+	ready: domReady, // events
+	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
+	scrollToId: scrollToId
 }
 
 })();
@@ -2714,6 +2849,146 @@ ariaMatches: function(role) {
 
 
 }).call(this);
+
+(function() {
+
+var window = this;
+var Meeko = window.Meeko;
+var _ = Meeko.stuff;
+var URL = Meeko.URL;
+var DOM = Meeko.DOM;
+var Promise = Meeko.Promise;
+
+/*
+	HTML_IN_DOMPARSER indicates if DOMParser supports 'text/html' parsing. Historically only Firefox did.
+	Cross-browser support coming? https://developer.mozilla.org/en-US/docs/Web/API/DOMParser#Browser_compatibility
+*/
+var HTML_IN_DOMPARSER = (function() {
+
+	try {
+		var doc = (new DOMParser).parseFromString('', 'text/html');
+		return !!doc;
+	}
+	catch(err) { return false; }
+
+})();
+
+
+/*
+	normalize() is called between html-parsing (internal) and document normalising (external function).
+	It is called after using the native parser:
+	- with DOMParser#parseFromString(), see htmlParser#nativeParser()
+	- with XMLHttpRequest & xhr.responseType='document', see httpProxy's request()
+	The innerHTMLParser also uses this call
+*/
+function normalize(doc, details) { 
+
+	var baseURL = URL(details.url);
+
+	_.forEach(DOM.findAll('style', doc.body), function(node) { // TODO support <style scoped>
+		doc.head.appendChild(node); // NOTE no adoption
+	});
+	
+	_.forEach(DOM.findAll('style', doc.head), function(node) {
+		// TODO the following rewrites url() property values but isn't robust
+		var text = node.textContent;
+		var replacements = 0;
+		text = text.replace(/\burl\(\s*(['"]?)([^\r\n]*)\1\s*\)/ig, function(match, quote, url) {
+				absURL = baseURL.resolve(url);
+				if (absURL === url) return match;
+				replacements++;
+				return "url(" + quote + absURL + quote + ")";
+			});
+		if (replacements) node.textContent = text;
+	});
+
+	return resolveAll(doc, baseURL, false);
+}
+
+/*
+	resolveAll() resolves all URL attributes
+*/
+var urlAttributes = URL.attributes;
+
+var resolveAll = function(doc, baseURL) {
+
+	return Promise.pipe(null, [
+
+	function () {
+		var selector = Object.keys(urlAttributes).join(', ');
+		return DOM.findAll(selector, doc);
+	},
+
+	function(nodeList) {
+		return Promise.reduce(null, nodeList, function(dummy, el) {
+			var tag = DOM.getTagName(el);
+			var attrList = urlAttributes[tag];
+			_.forOwn(attrList, function(attrDesc, attrName) {
+				if (!el.hasAttribute(attrName)) return;
+				attrDesc.resolve(el, baseURL);
+			});
+		});
+	},
+
+	function() {
+		return doc;
+	}
+
+	]);
+
+}
+
+
+
+var htmlParser = Meeko.htmlParser = (function() {
+
+function nativeParser(html, details) {
+
+	return Promise.pipe(null, [
+		
+	function() {
+		var doc = (new DOMParser).parseFromString(html, 'text/html');
+		return normalize(doc, details);
+	}
+	
+	]);
+
+}
+
+function innerHTMLParser(html, details) {
+	return Promise.pipe(null, [
+		
+	function() {
+		var doc = DOM.createHTMLDocument('');
+		var docElement = doc.documentElement;
+		docElement.innerHTML = html;
+		var m = html.match(/<html(?=\s|>)(?:[^>]*)>/i); // WARN this assumes there are no comments containing '<html' and no attributes containing '>'.
+		var div = document.createElement('div');
+		div.innerHTML = m[0].replace(/^<html/i, '<div');
+		var htmlElement = div.firstChild;
+		DOM.copyAttributes(docElement, htmlElement);
+		return doc;
+	},
+	
+	function(doc) {
+		return normalize(doc, details);
+	}
+	
+	]);
+}
+
+
+return {
+	HTML_IN_DOMPARSER: HTML_IN_DOMPARSER,
+	parse: HTML_IN_DOMPARSER ? nativeParser : innerHTMLParser,
+	normalize: normalize
+}
+
+})();
+
+
+
+}).call(this);
 /*!
  * HyperFrameset
  * Copyright 2009-2014 Sean Hogan (http://meekostuff.net/)
@@ -2756,151 +3031,7 @@ var URL = Meeko.URL;
  */
 
 var DOM = Meeko.DOM;
-
-// WARN IE <= 8 would need styleText() to get/set <style> contents
-// WARN old non-IE would need scriptText() to get/set <script> contents
-
-var copyAttributes = function(node, srcNode) {
-	_.forEach(_.map(srcNode.attributes), function(attr) {
-		node.setAttribute(attr.name, attr.value); // WARN needs to be more complex for IE <= 7
-	});
-	return node;
-}
-
-var removeAttributes = function(node) {
-	_.forEach(_.map(node.attributes), function(attr) {
-		node.removeAttribute(attr.name);
-	});
-	return node;
-}
-
-var CREATE_DOCUMENT_COPIES_URL = (function() {
-	var doc = document.implementation.createHTMLDocument('');
-	return doc.URL === document.URL;
-})();
-
-var CLONE_DOCUMENT_COPIES_URL = (function() {
-	try {
-		var doc = document.cloneNode(false);
-		if (doc.URL === document.URL) return true;
-	}
-	catch (err) { }
-	return false;
-})();
-		
-// NOTE we want create*Document() to have a URL
-var CREATE_DOCUMENT_WITH_CLONE = !CREATE_DOCUMENT_COPIES_URL && CLONE_DOCUMENT_COPIES_URL;
-
-var createDocument = function(srcDoc) { // modern browsers. IE >= 9
-	if (!srcDoc) srcDoc = document;
-	// TODO find doctype element??
-	var doc;
-	if (CREATE_DOCUMENT_WITH_CLONE) { 
-		doc = srcDoc.cloneNode(false);
-	}
-	else {
-		doc = srcDoc.implementation.createHTMLDocument('');
-		doc.removeChild(doc.documentElement);
-	}
-	return doc;
-}
-
-var createHTMLDocument = function(title, srcDoc) { // modern browsers. IE >= 9
-	if (!srcDoc) srcDoc = document;
-	// TODO find doctype element??
-	var doc;
-	if (CREATE_DOCUMENT_WITH_CLONE) { 
-		doc = srcDoc.cloneNode(false);
-		docEl = doc.createElement('html');
-		docEl.innerHTML = '<head><title>' + title + '</title></head><body></body>';
-		doc.appendChild(docEl);
-	}
-	else {
-		doc = srcDoc.implementation.createHTMLDocument('');
-	}
-	return doc;
-}
-
-var cloneDocument = function(srcDoc) {
-	var doc = DOM.createDocument(srcDoc);
-	var docEl = doc.importNode(srcDoc.documentElement, true);
-	doc.appendChild(docEl); // NOTE already adopted
-
-	// WARN sometimes IE9/IE10/IE11 doesn't read the content of inserted <style>
-	// NOTE this doesn't seem to matter on IE10+. The following is precautionary
-	_.forEach(DOM.findAll('style', doc), function(node) {
-		var sheet = node.styleSheet || node.sheet;
-		if (!sheet || sheet.cssText == null) return;
-		if (sheet.cssText != '') return;
-		node.textContent = node.textContent;
-	});
-	
-	return doc;
-}
-
-var scrollToId = function(id) { // FIXME this isn't being used
-	if (id) {
-		var el = DOM.findId(id);
-		if (el) el.scrollIntoView(true);
-	}
-	else window.scroll(0, 0);
-}
-
-var readyStateLookup = { // used in domReady() and checkStyleSheets()
-	'uninitialized': false,
-	'loading': false,
-	'interactive': false,
-	'loaded': true,
-	'complete': true
-}
-
-var domReady = (function() { // WARN this assumes that document.readyState is valid or that content is ready...
-
-var readyState = document.readyState;
-var loaded = readyState ? readyStateLookup[readyState] : true;
-var queue = [];
-
-function domReady(fn) {
-	if (typeof fn !== 'function') return;
-	queue.push(fn);
-	if (loaded) processQueue();
-}
-
-function processQueue() {
-	_.forEach(queue, function(fn) { setTimeout(fn); });
-	queue.length = 0;
-}
-
-var events = {
-	'DOMContentLoaded': document,
-	'load': window
-};
-
-if (!loaded) _.forOwn(events, function(node, type) { node.addEventListener(type, onLoaded, false); });
-
-return domReady;
-
-// NOTE the following functions are hoisted
-function onLoaded(e) {
-	loaded = true;
-	_.forOwn(events, function(node, type) { node.removeEventListener(type, onLoaded, false); });
-	processQueue();
-}
-
-})();
-
-_.defaults(DOM, {
-	copyAttributes: copyAttributes, removeAttributes: removeAttributes, // attrs
-	ready: domReady, // events
-	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
-	scrollToId: scrollToId
-});
-
-/* parseHTML are AJAX utilities */
-var parseHTML = function(html, details) {
-	var parser = new HTMLParser();
-	return parser.parse(html, details);
-}
+var htmlParser = Meeko.htmlParser;
 
 /* A few feature-detect constants for HTML loading & parsing */
 
@@ -2930,23 +3061,8 @@ var HTML_IN_XHR = (function() { // FIXME more testing, especially Webkit
 	return true;
 })();
 
-/*
-	HTML_IN_DOMPARSER indicates if DOMParser supports 'text/html' parsing. Historically only Firefox did.
-	Cross-browser support coming? https://developer.mozilla.org/en-US/docs/Web/API/DOMParser#Browser_compatibility
-*/
-var HTML_IN_DOMPARSER = (function() {
-
-	try {
-		var doc = (new DOMParser).parseFromString('', 'text/html');
-		return !!doc;
-	}
-	catch(err) { return false; }
-
-})();
-
 _.defaults(DOM, {
-	parseHTML: parseHTML,
-	HTML_IN_XHR: HTML_IN_XHR, HTML_IN_DOMPARSER: HTML_IN_DOMPARSER
+	HTML_IN_XHR: HTML_IN_XHR
 });
 
 var CustomNS = Meeko.CustomNS = (function() {
@@ -3072,7 +3188,7 @@ add: function(response) { // NOTE this is only for the landing page
 	return Promise.pipe(undefined, [
 
 	function() {
-		return normalize(response.document, request);
+		return htmlParser.normalize(response.document, request);
 	},
 	function(doc) {
 		response.document = doc;
@@ -3176,14 +3292,14 @@ function handleResponse(xhr, info) { // TODO handle info.responseType
 		statusText: xhr.statusText
 	};
 	if (HTML_IN_XHR) {
-		return normalize(xhr.response, info)
+		return htmlParser.normalize(xhr.response, info)
 		.then(function(doc) {
 			response.document = doc;
 			return response;
 		});
 	}
 	else {
-		return DOM.parseHTML(new String(xhr.responseText), info)
+		return htmlParser.parse(new String(xhr.responseText), info)
 		.then(function(doc) {
 				response.document = doc;
 				return response;
@@ -3192,124 +3308,6 @@ function handleResponse(xhr, info) { // TODO handle info.responseType
 }
 
 return httpProxy;
-
-})();
-
-
-/*
-	resolveAll() resolves all URL attributes
-*/
-var urlAttributes = URL.attributes;
-
-var resolveAll = function(doc, baseURL) {
-
-	return Promise.pipe(null, [
-
-	function () {
-		var selector = Object.keys(urlAttributes).join(', ');
-		return DOM.findAll(selector, doc);
-	},
-
-	function(nodeList) {
-		return Promise.reduce(null, nodeList, function(dummy, el) {
-			var tag = DOM.getTagName(el);
-			var attrList = urlAttributes[tag];
-			_.forOwn(attrList, function(attrDesc, attrName) {
-				if (!el.hasAttribute(attrName)) return;
-				attrDesc.resolve(el, baseURL);
-			});
-		});
-	},
-
-	function() {
-		return doc;
-	}
-
-	]);
-
-}
-
-
-
-/*
-	normalize() is called between html-parsing (internal) and document normalising (external function).
-	It is called after using the native parser:
-	- with DOMParser#parseFromString(), see HTMLParser#nativeParser()
-	- with XMLHttpRequest & xhr.responseType='document', see httpProxy's request()
-	The innerHTMLParser also uses this call
-*/
-function normalize(doc, details) { 
-
-	var baseURL = URL(details.url);
-
-	_.forEach(DOM.findAll('style', doc.body), function(node) { // TODO support <style scoped>
-		doc.head.appendChild(node); // NOTE no adoption
-	});
-	
-	_.forEach(DOM.findAll('style', doc.head), function(node) {
-		// TODO the following rewrites url() property values but isn't robust
-		var text = node.textContent;
-		var replacements = 0;
-		text = text.replace(/\burl\(\s*(['"]?)([^\r\n]*)\1\s*\)/ig, function(match, quote, url) {
-				absURL = baseURL.resolve(url);
-				if (absURL === url) return match;
-				replacements++;
-				return "url(" + quote + absURL + quote + ")";
-			});
-		if (replacements) node.textContent = text;
-	});
-
-	return resolveAll(doc, baseURL, false);
-}
-
-var HTMLParser = Meeko.HTMLParser = (function() {
-
-var HTMLParser = function() { // TODO should this receive options
-	if (this instanceof HTMLParser) return;
-	return new HTMLParser();
-}
-
-function nativeParser(html, details) {
-
-	return Promise.pipe(null, [
-		
-	function() {
-		var doc = (new DOMParser).parseFromString(html, 'text/html');
-		return normalize(doc, details);
-	}
-	
-	]);
-
-}
-
-function innerHTMLParser(html, details) {
-	return Promise.pipe(null, [
-		
-	function() {
-		var doc = DOM.createHTMLDocument('');
-		var docElement = doc.documentElement;
-		docElement.innerHTML = html;
-		var m = html.match(/<html(?=\s|>)(?:[^>]*)>/i); // WARN this assumes there are no comments containing '<html' and no attributes containing '>'.
-		var div = document.createElement('div');
-		div.innerHTML = m[0].replace(/^<html/i, '<div');
-		var htmlElement = div.firstChild;
-		DOM.copyAttributes(docElement, htmlElement);
-		return doc;
-	},
-	
-	function(doc) {
-		return normalize(doc, details);
-	}
-	
-	]);
-}
-
-
-_.defaults(HTMLParser.prototype, {
-	parse: HTML_IN_DOMPARSER ? nativeParser : innerHTMLParser
-});
-
-return HTMLParser;
 
 })();
 
@@ -4244,6 +4242,8 @@ lookupSelector: function(selector) {
 	scope:{path}
  is rewritten with `path` being relative to the current scope.
  */
+
+var urlAttributes = URL.attributes;
 
 function rebase(doc, scopeURL) {
 	_.forOwn(urlAttributes, function(attrList, tag) {
