@@ -88,6 +88,23 @@ var find = function(a, fn, context) {
 	return _find(a, fn, context, false);
 }
 
+var without = function(a1, a2) {
+	var result = [];
+	forEach(a1, function(item) {
+		if (includes(a2, item) || includes(result, item)) return;
+		result.push(item);
+	});
+	return result;
+}
+
+var difference = function(a1, a2) {
+	var result = [].concat(
+		without(a1, a2),
+		without(a2, a1)
+	);
+	return result;
+}
+
 var words = function(text) { return text.split(/\s+/); }
 
 var forIn = function(object, fn, context) {
@@ -125,16 +142,17 @@ var assign = function(dest, src) {
 	return dest;
 }
 
+
 assign(stuff, {
 	uc: uc, lc: lc, ucFirst: ucFirst, camelCase: camelCase, kebabCase: kebabCase, words: words, // string
 	contains: includes, // FIXME deprecated
 	includes: includes, forEach: forEach, some: some, every: every, map: map, filter: filter, find: find, findIndex: findIndex, // array
+	without: without, difference: difference,
 	forIn: forIn, forOwn: forOwn, isEmpty: isEmpty, defaults: defaults, assign: assign, extend: assign // object
 });
 
 
 }).call(this);
-
 
 (function() {
 
@@ -2728,30 +2746,6 @@ if (!window.XMLHttpRequest) throw Error('HyperFrameset requires native XMLHttpRe
 
 
 var _ = Meeko.stuff; // provided by DOMSprockets
-
-// TODO these additions to Meeko.stuff should go in DOMSprockets
-
-var without = function(a1, a2) {
-	var result = [];
-	_.forEach(a1, function(item) {
-		if (_.includes(a2, item) || _.includes(result, item)) return;
-		result.push(item);
-	});
-	return result;
-}
-
-var difference = function(a1, a2) {
-	var result = [].concat(
-		_.without(a1, a2),
-		_.without(a2, a1)
-	);
-	return result;
-}
-
-_.defaults(_, {
-	without: without, difference: difference
-});
-	
 
 var Task = Meeko.Task;
 var Promise = Meeko.Promise;
