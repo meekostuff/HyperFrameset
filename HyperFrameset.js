@@ -1,41 +1,26 @@
+
+(function() {
+
+if (!this.Meeko) this.Meeko = {};
+if (!this.vendorPrefix) this.vendorPrefix = 'meeko';
+
+}).call(this);
+
 /*!
- Sprocket
- (c) Sean Hogan, 2008,2012,2013,2014
+ JS and Promise utils
+ (c) Sean Hogan, 2008,2012,2013,2014,2015
  Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 */
 
-/* NOTE
-Requires some features not implemented on older browsers:
-element.matchesSelector (or prefixed equivalent) - IE9+
-element.querySelectorAll - IE8+
-element.addEventListener - IE9+
-element.dispatchEvent - IE9+
-Object.create - IE9+
-*/
-
-/* FIXME
-- event modifiers aren't filtering
-- everything in the sprockets code (apart from the Binding implementation) is a BIG BALL OF MUD
-*/
-
-if (!this.Meeko) this.Meeko = {};
-
-(function(window) {
-
-var document = window.document;
-
-var defaultOptions = {
-	'log_level': 'warn'
-}
-
-var vendorPrefix = 'meeko';
+(function() {
 
 /*
  ### Utility functions
  These might (or might not) be lodash equivalents
  */
 
-if (!Meeko.stuff) Meeko.stuff = (function() {
+var Meeko = this.Meeko;
+var stuff = Meeko.stuff = {};
 
 // TODO do string utils needs to sanity check args?
 var uc = function(str) { return str ? str.toUpperCase() : ''; }
@@ -86,15 +71,30 @@ var filter = function(a, fn, context) {
 	return output;
 }
 
-var find = function(a, fn, context) {
+function _find(a, fn, context, byIndex) {
 	for (var n=a.length, i=0; i<n; i++) {
 		var item = a[i];
 		var success = fn.call(context, item, i, a);
-		if (success) return item;
+		if (success) return byIndex ? i : item;
 	}
+	return byIndex ? -1 : undefined;
+}
+
+var findIndex = function(a, fn, context) {
+	return _find(a, fn, context, true);
+}
+
+var find = function(a, fn, context) {
+	return _find(a, fn, context, false);
 }
 
 var words = function(text) { return text.split(/\s+/); }
+
+var forIn = function(object, fn, context) {
+	for (var key in object) {
+		fn.call(context, object[key], key, object);
+	}
+}
 
 var forOwn = function(object, fn, context) {
 	var keys = Object.keys(object);
@@ -125,48 +125,21 @@ var assign = function(dest, src) {
 	return dest;
 }
 
-return {
+assign(stuff, {
 	uc: uc, lc: lc, ucFirst: ucFirst, camelCase: camelCase, kebabCase: kebabCase, words: words, // string
 	contains: includes, // FIXME deprecated
-	includes: includes, forEach: forEach, some: some, every: every, map: map, filter: filter, find: find, // array
-	forOwn: forOwn, isEmpty: isEmpty, defaults: defaults, assign: assign, extend: assign // object
-}
+	includes: includes, forEach: forEach, some: some, every: every, map: map, filter: filter, find: find, findIndex: findIndex, // array
+	forIn: forIn, forOwn: forOwn, isEmpty: isEmpty, defaults: defaults, assign: assign, extend: assign // object
+});
 
-})();
 
+}).call(this);
+
+
+(function() {
+
+var window = this;
 var _ = window._ || Meeko.stuff; // WARN this could potentially use underscore.js / lodash.js but HAS NOT BEEN TESTED!!!
-
-/*
- ### Logger (minimal implementation - can be over-ridden)
- */
-if (!Meeko.logger) Meeko.logger = (function() {
-
-var logger = {};
-
-var levels = logger.levels = _.words('none error warn info debug');
-
-_.forEach(levels, function(name, num) {
-	
-levels[name] = num;
-logger[name] = window.console ?
-	console[name] ? 
-		console[name].apply ?
-			function() { if (num <= logger.LOG_LEVEL) console[name].apply(console, arguments); } :
-			function() { if (num <= logger.LOG_LEVEL) console[name](_.map(arguments).join(' ')); } // IE9
-
-		: function() { if (num <= logger.LOG_LEVEL) console.log(_.map(arguments).join(' ')); }
-	: function() {}; 
-
-}, this);
-
-logger.LOG_LEVEL = levels[defaultOptions['log_level']]; // DEFAULT
-
-return logger;
-
-})(); // end logger definition
-
-var logger = Meeko.logger;
-
 
 
 /*
@@ -358,9 +331,9 @@ function throwErrors() {
 function createThrowers(list) {
 	return _.map(list, function(error) {
 		return function() {
-			if (logger.LOG_LEVEL >= logger.levels.indexOf('debug')) {
-				if (error && error.stack) logger.debug(error.stack);
-				else logger.debug('Untraceable error: ' + error); // FIXME why are these occuring??
+			if (console.logLevel === 'debug') {
+				if (error && error.stack) console.debug(error.stack);
+				else console.debug('Untraceable error: ' + error); // FIXME why are these occuring??
 			}
 			throw error;
 		};
@@ -382,12 +355,21 @@ return {
 
 })(); // END Task
 
+
+}).call(this);
 /*
  ### Promise
  WARN: This was based on early DOM Futures specification. This has been evolved towards ES6 Promises.
  */
+
+(function() {
+
+var window = this;
+var _ = window._ || Meeko.stuff; // WARN this could potentially use underscore.js / lodash.js but HAS NOT BEEN TESTED!!!
+var Task = Meeko.Task;
+
 var Promise = Meeko.Promise = (function() {
-	
+
 var Promise = function(init) { // `init` is called as init(resolve, reject)
 	if (!(this instanceof Promise)) return new Promise(init);
 	
@@ -797,7 +779,7 @@ getTimeoutCount: function(remainingTime) {
 	if (predictor.currLimit < predictor.absLimit) return n;
 	predictor.currLimit = predictor.absLimit;
 	// FIXME do methods other than reduce() use TimeoutPredictor??
-	logger.debug('Promise.reduce() hit absLimit: ', predictor.absLimit);
+	console.debug('Promise.reduce() hit absLimit: ', predictor.absLimit);
 	return n;
 }
 
@@ -813,10 +795,227 @@ return Promise;
 })();
 
 
+}).call(this);
+
+
+
+
+(function() {
+
+var window = this;
+var document = window.document;
+
+var Meeko = window.Meeko;
+var _ = window._ || Meeko.stuff; // WARN this could potentially use underscore.js / lodash.js but HAS NOT BEEN TESTED!!!
+
+/*
+ ### URL utility functions
+ */
+var URL = Meeko.URL = (function() {
+
+// TODO Ideally Meeko.URL is read-only compatible with DOM4 URL
+// NOTE This could use `document.createElement('a').href = url` except DOM is too slow
+
+var URL = function(href, base) {
+	if (!(this instanceof URL)) return new URL(href, base);
+	var baseURL;
+	if (base) baseURL = typeof base === 'string' ? new URL(base) : base;
+	init.call(this, href, baseURL);
+}
+
+var init = function(href, baseURL) {
+	if (baseURL) {
+		href = baseURL.resolve(href);
+		_.assign(this, new URL(href));
+	}
+	else {
+		var url = parse(href);
+		for (var key in url) this[key] = url[key]; // _.assign(this, url);
+		enhance(this);
+	}
+}
+
+var keys = ['source','protocol','hostname','port','pathname','search','hash'];
+var parser = /^([^:\/?#]+:)?(?:\/\/([^:\/?#]*)(?::(\d*))?)?([^?#]*)?(\?[^#]*)?(#.*)?$/;
+
+var parse = ((typeof window.URL === 'function') && ('href' in window.URL.prototype)) ? 
+function(href) {
+	return new window.URL(href);
+} :
+function(href) {
+	href = href.trim();
+	var m = parser.exec(str);
+	var url = {};
+	for (var n=keys.length, i=0; i<n; i++) url[keys[i]] = m[i] || '';
+	return url;
+}
+
+function enhance(url) {
+	url.protocol = _.lc(url.protocol);
+	url.supportsResolve = /^(http|https|ftp|file):$/i.test(url.protocol);
+	if (!url.supportsResolve) return;
+	if (url.hostname) url.hostname = _.lc(url.hostname);
+	if (!url.host) {
+		url.host = url.hostname;
+		if (url.port) url.host += ':' + url.port;
+	}
+	if (!url.origin) url.origin = url.protocol + '//' + url.host;
+	if (!url.pathname) url.pathname = '/';
+	var pathParts = url.pathname.split('/'); // creates an array of at least 2 strings with the first string empty: ['', ...]
+	pathParts.shift(); // leaves an array of at least 1 string [...]
+	url.filename = pathParts.pop(); // filename could be ''
+	url.basepath = pathParts.length ? '/' + pathParts.join('/') + '/' : '/'; // either '/rel-path-prepended-by-slash/' or '/'
+	url.base = url.origin + url.basepath;
+	url.nosearch = url.origin + url.pathname;
+	url.nohash = url.nosearch + url.search;
+	url.href = url.nohash + url.hash;
+	url.toString = function() { return url.href; }
+};
+
+URL.prototype.resolve = function resolve(relHref) {
+	relHref = relHref.trim();
+	if (!this.supportsResolve) return relHref;
+	var substr1 = relHref.charAt(0), substr2 = relHref.substr(0,2);
+	var absHref =
+		/^[a-zA-Z0-9-]+:/.test(relHref) ? relHref :
+		substr2 == '//' ? this.protocol + relHref :
+		substr1 == '/' ? this.origin + relHref :
+		substr1 == '?' ? this.nosearch + relHref :
+		substr1 == '#' ? this.nohash + relHref :
+		substr1 != '.' ? this.base + relHref :
+		substr2 == './' ? this.base + relHref.replace('./', '') :
+		(function() {
+			var myRel = relHref;
+			var myDir = this.basepath;
+			while (myRel.substr(0,3) == '../') {
+				myRel = myRel.replace('../', '');
+				myDir = myDir.replace(/[^\/]+\/$/, '');
+			}
+			return this.origin + myDir + myRel;
+		}).call(this);
+	return absHref;
+}
+
+var urlAttributes = URL.attributes = (function() {
+	
+var AttributeDescriptor = function(tagName, attrName, loads, compound) {
+	var testEl = document.createElement(tagName);
+	var supported = attrName in testEl;
+	var lcAttr = _.lc(attrName); // NOTE for longDesc, etc
+	_.defaults(this, { // attrDesc
+		tagName: tagName,
+		attrName: attrName,
+		loads: loads,
+		compound: compound,
+		supported: supported
+	});
+}
+
+_.defaults(AttributeDescriptor.prototype, {
+
+resolve: function(el, baseURL) {
+	var attrName = this.attrName;
+	var url = el.getAttribute(attrName);
+	if (url == null) return;
+	var finalURL = this.resolveURL(url, baseURL)
+	if (finalURL !== url) el.setAttribute(attrName, finalURL);
+},
+
+resolveURL: function(url, baseURL) {
+	var relURL = url.trim();
+	var finalURL = relURL;
+	switch (relURL.charAt(0)) {
+		case '': // empty, but not null. TODO should this be a warning??
+			break;
+		
+		default:
+			finalURL = baseURL.resolve(relURL);
+			break;
+	}
+	return finalURL;
+}
+
+});
+
+var urlAttributes = {};
+_.forEach(_.words('link@<href script@<src img@<longDesc,<src,+srcset iframe@<longDesc,<src object@<data embed@<src video@<poster,<src audio@<src source@<src,+srcset input@formAction,<src button@formAction,<src a@+ping,href area@href q@cite blockquote@cite ins@cite del@cite form@action'), function(text) {
+	var m = text.split('@'), tagName = m[0], attrs = m[1];
+	var attrList = urlAttributes[tagName] = {};
+	_.forEach(attrs.split(','), function(attrName) {
+		var downloads = false;
+		var compound = false;
+		var modifier = attrName.charAt(0);
+		switch (modifier) {
+		case '<':
+			downloads = true;
+			attrName = attrName.substr(1);
+			break;
+		case '+':
+			compound = true;
+			attrName = attrName.substr(1);
+			break;
+		}
+		attrList[attrName] = new AttributeDescriptor(tagName, attrName, downloads, compound);
+	});
+});
+
+function resolveSrcset(urlSet, baseURL) {
+	var urlList = urlSet.split(/\s*,\s*/); // FIXME this assumes URLs don't contain ','
+	_.forEach(urlList, function(urlDesc, i) {
+		urlList[i] = urlDesc.replace(/^\s*(\S+)(?=\s|$)/, function(all, url) { return baseURL.resolve(url); });
+	});
+	return urlList.join(', ');
+}
+
+urlAttributes['img']['srcset'].resolveURL = resolveSrcset;
+urlAttributes['source']['srcset'].resolveURL = resolveSrcset;
+
+urlAttributes['a']['ping'].resolveURL = function(urlSet, baseURL) {
+	var urlList = urlSet.split(/\s+/);
+	_.forEach(urlList, function(url, i) {
+		urlList[i] = baseURL.resolve(url);
+	});
+	return urlList.join(' ');
+}
+
+return urlAttributes;
+
+})();
+
+
+return URL;
+
+})();
+
+
+}).call(this);
+/*!
+ DOM utils
+ (c) Sean Hogan, 2008,2012,2013,2014
+ Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+*/
+
+/* NOTE
+Requires some features not implemented on older browsers:
+element.matchesSelector (or prefixed equivalent) - IE9+
+element.querySelectorAll - IE8+
+element.addEventListener - IE9+
+element.dispatchEvent - IE9+
+Object.create - IE9+
+*/
+
+(function() {
+
+var window = this;
+var document = window.document;
+
+var Meeko = window.Meeko;
+
+var _ = window._ || Meeko.stuff; // WARN this could potentially use underscore.js / lodash.js but HAS NOT BEEN TESTED!!!
+
 /*
  ### DOM utility functions
  */
-
 var DOM = Meeko.DOM = (function() {
 
 // TODO all this node manager stuff assumes that nodes are only released on unload
@@ -870,8 +1069,17 @@ var getTagName = function(el) {
 	return el && el.nodeType === 1 ? _.lc(el.tagName) : '';
 }
 
+
+var getTagName = function(el) {
+	return el && el.nodeType === 1 ? _.lc(el.tagName) : '';
+}
+
 var matchesSelector;
-_.some(_.words('moz webkit ms o'), function(prefix) {
+
+if (document.documentElement.matches) matchesSelector = function(element, selector) {
+	return (element && element.nodeType === 1) ? element.matches(selector) : false; 
+}
+else _.some(_.words('moz webkit ms o'), function(prefix) {
 	var method = prefix + 'MatchesSelector';
 	if (document.documentElement[method]) {
 		matchesSelector = function(element, selector) { return (element && element.nodeType === 1) ? element[method](selector) : false; }
@@ -993,8 +1201,8 @@ function dispatchEvent(target, type, params) { // NOTE every JS initiated event 
 		params = type;
 		type = params.type;
 	}
-	var bubbles = 'bubbles' in params ? !!params.bubbles : true;
-	var cancelable = 'cancelable' in params ? !!params.cancelable : true;
+	var bubbles = params && 'bubbles' in params ? !!params.bubbles : true;
+	var cancelable = params && 'cancelable' in params ? !!params.cancelable : true;
 	if (typeof type !== 'string') throw Error('trigger() called with invalid event type');
 	var detail = params && params.detail;
 	var event = document.createEvent('CustomEvent');
@@ -1003,6 +1211,17 @@ function dispatchEvent(target, type, params) { // NOTE every JS initiated event 
 	return target.dispatchEvent(event);
 }
 
+var managedEvents = [];
+
+function manageEvent(type) {
+	if (_.includes(managedEvents, type)) return;
+	managedEvents.push(type);
+	window.addEventListener(type, function(event) {
+		// NOTE stopPropagation() prevents custom default-handlers from running. DOMSprockets nullifies it.
+		event.stopPropagation = function() { console.warn('event.stopPropagation() is a no-op'); }
+		event.stopImmediatePropagation = function() { console.warn('event.stopImmediatePropagation() is a no-op'); }
+	}, true);
+}
 
 var SUPPORTS_ATTRMODIFIED = (function() {
 	var supported = false;
@@ -1058,7 +1277,7 @@ else if (SUPPORTS_ATTRMODIFIED) {
 	}, true);
 	
 }
-else logger.warn('element.visibilitychange event will not be supported');
+else console.warn('element.visibilitychange event will not be supported');
 
 // FIXME this should use observers, not events
 function triggerVisibilityChangeEvent(target) {
@@ -1088,17 +1307,95 @@ function whenVisible(element) { // FIXME this quite possibly causes leaks if clo
 	});
 }
 
+
 var insertNode = function(conf, refNode, node) { // like imsertAdjacentHTML but with a node and auto-adoption
 	var doc = refNode.ownerDocument;
 	if (doc.adoptNode) node = doc.adoptNode(node); // Safari 5 was throwing because imported nodes had been added to a document node
 	switch(conf) {
+
+	case 'before':
 	case 'beforebegin': refNode.parentNode.insertBefore(node, refNode); break;
+
+	case 'after':
 	case 'afterend': refNode.parentNode.insertBefore(node, refNode.nextSibling); break;
+
+	case 'start':
 	case 'afterbegin': refNode.insertBefore(node, refNode.firstChild); break;
+
+	case 'end':
 	case 'beforeend': refNode.appendChild(node); break;
-	case 'replace': refNode.parentNode.replaceChild(node, refNode);
+
+	case 'replace': refNode.parentNode.replaceChild(node, refNode); break;
+
+	case 'empty':
+	case 'contents': 
+		// TODO DOM.empty(refNode);
+		var child;
+		while (child = refNode.firstChild) refNode.removeChild(child);
+		refNode.appendChild(node);
+		break;
 	}
 	return refNode;
+}
+
+var cloneContents = function(parentNode) {
+	doc = parentNode.ownerDocument;
+	var frag = doc.createDocumentFragment();
+	var node;
+	while (node = parentNode.firstChild) frag.appendChild(node);
+	return frag;
+}
+	
+var adoptContents = function(parentNode, doc) {
+	if (!doc) doc = document;
+	var frag = doc.createDocumentFragment();
+	var node;
+	while (node = parentNode.firstChild) frag.appendChild(doc.adoptNode(node));
+	return frag;
+}
+	
+/* 
+NOTE:  for more details on how checkStyleSheets() works cross-browser see 
+http://aaronheckmann.blogspot.com/2010/01/writing-jquery-plugin-manager-part-1.html
+TODO: does this still work when there are errors loading stylesheets??
+*/
+// TODO would be nice if this didn't need to be polled
+// TODO should be able to use <link>.onload, see
+// http://stackoverflow.com/a/13610128/108354
+// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link
+var checkStyleSheets = function() { 
+	// check that every <link rel="stylesheet" type="text/css" /> 
+	// has loaded
+	return _.every(DOM.findAll('link'), function(node) {
+		if (!node.rel || !/^stylesheet$/i.test(node.rel)) return true;
+		if (node.type && !/^text\/css$/i.test(node.type)) return true;
+		if (node.disabled) return true;
+		
+		// handle IE
+		if (node.readyState) return readyStateLookup[node.readyState];
+
+		var sheet = node.sheet || node.styleSheet;
+
+		// handle webkit
+		if (!sheet) return false;
+
+		try {
+			// Firefox should throw if not loaded or cross-domain
+			var rules = sheet.rules || sheet.cssRules;
+			return true;
+		} 
+		catch (error) {
+			// handle Firefox cross-domain
+			switch(error.name) {
+			case 'NS_ERROR_DOM_SECURITY_ERR': case 'SecurityError':
+				return true;
+			case 'NS_ERROR_DOM_INVALID_ACCESS_ERR': case 'InvalidAccessError':
+				return false;
+			default:
+				return true;
+			}
+		} 
+	});
 }
 
 
@@ -1107,13 +1404,25 @@ return {
 	getTagName: getTagName,
 	contains: contains, matches: matches,
 	findId: findId, find: find, findAll: findAll, closest: closest, siblings: siblings,
+	dispatchEvent: dispatchEvent, manageEvent: manageEvent,
+	cloneContents: cloneContents, adoptContents: adoptContents,
 	SUPPORTS_ATTRMODIFIED: SUPPORTS_ATTRMODIFIED, 
-	dispatchEvent: dispatchEvent,
 	isVisible: isVisible, whenVisible: whenVisible,
-	insertNode: insertNode
+	insertNode: insertNode, 
+	checkStyleSheets: checkStyleSheets
 }
 
 })();
+
+
+}).call(this);
+
+(function() {
+
+var window = this;
+var document = window.document;
+var _ = window._ || Meeko.stuff; // WARN this could potentially use underscore.js / lodash.js but HAS NOT BEEN TESTED!!!
+var Task = Meeko.Task;
 
 Meeko.controllers = (function() { // TODO should this be under Meeko.sprockets??
 
@@ -1161,7 +1470,39 @@ listen: function(name, listener) {
 })();
 
 
-this.Meeko.sprockets = (function() {
+}).call(this);
+/*!
+ Sprocket
+ (c) Sean Hogan, 2008,2012,2013,2014,2016
+ Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+*/
+
+/* NOTE
+Requires some features not implemented on older browsers:
+element.matchesSelector (or prefixed equivalent) - IE9+
+element.querySelectorAll - IE8+
+element.addEventListener - IE9+
+element.dispatchEvent - IE9+
+Object.create - IE9+
+*/
+
+/* FIXME
+- event modifiers aren't filtering
+- everything in the sprockets code (apart from the Binding implementation) is a BIG BALL OF MUD
+*/
+
+(function() {
+
+var document = window.document;
+
+var Meeko = this.Meeko;
+var _ = window._ || Meeko.stuff; // WARN this could potentially use underscore.js / lodash.js but HAS NOT BEEN TESTED!!!
+var Task = Meeko.Task;
+var Promise = Meeko.Promise;
+var DOM = Meeko.DOM;
+
+
+var sprockets = Meeko.sprockets = (function() {
 /* FIXME
 	- auto DOM monitoring for node insertion / removal should be a start() option
 	- manual control must allow attached, enteredView, leftView lifecycle management
@@ -1177,7 +1518,7 @@ function attachBinding(definition, element) {
 	if (DOM.hasData(element)) {
 		binding = DOM.getData(element);
 		if (binding.definition !== rule.definition) throw Error('Mismatch between definition and binding already present');
-		logger.warn('Binding definition applied when binding already present');
+		console.warn('Binding definition applied when binding already present');
 		return binding;
 	}
 	binding = new Binding(definition);
@@ -1238,8 +1579,8 @@ manageEvent: function(type) {
 	this.managedEvents.push(type);
 	window.addEventListener(type, function(event) {
 		// NOTE stopPropagation() prevents custom default-handlers from running. DOMSprockets nullifies it.
-		event.stopPropagation = function() { logger.debug('event.stopPropagation() is a no-op'); }
-		event.stopImmediatePropagation = function() { logger.debug('event.stopImmediatePropagation() is a no-op'); }
+		event.stopPropagation = function() { console.debug('event.stopPropagation() is a no-op'); }
+		event.stopImmediatePropagation = function() { console.debug('event.stopImmediatePropagation() is a no-op'); }
 	}, true);
 }
 
@@ -1315,7 +1656,7 @@ addHandler: function(handler) {
 	var type = handler.type;
 	var capture = (handler.eventPhase == 1); // Event.CAPTURING_PHASE
 	if (capture) {
-		logger.warn('Capture phase for events not supported');
+		console.warn('Capture phase for events not supported');
 		return; // FIXME should this convert to bubbling instead??
 	}
 
@@ -1396,14 +1737,14 @@ function handleEvent(event, handler) {
 var convertXBLHandler = function(config) {
 	var handler = {}
 	handler.type = config.event;
-	if (null == config.event) logger.warn('Invalid handler: event property undeclared');
+	if (null == config.event) console.warn('Invalid handler: event property undeclared');
 
 	function lookupValue(attrName, lookup) {
 		var attrValue = config[attrName];
 		var result;
 		if (attrValue) {
 			result = lookup[attrValue];
-			if (null == result) logger.info('Ignoring invalid property ' + attrName + ': ' + attrValue);
+			if (null == result) console.info('Ignoring invalid property ' + attrName + ': ' + attrValue);
 		}
 		return result;
 	}
@@ -1683,7 +2024,7 @@ _.assign(sprockets, {
 
 registerElement: function(tagName, defn) { // FIXME test tagName
 	if (started) throw Error('sprockets management already started');
-	if (defn.rules) logger.warn('registerElement() does not support rules. Try registerComposite()');
+	if (defn.rules) console.warn('registerElement() does not support rules. Try registerComposite()');
 	var bindingDefn = new BindingDefinition(defn);
 	var selector = tagName + ', [is=' + tagName + ']'; // TODO why should @is be supported??
 	var rule = new BindingRule(selector, bindingDefn);
@@ -1879,7 +2220,7 @@ registerComposite: function(tagName, definition) {
 	var defn = _.assign({}, definition);
 	var rules = defn.rules;
 	delete defn.rules;
-	if (!rules) logger.warn('registerComposite() called without any sprocket rules. Try registerElement()');
+	if (!rules) console.warn('registerComposite() called without any sprocket rules. Try registerElement()');
 	var onattached = defn.attached;
 	defn.attached = function() {
 		var object = this;
@@ -2354,7 +2695,7 @@ ariaMatches: function(role) {
 })();
 
 
-})(window);
+}).call(this);
 /*!
  * HyperFrameset
  * Copyright 2009-2014 Sean Hogan (http://meekostuff.net/)
@@ -2384,9 +2725,7 @@ var document = window.document;
 
 
 if (!window.XMLHttpRequest) throw Error('HyperFrameset requires native XMLHttpRequest');
-if (!window.Meeko || !window.Meeko.sprockets) throw Error('HyperFrameset requires DOMSprockets');
 
-var vendorPrefix = 'meeko';
 
 var _ = Meeko.stuff; // provided by DOMSprockets
 
@@ -2414,10 +2753,9 @@ _.defaults(_, {
 });
 	
 
-var logger = Meeko.logger; // provided by DOMSprockets or even boot-script
-
 var Task = Meeko.Task;
 var Promise = Meeko.Promise;
+var URL = Meeko.URL;
 
 /*
  ### DOM utility functions
@@ -2557,53 +2895,9 @@ function onLoaded(e) {
 
 })();
 
-/* 
-NOTE:  for more details on how checkStyleSheets() works cross-browser see 
-http://aaronheckmann.blogspot.com/2010/01/writing-jquery-plugin-manager-part-1.html
-TODO: does this still work when there are errors loading stylesheets??
-*/
-// TODO would be nice if this didn't need to be polled
-// TODO should be able to use <link>.onload, see
-// http://stackoverflow.com/a/13610128/108354
-// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link
-var checkStyleSheets = function() { 
-	// check that every <link rel="stylesheet" type="text/css" /> 
-	// has loaded
-	return _.every(DOM.findAll('link'), function(node) {
-		if (!node.rel || !/^stylesheet$/i.test(node.rel)) return true;
-		if (node.type && !/^text\/css$/i.test(node.type)) return true;
-		if (node.disabled) return true;
-		
-		// handle IE
-		if (node.readyState) return readyStateLookup[node.readyState];
-
-		var sheet = node.sheet || node.styleSheet;
-
-		// handle webkit
-		if (!sheet) return false;
-
-		try {
-			// Firefox should throw if not loaded or cross-domain
-			var rules = sheet.rules || sheet.cssRules;
-			return true;
-		} 
-		catch (error) {
-			// handle Firefox cross-domain
-			switch(error.name) {
-			case 'NS_ERROR_DOM_SECURITY_ERR': case 'SecurityError':
-				return true;
-			case 'NS_ERROR_DOM_INVALID_ACCESS_ERR': case 'InvalidAccessError':
-				return false;
-			default:
-				return true;
-			}
-		} 
-	});
-}
-
 _.defaults(DOM, {
 	copyAttributes: copyAttributes, removeAttributes: removeAttributes, // attrs
-	ready: domReady, checkStyleSheets: checkStyleSheets, // events
+	ready: domReady, // events
 	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
 	scrollToId: scrollToId
 });
@@ -2727,71 +3021,6 @@ return CustomNS;
 
 })();
 
-
-var URL = Meeko.URL = (function() {
-
-// TODO is this URL class compatible with the proposed DOM4 URL class??
-
-var URL = function(str) {
-	if (!(this instanceof URL)) return new URL(str);
-	this.parse(str);
-}
-
-var keys = ['source','protocol','hostname','port','pathname','search','hash'];
-var parser = /^([^:\/?#]+:)?(?:\/\/([^:\/?#]*)(?::(\d*))?)?([^?#]*)?(\?[^#]*)?(#.*)?$/;
-
-URL.prototype.parse = function parse(str) {
-	str = str.trim();
-	var	m = parser.exec(str);
-
-	for (var n=keys.length, i=0; i<n; i++) this[keys[i]] = m[i] || '';
-	this.protocol = _.lc(this.protocol);
-	this.supportsResolve = /^(http|https|ftp|file):$/i.test(this.protocol);
-	if (!this.supportsResolve) return;
-	this.hostname = _.lc(this.hostname);
-	this.host = this.hostname;
-	if (this.port) this.host += ':' + this.port;
-	this.origin = this.protocol + '//' + this.host;
-	if (this.pathname == '') this.pathname = '/';
-	var pathParts = this.pathname.split('/'); // creates an array of at least 2 strings with the first string empty: ['', ...]
-	pathParts.shift(); // leaves an array of at least 1 string [...]
-	this.filename = pathParts.pop(); // filename could be ''
-	this.basepath = pathParts.length ? '/' + pathParts.join('/') + '/' : '/'; // either '/rel-path-prepended-by-slash/' or '/'
-	this.base = this.origin + this.basepath;
-	this.nosearch = this.origin + this.pathname;
-	this.nohash = this.nosearch + this.search;
-	this.href = this.nohash + this.hash;
-	this.toString = function() { return this.href; }
-};
-
-URL.prototype.resolve = function resolve(relURL) {
-	relURL = relURL.trim();
-	if (!this.supportsResolve) return relURL;
-	var substr1 = relURL.charAt(0), substr2 = relURL.substr(0,2);
-	var absURL =
-		/^[a-zA-Z0-9-]+:/.test(relURL) ? relURL :
-		substr2 == '//' ? this.protocol + relURL :
-		substr1 == '/' ? this.origin + relURL :
-		substr1 == '?' ? this.nosearch + relURL :
-		substr1 == '#' ? this.nohash + relURL :
-		substr1 != '.' ? this.base + relURL :
-		substr2 == './' ? this.base + relURL.replace('./', '') :
-		(function() {
-			var myRel = relURL;
-			var myDir = this.basepath;
-			while (myRel.substr(0,3) == '../') {
-				myRel = myRel.replace('../', '');
-				myDir = myDir.replace(/[^\/]+\/$/, '');
-			}
-			return this.origin + myDir + myRel;
-		}).call(this);
-	return absURL;
-}
-
-
-return URL;
-
-})();
 
 var httpProxy = Meeko.httpProxy = (function() {
 
@@ -2973,95 +3202,11 @@ return httpProxy;
 })();
 
 
-var urlAttributes = URL.attributes = (function() {
-	
-var AttributeDescriptor = function(tagName, attrName, loads, compound) {
-	var testEl = document.createElement(tagName);
-	var supported = attrName in testEl;
-	var lcAttr = _.lc(attrName); // NOTE for longDesc, etc
-	_.defaults(this, { // attrDesc
-		tagName: tagName,
-		attrName: attrName,
-		loads: loads,
-		compound: compound,
-		supported: supported
-	});
-}
-
-_.defaults(AttributeDescriptor.prototype, {
-
-resolve: function(el, baseURL) {
-	var attrName = this.attrName;
-	var url = el.getAttribute(attrName);
-	if (url == null) return;
-	var finalURL = this.resolveURL(url, baseURL)
-	if (finalURL !== url) el.setAttribute(attrName, finalURL);
-},
-
-resolveURL: function(url, baseURL) {
-	var relURL = url.trim();
-	var finalURL = relURL;
-	switch (relURL.charAt(0)) {
-		case '': // empty, but not null. TODO should this be a warning??
-			break;
-		
-		default:
-			finalURL = baseURL.resolve(relURL);
-			break;
-	}
-	return finalURL;
-}
-
-});
-
-var urlAttributes = {};
-_.forEach(_.words('link@<href script@<src img@<longDesc,<src,+srcset iframe@<longDesc,<src object@<data embed@<src video@<poster,<src audio@<src source@<src,+srcset input@formAction,<src button@formAction,<src a@+ping,href area@href q@cite blockquote@cite ins@cite del@cite form@action'), function(text) {
-	var m = text.split('@'), tagName = m[0], attrs = m[1];
-	var attrList = urlAttributes[tagName] = {};
-	_.forEach(attrs.split(','), function(attrName) {
-		var downloads = false;
-		var compound = false;
-		var modifier = attrName.charAt(0);
-		switch (modifier) {
-		case '<':
-			downloads = true;
-			attrName = attrName.substr(1);
-			break;
-		case '+':
-			compound = true;
-			attrName = attrName.substr(1);
-			break;
-		}
-		attrList[attrName] = new AttributeDescriptor(tagName, attrName, downloads, compound);
-	});
-});
-
-function resolveSrcset(urlSet, baseURL) {
-	var urlList = urlSet.split(/\s*,\s*/); // FIXME this assumes URLs don't contain ','
-	_.forEach(urlList, function(urlDesc, i) {
-		urlList[i] = urlDesc.replace(/^\s*(\S+)(?=\s|$)/, function(all, url) { return baseURL.resolve(url); });
-	});
-	return urlList.join(', ');
-}
-
-urlAttributes['img']['srcset'].resolveURL = resolveSrcset;
-urlAttributes['source']['srcset'].resolveURL = resolveSrcset;
-
-urlAttributes['a']['ping'].resolveURL = function(urlSet, baseURL) {
-	var urlList = urlSet.split(/\s+/);
-	_.forEach(urlList, function(url, i) {
-		urlList[i] = baseURL.resolve(url);
-	});
-	return urlList.join(' ');
-}
-
-return urlAttributes;
-
-})();
-
 /*
 	resolveAll() resolves all URL attributes
 */
+var urlAttributes = URL.attributes;
+
 var resolveAll = function(doc, baseURL) {
 
 	return Promise.pipe(null, [
@@ -3209,13 +3354,13 @@ return new Promise(function(resolve, reject) {
 
 	// TODO this filtering may need reworking now we don't support older browsers
 	if (!node.type || /^text\/javascript$/i.test(node.type)) {
-		logger.info('Attempt to queue already executed script ' + node.src);
+		console.info('Attempt to queue already executed script ' + node.src);
 		resolve(); // TODO should this be reject() ??
 		return;
 	}
 
 	if (!/^text\/javascript\?disabled$/i.test(node.type)) {
-		logger.info('Unsupported script-type ' + node.type);
+		console.info('Unsupported script-type ' + node.type);
 		resolve(); // TODO should this be reject() ??
 		return;
 	}
@@ -3230,7 +3375,7 @@ return new Promise(function(resolve, reject) {
 	if (script.getAttribute('defer')) { // @defer is not appropriate. Implement as @async
 		script.removeAttribute('defer');
 		script.setAttribute('async', '');
-		logger.warn('@defer not supported on scripts');
+		console.warn('@defer not supported on scripts');
 	}
 	if (supportsSync && script.src && !script.hasAttribute('async')) script.async = false;
 	script.type = 'text/javascript';
@@ -3382,7 +3527,7 @@ if (history.replaceState) window.addEventListener('popstate', function(e) {
 		
 		var newSettings = e.state;
 		if (!newSettings[stateTag]) {
-			logger.warn('Ignoring invalid PopStateEvent');
+			console.warn('Ignoring invalid PopStateEvent');
 			return;
 		}
 		scheduler.reset(function() {
@@ -3647,7 +3792,7 @@ init: function(el) {
 			bodies.push(new HBodyDefinition(node, frameset));
 			return;
 		}
-		logger.warn('Unexpected element in HFrame: ' + tag);
+		console.warn('Unexpected element in HFrame: ' + tag);
 		return;
 	});
 
@@ -3719,7 +3864,7 @@ init: function(el) {
 		finalCondition = normalizeCondition(condition);
 		if (!finalCondition) {
 			finalCondition = condition;
-			logger.warn('Frame body defined with unknown condition: ' + condition);
+			console.warn('Frame body defined with unknown condition: ' + condition);
 		}
 	}
 	else finalCondition = 'loaded';
@@ -3736,7 +3881,7 @@ init: function(el) {
 		}	
 	});
 	if (!bodyDef.transforms.length && bodyDef.condition === 'loaded') {
-		logger.warn('HBody definition for loaded content contains no HTransform definitions');
+		console.warn('HBody definition for loaded content contains no HTransform definitions');
 	}
 },
 
@@ -3891,7 +4036,7 @@ init: function(doc, settings) {
 	_.forEach(DOM.findAll('script[for]', doc.head), function(script) {
 		doc.body.insertBefore(script, firstChild);
 		script.setAttribute('for', '');
-		logger.info('Moved <script for> in frameset <head> to <body>');
+		console.info('Moved <script for> in frameset <head> to <body>');
 	});
 
 	var body = doc.body;
@@ -3915,7 +4060,7 @@ preprocess: function() {
 		if (script.type && !/^text\/javascript/.test(script.type)) return;
 
 		if (script.hasAttribute('src')) { // external javascript in <body> is invalid
-			logger.warn('Frameset <body> may not contain external scripts: \n' +
+			console.warn('Frameset <body> may not contain external scripts: \n' +
 				script.cloneNode(false).outerHTML);
 			script.parentNode.removeChild(script);
 			return;
@@ -3930,7 +4075,7 @@ preprocess: function() {
 				DOM.insertNode('beforeend', document.head, newScript);
 			}
 			catch(err) { // TODO test if this actually catches script errors
-				logger.warn('Error evaluating inline script in frameset:\n' +
+				console.warn('Error evaluating inline script in frameset:\n' +
 					frameset.url + '#' + script.id);
 				Task.postError(err);
 			}
@@ -3939,7 +4084,7 @@ preprocess: function() {
 		}
 
 		if (script.getAttribute('for') !== '') {
-			logger.warn('<script> may only contain EMPTY @for: \n' +
+			console.warn('<script> may only contain EMPTY @for: \n' +
 				script.cloneNode(false).outerHTML);
 			script.parentNode.removeChild(script);
 			return;
@@ -3971,7 +4116,7 @@ preprocess: function() {
 			frameset.configData[sourceURL] = object;
 		}
 		catch(err) { 
-			logger.warn('Error evaluating inline script in frameset:\n' +
+			console.warn('Error evaluating inline script in frameset:\n' +
 				frameset.url + '#' + script.id);
 			Task.postError(err);
 		}
@@ -4012,7 +4157,7 @@ preprocess: function() {
 	_.forEach(frameRefElts, function(el) {
 		var def = el.getAttribute('def');
 		if (!frameset.frames[def]) {
-			logger.warn('HyperFrame references non-existant frame: ' + def);
+			console.warn('HyperFrame references non-existant frame: ' + def);
 		}
 	});
 
@@ -4028,11 +4173,11 @@ addDefaultNamespace: function(nsSpec) {
 	var nsDef = new CustomNS(nsSpec);
 	var matchingNS = _.find(framesetDef.defaultNamespaces, function(def) {
 		if (_.lc(def.urn) === _.lc(nsDef.urn)) {
-			if (def.prefix !== nsDef.prefix) logger.warn('Attempted to add default namespace with same urn as one already present: ' + def.urn);
+			if (def.prefix !== nsDef.prefix) console.warn('Attempted to add default namespace with same urn as one already present: ' + def.urn);
 			return true;
 		}
 		if (def.prefix === nsDef.prefix) {
-			if (_.lc(def.urn) !== _.lc(nsDef.urn)) logger.warn('Attempted to add default namespace with same prefix as one already present: ' + def.prefix);
+			if (_.lc(def.urn) !== _.lc(nsDef.urn)) console.warn('Attempted to add default namespace with same prefix as one already present: ' + def.prefix);
 			return true;
 		}
 	});
@@ -4048,11 +4193,11 @@ addNamespace: function(nsDef) {
 
 	var matchingNS = _.find(framesetDef.namespaces, function(def) {
 		if (_.lc(def.urn) === _.lc(nsDef.urn)) {
-			if (def.prefix !== nsDef.prefix) logger.warn('Attempted to add namespace with same urn as one already present: ' + def.urn);
+			if (def.prefix !== nsDef.prefix) console.warn('Attempted to add namespace with same urn as one already present: ' + def.urn);
 			return true;
 		}
 		if (def.prefix === nsDef.prefix) {
-			if (_.lc(def.urn) !== _.lc(nsDef.urn)) logger.warn('Attempted to add namespace with same prefix as one already present: ' + def.prefix);
+			if (_.lc(def.urn) !== _.lc(nsDef.urn)) console.warn('Attempted to add namespace with same prefix as one already present: ' + def.prefix);
 			return true;
 		}
 	});
@@ -4978,7 +5123,7 @@ start: function(startOptions) {
 		if (!framerConfig) throw Error('No frameset could be determined for this page');
 		framer.scope = framerConfig.scope; // FIXME shouldn't set this until loadFramesetDefinition() returns success
 		var framesetURL = URL(framerConfig.framesetURL);
-		if (framesetURL.hash) logger.info('Ignoring hash component of frameset URL: ' + framesetURL.hash);
+		if (framesetURL.hash) console.info('Ignoring hash component of frameset URL: ' + framesetURL.hash);
 		framer.framesetURL = framerConfig.framesetURL = framesetURL.nohash;
 		return httpProxy.load(framer.framesetURL, { responseType: 'document' })
 		.then(function(response) {
@@ -5253,7 +5398,7 @@ onRequestNavigation: function(e, frame) { // `return false` means success (so pr
 
 onPageLink: function(url, details) {
 	var framer = this;
-	logger.warn('Ignoring on-same-page links for now.'); // FIXME
+	console.warn('Ignoring on-same-page links for now.'); // FIXME
 },
 
 navigate: function(url, changeset) { // FIXME doesn't support replaceState
@@ -5340,7 +5485,7 @@ onPopState: function(changeset) {
 	var frames = [];
 	var url = changeset.url;
 	if (url !== document.URL) {
-		logger.warn('Popped state URL does not match address-bar URL.');
+		console.warn('Popped state URL does not match address-bar URL.');
 		// FIXME needs an optional error recovery, perhaps reloading document.URL
 	}
 	framer.load(url, changeset, 0);
@@ -5460,11 +5605,11 @@ return {
 
 register: function(name, fn) {
 	if (!/^[_a-zA-Z][_a-zA-Z0-9]*$/.test(name)) { // TODO should be in filters.register()
-		logger.error('registerFilter called with invalid name: ' + name);
+		console.error('registerFilter called with invalid name: ' + name);
 		return; // TODO throw??
 	}
 	if (this.has(name)) {
-		logger.warn('A filter by that name already exists: ' + name);
+		console.warn('A filter by that name already exists: ' + name);
 		return; // TODO throw??
 	}
 	items[name] = fn;
@@ -5698,7 +5843,6 @@ var _ = Meeko.stuff;
 var DOM = Meeko.DOM;
 var Task = Meeko.Task;
 var Promise = Meeko.Promise;
-var logger = Meeko.logger;
 var framer = Meeko.framer;
 
 /* WARN 
@@ -5719,7 +5863,7 @@ function MainProcessor(options, framesetDef) {}
 _.defaults(MainProcessor.prototype, {
 
 loadTemplate: function(template) {
-	if (/\S+/.test(template.textContent)) logger.warn('"main" transforms do not use templates');
+	if (/\S+/.test(template.textContent)) console.warn('"main" transforms do not use templates');
 },
 
 transform: function(provider, details) { // TODO how to use details?
@@ -5760,35 +5904,35 @@ loadTemplate: function(template) {
 		case 1: // Element
 			switch (DOM.getTagName(node)) {
 			case 'script':
-				if (script) logger.warn('Ignoring secondary <script> in "script" transform template');
+				if (script) console.warn('Ignoring secondary <script> in "script" transform template');
 				else script = node;
 				return;
 			default:
-				logger.warn('Ignoring unexpected non-<script> element in "script" transform template');
+				console.warn('Ignoring unexpected non-<script> element in "script" transform template');
 				return;
 			}
 			break; // should never reach here
 		case 3: // Text
-			if (/\S+/.test(node.nodeValue)) logger.warn('"script" transforms should not have non-empty text-nodes');
+			if (/\S+/.test(node.nodeValue)) console.warn('"script" transforms should not have non-empty text-nodes');
 			return;
 		case 8: // Comment
 			return;
 		default:
-			logger.warn('Unexpected node in "script" transform template');
+			console.warn('Unexpected node in "script" transform template');
 			return;
 		}
 	});
 	if (!script) {
 		// no problem if already a processor defined in new ScriptProcessor(options)
 		if (this.processor) return;
-		logger.warn('No <script> found in "script" transform template');
+		console.warn('No <script> found in "script" transform template');
 		return;
 	}
 	try { this.processor = (Function('return (' + script.text + ')'))(); }
 	catch(err) { Task.postError(err); }
 	
 	if (!this.processor || !this.processor.transform) {
-		logger.warn('"script" transform template did not produce valid transform object');
+		console.warn('"script" transform template did not produce valid transform object');
 		return;
 	}
 },
@@ -5796,7 +5940,7 @@ loadTemplate: function(template) {
 transform: function(provider, details) {
 	var srcNode = provider.srcNode;
 	if (!this.processor || !this.processor.transform) {
-		logger.warn('"script" transform template did not produce valid transform object');
+		console.warn('"script" transform template did not produce valid transform object');
 		return;
 	}
 	return this.processor.transform(srcNode, details);
@@ -5881,7 +6025,7 @@ function checkElementPerformance(el, namespaces) {
 			break;
 		}
 		if (!outerHTML) outerHTML = el.cloneNode(false).outerHTML; // FIXME caniuse outerHTML??
-		logger.debug('Found ' + cond.description + ':\n\t\t' + outerHTML + '\n\t' +
+		console.debug('Found ' + cond.description + ':\n\t\t' + outerHTML + '\n\t' +
 			'This can cause poor performance on IE / Edge.');
 	});
 }
@@ -6014,7 +6158,7 @@ loadTemplate: function(template) {
 		});
 
 		if (el.hasAttribute(mexprHtmlAttr)) {
-			logger.warn('Removing unsupported @' + mexprHtmlAttr);
+			console.warn('Removing unsupported @' + mexprHtmlAttr);
 			el.removeAttribute(mexprHtmlAttr);
 		}
 
@@ -6069,7 +6213,7 @@ loadTemplate: function(template) {
 		el.hazardDetails = getHazardDetails(el, processor.frameset);
 	});
 	
-	if (logger.LOG_LEVEL < logger.levels.indexOf('debug')) return;
+	if (console.logLevel !== 'debug') return;
 
 	// if debugging then warn about PERFORMANCE_UNFRIENDLY_CONDITIONS (IE11 / Edge)
 	var hfNS = processor.frameset.namespace;
@@ -6173,7 +6317,7 @@ transformHazardTree: function(el, context, variables, frag) {
 		var name = el.getAttribute('name');
 		template = processor.templates[name];
 		if (!template) {
-			logger.warn('Hazard could not find template name=' + name);
+			console.warn('Hazard could not find template name=' + name);
 			return frag;
 		}
 	
@@ -6230,7 +6374,7 @@ transformHazardTree: function(el, context, variables, frag) {
 		}
 		catch (err) {
 			Task.postError(err);
-			logger.warn('Error evaluating <haz:if test="' + testVal + '">. Assumed false.');
+			console.warn('Error evaluating <haz:if test="' + testVal + '">. Assumed false.');
 			pass = false;
 		}
 		if (invertTest) pass = !pass;
@@ -6272,7 +6416,7 @@ transformHazardTree: function(el, context, variables, frag) {
 		}
 		catch (err) {
 			Task.postError(err);
-			logger.warn('Error evaluating <haz:each select="' + selector + '">. Assumed empty.');
+			console.warn('Error evaluating <haz:each select="' + selector + '">. Assumed empty.');
 			return;
 		}
 
@@ -6313,7 +6457,7 @@ transformSingleElement: function(srcNode, context, variables) {
 		}
 		catch (err) {
 			Task.postError(err);
-			logger.warn('Error evaluating @' + desc.attrName + '="' + desc.expression + '". Assumed false.');
+			console.warn('Error evaluating @' + desc.attrName + '="' + desc.expression + '". Assumed false.');
 			value = false;
 		}
 		setAttribute(el, desc.attrName, value);
@@ -6425,14 +6569,14 @@ function interpretExpression(exprText) { // FIXME robustness
 		var text = filterSpec;
 		var m = text.match(/^([_a-zA-Z][_a-zA-Z0-9]*)\s*(:?)/);
 		if (!m) {
-			logger.warn('Syntax Error in filter call: ' + filterSpec);
+			console.warn('Syntax Error in filter call: ' + filterSpec);
 			return false;
 		}
 		var filterName = m[1];
 		var hasParams = m[2];
 		text = text.substr(m[0].length);
 		if (!hasParams && /\S+/.test(text)) {
-			logger.warn('Syntax Error in filter call: ' + filterSpec);
+			console.warn('Syntax Error in filter call: ' + filterSpec);
 			return false;
 		}
 
@@ -6440,7 +6584,7 @@ function interpretExpression(exprText) { // FIXME robustness
 			var filterParams = (Function('return [' + text + '];'))();
 		}
 		catch (err) {
-			logger.warn('Syntax Error in filter call: ' + filterSpec);
+			console.warn('Syntax Error in filter call: ' + filterSpec);
 			return false;
 		}
 
@@ -6481,7 +6625,7 @@ function processExpression(expr, filters, provider, context, variables, type) { 
 		}
 		catch (err) {
 			Task.postError(err);
-			logger.warn('Failure processing filter call: "' + filter.text + '" with input: "' + value + '"');
+			console.warn('Failure processing filter call: "' + filter.text + '" with input: "' + value + '"');
 			value = '';
 			return false;
 		}
@@ -6510,7 +6654,7 @@ function processExpression(expr, filters, provider, context, variables, type) { 
 			if (value == null || value === false) value = false;
 			else value = true;
 			break;
-		default: // FIXME should never occur. logger.warn !?
+		default: // FIXME should never occur. console.warn !?
 			if (value && value.nodeType) value = value.textContent;
 			break;
 		}

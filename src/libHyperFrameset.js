@@ -27,9 +27,7 @@ var document = window.document;
 
 
 if (!window.XMLHttpRequest) throw Error('HyperFrameset requires native XMLHttpRequest');
-if (!window.Meeko || !window.Meeko.sprockets) throw Error('HyperFrameset requires DOMSprockets');
 
-var vendorPrefix = 'meeko';
 
 var _ = Meeko.stuff; // provided by DOMSprockets
 
@@ -57,10 +55,9 @@ _.defaults(_, {
 });
 	
 
-var logger = Meeko.logger; // provided by DOMSprockets or even boot-script
-
 var Task = Meeko.Task;
 var Promise = Meeko.Promise;
+var URL = Meeko.URL;
 
 /*
  ### DOM utility functions
@@ -200,53 +197,9 @@ function onLoaded(e) {
 
 })();
 
-/* 
-NOTE:  for more details on how checkStyleSheets() works cross-browser see 
-http://aaronheckmann.blogspot.com/2010/01/writing-jquery-plugin-manager-part-1.html
-TODO: does this still work when there are errors loading stylesheets??
-*/
-// TODO would be nice if this didn't need to be polled
-// TODO should be able to use <link>.onload, see
-// http://stackoverflow.com/a/13610128/108354
-// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link
-var checkStyleSheets = function() { 
-	// check that every <link rel="stylesheet" type="text/css" /> 
-	// has loaded
-	return _.every(DOM.findAll('link'), function(node) {
-		if (!node.rel || !/^stylesheet$/i.test(node.rel)) return true;
-		if (node.type && !/^text\/css$/i.test(node.type)) return true;
-		if (node.disabled) return true;
-		
-		// handle IE
-		if (node.readyState) return readyStateLookup[node.readyState];
-
-		var sheet = node.sheet || node.styleSheet;
-
-		// handle webkit
-		if (!sheet) return false;
-
-		try {
-			// Firefox should throw if not loaded or cross-domain
-			var rules = sheet.rules || sheet.cssRules;
-			return true;
-		} 
-		catch (error) {
-			// handle Firefox cross-domain
-			switch(error.name) {
-			case 'NS_ERROR_DOM_SECURITY_ERR': case 'SecurityError':
-				return true;
-			case 'NS_ERROR_DOM_INVALID_ACCESS_ERR': case 'InvalidAccessError':
-				return false;
-			default:
-				return true;
-			}
-		} 
-	});
-}
-
 _.defaults(DOM, {
 	copyAttributes: copyAttributes, removeAttributes: removeAttributes, // attrs
-	ready: domReady, checkStyleSheets: checkStyleSheets, // events
+	ready: domReady, // events
 	createDocument: createDocument, createHTMLDocument: createHTMLDocument, cloneDocument: cloneDocument, // documents
 	scrollToId: scrollToId
 });
@@ -370,71 +323,6 @@ return CustomNS;
 
 })();
 
-
-var URL = Meeko.URL = (function() {
-
-// TODO is this URL class compatible with the proposed DOM4 URL class??
-
-var URL = function(str) {
-	if (!(this instanceof URL)) return new URL(str);
-	this.parse(str);
-}
-
-var keys = ['source','protocol','hostname','port','pathname','search','hash'];
-var parser = /^([^:\/?#]+:)?(?:\/\/([^:\/?#]*)(?::(\d*))?)?([^?#]*)?(\?[^#]*)?(#.*)?$/;
-
-URL.prototype.parse = function parse(str) {
-	str = str.trim();
-	var	m = parser.exec(str);
-
-	for (var n=keys.length, i=0; i<n; i++) this[keys[i]] = m[i] || '';
-	this.protocol = _.lc(this.protocol);
-	this.supportsResolve = /^(http|https|ftp|file):$/i.test(this.protocol);
-	if (!this.supportsResolve) return;
-	this.hostname = _.lc(this.hostname);
-	this.host = this.hostname;
-	if (this.port) this.host += ':' + this.port;
-	this.origin = this.protocol + '//' + this.host;
-	if (this.pathname == '') this.pathname = '/';
-	var pathParts = this.pathname.split('/'); // creates an array of at least 2 strings with the first string empty: ['', ...]
-	pathParts.shift(); // leaves an array of at least 1 string [...]
-	this.filename = pathParts.pop(); // filename could be ''
-	this.basepath = pathParts.length ? '/' + pathParts.join('/') + '/' : '/'; // either '/rel-path-prepended-by-slash/' or '/'
-	this.base = this.origin + this.basepath;
-	this.nosearch = this.origin + this.pathname;
-	this.nohash = this.nosearch + this.search;
-	this.href = this.nohash + this.hash;
-	this.toString = function() { return this.href; }
-};
-
-URL.prototype.resolve = function resolve(relURL) {
-	relURL = relURL.trim();
-	if (!this.supportsResolve) return relURL;
-	var substr1 = relURL.charAt(0), substr2 = relURL.substr(0,2);
-	var absURL =
-		/^[a-zA-Z0-9-]+:/.test(relURL) ? relURL :
-		substr2 == '//' ? this.protocol + relURL :
-		substr1 == '/' ? this.origin + relURL :
-		substr1 == '?' ? this.nosearch + relURL :
-		substr1 == '#' ? this.nohash + relURL :
-		substr1 != '.' ? this.base + relURL :
-		substr2 == './' ? this.base + relURL.replace('./', '') :
-		(function() {
-			var myRel = relURL;
-			var myDir = this.basepath;
-			while (myRel.substr(0,3) == '../') {
-				myRel = myRel.replace('../', '');
-				myDir = myDir.replace(/[^\/]+\/$/, '');
-			}
-			return this.origin + myDir + myRel;
-		}).call(this);
-	return absURL;
-}
-
-
-return URL;
-
-})();
 
 var httpProxy = Meeko.httpProxy = (function() {
 
@@ -616,95 +504,11 @@ return httpProxy;
 })();
 
 
-var urlAttributes = URL.attributes = (function() {
-	
-var AttributeDescriptor = function(tagName, attrName, loads, compound) {
-	var testEl = document.createElement(tagName);
-	var supported = attrName in testEl;
-	var lcAttr = _.lc(attrName); // NOTE for longDesc, etc
-	_.defaults(this, { // attrDesc
-		tagName: tagName,
-		attrName: attrName,
-		loads: loads,
-		compound: compound,
-		supported: supported
-	});
-}
-
-_.defaults(AttributeDescriptor.prototype, {
-
-resolve: function(el, baseURL) {
-	var attrName = this.attrName;
-	var url = el.getAttribute(attrName);
-	if (url == null) return;
-	var finalURL = this.resolveURL(url, baseURL)
-	if (finalURL !== url) el.setAttribute(attrName, finalURL);
-},
-
-resolveURL: function(url, baseURL) {
-	var relURL = url.trim();
-	var finalURL = relURL;
-	switch (relURL.charAt(0)) {
-		case '': // empty, but not null. TODO should this be a warning??
-			break;
-		
-		default:
-			finalURL = baseURL.resolve(relURL);
-			break;
-	}
-	return finalURL;
-}
-
-});
-
-var urlAttributes = {};
-_.forEach(_.words('link@<href script@<src img@<longDesc,<src,+srcset iframe@<longDesc,<src object@<data embed@<src video@<poster,<src audio@<src source@<src,+srcset input@formAction,<src button@formAction,<src a@+ping,href area@href q@cite blockquote@cite ins@cite del@cite form@action'), function(text) {
-	var m = text.split('@'), tagName = m[0], attrs = m[1];
-	var attrList = urlAttributes[tagName] = {};
-	_.forEach(attrs.split(','), function(attrName) {
-		var downloads = false;
-		var compound = false;
-		var modifier = attrName.charAt(0);
-		switch (modifier) {
-		case '<':
-			downloads = true;
-			attrName = attrName.substr(1);
-			break;
-		case '+':
-			compound = true;
-			attrName = attrName.substr(1);
-			break;
-		}
-		attrList[attrName] = new AttributeDescriptor(tagName, attrName, downloads, compound);
-	});
-});
-
-function resolveSrcset(urlSet, baseURL) {
-	var urlList = urlSet.split(/\s*,\s*/); // FIXME this assumes URLs don't contain ','
-	_.forEach(urlList, function(urlDesc, i) {
-		urlList[i] = urlDesc.replace(/^\s*(\S+)(?=\s|$)/, function(all, url) { return baseURL.resolve(url); });
-	});
-	return urlList.join(', ');
-}
-
-urlAttributes['img']['srcset'].resolveURL = resolveSrcset;
-urlAttributes['source']['srcset'].resolveURL = resolveSrcset;
-
-urlAttributes['a']['ping'].resolveURL = function(urlSet, baseURL) {
-	var urlList = urlSet.split(/\s+/);
-	_.forEach(urlList, function(url, i) {
-		urlList[i] = baseURL.resolve(url);
-	});
-	return urlList.join(' ');
-}
-
-return urlAttributes;
-
-})();
-
 /*
 	resolveAll() resolves all URL attributes
 */
+var urlAttributes = URL.attributes;
+
 var resolveAll = function(doc, baseURL) {
 
 	return Promise.pipe(null, [
@@ -852,13 +656,13 @@ return new Promise(function(resolve, reject) {
 
 	// TODO this filtering may need reworking now we don't support older browsers
 	if (!node.type || /^text\/javascript$/i.test(node.type)) {
-		logger.info('Attempt to queue already executed script ' + node.src);
+		console.info('Attempt to queue already executed script ' + node.src);
 		resolve(); // TODO should this be reject() ??
 		return;
 	}
 
 	if (!/^text\/javascript\?disabled$/i.test(node.type)) {
-		logger.info('Unsupported script-type ' + node.type);
+		console.info('Unsupported script-type ' + node.type);
 		resolve(); // TODO should this be reject() ??
 		return;
 	}
@@ -873,7 +677,7 @@ return new Promise(function(resolve, reject) {
 	if (script.getAttribute('defer')) { // @defer is not appropriate. Implement as @async
 		script.removeAttribute('defer');
 		script.setAttribute('async', '');
-		logger.warn('@defer not supported on scripts');
+		console.warn('@defer not supported on scripts');
 	}
 	if (supportsSync && script.src && !script.hasAttribute('async')) script.async = false;
 	script.type = 'text/javascript';
@@ -1025,7 +829,7 @@ if (history.replaceState) window.addEventListener('popstate', function(e) {
 		
 		var newSettings = e.state;
 		if (!newSettings[stateTag]) {
-			logger.warn('Ignoring invalid PopStateEvent');
+			console.warn('Ignoring invalid PopStateEvent');
 			return;
 		}
 		scheduler.reset(function() {
@@ -1290,7 +1094,7 @@ init: function(el) {
 			bodies.push(new HBodyDefinition(node, frameset));
 			return;
 		}
-		logger.warn('Unexpected element in HFrame: ' + tag);
+		console.warn('Unexpected element in HFrame: ' + tag);
 		return;
 	});
 
@@ -1362,7 +1166,7 @@ init: function(el) {
 		finalCondition = normalizeCondition(condition);
 		if (!finalCondition) {
 			finalCondition = condition;
-			logger.warn('Frame body defined with unknown condition: ' + condition);
+			console.warn('Frame body defined with unknown condition: ' + condition);
 		}
 	}
 	else finalCondition = 'loaded';
@@ -1379,7 +1183,7 @@ init: function(el) {
 		}	
 	});
 	if (!bodyDef.transforms.length && bodyDef.condition === 'loaded') {
-		logger.warn('HBody definition for loaded content contains no HTransform definitions');
+		console.warn('HBody definition for loaded content contains no HTransform definitions');
 	}
 },
 
@@ -1534,7 +1338,7 @@ init: function(doc, settings) {
 	_.forEach(DOM.findAll('script[for]', doc.head), function(script) {
 		doc.body.insertBefore(script, firstChild);
 		script.setAttribute('for', '');
-		logger.info('Moved <script for> in frameset <head> to <body>');
+		console.info('Moved <script for> in frameset <head> to <body>');
 	});
 
 	var body = doc.body;
@@ -1558,7 +1362,7 @@ preprocess: function() {
 		if (script.type && !/^text\/javascript/.test(script.type)) return;
 
 		if (script.hasAttribute('src')) { // external javascript in <body> is invalid
-			logger.warn('Frameset <body> may not contain external scripts: \n' +
+			console.warn('Frameset <body> may not contain external scripts: \n' +
 				script.cloneNode(false).outerHTML);
 			script.parentNode.removeChild(script);
 			return;
@@ -1573,7 +1377,7 @@ preprocess: function() {
 				DOM.insertNode('beforeend', document.head, newScript);
 			}
 			catch(err) { // TODO test if this actually catches script errors
-				logger.warn('Error evaluating inline script in frameset:\n' +
+				console.warn('Error evaluating inline script in frameset:\n' +
 					frameset.url + '#' + script.id);
 				Task.postError(err);
 			}
@@ -1582,7 +1386,7 @@ preprocess: function() {
 		}
 
 		if (script.getAttribute('for') !== '') {
-			logger.warn('<script> may only contain EMPTY @for: \n' +
+			console.warn('<script> may only contain EMPTY @for: \n' +
 				script.cloneNode(false).outerHTML);
 			script.parentNode.removeChild(script);
 			return;
@@ -1614,7 +1418,7 @@ preprocess: function() {
 			frameset.configData[sourceURL] = object;
 		}
 		catch(err) { 
-			logger.warn('Error evaluating inline script in frameset:\n' +
+			console.warn('Error evaluating inline script in frameset:\n' +
 				frameset.url + '#' + script.id);
 			Task.postError(err);
 		}
@@ -1655,7 +1459,7 @@ preprocess: function() {
 	_.forEach(frameRefElts, function(el) {
 		var def = el.getAttribute('def');
 		if (!frameset.frames[def]) {
-			logger.warn('HyperFrame references non-existant frame: ' + def);
+			console.warn('HyperFrame references non-existant frame: ' + def);
 		}
 	});
 
@@ -1671,11 +1475,11 @@ addDefaultNamespace: function(nsSpec) {
 	var nsDef = new CustomNS(nsSpec);
 	var matchingNS = _.find(framesetDef.defaultNamespaces, function(def) {
 		if (_.lc(def.urn) === _.lc(nsDef.urn)) {
-			if (def.prefix !== nsDef.prefix) logger.warn('Attempted to add default namespace with same urn as one already present: ' + def.urn);
+			if (def.prefix !== nsDef.prefix) console.warn('Attempted to add default namespace with same urn as one already present: ' + def.urn);
 			return true;
 		}
 		if (def.prefix === nsDef.prefix) {
-			if (_.lc(def.urn) !== _.lc(nsDef.urn)) logger.warn('Attempted to add default namespace with same prefix as one already present: ' + def.prefix);
+			if (_.lc(def.urn) !== _.lc(nsDef.urn)) console.warn('Attempted to add default namespace with same prefix as one already present: ' + def.prefix);
 			return true;
 		}
 	});
@@ -1691,11 +1495,11 @@ addNamespace: function(nsDef) {
 
 	var matchingNS = _.find(framesetDef.namespaces, function(def) {
 		if (_.lc(def.urn) === _.lc(nsDef.urn)) {
-			if (def.prefix !== nsDef.prefix) logger.warn('Attempted to add namespace with same urn as one already present: ' + def.urn);
+			if (def.prefix !== nsDef.prefix) console.warn('Attempted to add namespace with same urn as one already present: ' + def.urn);
 			return true;
 		}
 		if (def.prefix === nsDef.prefix) {
-			if (_.lc(def.urn) !== _.lc(nsDef.urn)) logger.warn('Attempted to add namespace with same prefix as one already present: ' + def.prefix);
+			if (_.lc(def.urn) !== _.lc(nsDef.urn)) console.warn('Attempted to add namespace with same prefix as one already present: ' + def.prefix);
 			return true;
 		}
 	});
@@ -2621,7 +2425,7 @@ start: function(startOptions) {
 		if (!framerConfig) throw Error('No frameset could be determined for this page');
 		framer.scope = framerConfig.scope; // FIXME shouldn't set this until loadFramesetDefinition() returns success
 		var framesetURL = URL(framerConfig.framesetURL);
-		if (framesetURL.hash) logger.info('Ignoring hash component of frameset URL: ' + framesetURL.hash);
+		if (framesetURL.hash) console.info('Ignoring hash component of frameset URL: ' + framesetURL.hash);
 		framer.framesetURL = framerConfig.framesetURL = framesetURL.nohash;
 		return httpProxy.load(framer.framesetURL, { responseType: 'document' })
 		.then(function(response) {
@@ -2896,7 +2700,7 @@ onRequestNavigation: function(e, frame) { // `return false` means success (so pr
 
 onPageLink: function(url, details) {
 	var framer = this;
-	logger.warn('Ignoring on-same-page links for now.'); // FIXME
+	console.warn('Ignoring on-same-page links for now.'); // FIXME
 },
 
 navigate: function(url, changeset) { // FIXME doesn't support replaceState
@@ -2983,7 +2787,7 @@ onPopState: function(changeset) {
 	var frames = [];
 	var url = changeset.url;
 	if (url !== document.URL) {
-		logger.warn('Popped state URL does not match address-bar URL.');
+		console.warn('Popped state URL does not match address-bar URL.');
 		// FIXME needs an optional error recovery, perhaps reloading document.URL
 	}
 	framer.load(url, changeset, 0);
@@ -3103,11 +2907,11 @@ return {
 
 register: function(name, fn) {
 	if (!/^[_a-zA-Z][_a-zA-Z0-9]*$/.test(name)) { // TODO should be in filters.register()
-		logger.error('registerFilter called with invalid name: ' + name);
+		console.error('registerFilter called with invalid name: ' + name);
 		return; // TODO throw??
 	}
 	if (this.has(name)) {
-		logger.warn('A filter by that name already exists: ' + name);
+		console.warn('A filter by that name already exists: ' + name);
 		return; // TODO throw??
 	}
 	items[name] = fn;

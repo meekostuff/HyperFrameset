@@ -1,0 +1,7 @@
+html { width: 100%; text-align: center; font-family: arial, sans-serif; background-color: #ffffff; color: #000000; }
+body { width: 72ex; margin: 1em auto; text-align: left; }
+h1 { padding: 0.2em 0.5em; background-color: #eee; border-top: 4px solid #ccc; text-align: center; }
+h2 { padding: 0.2em 0.5em; background-color: #eee; border-left: 4px solid #ccc; }
+h3 { padding: 0.2em 0.5em; border-left: 4px solid #ccc; border-top: 1px solid #ccc; }
+abbr { border-bottom: 1px dotted; }
+dt { font-weight: bolder; }

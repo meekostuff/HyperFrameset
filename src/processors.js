@@ -22,7 +22,6 @@ var _ = Meeko.stuff;
 var DOM = Meeko.DOM;
 var Task = Meeko.Task;
 var Promise = Meeko.Promise;
-var logger = Meeko.logger;
 var framer = Meeko.framer;
 
 /* WARN 
@@ -43,7 +42,7 @@ function MainProcessor(options, framesetDef) {}
 _.defaults(MainProcessor.prototype, {
 
 loadTemplate: function(template) {
-	if (/\S+/.test(template.textContent)) logger.warn('"main" transforms do not use templates');
+	if (/\S+/.test(template.textContent)) console.warn('"main" transforms do not use templates');
 },
 
 transform: function(provider, details) { // TODO how to use details?
@@ -84,35 +83,35 @@ loadTemplate: function(template) {
 		case 1: // Element
 			switch (DOM.getTagName(node)) {
 			case 'script':
-				if (script) logger.warn('Ignoring secondary <script> in "script" transform template');
+				if (script) console.warn('Ignoring secondary <script> in "script" transform template');
 				else script = node;
 				return;
 			default:
-				logger.warn('Ignoring unexpected non-<script> element in "script" transform template');
+				console.warn('Ignoring unexpected non-<script> element in "script" transform template');
 				return;
 			}
 			break; // should never reach here
 		case 3: // Text
-			if (/\S+/.test(node.nodeValue)) logger.warn('"script" transforms should not have non-empty text-nodes');
+			if (/\S+/.test(node.nodeValue)) console.warn('"script" transforms should not have non-empty text-nodes');
 			return;
 		case 8: // Comment
 			return;
 		default:
-			logger.warn('Unexpected node in "script" transform template');
+			console.warn('Unexpected node in "script" transform template');
 			return;
 		}
 	});
 	if (!script) {
 		// no problem if already a processor defined in new ScriptProcessor(options)
 		if (this.processor) return;
-		logger.warn('No <script> found in "script" transform template');
+		console.warn('No <script> found in "script" transform template');
 		return;
 	}
 	try { this.processor = (Function('return (' + script.text + ')'))(); }
 	catch(err) { Task.postError(err); }
 	
 	if (!this.processor || !this.processor.transform) {
-		logger.warn('"script" transform template did not produce valid transform object');
+		console.warn('"script" transform template did not produce valid transform object');
 		return;
 	}
 },
@@ -120,7 +119,7 @@ loadTemplate: function(template) {
 transform: function(provider, details) {
 	var srcNode = provider.srcNode;
 	if (!this.processor || !this.processor.transform) {
-		logger.warn('"script" transform template did not produce valid transform object');
+		console.warn('"script" transform template did not produce valid transform object');
 		return;
 	}
 	return this.processor.transform(srcNode, details);
@@ -205,7 +204,7 @@ function checkElementPerformance(el, namespaces) {
 			break;
 		}
 		if (!outerHTML) outerHTML = el.cloneNode(false).outerHTML; // FIXME caniuse outerHTML??
-		logger.debug('Found ' + cond.description + ':\n\t\t' + outerHTML + '\n\t' +
+		console.debug('Found ' + cond.description + ':\n\t\t' + outerHTML + '\n\t' +
 			'This can cause poor performance on IE / Edge.');
 	});
 }
@@ -338,7 +337,7 @@ loadTemplate: function(template) {
 		});
 
 		if (el.hasAttribute(mexprHtmlAttr)) {
-			logger.warn('Removing unsupported @' + mexprHtmlAttr);
+			console.warn('Removing unsupported @' + mexprHtmlAttr);
 			el.removeAttribute(mexprHtmlAttr);
 		}
 
@@ -393,7 +392,7 @@ loadTemplate: function(template) {
 		el.hazardDetails = getHazardDetails(el, processor.frameset);
 	});
 	
-	if (logger.LOG_LEVEL < logger.levels.indexOf('debug')) return;
+	if (console.logLevel !== 'debug') return;
 
 	// if debugging then warn about PERFORMANCE_UNFRIENDLY_CONDITIONS (IE11 / Edge)
 	var hfNS = processor.frameset.namespace;
@@ -497,7 +496,7 @@ transformHazardTree: function(el, context, variables, frag) {
 		var name = el.getAttribute('name');
 		template = processor.templates[name];
 		if (!template) {
-			logger.warn('Hazard could not find template name=' + name);
+			console.warn('Hazard could not find template name=' + name);
 			return frag;
 		}
 	
@@ -554,7 +553,7 @@ transformHazardTree: function(el, context, variables, frag) {
 		}
 		catch (err) {
 			Task.postError(err);
-			logger.warn('Error evaluating <haz:if test="' + testVal + '">. Assumed false.');
+			console.warn('Error evaluating <haz:if test="' + testVal + '">. Assumed false.');
 			pass = false;
 		}
 		if (invertTest) pass = !pass;
@@ -596,7 +595,7 @@ transformHazardTree: function(el, context, variables, frag) {
 		}
 		catch (err) {
 			Task.postError(err);
-			logger.warn('Error evaluating <haz:each select="' + selector + '">. Assumed empty.');
+			console.warn('Error evaluating <haz:each select="' + selector + '">. Assumed empty.');
 			return;
 		}
 
@@ -637,7 +636,7 @@ transformSingleElement: function(srcNode, context, variables) {
 		}
 		catch (err) {
 			Task.postError(err);
-			logger.warn('Error evaluating @' + desc.attrName + '="' + desc.expression + '". Assumed false.');
+			console.warn('Error evaluating @' + desc.attrName + '="' + desc.expression + '". Assumed false.');
 			value = false;
 		}
 		setAttribute(el, desc.attrName, value);
@@ -749,14 +748,14 @@ function interpretExpression(exprText) { // FIXME robustness
 		var text = filterSpec;
 		var m = text.match(/^([_a-zA-Z][_a-zA-Z0-9]*)\s*(:?)/);
 		if (!m) {
-			logger.warn('Syntax Error in filter call: ' + filterSpec);
+			console.warn('Syntax Error in filter call: ' + filterSpec);
 			return false;
 		}
 		var filterName = m[1];
 		var hasParams = m[2];
 		text = text.substr(m[0].length);
 		if (!hasParams && /\S+/.test(text)) {
-			logger.warn('Syntax Error in filter call: ' + filterSpec);
+			console.warn('Syntax Error in filter call: ' + filterSpec);
 			return false;
 		}
 
@@ -764,7 +763,7 @@ function interpretExpression(exprText) { // FIXME robustness
 			var filterParams = (Function('return [' + text + '];'))();
 		}
 		catch (err) {
-			logger.warn('Syntax Error in filter call: ' + filterSpec);
+			console.warn('Syntax Error in filter call: ' + filterSpec);
 			return false;
 		}
 
@@ -805,7 +804,7 @@ function processExpression(expr, filters, provider, context, variables, type) { 
 		}
 		catch (err) {
 			Task.postError(err);
-			logger.warn('Failure processing filter call: "' + filter.text + '" with input: "' + value + '"');
+			console.warn('Failure processing filter call: "' + filter.text + '" with input: "' + value + '"');
 			value = '';
 			return false;
 		}
@@ -834,7 +833,7 @@ function processExpression(expr, filters, provider, context, variables, type) { 
 			if (value == null || value === false) value = false;
 			else value = true;
 			break;
-		default: // FIXME should never occur. logger.warn !?
+		default: // FIXME should never occur. console.warn !?
 			if (value && value.nodeType) value = value.textContent;
 			break;
 		}
