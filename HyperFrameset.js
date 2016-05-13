@@ -2989,51 +2989,15 @@ return {
 
 
 }).call(this);
-/*!
- * HyperFrameset
- * Copyright 2009-2014 Sean Hogan (http://meekostuff.net/)
- * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
- */
-
-/* NOTE
-	+ assumes DOMSprockets
-*/
-/* TODO
-    + substantial error handling and notification needs to be added
-    + <link rel="self" />
-    + Would be nice if more of the internal functions were called as method, eg DOM.ready()...
-        this would allow the boot-script to modify them as appropriate
-    + Up-front feature testing to prevent boot on unsupportable platorms...
-        e.g. can't create HTML documents
-    + use requestAnimationFrame() when available
-    + The passing of nodes between documents needs to be audited.
-		Safari and IE10,11 in particular seem to require nodes to be imported / adopted
-		(not fully understood right now)
- */
-
 (function() {
 
 var window = this;
-var document = window.document;
-
-
-if (!window.XMLHttpRequest) throw Error('HyperFrameset requires native XMLHttpRequest');
-
-
-var _ = Meeko.stuff; // provided by DOMSprockets
-
-var Task = Meeko.Task;
-var Promise = Meeko.Promise;
+var Meeko = window.Meeko;
+var _ = Meeko.stuff;
 var URL = Meeko.URL;
-
-/*
- ### DOM utility functions
- */
-
 var DOM = Meeko.DOM;
+var Promise = Meeko.Promise;
 var htmlParser = Meeko.htmlParser;
-
-/* A few feature-detect constants for HTML loading & parsing */
 
 /*
 	HTML_IN_XHR indicates if XMLHttpRequest supports HTML parsing
@@ -3059,76 +3023,6 @@ var HTML_IN_XHR = (function() { // FIXME more testing, especially Webkit
 	}
 
 	return true;
-})();
-
-_.defaults(DOM, {
-	HTML_IN_XHR: HTML_IN_XHR
-});
-
-var CustomNS = Meeko.CustomNS = (function() {
-
-function CustomNS(options) {
-	if (!(this instanceof CustomNS)) return new CustomNS(options);
-	var style = options.style = _.lc(options.style);
-	var styleInfo = _.find(CustomNS.namespaceStyles, function(styleInfo) {
-		return styleInfo.style === style;
-	});
-	if (!styleInfo) throw Error('Unexpected namespace style: ' + style);
-	var name = options.name = _.lc(options.name);
-	if (!name) throw Error('Unexpected name: ' + name);
-	
-	var nsDef = this;
-	_.assign(nsDef, options);
-	var separator = styleInfo.separator;
-	nsDef.prefix = nsDef.name + separator;
-	nsDef.selectorPrefix = nsDef.name + (separator === ':' ? '\\:' : separator);
-}
-
-_.defaults(CustomNS.prototype, {
-
-lookupTagName: function(name) { return this.prefix + name; },
-lookupSelector: function(name) { return this.selectorPrefix + name; }
-
-});
-
-CustomNS.namespaceStyles = [
-	{
-		style: 'vendor',
-		configNamespace: 'custom',
-		separator: '-'
-	},
-	{
-		style: 'xml',
-		configNamespace: 'xmlns',
-		separator: ':'
-	}
-];
-
-_.forOwn(CustomNS.namespaceStyles, function(styleInfo) {
-	styleInfo.configPrefix = styleInfo.configNamespace + styleInfo.separator;
-});
-
-CustomNS.getNamespaces = function(doc) { // NOTE modelled on IE8, IE9 document.namespaces interface
-	var namespaces = [];
-	_.forEach(_.map(doc.documentElement.attributes), function(attr) {
-		var fullName = _.lc(attr.name);
-		var styleInfo = _.find(CustomNS.namespaceStyles, function(styleInfo) {
-			return (fullName.indexOf(styleInfo.configPrefix) === 0);
-		});
-		if (!styleInfo) return;
-		var name = fullName.substr(styleInfo.configPrefix.length);
-		var nsDef = new CustomNS({
-			urn: attr.value,
-			name: name,
-			style: styleInfo.style
-		});
-		namespaces.push(nsDef);
-	});
-	return namespaces;
-}
-
-return CustomNS;
-
 })();
 
 
@@ -3176,6 +3070,8 @@ function cacheMatch(request, entry) {
 }
 
 var httpProxy = {
+
+HTML_IN_XHR: HTML_IN_XHR,
 
 add: function(response) { // NOTE this is only for the landing page
 	var url = response.url;
@@ -3311,6 +3207,118 @@ return httpProxy;
 
 })();
 
+}).call(this);
+
+/*!
+ * HyperFrameset
+ * Copyright 2009-2014 Sean Hogan (http://meekostuff.net/)
+ * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+ */
+
+/* NOTE
+	+ assumes DOMSprockets
+*/
+/* TODO
+    + substantial error handling and notification needs to be added
+    + <link rel="self" />
+    + Would be nice if more of the internal functions were called as method, eg DOM.ready()...
+        this would allow the boot-script to modify them as appropriate
+    + Up-front feature testing to prevent boot on unsupportable platorms...
+        e.g. can't create HTML documents
+    + use requestAnimationFrame() when available
+    + The passing of nodes between documents needs to be audited.
+		Safari and IE10,11 in particular seem to require nodes to be imported / adopted
+		(not fully understood right now)
+ */
+
+(function() {
+
+var window = this;
+var document = window.document;
+
+
+if (!window.XMLHttpRequest) throw Error('HyperFrameset requires native XMLHttpRequest');
+
+
+var _ = Meeko.stuff; // provided by DOMSprockets
+
+var Task = Meeko.Task;
+var Promise = Meeko.Promise;
+var URL = Meeko.URL;
+
+/*
+ ### DOM utility functions
+ */
+
+var DOM = Meeko.DOM;
+var htmlParser = Meeko.htmlParser;
+var httpProxy = Meeko.httpProxy;
+
+var CustomNS = Meeko.CustomNS = (function() {
+
+function CustomNS(options) {
+	if (!(this instanceof CustomNS)) return new CustomNS(options);
+	var style = options.style = _.lc(options.style);
+	var styleInfo = _.find(CustomNS.namespaceStyles, function(styleInfo) {
+		return styleInfo.style === style;
+	});
+	if (!styleInfo) throw Error('Unexpected namespace style: ' + style);
+	var name = options.name = _.lc(options.name);
+	if (!name) throw Error('Unexpected name: ' + name);
+	
+	var nsDef = this;
+	_.assign(nsDef, options);
+	var separator = styleInfo.separator;
+	nsDef.prefix = nsDef.name + separator;
+	nsDef.selectorPrefix = nsDef.name + (separator === ':' ? '\\:' : separator);
+}
+
+_.defaults(CustomNS.prototype, {
+
+lookupTagName: function(name) { return this.prefix + name; },
+lookupSelector: function(name) { return this.selectorPrefix + name; }
+
+});
+
+CustomNS.namespaceStyles = [
+	{
+		style: 'vendor',
+		configNamespace: 'custom',
+		separator: '-'
+	},
+	{
+		style: 'xml',
+		configNamespace: 'xmlns',
+		separator: ':'
+	}
+];
+
+_.forOwn(CustomNS.namespaceStyles, function(styleInfo) {
+	styleInfo.configPrefix = styleInfo.configNamespace + styleInfo.separator;
+});
+
+CustomNS.getNamespaces = function(doc) { // NOTE modelled on IE8, IE9 document.namespaces interface
+	var namespaces = [];
+	_.forEach(_.map(doc.documentElement.attributes), function(attr) {
+		var fullName = _.lc(attr.name);
+		var styleInfo = _.find(CustomNS.namespaceStyles, function(styleInfo) {
+			return (fullName.indexOf(styleInfo.configPrefix) === 0);
+		});
+		if (!styleInfo) return;
+		var name = fullName.substr(styleInfo.configPrefix.length);
+		var nsDef = new CustomNS({
+			urn: attr.value,
+			name: name,
+			style: styleInfo.style
+		});
+		namespaces.push(nsDef);
+	});
+	return namespaces;
+}
+
+return CustomNS;
+
+})();
 
 var scriptQueue = new function() {
 
