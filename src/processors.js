@@ -1273,63 +1273,6 @@ return JSONDecoder;
 
 framer.registerDecoder('json', JSONDecoder);
 
-// FIXME filters need sanity checking
-framer.registerFilter('lowercase', function(value, text) {
-	return value.toLowerCase();
-});
-
-framer.registerFilter('uppercase', function(value, text) {
-	return value.toUpperCase();
-});
-
-framer.registerFilter('if', function(value, yep) {
-	return (!!value) ? yep : value;
-});
-
-framer.registerFilter('unless', function(value, nope) {
-	return (!value) ? nope : value;
-});
-
-framer.registerFilter('if_unless', function(value, yep, nope) {
-	return (!!value) ? yep : nope;
-});
-
-framer.registerFilter('map', function(value, dict) { // dict can be {} or []
-
-	if (Array.isArray(dict)) {
-		var patterns = _.filter(dict, function(item, i) { return !(i % 2); });
-		var results = _.filter(dict, function(item, i) { return !!(i % 2); });
-		_.some(patterns, function(pattern, i) {
-			// FIXME what if pattern not RegExp && not string??
-			if (!(pattern instanceof RegExp)) pattern = new RegExp('^' + pattern + '$');
-			if (!pattern.test(value)) return false;
-			value = results[i];
-			return true;
-		});
-		return value;
-	}
-
-	if (value in dict) return dict[value]; // TODO sanity check before returning
-	return value;
-});
-
-framer.registerFilter('match', function(value, pattern, yep, nope) {
-	// FIXME what if pattern not RegExp && not string??
-	if (!(pattern instanceof RegExp)) pattern = new RegExp('^' + pattern + '$'); // FIXME sanity TODO case-insensitive??
-	var bMatch = pattern.test(value);
-	if (yep != null && bMatch) return yep;
-	if (nope != null && !bMatch) return nope;
-	return bMatch;
-});
-
-framer.registerFilter('replace', function(value, pattern, text) {
-	return value.replace(pattern, text); // TODO sanity check before returning
-});
-
-if (_.dateFormat) framer.registerFilter('date', function(value, format, utc) {
-	return _.dateFormat(value, format, utc);
-});
-
 _.assign(classnamespace, {
 
 MainProcessor: MainProcessor,
