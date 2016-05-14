@@ -263,6 +263,10 @@ return new Promise(function(resolve, reject) {
 var historyManager = Meeko.historyManager;
 var sprockets = Meeko.sprockets;
 var controllers = Meeko.controllers;
+var filters = Meeko.filters;
+var decoders = Meeko.decoders;
+var processors = Meeko.processors;
+
 
 var framer = Meeko.framer = (function() {
 
@@ -569,7 +573,7 @@ init: function(el) {
 		var configID = _.words(el.getAttribute('configid'))[0];
 		options = frameset.configData[configID];
 	}
-	var processor = transform.processor = framer.createProcessor(transform.type, options);
+	var processor = transform.processor = processors.create(transform.type, options, frameset);
 	processor.loadTemplate(frag);
 },
 
@@ -579,7 +583,7 @@ process: function(srcNode, details) {
 	var hfNS = frameset.namespace;
 	var decoder;
 	if (transform.format) {
-		decoder = framer.createDecoder(transform.format);
+		decoder = decoders.create(transform.format, {}, frameset);
 		decoder.init(srcNode);
 	}
 	else decoder = {
@@ -2224,32 +2228,6 @@ config: function(options) {
 
 });
 
-
-var filters = Meeko.filters;
-
-_.defaults(framer, {
-
-decoders: {},
-
-registerDecoder: function(type, constructor) {
-	this.decoders[type] = constructor;
-},
-
-createDecoder: function(type, options) {
-	return new this.decoders[type](options, this.definition);
-},
-
-processors: {},
-
-registerProcessor: function(type, constructor) {
-	this.processors[type] = constructor;
-},
-
-createProcessor: function(type, options) {
-	return new this.processors[type](options, this.definition, filters);
-}
-
-});
 
 _.defaults(framer, {
 
