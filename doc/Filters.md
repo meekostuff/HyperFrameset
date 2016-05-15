@@ -3,7 +3,7 @@
 A filter is a JS function which is registered with the frame-overseer by calling 
 
 ``` .javascript
-Meeko.framer.registerFilter(name, fn)
+Meeko.filters.register(name, fn)
 ```
 
 where 

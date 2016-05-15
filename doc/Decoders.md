@@ -5,7 +5,7 @@ A decoder executes queries on a DOM (or other) tree.
 A decoder is a javascript "class" which is registered with the frame-overseer by calling 
 
 ``` .javascript
-Meeko.framer.registerDecoder(name, decoder)
+Meeko.decoders.register(name, decoder)
 ```
 
 where 

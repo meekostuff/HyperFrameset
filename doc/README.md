@@ -18,6 +18,7 @@
 	- [CSS Decoder](CSS-Decoder.md)
 	- [Microdata Decoder](Microdata-Decoder.md)
 	- [JSON Decoder](JSON-Decoder.md)
+- [Filters](Filters.md)
 - [Frameset Layout](Frameset-Layout.md)
 - [Frame Declaration](Frame-Declaration.md)
 - [Debugging](Debugging.md)

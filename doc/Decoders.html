@@ -20,9 +20,8 @@
            rel="home">HyperFrameset</a> / <a href="Decoders.html"
            rel="self">Decoders</a><br />
       Previous: <a href="Processors.html"
-           title="Previous">Processors</a> , Next: <a href=
-           "Frameset-Layout.html"
-           title="Next">Frameset Layout</a>
+           title="Previous">Processors</a> , Next: <a href="Filters.html"
+           title="Next">Filters</a>
     </nav>
     <main id="mk_main"
           role="main">
@@ -36,7 +35,7 @@
         A decoder is a javascript "class" which is registered with the
         frame-overseer by calling
       </p>
-      <pre><code class="javascript">Meeko.framer.registerDecoder(name, decoder)
+      <pre><code class="javascript">Meeko.decoders.register(name, decoder)
 </code></pre>
       <p>
         where

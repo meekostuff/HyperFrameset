@@ -6,7 +6,7 @@ The processing MAY be configurable with a processing-template and other options 
 A processor is a javascript "class" which is registered with the frame-overseer by calling 
 
 ``` .javascript
-Meeko.framer.registerProcessor(name, processor)
+Meeko.processors.register(name, processor)
 ```
 
 where 
