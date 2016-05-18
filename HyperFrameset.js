@@ -3383,6 +3383,166 @@ return scheduler;
 
 }).call(this);
 
+
+(function() {
+
+var global = this;
+var Meeko = global.Meeko;
+var _ = Meeko.stuff;
+
+var CustomNamespace = Meeko.CustomNamespace = (function() {
+
+function CustomNamespace(options) {
+	if (!(this instanceof CustomNamespace)) return new CustomNamespace(options);
+	if (!options) return; // WARN for cloning / inheritance
+	var style = options.style = _.lc(options.style);
+	var styleInfo = _.find(CustomNamespace.namespaceStyles, function(styleInfo) {
+		return styleInfo.style === style;
+	});
+	if (!styleInfo) throw Error('Unexpected namespace style: ' + style);
+	var name = options.name = _.lc(options.name);
+	if (!name) throw Error('Unexpected name: ' + name);
+	
+	var nsDef = this;
+	_.assign(nsDef, options);
+	var separator = styleInfo.separator;
+	nsDef.prefix = nsDef.name + separator;
+	nsDef.selectorPrefix = nsDef.name + (separator === ':' ? '\\:' : separator);
+}
+
+_.defaults(CustomNamespace.prototype, {
+
+clone: function() {
+	var clone = new CustomNamespace();
+	_.assign(clone, this);
+	return clone;
+},
+
+lookupTagName: function(name) { return this.prefix + name; },
+lookupSelector: function(name) { return this.selectorPrefix + name; }
+
+});
+
+CustomNamespace.namespaceStyles = [
+	{
+		style: 'vendor',
+		configNamespace: 'custom',
+		separator: '-'
+	},
+	{
+		style: 'xml',
+		configNamespace: 'xmlns',
+		separator: ':'
+	}
+];
+
+_.forOwn(CustomNamespace.namespaceStyles, function(styleInfo) {
+	styleInfo.configPrefix = styleInfo.configNamespace + styleInfo.separator;
+});
+
+CustomNamespace.getNamespaces = function(doc) { // NOTE modelled on IE8, IE9 document.namespaces interface
+	return new NamespaceCollection(doc);
+}
+
+return CustomNamespace;
+
+})();
+
+var NamespaceCollection = Meeko.NamespaceCollection = function(doc) { 
+	if (!(this instanceof NamespaceCollection)) return new NamespaceCollection(doc);
+	this.items = [];
+	if (!doc) return; // WARN for cloning / inheritance
+	this.init(doc); 
+}
+
+_.assign(NamespaceCollection.prototype, {
+
+init: function(doc) {
+	var coll = this;
+	_.forEach(_.map(doc.documentElement.attributes), function(attr) {
+		var fullName = _.lc(attr.name);
+		var styleInfo = _.find(CustomNamespace.namespaceStyles, function(styleInfo) {
+			return (fullName.indexOf(styleInfo.configPrefix) === 0);
+		});
+		if (!styleInfo) return;
+		var name = fullName.substr(styleInfo.configPrefix.length);
+		var nsDef = new CustomNamespace({
+			urn: attr.value,
+			name: name,
+			style: styleInfo.style
+		});
+		coll.add(nsDef);
+	});
+},
+
+clone: function() {
+	var coll = new NamespaceCollection();
+	_.forEach(this.items, function(nsDef) { 
+		coll.items.push(nsDef.clone());
+	});
+	return coll;
+},
+
+add: function(nsDef) {
+	var coll = this;
+	var matchingNS = _.find(coll.items, function(def) {
+		if (_.lc(def.urn) === _.lc(nsDef.urn)) {
+			if (def.prefix !== nsDef.prefix) console.warn('Attempted to add namespace with same urn as one already present: ' + def.urn);
+			return true;
+		}
+		if (def.prefix === nsDef.prefix) {
+			if (_.lc(def.urn) !== _.lc(nsDef.urn)) console.warn('Attempted to add namespace with same prefix as one already present: ' + def.prefix);
+			return true;
+		}
+	});
+	if (matchingNS) return;
+	coll.items.push(nsDef);
+},
+
+lookupNamespace: function(urn) {
+	var coll = this;
+	urn = _.lc(urn);
+	var nsDef = _.find(coll.items, function(def) {
+		return (_.lc(def.urn) === urn);
+	});
+	return nsDef;
+},
+
+
+lookupPrefix: function(urn) {
+	var coll = this;
+	var nsDef = coll.lookupNamespace(urn);
+	return nsDef && nsDef.prefix;
+},
+
+lookupNamespaceURI: function(prefix) {
+	var coll = this;
+	prefix = _.lc(prefix);
+	var nsDef = _.find(coll.items, function(def) {
+		return (def.prefix === prefix);
+	});
+	return nsDef && nsDef.urn;
+},
+
+lookupTagNameNS: function(name, urn) {
+	var coll = this;
+	var nsDef = coll.lookupNamespace(urn);
+	if (!nsDef) return name; // TODO is this correct?
+	return nsDef.prefix + name; // TODO _.lc(name) ??
+},
+
+lookupSelector: function(selector, urn) {
+	var nsDef = this.lookupNamespace(urn);
+	if (!nsDef) return selector;
+	var tags = selector.split(/\s*,\s*|\s+/);
+	return _.map(tags, function(tag) { return nsDef.lookupSelector(tag); }).join(', ');
+}
+
+});
+
+
+
+}).call(this);
 /*
  * Date Format 1.2.3
  * (c) 2007-2009 Steven Levithan <stevenlevithan.com>
@@ -3640,8 +3800,8 @@ register: function(type, constructor) {
 	this.items[type] = constructor;
 },
 
-create: function(type, options, framesetDefinition) { // FIXME `framesetDefinition` should be `namespaces`
-	return new this.items[type](options, framesetDefinition);
+create: function(type, options, namespaces) {
+	return new this.items[type](options, namespaces);
 }
 
 }
@@ -3652,7 +3812,7 @@ var htmlAttr = '_html';
 
 var CSSDecoder = (function() {
 
-function CSSDecoder(options, framesetDef) {}
+function CSSDecoder(options, namespaces) {}
 
 _.defaults(CSSDecoder.prototype, {
 
@@ -3953,7 +4113,7 @@ getValue: getValue
 
 var MicrodataDecoder = (function() {
 
-function MicrodataDecoder(options, framesetDef) {}
+function MicrodataDecoder(options, namespaces) {}
 
 _.defaults(MicrodataDecoder.prototype, {
 
@@ -4024,7 +4184,7 @@ var JSONDecoder = (function() {
 // FIXME not really a JSON decoder since expects JSON input and 
 // doesn't use JSON paths
 
-function JSONDecoder(options, framesetDef) {}
+function JSONDecoder(options, namespaces) {}
 
 _.defaults(JSONDecoder.prototype, {
 
@@ -4110,6 +4270,8 @@ var DOM = Meeko.DOM;
 var Task = Meeko.Task;
 var Promise = Meeko.Promise;
 var filters = Meeko.filters;
+var CustomNamespace = Meeko.CustomNamespace;
+var NamespaceCollection = Meeko.NamespaceCollection;
 
 var processors = Meeko.processors = {
 
@@ -4119,8 +4281,8 @@ register: function(type, constructor) {
 	this.items[type] = constructor;
 },
 
-create: function(type, options, framesetDefinition) { // `framesetDefinition` should be `namespaces`
-	return new this.items[type](options, framesetDefinition, filters);
+create: function(type, options, namespaces) {
+	return new this.items[type](options, namespaces, filters);
 }
 
 }
@@ -4139,7 +4301,7 @@ var FRAGMENTS_ARE_INERT = !(window.HTMLUnknownElement &&
 
 var MainProcessor = (function() {
 
-function MainProcessor(options, framesetDef) {}
+function MainProcessor(options) {}
 
 _.defaults(MainProcessor.prototype, {
 
@@ -4171,7 +4333,7 @@ processors.register('main', MainProcessor);
 
 var ScriptProcessor = (function() {
 
-function ScriptProcessor(options, framesetDef) {
+function ScriptProcessor(options) {
 	this.processor = options;
 }
 
@@ -4239,26 +4401,28 @@ processors.register('script', ScriptProcessor);
 var textAttr = '_text';
 var htmlAttr = '_html';
 
+var HYPERFRAMESET_URN = 'hyperframeset'; // FIXME DRY with libHyperFrameset.js
+
 var HazardProcessor = (function() {
 
 var HAZARD_TRANSFORM_URN = 'HazardTransform';
-var hazDefaultNS = {
+var hazDefaultNS = new CustomNamespace({
 	urn: HAZARD_TRANSFORM_URN,
 	name: 'haz',
 	style: 'xml'
-}
+});
 var HAZARD_EXPRESSION_URN = 'HazardExpression';
-var exprDefaultNS = {
+var exprDefaultNS = new CustomNamespace({
 	urn: HAZARD_EXPRESSION_URN,
 	name: 'expr',
 	style: 'xml'
-}
+});
 var HAZARD_MEXPRESSION_URN = 'HazardMExpression';
-var mexprDefaultNS = {
+var mexprDefaultNS = new CustomNamespace({
 	urn: HAZARD_MEXPRESSION_URN,
 	name: 'mexpr',
 	style: 'xml'
-}
+});
 
 /* 
  NOTE IE11 / Edge has a bad performance regression with DOM fragments 
@@ -4385,12 +4549,15 @@ function htmlToFragment(html, doc) {
 	return result;
 }
 
-function HazardProcessor(options, frameset, filters) {
-	this.frameset = frameset;
+function HazardProcessor(options, namespaces, filters) {
 	this.filters = filters;
-	frameset.addDefaultNamespace(hazDefaultNS);
-	frameset.addDefaultNamespace(exprDefaultNS);
-	frameset.addDefaultNamespace(mexprDefaultNS);
+	this.namespaces = namespaces = namespaces.clone();
+	if (!namespaces.lookupNamespace(HAZARD_TRANSFORM_URN))
+		namespaces.add(hazDefaultNS);
+	if (!namespaces.lookupNamespace(HAZARD_EXPRESSION_URN))
+		namespaces.add(exprDefaultNS);
+	if (!namespaces.lookupNamespace(HAZARD_MEXPRESSION_URN))
+		namespaces.add(mexprDefaultNS);
 }
 
 _.defaults(HazardProcessor.prototype, {
@@ -4400,10 +4567,10 @@ loadTemplate: function(template) {
 	processor.root = template; // FIXME assert template is Fragment
 	processor.templates = {};
 
-	var framesetDef = processor.frameset;
-	var hazPrefix = framesetDef.lookupPrefix(HAZARD_TRANSFORM_URN);
-	var exprPrefix = framesetDef.lookupPrefix(HAZARD_EXPRESSION_URN);
-	var mexprPrefix = framesetDef.lookupPrefix(HAZARD_MEXPRESSION_URN);
+	var namespaces = processor.namespaces;
+	var hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
+	var exprPrefix = namespaces.lookupPrefix(HAZARD_EXPRESSION_URN);
+	var mexprPrefix = namespaces.lookupPrefix(HAZARD_MEXPRESSION_URN);
 
 	var exprHtmlAttr = exprPrefix + htmlAttr; // NOTE this is mapped to haz:eval
 	var hazEvalTag = hazPrefix + 'eval';
@@ -4490,18 +4657,18 @@ loadTemplate: function(template) {
 
 	// finally, preprocess all elements to extract hazardDetails
 	walkTree(template, true, function(el) {
-		el.hazardDetails = getHazardDetails(el, processor.frameset);
+		el.hazardDetails = getHazardDetails(el, processor.namespaces);
 	});
 	
 	if (console.logLevel !== 'debug') return;
 
 	// if debugging then warn about PERFORMANCE_UNFRIENDLY_CONDITIONS (IE11 / Edge)
-	var hfNS = processor.frameset.namespace;
+	var hfNS = processor.namespaces.lookupNamespace(HYPERFRAMESET_URN);
 	walkTree(template, true, function(el) {
 		var tag = DOM.getTagName(el);
 		if (tag.indexOf(hazPrefix) === 0) return;
 		if (tag.indexOf(hfNS.prefix) === 0) return; // HyperFrameset element
-		checkElementPerformance(el, framesetDef);
+		checkElementPerformance(el, namespaces);
 	});
 
 
@@ -4961,7 +5128,7 @@ HazardProcessor: HazardProcessor,
 }).call(this, this.Meeko);
 /*!
  * HyperFrameset
- * Copyright 2009-2014 Sean Hogan (http://meekostuff.net/)
+ * Copyright 2009-2016 Sean Hogan (http://meekostuff.net/)
  * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
  */
 
@@ -5003,72 +5170,8 @@ var URL = Meeko.URL;
 var DOM = Meeko.DOM;
 var htmlParser = Meeko.htmlParser;
 var httpProxy = Meeko.httpProxy;
-
-var CustomNS = Meeko.CustomNS = (function() {
-
-function CustomNS(options) {
-	if (!(this instanceof CustomNS)) return new CustomNS(options);
-	var style = options.style = _.lc(options.style);
-	var styleInfo = _.find(CustomNS.namespaceStyles, function(styleInfo) {
-		return styleInfo.style === style;
-	});
-	if (!styleInfo) throw Error('Unexpected namespace style: ' + style);
-	var name = options.name = _.lc(options.name);
-	if (!name) throw Error('Unexpected name: ' + name);
-	
-	var nsDef = this;
-	_.assign(nsDef, options);
-	var separator = styleInfo.separator;
-	nsDef.prefix = nsDef.name + separator;
-	nsDef.selectorPrefix = nsDef.name + (separator === ':' ? '\\:' : separator);
-}
-
-_.defaults(CustomNS.prototype, {
-
-lookupTagName: function(name) { return this.prefix + name; },
-lookupSelector: function(name) { return this.selectorPrefix + name; }
-
-});
-
-CustomNS.namespaceStyles = [
-	{
-		style: 'vendor',
-		configNamespace: 'custom',
-		separator: '-'
-	},
-	{
-		style: 'xml',
-		configNamespace: 'xmlns',
-		separator: ':'
-	}
-];
-
-_.forOwn(CustomNS.namespaceStyles, function(styleInfo) {
-	styleInfo.configPrefix = styleInfo.configNamespace + styleInfo.separator;
-});
-
-CustomNS.getNamespaces = function(doc) { // NOTE modelled on IE8, IE9 document.namespaces interface
-	var namespaces = [];
-	_.forEach(_.map(doc.documentElement.attributes), function(attr) {
-		var fullName = _.lc(attr.name);
-		var styleInfo = _.find(CustomNS.namespaceStyles, function(styleInfo) {
-			return (fullName.indexOf(styleInfo.configPrefix) === 0);
-		});
-		if (!styleInfo) return;
-		var name = fullName.substr(styleInfo.configPrefix.length);
-		var nsDef = new CustomNS({
-			urn: attr.value,
-			name: name,
-			style: styleInfo.style
-		});
-		namespaces.push(nsDef);
-	});
-	return namespaces;
-}
-
-return CustomNS;
-
-})();
+var CustomNamespace = Meeko.CustomNamespace;
+var NamespaceCollection = Meeko.NamespaceCollection;
 
 var scriptQueue = new function() {
 
@@ -5231,15 +5334,16 @@ var processors = Meeko.processors;
 
 var framer = Meeko.framer = (function() {
 
+// FIXME DRY these @rel values with boot.js
 var FRAMESET_REL = 'frameset'; // NOTE http://lists.w3.org/Archives/Public/www-html/1996Dec/0143.html
 var SELF_REL = 'self';
 
 var HYPERFRAMESET_URN = 'hyperframeset';
-var hfDefaultNamespace = {
+var hfDefaultNamespace = new CustomNamespace({
 	name: 'hf',
 	style: 'vendor',
 	urn: HYPERFRAMESET_URN
-}
+});
 
 
 function registerFormElements() {
@@ -5365,7 +5469,6 @@ _.defaults(HFrameDefinition.prototype, {
 init: function(el) {
     var frameDef = this;
 	var frameset = frameDef.frameset;
-	var hfNS = frameset.namespace;
 	_.defaults(frameDef, {
 		element: el,
 		id: el.id,
@@ -5377,7 +5480,7 @@ init: function(el) {
 		var tag = DOM.getTagName(node);
 		if (!tag) return;
 		if (_.includes(hfHeadTags, tag)) return; // ignore typical <head> elements
-		if (tag === hfNS.lookupTagName('body')) {
+		if (tag === frameset.namespaces.lookupTagNameNS('body', HYPERFRAMESET_URN)) {
 			el.removeChild(node);
 			bodies.push(new HBodyDefinition(node, frameset));
 			return;
@@ -5392,7 +5495,6 @@ init: function(el) {
 render: function(resource, condition, details) {
 var frameDef = this;
 	var frameset = frameDef.frameset;
-	var hfNS = frameset.namespace;
 	if (!details) details = {};
 	_.defaults(details, { // TODO more details??
 		scope: framer.scope,
@@ -5465,7 +5567,7 @@ init: function(el) {
 		transforms: []
 	});
 	_.forEach(_.map(el.childNodes), function(node) {
-		if (DOM.getTagName(node) === hfNS.lookupTagName('transform')) {
+		if (DOM.getTagName(node) === frameset.namespaces.lookupTagNameNS('transform', HYPERFRAMESET_URN)) {
 			el.removeChild(node);
 			bodyDef.transforms.push(new HTransformDefinition(node, frameset));
 		}	
@@ -5478,7 +5580,6 @@ init: function(el) {
 render: function(resource, details) {
 	var bodyDef = this;
 	var frameset = bodyDef.frameset;
-	var hfNS = frameset.namespace;
 	if (bodyDef.transforms.length <= 0) {
 		return bodyDef.element.cloneNode(true);
 	}
@@ -5517,7 +5618,6 @@ _.defaults(HTransformDefinition.prototype, {
 init: function(el) {
 	var transform = this;
 	var frameset = transform.frameset;
-	var hfNS = frameset.namespace;
 	_.defaults(transform, {
 		element: el,
 		type: el.getAttribute('type') || 'main',
@@ -5534,17 +5634,16 @@ init: function(el) {
 		var configID = _.words(el.getAttribute('configid'))[0];
 		options = frameset.configData[configID];
 	}
-	var processor = transform.processor = processors.create(transform.type, options, frameset);
+	var processor = transform.processor = processors.create(transform.type, options, frameset.namespaces);
 	processor.loadTemplate(frag);
 },
 
 process: function(srcNode, details) {
 	var transform = this;
 	var frameset = transform.frameset;
-	var hfNS = frameset.namespace;
 	var decoder;
 	if (transform.format) {
-		decoder = decoders.create(transform.format, {}, frameset);
+		decoder = decoders.create(transform.format, {}, frameset.namespaces);
 		decoder.init(srcNode);
 	}
 	else decoder = {
@@ -5565,8 +5664,6 @@ var HFramesetDefinition = (function() {
 
 function HFramesetDefinition(doc, settings) {
 	if (!doc) return; // in case of inheritance
-	this.defaultNamespaces = [];
-	this.addDefaultNamespace(hfDefaultNamespace);
 	this.namespaces = null;
 	this.init(doc, settings);
 }
@@ -5579,20 +5676,17 @@ init: function(doc, settings) {
 		url: settings.framesetURL
 	});
 
-	frameset.namespaces = [];
-	var namespaces = CustomNS.getNamespaces(doc);
-	_.forEach(namespaces, function(nsDef) {
-		frameset.addNamespace(nsDef);
-	});
-	_.forEach(frameset.defaultNamespaces, function(nsDef) {
-		frameset.addNamespace(nsDef);
-	});
-	var hfNS = frameset.namespace = frameset.lookupNamespace(HYPERFRAMESET_URN);
+	var namespaces = frameset.namespaces = CustomNamespace.getNamespaces(doc);
+	if (!namespaces.lookupNamespace(HYPERFRAMESET_URN)) {
+		namespaces.add(hfDefaultNamespace);
+	}
 
 	// NOTE first rebase scope: urls
 	var scopeURL = URL(settings.scope);
 	rebase(doc, scopeURL);
-	var frameElts = DOM.findAll(frameset.lookupSelector('frame'), doc.body);
+	var frameElts = DOM.findAll(
+		frameset.namespaces.lookupSelector('frame', HYPERFRAMESET_URN), 
+		doc.body);
 	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
 		// NOTE first rebase @src with scope: urls
 		var src = el.getAttribute('src');
@@ -5715,7 +5809,9 @@ preprocess: function() {
 	});
 
 
-	var frameElts = DOM.findAll(frameset.lookupSelector('frame'), body);
+	var frameElts = DOM.findAll(
+		frameset.namespaces.lookupSelector('frame', HYPERFRAMESET_URN), 
+		body);
 	var frameDefElts = [];
 	var frameRefElts = [];
 	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
@@ -5756,81 +5852,6 @@ preprocess: function() {
 render: function() {
 	var frameset = this;
 	return frameset.element.cloneNode(true);
-},
-
-addDefaultNamespace: function(nsSpec) {
-	var framesetDef = this;
-	var nsDef = new CustomNS(nsSpec);
-	var matchingNS = _.find(framesetDef.defaultNamespaces, function(def) {
-		if (_.lc(def.urn) === _.lc(nsDef.urn)) {
-			if (def.prefix !== nsDef.prefix) console.warn('Attempted to add default namespace with same urn as one already present: ' + def.urn);
-			return true;
-		}
-		if (def.prefix === nsDef.prefix) {
-			if (_.lc(def.urn) !== _.lc(nsDef.urn)) console.warn('Attempted to add default namespace with same prefix as one already present: ' + def.prefix);
-			return true;
-		}
-	});
-	if (matchingNS) return;
-	framesetDef.defaultNamespaces.push(nsDef);
-
-	framesetDef.addNamespace(nsDef);
-},
-
-addNamespace: function(nsDef) {
-	var framesetDef = this;
-	if (!framesetDef.namespaces) return;
-
-	var matchingNS = _.find(framesetDef.namespaces, function(def) {
-		if (_.lc(def.urn) === _.lc(nsDef.urn)) {
-			if (def.prefix !== nsDef.prefix) console.warn('Attempted to add namespace with same urn as one already present: ' + def.urn);
-			return true;
-		}
-		if (def.prefix === nsDef.prefix) {
-			if (_.lc(def.urn) !== _.lc(nsDef.urn)) console.warn('Attempted to add namespace with same prefix as one already present: ' + def.prefix);
-			return true;
-		}
-	});
-	if (matchingNS) return;
-	framesetDef.namespaces.push(nsDef);
-},
-
-lookupNamespace: function(urn) {
-	var framesetDef = this;
-	urn = _.lc(urn);
-	var nsDef = _.find(framesetDef.namespaces, function(def) {
-		return (_.lc(def.urn) === urn);
-	});
-	return nsDef;
-},
-
-
-lookupPrefix: function(urn) {
-	var framesetDef = this;
-	var nsDef = framesetDef.lookupNamespace(urn);
-	return nsDef && nsDef.prefix;
-},
-
-lookupNamespaceURI: function(prefix) {
-	var framesetDef = this;
-	prefix = _.lc(prefix);
-	var nsDef = _.find(framesetDef.namespaces, function(def) {
-		return (def.prefix === prefix);
-	});
-	return nsDef && nsDef.urn;
-},
-
-lookupTagNameNS: function(name, urn) {
-	var framesetDef = this;
-	var nsDef = framesetDef.lookupNamespace(urn);
-	if (!nsDef) return ''; // TODO is this correct?
-	return nsDef.prefix + name; // TODO _.lc(name) ??
-},
-
-lookupSelector: function(selector) {
-	var hfNS = this.namespace;
-	var tags = selector.split(/\s*,\s*|\s+/);
-	return _.map(tags, function(tag) { return hfNS.lookupSelector(tag); }).join(', ');
 }
 
 });
@@ -6054,7 +6075,17 @@ var Layout = sprockets.evolve(Link, {
 role: 'group',
 
 owns: {
-	get: function() { return _.filter(this.element.children, function(el) { return DOM.matches(el, framer.definition.lookupSelector('hlayout, vlayout, deck, rdeck, panel, frame')); }); }
+	get: function() { 
+		var namespaces = framer.definition.namespaces;
+		return _.filter(this.element.children, function(el) { 
+			return DOM.matches(el, 
+				namespaces.lookupSelector(
+					'hlayout, vlayout, deck, rdeck, panel, frame', 
+					HYPERFRAMESET_URN
+				)
+			); 
+		}); 
+	}
 }
 
 });
@@ -6062,11 +6093,12 @@ owns: {
 _.assign(Layout, {
 
 iEnteredDocument: function() {
+	var namespaces = framer.definition.namespaces;
 	var element = this.element;
 	var parent = element.parentNode;
 
 	// FIXME dimension setting should occur before becoming visible
-	if (DOM.matches(parent, framer.definition.lookupSelector('layer'))) { // TODO vh, vw not tested on various platforms
+	if (DOM.matches(parent, namespaces.lookupSelector('layer', HYPERFRAMESET_URN))) { // TODO vh, vw not tested on various platforms
 		var height = this.attr('height'); // TODO css unit parsing / validation
 		if (!height) height = '100vh';
 		else height = height.replace('%', 'vh');
@@ -6081,7 +6113,7 @@ iEnteredDocument: function() {
 	
 	function normalizeChild(node) {
 		var element = this;
-		if (DOM.matches(node, framer.definition.lookupSelector('hlayout, vlayout, deck, rdeck, panel, frame'))) return; 
+		if (DOM.matches(node, namespaces.lookupSelector('hlayout, vlayout, deck, rdeck, panel, frame', HYPERFRAMESET_URN))) return; 
 		switch (node.nodeType) {
 		case 1: // hide non-layout elements
 			node.hidden = true;
@@ -6589,39 +6621,39 @@ return HFrameset;
 
 function registerHyperFramesetElements() {
 
-var framesetDef = framer.definition;
+var namespaces = framer.definition.namespaces;
 
 sprockets.registerElement('body', HFrameset);
-sprockets.registerElement(framesetDef.lookupSelector('frame'), HFrame);
+sprockets.registerElement(namespaces.lookupSelector('frame', HYPERFRAMESET_URN), HFrame);
 
-sprockets.registerElement(framesetDef.lookupSelector('layer'), Layer);
-sprockets.registerElement(framesetDef.lookupSelector('popup'), Popup);
-sprockets.registerElement(framesetDef.lookupSelector('panel'), Panel);
-sprockets.registerElement(framesetDef.lookupSelector('vlayout'), VLayout);
-sprockets.registerElement(framesetDef.lookupSelector('hlayout'), HLayout);
-sprockets.registerElement(framesetDef.lookupSelector('deck'), Deck);
-sprockets.registerElement(framesetDef.lookupSelector('rdeck'), ResponsiveDeck);
+sprockets.registerElement(namespaces.lookupSelector('layer', HYPERFRAMESET_URN), Layer);
+sprockets.registerElement(namespaces.lookupSelector('popup', HYPERFRAMESET_URN), Popup);
+sprockets.registerElement(namespaces.lookupSelector('panel', HYPERFRAMESET_URN), Panel);
+sprockets.registerElement(namespaces.lookupSelector('vlayout', HYPERFRAMESET_URN), VLayout);
+sprockets.registerElement(namespaces.lookupSelector('hlayout', HYPERFRAMESET_URN), HLayout);
+sprockets.registerElement(namespaces.lookupSelector('deck', HYPERFRAMESET_URN), Deck);
+sprockets.registerElement(namespaces.lookupSelector('rdeck', HYPERFRAMESET_URN), ResponsiveDeck);
 
 var cssText = [
 '*[hidden] { display: none !important; }', // TODO maybe not !important
 'html, body { margin: 0; padding: 0; }',
 'html { width: 100%; height: 100%; }',
-framesetDef.lookupSelector('layer, popup, hlayout, vlayout, deck, rdeck, panel, frame, body') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
-framesetDef.lookupSelector('layer') + ' { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; }',
-framesetDef.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { display: block; width: 0; height: 0; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
-framesetDef.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { width: 100%; height: 100%; }', // FIXME should be 0,0 before manual calculations
-framesetDef.lookupSelector('frame, panel') + ' { display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
-framesetDef.lookupSelector('body') + ' { display: block; width: auto; height: auto; margin: 0; }',
-framesetDef.lookupSelector('popup') + ' { display: block; position: relative; width: 0; height: 0; }',
-framesetDef.lookupSelector('popup') + ' > * { position: absolute; top: 0; left: 0; }', // TODO or change 'body' styling above
-framesetDef.lookupSelector('vlayout') + ' { height: 100%; }',
-framesetDef.lookupSelector('hlayout') + ' { width: 100%; overflow-y: hidden; }',
-framesetDef.lookupSelector('vlayout') + ' > * { display: block; float: left; width: 100%; height: auto; text-align: left; }',
-framesetDef.lookupSelector('vlayout') + ' > *::after { clear: both; }',
-framesetDef.lookupSelector('hlayout') + ' > * { display: block; float: left; width: auto; height: 100%; vertical-align: top; overflow-y: auto; }',
-framesetDef.lookupSelector('hlayout') + '::after { clear: both; }',
-framesetDef.lookupSelector('deck') + ' > * { width: 100%; height: 100%; }',
-framesetDef.lookupSelector('rdeck') + ' > * { width: 0; height: 0; }',
+namespaces.lookupSelector('layer, popup, hlayout, vlayout, deck, rdeck, panel, frame, body', HYPERFRAMESET_URN) + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
+namespaces.lookupSelector('layer', HYPERFRAMESET_URN) + ' { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; }',
+namespaces.lookupSelector('hlayout, vlayout, deck, rdeck', HYPERFRAMESET_URN) + ' { display: block; width: 0; height: 0; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+namespaces.lookupSelector('hlayout, vlayout, deck, rdeck', HYPERFRAMESET_URN) + ' { width: 100%; height: 100%; }', // FIXME should be 0,0 before manual calculations
+namespaces.lookupSelector('frame, panel', HYPERFRAMESET_URN) + ' { display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+namespaces.lookupSelector('body', HYPERFRAMESET_URN) + ' { display: block; width: auto; height: auto; margin: 0; }',
+namespaces.lookupSelector('popup', HYPERFRAMESET_URN) + ' { display: block; position: relative; width: 0; height: 0; }',
+namespaces.lookupSelector('popup', HYPERFRAMESET_URN) + ' > * { position: absolute; top: 0; left: 0; }', // TODO or change 'body' styling above
+namespaces.lookupSelector('vlayout', HYPERFRAMESET_URN) + ' { height: 100%; }',
+namespaces.lookupSelector('hlayout', HYPERFRAMESET_URN) + ' { width: 100%; overflow-y: hidden; }',
+namespaces.lookupSelector('vlayout', HYPERFRAMESET_URN) + ' > * { display: block; float: left; width: 100%; height: auto; text-align: left; }',
+namespaces.lookupSelector('vlayout', HYPERFRAMESET_URN) + ' > *::after { clear: both; }',
+namespaces.lookupSelector('hlayout', HYPERFRAMESET_URN) + ' > * { display: block; float: left; width: auto; height: 100%; vertical-align: top; overflow-y: auto; }',
+namespaces.lookupSelector('hlayout', HYPERFRAMESET_URN) + '::after { clear: both; }',
+namespaces.lookupSelector('deck', HYPERFRAMESET_URN) + ' > * { width: 100%; height: 100%; }',
+namespaces.lookupSelector('rdeck', HYPERFRAMESET_URN) + ' > * { width: 0; height: 0; }',
 ].join('\n');
 
 var style = document.createElement('style');
@@ -6811,8 +6843,9 @@ framesetLeft: function(frameset) { // WARN this should never happen
 },
 
 frameEntered: function(frame) {
+	var namespaces = framer.definition.namespaces;
 	var parentFrame;
-	var parentElement = DOM.closest(frame.element.parentNode, framer.definition.lookupSelector('frame')); // TODO frame.element.parentNode.ariaClosest('frame')
+	var parentElement = DOM.closest(frame.element.parentNode, namespaces.lookupSelector('frame', HYPERFRAMESET_URN)); // TODO frame.element.parentNode.ariaClosest('frame')
 	if (parentElement) parentFrame = HFrame(parentElement);
 	else {
 		parentElement = document.body; // TODO  frame.elenent.parentNode.ariaClosest('frameset'); 

@@ -15,8 +15,8 @@ register: function(type, constructor) {
 	this.items[type] = constructor;
 },
 
-create: function(type, options, framesetDefinition) { // FIXME `framesetDefinition` should be `namespaces`
-	return new this.items[type](options, framesetDefinition);
+create: function(type, options, namespaces) {
+	return new this.items[type](options, namespaces);
 }
 
 }
@@ -27,7 +27,7 @@ var htmlAttr = '_html';
 
 var CSSDecoder = (function() {
 
-function CSSDecoder(options, framesetDef) {}
+function CSSDecoder(options, namespaces) {}
 
 _.defaults(CSSDecoder.prototype, {
 
@@ -328,7 +328,7 @@ getValue: getValue
 
 var MicrodataDecoder = (function() {
 
-function MicrodataDecoder(options, framesetDef) {}
+function MicrodataDecoder(options, namespaces) {}
 
 _.defaults(MicrodataDecoder.prototype, {
 
@@ -399,7 +399,7 @@ var JSONDecoder = (function() {
 // FIXME not really a JSON decoder since expects JSON input and 
 // doesn't use JSON paths
 
-function JSONDecoder(options, framesetDef) {}
+function JSONDecoder(options, namespaces) {}
 
 _.defaults(JSONDecoder.prototype, {
 

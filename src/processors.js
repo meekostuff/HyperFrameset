@@ -24,6 +24,8 @@ var DOM = Meeko.DOM;
 var Task = Meeko.Task;
 var Promise = Meeko.Promise;
 var filters = Meeko.filters;
+var CustomNamespace = Meeko.CustomNamespace;
+var NamespaceCollection = Meeko.NamespaceCollection;
 
 var processors = Meeko.processors = {
 
@@ -33,8 +35,8 @@ register: function(type, constructor) {
 	this.items[type] = constructor;
 },
 
-create: function(type, options, framesetDefinition) { // `framesetDefinition` should be `namespaces`
-	return new this.items[type](options, framesetDefinition, filters);
+create: function(type, options, namespaces) {
+	return new this.items[type](options, namespaces, filters);
 }
 
 }
@@ -53,7 +55,7 @@ var FRAGMENTS_ARE_INERT = !(window.HTMLUnknownElement &&
 
 var MainProcessor = (function() {
 
-function MainProcessor(options, framesetDef) {}
+function MainProcessor(options) {}
 
 _.defaults(MainProcessor.prototype, {
 
@@ -85,7 +87,7 @@ processors.register('main', MainProcessor);
 
 var ScriptProcessor = (function() {
 
-function ScriptProcessor(options, framesetDef) {
+function ScriptProcessor(options) {
 	this.processor = options;
 }
 
@@ -153,26 +155,28 @@ processors.register('script', ScriptProcessor);
 var textAttr = '_text';
 var htmlAttr = '_html';
 
+var HYPERFRAMESET_URN = 'hyperframeset'; // FIXME DRY with libHyperFrameset.js
+
 var HazardProcessor = (function() {
 
 var HAZARD_TRANSFORM_URN = 'HazardTransform';
-var hazDefaultNS = {
+var hazDefaultNS = new CustomNamespace({
 	urn: HAZARD_TRANSFORM_URN,
 	name: 'haz',
 	style: 'xml'
-}
+});
 var HAZARD_EXPRESSION_URN = 'HazardExpression';
-var exprDefaultNS = {
+var exprDefaultNS = new CustomNamespace({
 	urn: HAZARD_EXPRESSION_URN,
 	name: 'expr',
 	style: 'xml'
-}
+});
 var HAZARD_MEXPRESSION_URN = 'HazardMExpression';
-var mexprDefaultNS = {
+var mexprDefaultNS = new CustomNamespace({
 	urn: HAZARD_MEXPRESSION_URN,
 	name: 'mexpr',
 	style: 'xml'
-}
+});
 
 /* 
  NOTE IE11 / Edge has a bad performance regression with DOM fragments 
@@ -299,12 +303,15 @@ function htmlToFragment(html, doc) {
 	return result;
 }
 
-function HazardProcessor(options, frameset, filters) {
-	this.frameset = frameset;
+function HazardProcessor(options, namespaces, filters) {
 	this.filters = filters;
-	frameset.addDefaultNamespace(hazDefaultNS);
-	frameset.addDefaultNamespace(exprDefaultNS);
-	frameset.addDefaultNamespace(mexprDefaultNS);
+	this.namespaces = namespaces = namespaces.clone();
+	if (!namespaces.lookupNamespace(HAZARD_TRANSFORM_URN))
+		namespaces.add(hazDefaultNS);
+	if (!namespaces.lookupNamespace(HAZARD_EXPRESSION_URN))
+		namespaces.add(exprDefaultNS);
+	if (!namespaces.lookupNamespace(HAZARD_MEXPRESSION_URN))
+		namespaces.add(mexprDefaultNS);
 }
 
 _.defaults(HazardProcessor.prototype, {
@@ -314,10 +321,10 @@ loadTemplate: function(template) {
 	processor.root = template; // FIXME assert template is Fragment
 	processor.templates = {};
 
-	var framesetDef = processor.frameset;
-	var hazPrefix = framesetDef.lookupPrefix(HAZARD_TRANSFORM_URN);
-	var exprPrefix = framesetDef.lookupPrefix(HAZARD_EXPRESSION_URN);
-	var mexprPrefix = framesetDef.lookupPrefix(HAZARD_MEXPRESSION_URN);
+	var namespaces = processor.namespaces;
+	var hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
+	var exprPrefix = namespaces.lookupPrefix(HAZARD_EXPRESSION_URN);
+	var mexprPrefix = namespaces.lookupPrefix(HAZARD_MEXPRESSION_URN);
 
 	var exprHtmlAttr = exprPrefix + htmlAttr; // NOTE this is mapped to haz:eval
 	var hazEvalTag = hazPrefix + 'eval';
@@ -404,18 +411,18 @@ loadTemplate: function(template) {
 
 	// finally, preprocess all elements to extract hazardDetails
 	walkTree(template, true, function(el) {
-		el.hazardDetails = getHazardDetails(el, processor.frameset);
+		el.hazardDetails = getHazardDetails(el, processor.namespaces);
 	});
 	
 	if (console.logLevel !== 'debug') return;
 
 	// if debugging then warn about PERFORMANCE_UNFRIENDLY_CONDITIONS (IE11 / Edge)
-	var hfNS = processor.frameset.namespace;
+	var hfNS = processor.namespaces.lookupNamespace(HYPERFRAMESET_URN);
 	walkTree(template, true, function(el) {
 		var tag = DOM.getTagName(el);
 		if (tag.indexOf(hazPrefix) === 0) return;
 		if (tag.indexOf(hfNS.prefix) === 0) return; // HyperFrameset element
-		checkElementPerformance(el, framesetDef);
+		checkElementPerformance(el, namespaces);
 	});
 
 
