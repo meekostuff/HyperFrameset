@@ -5458,9 +5458,9 @@ var hfHeadTags = _.words('title meta link style script');
 
 var HFrameDefinition = (function() {
 
-function HFrameDefinition(el, frameset) {
+function HFrameDefinition(el, framesetDef) {
 	if (!el) return; // in case of inheritance
-	this.frameset = frameset;
+	this.framesetDefinition = framesetDef;
 	this.init(el);
 }
 
@@ -5468,7 +5468,7 @@ _.defaults(HFrameDefinition.prototype, {
 
 init: function(el) {
     var frameDef = this;
-	var frameset = frameDef.frameset;
+	var framesetDef = frameDef.framesetDefinition;
 	_.defaults(frameDef, {
 		element: el,
 		id: el.id,
@@ -5480,9 +5480,9 @@ init: function(el) {
 		var tag = DOM.getTagName(node);
 		if (!tag) return;
 		if (_.includes(hfHeadTags, tag)) return; // ignore typical <head> elements
-		if (tag === frameset.namespaces.lookupTagNameNS('body', HYPERFRAMESET_URN)) {
+		if (tag === framesetDef.namespaces.lookupTagNameNS('body', HYPERFRAMESET_URN)) {
 			el.removeChild(node);
-			bodies.push(new HBodyDefinition(node, frameset));
+			bodies.push(new HBodyDefinition(node, framesetDef));
 			return;
 		}
 		console.warn('Unexpected element in HFrame: ' + tag);
@@ -5493,8 +5493,8 @@ init: function(el) {
 },
 
 render: function(resource, condition, details) {
-var frameDef = this;
-	var frameset = frameDef.frameset;
+	var frameDef = this;
+	var framesetDef = frameDef.framesetDefinition;
 	if (!details) details = {};
 	_.defaults(details, { // TODO more details??
 		scope: framer.scope,
@@ -5516,9 +5516,9 @@ return HFrameDefinition;
 
 var HBodyDefinition = (function() {
 	
-function HBodyDefinition(el, frameset) {
+function HBodyDefinition(el, framesetDef) {
 	if (!el) return; // in case of inheritance
-	this.frameset = frameset;
+	this.framesetDefinition = framesetDef;
 	this.init(el);
 }
 
@@ -5548,8 +5548,7 @@ _.defaults(HBodyDefinition.prototype, {
 
 init: function(el) {
 	var bodyDef = this;
-	var frameset = bodyDef.frameset;
-	var hfNS = frameset.namespace;
+	var framesetDef = bodyDef.framesetDefinition;
 	var condition = el.getAttribute('condition');
 	var finalCondition;
 	if (condition) {
@@ -5567,9 +5566,9 @@ init: function(el) {
 		transforms: []
 	});
 	_.forEach(_.map(el.childNodes), function(node) {
-		if (DOM.getTagName(node) === frameset.namespaces.lookupTagNameNS('transform', HYPERFRAMESET_URN)) {
+		if (DOM.getTagName(node) === framesetDef.namespaces.lookupTagNameNS('transform', HYPERFRAMESET_URN)) {
 			el.removeChild(node);
-			bodyDef.transforms.push(new HTransformDefinition(node, frameset));
+			bodyDef.transforms.push(new HTransformDefinition(node, framesetDef));
 		}	
 	});
 	if (!bodyDef.transforms.length && bodyDef.condition === 'loaded') {
@@ -5579,7 +5578,7 @@ init: function(el) {
 
 render: function(resource, details) {
 	var bodyDef = this;
-	var frameset = bodyDef.frameset;
+	var framesetDef = bodyDef.framesetDefinition;
 	if (bodyDef.transforms.length <= 0) {
 		return bodyDef.element.cloneNode(true);
 	}
@@ -5607,9 +5606,9 @@ return HBodyDefinition;
 
 var HTransformDefinition = (function() {
 	
-function HTransformDefinition(el, frameset) {
+function HTransformDefinition(el, framesetDef) {
 	if (!el) return; // in case of inheritance
-	this.frameset = frameset;
+	this.framesetDefinition = framesetDef;
 	this.init(el);
 }
 
@@ -5617,14 +5616,14 @@ _.defaults(HTransformDefinition.prototype, {
 
 init: function(el) {
 	var transform = this;
-	var frameset = transform.frameset;
+	var framesetDef = transform.framesetDefinition;
 	_.defaults(transform, {
 		element: el,
 		type: el.getAttribute('type') || 'main',
 		format: el.getAttribute('format')
     });
 	if (transform.type === 'main') transform.format = '';
-	var doc = frameset.document; // or el.ownerDocument
+	var doc = framesetDef.document; // or el.ownerDocument
 	var frag = doc.createDocumentFragment();
 	var node;
 	while (node = el.firstChild) frag.appendChild(node); // NOTE no adoption
@@ -5632,18 +5631,18 @@ init: function(el) {
 	var options;
 	if (el.hasAttribute('configid')) {
 		var configID = _.words(el.getAttribute('configid'))[0];
-		options = frameset.configData[configID];
+		options = framesetDef.configData[configID];
 	}
-	var processor = transform.processor = processors.create(transform.type, options, frameset.namespaces);
+	var processor = transform.processor = processors.create(transform.type, options, framesetDef.namespaces);
 	processor.loadTemplate(frag);
 },
 
 process: function(srcNode, details) {
 	var transform = this;
-	var frameset = transform.frameset;
+	var framesetDef = transform.framesetDefinition;
 	var decoder;
 	if (transform.format) {
-		decoder = decoders.create(transform.format, {}, frameset.namespaces);
+		decoder = decoders.create(transform.format, {}, framesetDef.namespaces);
 		decoder.init(srcNode);
 	}
 	else decoder = {
@@ -5671,12 +5670,12 @@ function HFramesetDefinition(doc, settings) {
 _.defaults(HFramesetDefinition.prototype, {
 
 init: function(doc, settings) {
-	var frameset = this;
-	_.defaults(frameset, {
+	var framesetDef = this;
+	_.defaults(framesetDef, {
 		url: settings.framesetURL
 	});
 
-	var namespaces = frameset.namespaces = CustomNamespace.getNamespaces(doc);
+	var namespaces = framesetDef.namespaces = CustomNamespace.getNamespaces(doc);
 	if (!namespaces.lookupNamespace(HYPERFRAMESET_URN)) {
 		namespaces.add(hfDefaultNamespace);
 	}
@@ -5685,7 +5684,7 @@ init: function(doc, settings) {
 	var scopeURL = URL(settings.scope);
 	rebase(doc, scopeURL);
 	var frameElts = DOM.findAll(
-		frameset.namespaces.lookupSelector('frame', HYPERFRAMESET_URN), 
+		framesetDef.namespaces.lookupSelector('frame', HYPERFRAMESET_URN), 
 		doc.body);
 	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
 		// NOTE first rebase @src with scope: urls
@@ -5709,7 +5708,7 @@ init: function(doc, settings) {
 		var sourceURL;
 		if (script.hasAttribute('sourceurl')) sourceURL = script.getAttribute('sourceurl');
 		else {
-			sourceURL = frameset.url + '__' + id; // FIXME this should be configurable
+			sourceURL = framesetDef.url + '__' + id; // FIXME this should be configurable
 			script.setAttribute('sourceurl', sourceURL);
 		}
 		script.text += '\n//# sourceURL=' + sourceURL;
@@ -5725,15 +5724,14 @@ init: function(doc, settings) {
 
 	var body = doc.body;
 	body.parentNode.removeChild(body);
-	frameset.document = doc;
-	frameset.element = body;
+	framesetDef.document = doc;
+	framesetDef.element = body;
 },
 
 preprocess: function() {
-	var frameset = this;
-	var hfNS = frameset.namespace;
-	var body = frameset.element;
-	_.defaults(frameset, {
+	var framesetDef = this;
+	var body = framesetDef.element;
+	_.defaults(framesetDef, {
 		configData: {}, // Indexed by @sourceURL
 		frames: {} // all hyperframe definitions. Indexed by @id (which may be auto-generated)
 	});
@@ -5760,7 +5758,7 @@ preprocess: function() {
 			}
 			catch(err) { // TODO test if this actually catches script errors
 				console.warn('Error evaluating inline script in frameset:\n' +
-					frameset.url + '#' + script.id);
+					framesetDef.url + '#' + script.id);
 				Task.postError(err);
 			}
 			script.parentNode.removeChild(script); // physical <script> no longer needed
@@ -5797,11 +5795,11 @@ preprocess: function() {
 		try {
 			var fn = Function(fnText);
 			var object = fn();
-			frameset.configData[sourceURL] = object;
+			framesetDef.configData[sourceURL] = object;
 		}
 		catch(err) { 
 			console.warn('Error evaluating inline script in frameset:\n' +
-				frameset.url + '#' + script.id);
+				framesetDef.url + '#' + script.id);
 			Task.postError(err);
 		}
 
@@ -5810,7 +5808,7 @@ preprocess: function() {
 
 
 	var frameElts = DOM.findAll(
-		frameset.namespaces.lookupSelector('frame', HYPERFRAMESET_URN), 
+		framesetDef.namespaces.lookupSelector('frame', HYPERFRAMESET_URN), 
 		body);
 	var frameDefElts = [];
 	var frameRefElts = [];
@@ -5838,11 +5836,11 @@ preprocess: function() {
 	});
 	_.forEach(frameDefElts, function(el) {
 		var defId = el.getAttribute('defid');
-		frameset.frames[defId] = new HFrameDefinition(el, frameset);
+		framesetDef.frames[defId] = new HFrameDefinition(el, framesetDef);
 	});
 	_.forEach(frameRefElts, function(el) {
 		var def = el.getAttribute('def');
-		if (!frameset.frames[def]) {
+		if (!framesetDef.frames[def]) {
 			console.warn('HyperFrame references non-existant frame: ' + def);
 		}
 	});
@@ -5850,8 +5848,8 @@ preprocess: function() {
 },
 
 render: function() {
-	var frameset = this;
-	return frameset.element.cloneNode(true);
+	var framesetDef = this;
+	return framesetDef.element.cloneNode(true);
 }
 
 });
@@ -6425,8 +6423,8 @@ frameLeft: function(frame) {
 
 render: function() {
 
-	var hframeset = this;
-	var definition = hframeset.definition;
+	var frameset = this;
+	var definition = frameset.definition;
 	var dstBody = this.element;
 
 	var srcBody = definition.render();
@@ -6733,7 +6731,7 @@ start: function(startOptions) {
 		return Promise.wait(function() { return !!document.body; });		
 	},
 
-	function() { // lookup or detect framesetURL
+	function() { // lookup or detect frameset.URL
 		var framerConfig;
 		framerConfig = framer.lookup(document.URL);
 		if (framerConfig) return framerConfig;
@@ -6743,7 +6741,7 @@ start: function(startOptions) {
 			});
 	},
 
-	function(framerConfig) { // initiate fetch of framesetURL
+	function(framerConfig) { // initiate fetch of frameset.URL
 		if (!framerConfig) throw Error('No frameset could be determined for this page');
 		framer.scope = framerConfig.scope; // FIXME shouldn't set this until loadFramesetDefinition() returns success
 		var framesetURL = URL(framerConfig.framesetURL);
