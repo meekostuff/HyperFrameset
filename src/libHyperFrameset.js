@@ -343,7 +343,6 @@ init: function(el) {
 	var framesetDef = frameDef.framesetDefinition;
 	_.defaults(frameDef, {
 		element: el,
-		type: el.getAttribute('type'),
 		mainSelector: el.getAttribute('main') // TODO consider using a hash in `@src`
     });
 	var bodies = frameDef.bodies = [];
@@ -371,7 +370,6 @@ render: function(resource, condition, details) {
 		scope: framer.scope,
 		url: resource && resource.url,
 		mainSelector: frameDef.mainSelector,
-		type: frameDef.type
 	});
 	var bodyDef = _.find(frameDef.bodies, function(body) { return body.condition === condition;});
 	if (!bodyDef) return; // FIXME what to do here??
