@@ -19,8 +19,8 @@ var window = this;
 var document = window.document;
 
 var Meeko = window.Meeko;
-
 var _ = window._ || Meeko.stuff; // WARN this could potentially use underscore.js / lodash.js but HAS NOT BEEN TESTED!!!
+var Promise = Meeko.Promise;
 
 /*
  ### DOM utility functions

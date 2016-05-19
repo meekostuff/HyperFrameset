@@ -43,7 +43,7 @@ function(href) {
 } :
 function(href) {
 	href = href.trim();
-	var m = parser.exec(str);
+	var m = parser.exec(href);
 	var url = {};
 	for (var n=keys.length, i=0; i<n; i++) url[keys[i]] = m[i] || '';
 	return url;
