@@ -343,7 +343,6 @@ init: function(el) {
 	var framesetDef = frameDef.framesetDefinition;
 	_.defaults(frameDef, {
 		element: el,
-		id: el.id,
 		type: el.getAttribute('type'),
 		mainSelector: el.getAttribute('main') // TODO consider using a hash in `@src`
     });
@@ -605,7 +604,7 @@ preprocess: function() {
 	var body = framesetDef.element;
 	_.defaults(framesetDef, {
 		configData: {}, // Indexed by @sourceURL
-		frames: {} // all hyperframe definitions. Indexed by @id (which may be auto-generated)
+		frames: {} // all hyperframe definitions. Indexed by @defid (which may be auto-generated)
 	});
 
 	var scripts = DOM.findAll('script', body);
