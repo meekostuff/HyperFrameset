@@ -347,14 +347,6 @@ var insertNode = function(conf, refNode, node) { // like imsertAdjacentHTML but 
 	return refNode;
 }
 
-var cloneContents = function(parentNode) {
-	doc = parentNode.ownerDocument;
-	var frag = doc.createDocumentFragment();
-	var node;
-	while (node = parentNode.firstChild) frag.appendChild(node);
-	return frag;
-}
-	
 var adoptContents = function(parentNode, doc) {
 	if (!doc) doc = document;
 	var frag = doc.createDocumentFragment();
@@ -545,7 +537,7 @@ return {
 	contains: contains, matches: matches,
 	findId: findId, find: find, findAll: findAll, closest: closest, siblings: siblings,
 	dispatchEvent: dispatchEvent, manageEvent: manageEvent,
-	cloneContents: cloneContents, adoptContents: adoptContents,
+	adoptContents: adoptContents,
 	SUPPORTS_ATTRMODIFIED: SUPPORTS_ATTRMODIFIED, 
 	isVisible: isVisible, whenVisible: whenVisible,
 	insertNode: insertNode, 

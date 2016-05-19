@@ -1356,14 +1356,6 @@ var insertNode = function(conf, refNode, node) { // like imsertAdjacentHTML but 
 	return refNode;
 }
 
-var cloneContents = function(parentNode) {
-	doc = parentNode.ownerDocument;
-	var frag = doc.createDocumentFragment();
-	var node;
-	while (node = parentNode.firstChild) frag.appendChild(node);
-	return frag;
-}
-	
 var adoptContents = function(parentNode, doc) {
 	if (!doc) doc = document;
 	var frag = doc.createDocumentFragment();
@@ -1554,7 +1546,7 @@ return {
 	contains: contains, matches: matches,
 	findId: findId, find: find, findAll: findAll, closest: closest, siblings: siblings,
 	dispatchEvent: dispatchEvent, manageEvent: manageEvent,
-	cloneContents: cloneContents, adoptContents: adoptContents,
+	adoptContents: adoptContents,
 	SUPPORTS_ATTRMODIFIED: SUPPORTS_ATTRMODIFIED, 
 	isVisible: isVisible, whenVisible: whenVisible,
 	insertNode: insertNode, 
@@ -2885,11 +2877,12 @@ function normalize(doc, details) {
 
 	var baseURL = URL(details.url);
 
-	_.forEach(DOM.findAll('style', doc.body), function(node) { // TODO support <style scoped>
+	_.forEach(DOM.findAll('style', doc.body), function(node) {
+		if (node.hasAttribute('scoped')) return; // ignore
 		doc.head.appendChild(node); // NOTE no adoption
 	});
 	
-	_.forEach(DOM.findAll('style', doc.head), function(node) {
+	_.forEach(DOM.findAll('style', doc), function(node) {
 		// TODO the following rewrites url() property values but isn't robust
 		var text = node.textContent;
 		var replacements = 0;
@@ -5590,6 +5583,13 @@ render: function(resource, details) {
 	})
 	.then(function(fragment) {
 		var el = bodyDef.element.cloneNode(false);
+		// crop to <body> if it exists
+		var htmlBody = DOM.find('body', fragment);
+		if (htmlBody) fragment = DOM.adoptContents(htmlBody, el.ownerDocument);
+		// remove all stylesheets
+		_.forEach(DOM.findAll('link[rel~=stylesheet], style', fragment), function(node) {
+			node.parentNode.removeChild(node);
+		});
 		DOM.insertNode('beforeend', el, fragment);
 		return el;
 	});

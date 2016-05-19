@@ -462,6 +462,13 @@ render: function(resource, details) {
 	})
 	.then(function(fragment) {
 		var el = bodyDef.element.cloneNode(false);
+		// crop to <body> if it exists
+		var htmlBody = DOM.find('body', fragment);
+		if (htmlBody) fragment = DOM.adoptContents(htmlBody, el.ownerDocument);
+		// remove all stylesheets
+		_.forEach(DOM.findAll('link[rel~=stylesheet], style', fragment), function(node) {
+			node.parentNode.removeChild(node);
+		});
 		DOM.insertNode('beforeend', el, fragment);
 		return el;
 	});

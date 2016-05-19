@@ -34,11 +34,12 @@ function normalize(doc, details) {
 
 	var baseURL = URL(details.url);
 
-	_.forEach(DOM.findAll('style', doc.body), function(node) { // TODO support <style scoped>
+	_.forEach(DOM.findAll('style', doc.body), function(node) {
+		if (node.hasAttribute('scoped')) return; // ignore
 		doc.head.appendChild(node); // NOTE no adoption
 	});
 	
-	_.forEach(DOM.findAll('style', doc.head), function(node) {
+	_.forEach(DOM.findAll('style', doc), function(node) {
 		// TODO the following rewrites url() property values but isn't robust
 		var text = node.textContent;
 		var replacements = 0;
