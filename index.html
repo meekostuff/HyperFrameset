@@ -80,10 +80,9 @@ A BETTER UNDERSTANDING WILL BE GAINED THROUGH EXPLORING A DEMO - VIEW SOURCE IS 
 
 <h2>Quick Start</h2>
 
-<p><strong>Although this is not the preferred way of specifying the hyperframeset, it is still the default and is conceptually easiest to understand.</strong> <br />
-<strong>TODO:</strong> A better quick start would be copying a demo site.</p>
+<p><strong>TODO:</strong> A better quick start would be copying a demo site.</p>
 
-<p>Create a HTML document (page.html) with some page specific content. 
+<p>Create some HTML pages with some page specific content (page.html). 
 Any page specific scripts, styles or meta-data should go in <code>&lt;head&gt;</code>. 
 The <code>&lt;body&gt;</code> may also contain fallback content, which is
 only displayed if HyperFrameset is NOT enabled.</p>
@@ -119,6 +118,20 @@ only displayed if HyperFrameset is NOT enabled.</p>
     &lt;footer&gt;
     This fallback footer will be removed from the page
     &lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+
+<p>Create an index page (index.html).</p>
+
+<pre><code>&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;body&gt;
+    &lt;h1&gt;Index page&lt;/h1&gt;
+    &lt;nav&gt;
+        &lt;a href="/page.html"&gt;Page One&lt;/a&gt;&lt;br /&gt;
+        &lt;a href="/page2.html"&gt;Page Two&lt;/a&gt;
+    &lt;/nav&gt;
 &lt;/body&gt;
 &lt;/html&gt;
 </code></pre>
@@ -166,7 +179,8 @@ will appear as the final page without the page specific content. </p>
 </code></pre>
 
 <p>When page.html is loaded into the browser, HyperFrameset will load frameset.html and apply it to the view,
-inserting the <code>&lt;main&gt;</code> content from page.html into the <code>hf_main</code> frame.</p>
+inserting the <code>&lt;main&gt;</code> content from page.html into the <code>hf_main</code> frame,
+and inserting the <code>&lt;nav&gt;</code> content from index.html into the <code>hf_nav</code> frame.</p>
 
 <p>This process results in a DOM tree something like this:</p>
 

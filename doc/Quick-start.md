@@ -6,7 +6,7 @@ A HyperFrameset enabled site is similar to a HTMLFrameset based site. It has sep
 - the "frameset"
 - auxiliary content
 
-Create a HTML document (page.html) with some page specific content. 
+Create some HTML pages with some page specific content (page.html).
 Any page specific scripts, styles or meta-data should go in `<head>`. 
 The `<body>` may also contain fallback content, which is
 only displayed if HyperFrameset is NOT enabled.
@@ -46,7 +46,23 @@ only displayed if HyperFrameset is NOT enabled.
 </body>
 </html>
 ```
-	
+
+Create an index page (index.html).
+
+``` .html
+<!DOCTYPE html>
+<html>
+<body>
+	<h1>Index page</h1>
+	<nav>
+		<a href="/page.html">Page One</a><br />
+		<a href="/page2.html">Page Two</a>
+	</nav>
+</body>
+</html>
+```
+
+
 Create the frameset document (frameset.html).
 This is a normal page of HTML that, when viewed in the browser,
 will appear as the final page without the page specific content. 
@@ -91,7 +107,8 @@ will appear as the final page without the page specific content.
 ```
 
 When page.html is loaded into the browser, HyperFrameset will load frameset.html and apply it to the view,
-inserting the `<main>` content from page.html into the `hf_main` frame.
+inserting the `<main>` content from page.html into the `hf_main` frame,
+and inserting the `<nav>` content from index.html into the `hf_nav` frame.
 
 This process results in a DOM tree something like this:
 

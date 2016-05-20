@@ -41,7 +41,7 @@
         </li>
       </ul>
       <p>
-        Create a HTML document (page.html) with some page specific content. Any
+        Create some HTML pages with some page specific content (page.html). Any
         page specific scripts, styles or meta-data should go in
         <code>&lt;head&gt;</code>. The <code>&lt;body&gt;</code> may also
         contain fallback content, which is only displayed if HyperFrameset is
@@ -78,6 +78,20 @@
     &lt;footer&gt;
     This fallback footer will be removed from the page
     &lt;/footer&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+</code></pre>
+      <p>
+        Create an index page (index.html).
+      </p>
+      <pre><code class="html">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;body&gt;
+    &lt;h1&gt;Index page&lt;/h1&gt;
+    &lt;nav&gt;
+        &lt;a href="/page.html"&gt;Page One&lt;/a&gt;&lt;br /&gt;
+        &lt;a href="/page2.html"&gt;Page Two&lt;/a&gt;
+    &lt;/nav&gt;
 &lt;/body&gt;
 &lt;/html&gt;
 </code></pre>
@@ -127,7 +141,8 @@
         When page.html is loaded into the browser, HyperFrameset will load
         frameset.html and apply it to the view, inserting the
         <code>&lt;main&gt;</code> content from page.html into the
-        <code>hf_main</code> frame.
+        <code>hf_main</code> frame, and inserting the <code>&lt;nav&gt;</code>
+        content from index.html into the <code>hf_nav</code> frame.
       </p>
       <p>
         This process results in a DOM tree something like this:
