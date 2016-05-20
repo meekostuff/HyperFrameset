@@ -3695,7 +3695,7 @@ has: function(name) {
 },
 
 get: function(name) { 
-	if (!this.has(name)) throw name + ' is not a registered controller';
+	if (!this.has(name)) throw name + ' is not a registered filter';
 	return items[name];
 },
 
