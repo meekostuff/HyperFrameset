@@ -571,6 +571,15 @@ init: function(doc, settings) {
 		}
 	});
 
+	// warn about not using @id
+	var idElements = DOM.findAll('*[id]:not(script)', doc.body);
+	if (idElements.length) {
+		console.warn('@id is strongly discouraged in frameset-documents (except on <script>).\n' +
+			'Found ' + idElements.length + ', ' + 
+			'first @id is ' + idElements[0].getAttribute('id')
+		);
+	}
+
 	// Add @id and @sourceurl to inline <script type="text/javascript">
 	var scripts = DOM.findAll('script', doc);
 	_.forEach(scripts, function(script, i) {
@@ -611,6 +620,7 @@ init: function(doc, settings) {
 		}
 		
 		var scopeId = '__scope_' + index + '__';
+		scope.setAttribute('scopeid', scopeId);
 		if (scope.hasAttribute('id')) scopeId = scope.getAttribute('id');
 		else scope.setAttribute('id', scopeId);
 		var scopePrefix = '#' + scopeId + ' ';
@@ -783,9 +793,25 @@ preprocess: function() {
 	});
 	_.forEach(frameRefElts, function(el) {
 		var def = el.getAttribute('def');
-		if (!framesetDef.frames[def]) {
-			console.warn('HyperFrame references non-existant frame: ' + def);
+		var ref = framesetDef.frames[def];
+		if (!ref) {
+			console.warn('Frame declaration references non-existant frame definition: ' + def);
+			return;
 		}
+		var refEl = ref.element;
+		if (!refEl.hasAttribute('scopeid')) return;
+		var id = el.getAttribute('id');
+		if (id) {
+			console.warn('Frame declaration references a frame definition with scoped-styles but these cannot be applied because the frame declaration has its own @id: ' + id);
+			return;
+		}
+		id = refEl.getAttribute('id');
+		var scopeId = refEl.getAttribute('scopeid');
+		if (id !== scopeId) {
+			console.warn('Frame declaration references a frame definition with scoped-styles but these cannot be applied because the frame definition has its own @id: ' + id);
+			return;
+		}
+		el.setAttribute('id', scopeId);
 	});
 
 },
