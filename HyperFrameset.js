@@ -5728,74 +5728,9 @@ init: function(doc, settings) {
 		console.info('Moved <script for> in frameset <head> to <body>');
 	});
 
-	var scopedStyles = DOM.findAll('style[scoped]', doc.body);
 	var allowedScope = 'panel, frame';
 	var allowedScopeSelector = framesetDef.namespaces.lookupSelector(allowedScope, HYPERFRAMESET_URN);
-	var dummyDoc = document.implementation.createHTMLDocument('');
-	_.forEach(scopedStyles, function(el, index) {
-		var scope = el.parentNode;
-		if (!DOM.matches(scope, allowedScopeSelector)) {
-			console.warn('Removing <style scoped>. Must be child of ' + allowedScopeSelector);
-			scope.removeChild(el);
-			return;
-		}
-		
-		var scopeId = '__scope_' + index + '__';
-		scope.setAttribute('scopeid', scopeId);
-		if (scope.hasAttribute('id')) scopeId = scope.getAttribute('id');
-		else scope.setAttribute('id', scopeId);
-		var scopePrefix = '#' + scopeId + ' ';
-
-		el.removeAttribute('scoped');
-		var sheet = el.sheet || (function() {
-			// Firefox doesn't seem to instatiate el.sheet in XHR documents
-			var dummyEl = dummyDoc.createElement('style');
-			dummyEl.textContent = el.textContent;
-			DOM.insertNode('beforeend', dummyDoc.head, dummyEl);
-			return dummyEl.sheet;
-		})();
-		forRules(sheet, processRule);
-		var cssText = _.map(sheet.cssRules, function(rule) { 
-				return rule.cssText; 
-			}).join('\n');
-		el.textContent = cssText;
-		DOM.insertNode('beforeend', doc.head, el);
-		return;
-
-		function processRule(rule, id) {
-			var parentRule = rule.parentRule || sheet;
-			switch (rule.type) {
-			case 1: // CSSRule.STYLE_RULE
-				// prefix each selector in selector-chain with scopePrefix
-				// selector-chain is split on COMMA (,) that is not inside BRACKETS. Technically: not followed by a RHB ')' unless first followed by LHB '(' 
-				var selectorText = scopePrefix + rule.selectorText.replace(/,(?![^(]*\))/g, ', ' + scopePrefix); 
-				var cssText = rule.cssText.replace(rule.selectorText, '');
-				cssText = selectorText + ' ' + cssText;
-				parentRule.deleteRule(id);
-				parentRule.insertRule(cssText, id);
-				break;
-
-			case 11: // CSSRule.COUNTER_STYLE_RULE
-				break;
-
-			case 4: // CSSRule.MEDIA_RULE
-			case 12: // CSSRule.SUPPORTS_RULE
-				forRules(rule, processRule);
-				break;
-			
-			default:
-				console.warn('Deleting invalid rule for <style scoped>: \n' + rule.cssText);
-				parentRule.deleteRule(id);
-				break;
-			}
-		}
-		
-		function forRules(parentRule, callback) {
-			var ruleList = parentRule.cssRules;
-			for (var i=ruleList.length-1; i>=0; i--) callback(ruleList[i], i, ruleList);
-		}
-		
-	});
+	normalizeScopedStyles(doc, allowedScopeSelector);
 
 	var body = doc.body;
 	body.parentNode.removeChild(body);
@@ -5971,6 +5906,75 @@ function rebaseURL(url, baseURL) {
 	return baseURL.resolve(relURL);
 }
 
+function normalizeScopedStyles(doc, allowedScopeSelector) {
+	var scopedStyles = DOM.findAll('style[scoped]', doc.body);
+	var dummyDoc = document.implementation.createHTMLDocument('');
+	_.forEach(scopedStyles, function(el, index) {
+		var scope = el.parentNode;
+		if (!DOM.matches(scope, allowedScopeSelector)) {
+			console.warn('Removing <style scoped>. Must be child of ' + allowedScopeSelector);
+			scope.removeChild(el);
+			return;
+		}
+		
+		var scopeId = '__scope_' + index + '__';
+		scope.setAttribute('scopeid', scopeId);
+		if (scope.hasAttribute('id')) scopeId = scope.getAttribute('id');
+		else scope.setAttribute('id', scopeId);
+
+		el.removeAttribute('scoped');
+		var sheet = el.sheet || (function() {
+			// Firefox doesn't seem to instatiate el.sheet in XHR documents
+			var dummyEl = dummyDoc.createElement('style');
+			dummyEl.textContent = el.textContent;
+			DOM.insertNode('beforeend', dummyDoc.head, dummyEl);
+			return dummyEl.sheet;
+		})();
+		forRules(sheet, processRule, scope);
+		var cssText = _.map(sheet.cssRules, function(rule) { 
+				return rule.cssText; 
+			}).join('\n');
+		el.textContent = cssText;
+		DOM.insertNode('beforeend', doc.head, el);
+		return;
+	});
+}
+
+function processRule(rule, id, parentRule) {
+	var scope = this;
+	switch (rule.type) {
+	case 1: // CSSRule.STYLE_RULE
+		// prefix each selector in selector-chain with scopePrefix
+		// selector-chain is split on COMMA (,) that is not inside BRACKETS. Technically: not followed by a RHB ')' unless first followed by LHB '(' 
+		var scopeId = scope.getAttribute('scopeid');
+		var scopePrefix = '#' + scopeId + ' ';
+		var selectorText = scopePrefix + rule.selectorText.replace(/,(?![^(]*\))/g, ', ' + scopePrefix); 
+		var cssText = rule.cssText.replace(rule.selectorText, '');
+		cssText = selectorText + ' ' + cssText;
+		parentRule.deleteRule(id);
+		parentRule.insertRule(cssText, id);
+		break;
+
+	case 11: // CSSRule.COUNTER_STYLE_RULE
+		break;
+
+	case 4: // CSSRule.MEDIA_RULE
+	case 12: // CSSRule.SUPPORTS_RULE
+		forRules(rule, processRule, scope);
+		break;
+	
+	default:
+		console.warn('Deleting invalid rule for <style scoped>: \n' + rule.cssText);
+		parentRule.deleteRule(id);
+		break;
+	}
+}
+
+function forRules(parentRule, callback, context) {
+	var ruleList = parentRule.cssRules;
+	for (var i=ruleList.length-1; i>=0; i--) callback.call(context, ruleList[i], i, parentRule);
+}
+	
 
 return HFramesetDefinition;	
 })();
