@@ -822,7 +822,6 @@ if (hidden_timeout > 0) {
 
 function config() {
 	Meeko.DOM.ready = domReady;
-	Meeko.Promise.pollingInterval = bootOptions["polling_interval"];
 }
 
 function start() {
