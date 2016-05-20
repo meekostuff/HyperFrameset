@@ -375,7 +375,7 @@ var checkStyleSheets = function() {
 		// handle IE
 		if (node.readyState) return readyStateLookup[node.readyState];
 
-		var sheet = node.sheet || node.styleSheet;
+		var sheet = node.sheet;
 
 		// handle webkit
 		if (!sheet) return false;
@@ -471,7 +471,7 @@ var cloneDocument = function(srcDoc) {
 	// WARN sometimes IE9/IE10/IE11 doesn't read the content of inserted <style>
 	// NOTE this doesn't seem to matter on IE10+. The following is precautionary
 	_.forEach(DOM.findAll('style', doc), function(node) {
-		var sheet = node.styleSheet || node.sheet;
+		var sheet = node.sheet;
 		if (!sheet || sheet.cssText == null) return;
 		if (sheet.cssText != '') return;
 		node.textContent = node.textContent;

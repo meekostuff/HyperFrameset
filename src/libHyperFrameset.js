@@ -616,7 +616,7 @@ init: function(doc, settings) {
 		var scopePrefix = '#' + scopeId + ' ';
 
 		el.removeAttribute('scoped');
-		var sheet = el.sheet || el.styleSheet || (function() {
+		var sheet = el.sheet || (function() {
 			// Firefox doesn't seem to instatiate el.sheet in XHR documents
 			var dummyEl = dummyDoc.createElement('style');
 			dummyEl.textContent = el.textContent;
