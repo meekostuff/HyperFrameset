@@ -140,7 +140,7 @@ There are two possible prefixes: `expr` and `mexpr`.
 *`expr:`* attribute values have the form (FIXME BNF or something)
 
 ```
-query | filter-name: params | filter-name: params
+query //> filter-name: params //> filter-name: params
 ```
 
 where

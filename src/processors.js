@@ -155,6 +155,8 @@ processors.register('script', ScriptProcessor);
 var textAttr = '_text';
 var htmlAttr = '_html';
 
+var PIPE_OPERATOR = '//>';
+
 var HYPERFRAMESET_URN = 'hyperframeset'; // FIXME DRY with libHyperFrameset.js
 
 var HazardProcessor = (function() {
@@ -761,7 +763,7 @@ function interpretMExpression(mexprText) {
 function interpretExpression(exprText) { // FIXME robustness
 	var expression = {};
 	expression.text = exprText;
-	var exprParts = exprText.split(/\s+\|\s+/);
+	var exprParts = exprText.split(PIPE_OPERATOR);
 	expression.selector = exprParts.shift();
 	expression.filters = [];
 
