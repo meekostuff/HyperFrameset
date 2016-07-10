@@ -242,7 +242,7 @@ function checkElementPerformance(el, namespaces) {
     attrs to elements.
 */
 var hazLangDefinition = 
-	'<otherwise <when@test <each@select,var <if@test <unless@test ' +
+	'<otherwise <when@test <each@select +variable@name,select <if@test <unless@test ' +
 	'>choose <template@name >eval@select >mtext@select >text@select include@name';
 
 var hazLang = _.map(_.words(hazLangDefinition), function(def) {
@@ -253,7 +253,7 @@ var hazLang = _.map(_.words(hazLangDefinition), function(def) {
 	default: 
 		attrToElement = false; 
 		break;
-	case '<': case '>': 
+	case '<': case '>': case '+':
 		break;
 	}
 	if (attrToElement) tag = tag.substr(1);
@@ -399,6 +399,9 @@ loadTemplate: function(template) {
 				el.parentNode.replaceChild(directiveEl, el);
 				directiveEl.appendChild(el);
 				break;
+			case '+':
+				el.parentNode.insertBefore(directiveEl, el);
+				break;
 			default:
 				break;
 			}
@@ -524,7 +527,8 @@ transformHazardTree: function(el, context, variables, frag) {
 			return frag;
 		}
 	
-		return processor.transformChildNodes(template, context, variables, frag); 
+		var subVars = _.defaults({}, variables);
+		return processor.transformChildNodes(template, context, subVars, frag); 
 
 	case 'eval':
 		// FIXME attributes should already be in hazardDetails
@@ -611,8 +615,6 @@ transformHazardTree: function(el, context, variables, frag) {
 	case 'each':
 		// FIXME attributes should already be in hazardDetails
 		var selector = el.getAttribute('select');
-		var varName = el.getAttribute('var');
-		var subVars = _.defaults({}, variables);
 		var subContexts;
 		try {
 			subContexts = processor.provider.evaluate(selector, context, variables, true);
@@ -624,10 +626,26 @@ transformHazardTree: function(el, context, variables, frag) {
 		}
 
 		return Promise.reduce(null, subContexts, function(dummy, subContext) {
-			if (varName) subVars[varName] = subContext;
-			return processor.transformChildNodes(el, subContext, subVars, frag);
+			return processor.transformChildNodes(el, subContext, variables, frag);
 		});
 
+	case 'variable':
+		var name = el.getAttribute('name');
+		var selector = el.getAttribute('select');
+		var value = context;
+		if (selector) {
+			try {
+				value = processor.provider.evaluate(selector, context, variables, false);
+			}
+			catch (err) {
+				Task.postError(err);
+				console.warn('Error evaluating <haz:variable name="' + name + '" select="' + selector + '">. Assumed empty.');
+				value = undefined;
+			}
+		}
+
+		variables[name] = value;
+		return;
 	}
 			
 },
