@@ -69,12 +69,12 @@ If zero items are found then the contents will not be in the output at all.
 <haz:template name="ID">
 ```
 
-The element will be used to *replace* an `<haz:include>` element identified by `ID`.
+The element will be used to *replace* an `<haz:call>` element identified by `ID`.
 
-#### `<haz:include>`
+#### `<haz:call>`
 
 ``` .html
-<haz:include name="ID">
+<haz:call name="ID">
 ```
 
 The element will be *replaced* with 

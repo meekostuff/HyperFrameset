@@ -4482,7 +4482,7 @@ function checkElementPerformance(el, namespaces) {
 */
 var hazLangDefinition = 
 	'<otherwise <when@test <each@select +variable@name,select <if@test <unless@test ' +
-	'>choose <template@name >eval@select >mtext@select >text@select include@name';
+	'>choose <template@name >eval@select >mtext@select >text@select call@name';
 
 var hazLang = _.map(_.words(hazLangDefinition), function(def) {
 	def = def.split('@');
@@ -4757,7 +4757,7 @@ transformHazardTree: function(el, context, variables, frag) {
 	default: // for unknown (or unhandled like `template`) haz: elements just process the children
 		return processor.transformChildNodes(el, context, variables, frag); 
 		
-	case 'include':
+	case 'call':
 		// FIXME attributes should already be in hazardDetails
 		var name = el.getAttribute('name');
 		template = processor.templates[name];
