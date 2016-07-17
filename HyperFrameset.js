@@ -4730,13 +4730,11 @@ getNamedTemplate: function(name) {
 transform: FRAGMENTS_ARE_INERT ?
 function(provider, details) { // TODO how to use details
 	var processor = this;
-	processor.provider = provider;
-	var root = processor.getEntryTemplate();
+	var root = processor.root;
 	var doc = root.ownerDocument;
 	var frag = doc.createDocumentFragment();
-	var done = processor.transformChildNodes(root, null, {}, frag);
-	return Promise.resolve(done)
-	.then(function(result) {
+	return processor._transform(provider, details, frag)
+	.then(function() {
 		return frag;
 	});
 } :
@@ -4744,16 +4742,22 @@ function(provider, details) { // TODO how to use details
 // NOTE IE11, Edge needs a different transform() because fragments are not inert
 function(provider, details) {
 	var processor = this;
-	processor.provider = provider;
-	var root = processor.getEntryTemplate();
+	var root = processor.root;
 	var doc = DOM.createHTMLDocument('', root.ownerDocument);
-	var frag = doc.body; // WARN don't know why this is inert but fragments aren't
-	var done = processor.transformChildNodes(root, null, {}, frag);
-	return Promise.resolve(done)
-	.then(function(result) {
+	var frag = doc.body; // WARN don't know why `doc.body` is inert but fragments aren't
+	return processor._transform(provider, details, frag)
+	.then(function() {
 		frag = childNodesToFragment(frag);
 		return frag;
 	});
+},
+
+_transform: function(provider, details, frag) {
+	var processor = this;
+	processor.provider = provider;
+	var template = processor.getEntryTemplate()
+	var done = processor.transformChildNodes(template, null, {}, frag);
+	return Promise.resolve(done);
 },
 
 transformChildNodes: function(srcNode, context, variables, frag) {
