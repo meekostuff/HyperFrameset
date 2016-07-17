@@ -4546,6 +4546,7 @@ function htmlToFragment(html, doc) {
 
 function HazardProcessor(options, namespaces, filters) {
 	this.filters = filters;
+	this.templates = [];
 	this.namespaces = namespaces = namespaces.clone();
 	if (!namespaces.lookupNamespace(HAZARD_TRANSFORM_URN))
 		namespaces.add(hazDefaultNS);
@@ -4560,7 +4561,7 @@ _.defaults(HazardProcessor.prototype, {
 loadTemplate: function(template) {
 	var processor = this;
 	processor.root = template; // FIXME assert template is Fragment
-	processor.templates = {};
+	processor.templates = [];
 
 	var namespaces = processor.namespaces;
 	var hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
@@ -4653,6 +4654,8 @@ loadTemplate: function(template) {
 		if (tag === hazPrefix + 'choose') implyOtherwise(el);
 	});
 
+	implyEntryTemplate(template);
+
 	// finally, preprocess all elements to extract hazardDetails
 	walkTree(template, true, function(el) {
 		el.hazardDetails = getHazardDetails(el, processor.namespaces);
@@ -4670,12 +4673,6 @@ loadTemplate: function(template) {
 	});
 
 
-	function markTemplate(el) {
-		if (!el.hasAttribute('name')) return;
-		var name = el.getAttribute('name');
-		processor.templates[name] = el;
-	}
-
 	function implyOtherwise(el) { // NOTE this slurps *any* non-<haz:when>, including <haz:otherwise>
 		var otherwise = el.ownerDocument.createElement(hazPrefix + 'otherwise');
 		_.forEach(_.map(el.childNodes), function(node) {
@@ -4686,13 +4683,55 @@ loadTemplate: function(template) {
 		el.appendChild(otherwise);
 	}
 
+	function markTemplate(el) {
+		processor.templates.push(el);
+	}
+
+	function implyEntryTemplate(el) { // NOTE this slurps *any* non-<haz:template>
+		var firstExplicitTemplate;
+		var contentNodes = _.filter(el.childNodes, function(node) {
+			var tag = DOM.getTagName(node);
+			if (tag === hazPrefix + 'template') {
+				if (!firstExplicitTemplate) firstExplicitTemplate = node;
+				return false;
+			}
+			if (tag === hazPrefix + 'variable') return false;
+			if (node.nodeType === 3 && !(/\S/).test(node.nodeValue)) return false;
+			if (node.nodeType !== 1) return false;
+			return true;
+		});
+
+		if (contentNodes.length <= 0) {
+			if (firstExplicitTemplate) return;
+			console.warn('This Hazard Template cannot generate any content.');
+		}
+		var entryTemplate = el.ownerDocument.createElement(hazPrefix + 'template');
+		_.forEach(contentNodes, function(node) {
+			entryTemplate.appendChild(node);
+		});
+		el.insertBefore(entryTemplate, firstExplicitTemplate);
+		processor.templates.unshift(entryTemplate);
+	}
+
+},
+
+getEntryTemplate: function() {
+	return this.templates[0];
+},
+
+getNamedTemplate: function(name) {
+	var processor = this;
+	name = _.lc(name);
+	return _.find(processor.templates, function(template) {
+		return _.lc(template.getAttribute('name')) === name;
+	});
 },
 
 transform: FRAGMENTS_ARE_INERT ?
 function(provider, details) { // TODO how to use details
 	var processor = this;
 	processor.provider = provider;
-	var root = processor.root;
+	var root = processor.getEntryTemplate();
 	var doc = root.ownerDocument;
 	var frag = doc.createDocumentFragment();
 	var done = processor.transformChildNodes(root, null, {}, frag);
@@ -4706,7 +4745,7 @@ function(provider, details) { // TODO how to use details
 function(provider, details) {
 	var processor = this;
 	processor.provider = provider;
-	var root = processor.root;
+	var root = processor.getEntryTemplate();
 	var doc = DOM.createHTMLDocument('', root.ownerDocument);
 	var frag = doc.body; // WARN don't know why this is inert but fragments aren't
 	var done = processor.transformChildNodes(root, null, {}, frag);
@@ -4760,14 +4799,13 @@ transformHazardTree: function(el, context, variables, frag) {
 	case 'call':
 		// FIXME attributes should already be in hazardDetails
 		var name = el.getAttribute('name');
-		template = processor.templates[name];
+		template = processor.getNamedTemplate(name);
 		if (!template) {
 			console.warn('Hazard could not find template name=' + name);
 			return frag;
 		}
 	
-		var subVars = _.defaults({}, variables);
-		return processor.transformChildNodes(template, context, subVars, frag); 
+		return processor.transformChildNodes(template, context, variables, frag); 
 
 	case 'eval':
 		// FIXME attributes should already be in hazardDetails
