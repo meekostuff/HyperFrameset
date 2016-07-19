@@ -3813,6 +3813,42 @@ init: function(node) {
 	this.srcNode = node;
 },
 
+matches: function(element, query) { // FIXME refactor common-code in matches / evaluate
+	var queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
+	var selector = queryParts[1];
+	var attr = queryParts[2];
+	var result;
+	if (!matches(element, selector)) return;
+	var node = element;
+	var result = node;
+
+	if (attr) {
+		attr = attr.trim();
+		if (attr.charAt(0) === '@') attr = attr.substr(1);
+		result = getAttr(node, attr);
+	}
+
+	return result;
+
+	function getAttr(node, attr) {
+		switch(attr) {
+		case null: case undefined: case '': return node;
+		case textAttr: 
+			return node.textContent;
+		case htmlAttr:
+			var frag = doc.createDocumentFragment();
+			_.forEach(node.childNodes, function(child) { 
+				frag.appendChild(doc.importNode(child, true)); // TODO does `child` really need to be cloned??
+			});
+			return frag;
+		default: 
+			return node.getAttribute(attr);
+		}
+	}
+
+
+},
+
 evaluate: function(query, context, variables, wantArray) {
 	if (!context) context = this.srcNode;
 	var doc = context.nodeType === 9 ? context : context.ownerDocument; // FIXME which document??
@@ -3858,6 +3894,12 @@ evaluate: function(query, context, variables, wantArray) {
 
 });
 
+function matches(element, selectorGroup) {
+	if (selectorGroup.trim() === '') return;
+	var finalSelector = expandSelector(null, selectorGroup, {}, true);
+	return DOM.matches(element, finalSelector);
+}
+
 function find(context, selectorGroup, variables) {
 	if (selectorGroup.trim() === '') return context;
 	var finalSelector = expandSelector(context, selectorGroup, variables);
@@ -3871,8 +3913,8 @@ function findAll(context, selectorGroup, variables) {
 }
 
 var uidIndex = 0;
-function expandSelector(context, selectorGroup, variables) { // FIXME currently only implements `context` expansion
-	var isRoot = context.nodeType === 9 || context.nodeType === 11;
+function expandSelector(context, selectorGroup, variables, isRoot) { // FIXME currently only implements `context` expansion
+	if (context.nodeType === 9 || context.nodeType === 11) isRoot = true;
 	var id;
 	if (!isRoot) {
 		id = context.id;
@@ -4727,6 +4769,15 @@ getNamedTemplate: function(name) {
 	});
 },
 
+getMatchingTemplate: function(element) {
+	var processor = this;
+	return _.find(processor.templates, function(template) {
+		if (!template.hasAttribute('match')) return false;
+		var expression = template.getAttribute('match');
+		return processor.provider.matches(element, expression);
+	});	
+},
+
 transform: FRAGMENTS_ARE_INERT ?
 function(provider, details) { // TODO how to use details
 	var processor = this;
@@ -4803,13 +4854,25 @@ transformHazardTree: function(el, context, variables, frag) {
 	case 'call':
 		// FIXME attributes should already be in hazardDetails
 		var name = el.getAttribute('name');
-		template = processor.getNamedTemplate(name);
+		var template = processor.getNamedTemplate(name);
 		if (!template) {
 			console.warn('Hazard could not find template name=' + name);
 			return frag;
 		}
 	
 		return processor.transformChildNodes(template, context, variables, frag); 
+
+	case 'apply':
+		var template = processor.getMatchingTemplate(context);
+		var promise = Promise.resolve(el);
+		if (template) {
+			return processor.transformChildNodes(template, context, variables, frag);
+		}
+		var node = context.cloneNode(false);
+		frag.appendChild(node);
+		return Promise.reduce(null, context.childNodes, function(dummy, child) {
+			return processor.transformHazardTree(el, child, variables, node);
+		});
 
 	case 'eval':
 		// FIXME attributes should already be in hazardDetails

@@ -488,6 +488,15 @@ getNamedTemplate: function(name) {
 	});
 },
 
+getMatchingTemplate: function(element) {
+	var processor = this;
+	return _.find(processor.templates, function(template) {
+		if (!template.hasAttribute('match')) return false;
+		var expression = template.getAttribute('match');
+		return processor.provider.matches(element, expression);
+	});	
+},
+
 transform: FRAGMENTS_ARE_INERT ?
 function(provider, details) { // TODO how to use details
 	var processor = this;
@@ -564,13 +573,25 @@ transformHazardTree: function(el, context, variables, frag) {
 	case 'call':
 		// FIXME attributes should already be in hazardDetails
 		var name = el.getAttribute('name');
-		template = processor.getNamedTemplate(name);
+		var template = processor.getNamedTemplate(name);
 		if (!template) {
 			console.warn('Hazard could not find template name=' + name);
 			return frag;
 		}
 	
 		return processor.transformChildNodes(template, context, variables, frag); 
+
+	case 'apply':
+		var template = processor.getMatchingTemplate(context);
+		var promise = Promise.resolve(el);
+		if (template) {
+			return processor.transformChildNodes(template, context, variables, frag);
+		}
+		var node = context.cloneNode(false);
+		frag.appendChild(node);
+		return Promise.reduce(null, context.childNodes, function(dummy, child) {
+			return processor.transformHazardTree(el, child, variables, node);
+		});
 
 	case 'eval':
 		// FIXME attributes should already be in hazardDetails

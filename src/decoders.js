@@ -35,6 +35,42 @@ init: function(node) {
 	this.srcNode = node;
 },
 
+matches: function(element, query) { // FIXME refactor common-code in matches / evaluate
+	var queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
+	var selector = queryParts[1];
+	var attr = queryParts[2];
+	var result;
+	if (!matches(element, selector)) return;
+	var node = element;
+	var result = node;
+
+	if (attr) {
+		attr = attr.trim();
+		if (attr.charAt(0) === '@') attr = attr.substr(1);
+		result = getAttr(node, attr);
+	}
+
+	return result;
+
+	function getAttr(node, attr) {
+		switch(attr) {
+		case null: case undefined: case '': return node;
+		case textAttr: 
+			return node.textContent;
+		case htmlAttr:
+			var frag = doc.createDocumentFragment();
+			_.forEach(node.childNodes, function(child) { 
+				frag.appendChild(doc.importNode(child, true)); // TODO does `child` really need to be cloned??
+			});
+			return frag;
+		default: 
+			return node.getAttribute(attr);
+		}
+	}
+
+
+},
+
 evaluate: function(query, context, variables, wantArray) {
 	if (!context) context = this.srcNode;
 	var doc = context.nodeType === 9 ? context : context.ownerDocument; // FIXME which document??
@@ -80,6 +116,12 @@ evaluate: function(query, context, variables, wantArray) {
 
 });
 
+function matches(element, selectorGroup) {
+	if (selectorGroup.trim() === '') return;
+	var finalSelector = expandSelector(null, selectorGroup, {}, true);
+	return DOM.matches(element, finalSelector);
+}
+
 function find(context, selectorGroup, variables) {
 	if (selectorGroup.trim() === '') return context;
 	var finalSelector = expandSelector(context, selectorGroup, variables);
@@ -93,8 +135,8 @@ function findAll(context, selectorGroup, variables) {
 }
 
 var uidIndex = 0;
-function expandSelector(context, selectorGroup, variables) { // FIXME currently only implements `context` expansion
-	var isRoot = context.nodeType === 9 || context.nodeType === 11;
+function expandSelector(context, selectorGroup, variables, isRoot) { // FIXME currently only implements `context` expansion
+	if (context.nodeType === 9 || context.nodeType === 11) isRoot = true;
 	var id;
 	if (!isRoot) {
 		id = context.id;
