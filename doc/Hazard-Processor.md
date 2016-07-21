@@ -96,6 +96,7 @@ This template must be in the *current* hazard transform.
 **TODO:** 
 
 - `<haz:apply>`
+- `<haz:var name="alphanumeric_name" select="expression">`
 - `<haz:template match="expression">`
 - `<haz:eval select="expression">` 
 - `<haz:text select="expression">` 

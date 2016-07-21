@@ -242,7 +242,7 @@ function checkElementPerformance(el, namespaces) {
     attrs to elements.
 */
 var hazLangDefinition = 
-	'<otherwise <when@test <each@select <one@select +variable@name,select <if@test <unless@test ' +
+	'<otherwise <when@test <each@select <one@select +var@name,select <if@test <unless@test ' +
 	'>choose <template@name,match >eval@select >mtext@select >text@select ' +
 	'call@name apply clone deepclone element@name attr@name';
 
@@ -457,7 +457,7 @@ loadTemplate: function(template) {
 				if (!firstExplicitTemplate) firstExplicitTemplate = node;
 				return false;
 			}
-			if (tag === hazPrefix + 'variable') return false;
+			if (tag === hazPrefix + 'var') return false;
 			if (node.nodeType === 3 && !(/\S/).test(node.nodeValue)) return false;
 			if (node.nodeType !== 1) return false;
 			return true;
@@ -749,7 +749,7 @@ transformHazardTree: function(el, context, variables, frag) {
 			return processor.transformChildNodes(el, subContext, variables, frag);
 		});
 
-	case 'variable':
+	case 'var':
 		var name = el.getAttribute('name');
 		var selector = el.getAttribute('select');
 		var value = context;
@@ -759,7 +759,7 @@ transformHazardTree: function(el, context, variables, frag) {
 			}
 			catch (err) {
 				Task.postError(err);
-				console.warn('Error evaluating <haz:variable name="' + name + '" select="' + selector + '">. Assumed empty.');
+				console.warn('Error evaluating <haz:var name="' + name + '" select="' + selector + '">. Assumed empty.');
 				value = undefined;
 			}
 		}
