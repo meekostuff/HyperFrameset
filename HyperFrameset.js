@@ -4523,8 +4523,9 @@ function checkElementPerformance(el, namespaces) {
     attrs to elements.
 */
 var hazLangDefinition = 
-	'<otherwise <when@test <each@select +variable@name,select <if@test <unless@test ' +
-	'>choose <template@name >eval@select >mtext@select >text@select call@name';
+	'<otherwise <when@test <each@select <one@select +variable@name,select <if@test <unless@test ' +
+	'>choose <template@name,match >eval@select >mtext@select >text@select ' +
+	'call@name apply clone deepclone element@name attr@name';
 
 var hazLang = _.map(_.words(hazLangDefinition), function(def) {
 	def = def.split('@');
@@ -4862,7 +4863,7 @@ transformHazardTree: function(el, context, variables, frag) {
 	
 		return processor.transformChildNodes(template, context, variables, frag); 
 
-	case 'apply':
+	case 'apply': // WARN only applies to DOM-based provider
 		var template = processor.getMatchingTemplate(context);
 		var promise = Promise.resolve(el);
 		if (template) {
@@ -4872,6 +4873,46 @@ transformHazardTree: function(el, context, variables, frag) {
 		frag.appendChild(node);
 		return Promise.reduce(null, context.childNodes, function(dummy, child) {
 			return processor.transformHazardTree(el, child, variables, node);
+		});
+
+	case 'clone': // WARN only applies to DOM-based providers
+		var node = context.cloneNode(false);
+		frag.appendChild(node);
+		return processor.transformChildNodes(el, context, variables, node);
+
+	case 'deepclone': // WARN only applies to DOM-based providers
+		var node = context.cloneNode(true);
+		frag.appendChild(node);
+		// TODO WARN if el has child-nodes
+		return;
+
+	case 'element':
+		// FIXME attributes should already be in hazardDetails
+		// FIXME log a warning if this directive has children
+		var mexpr = el.getAttribute('name');
+		var name = evalMExpression(mexpr, processor.filters, processor.provider, context, variables);
+		var type = typeof value;
+		if (type !== 'string') return;
+
+		var node = doc.createElement(name);
+		frag.appendChild(node);
+		return processor.transformChildNodes(el, context, variables, node);
+		return;
+
+	case 'attr':
+		// FIXME attributes should already be in hazardDetails
+		// FIXME log a warning if this directive has children
+		var mexpr = el.getAttribute('name');
+		var name = evalMExpression(mexpr, processor.filters, processor.provider, context, variables);
+		var type = typeof value;
+		if (type !== 'string') return;
+
+		var node = doc.createDocumentFragment();
+		return processor.transformChildNodes(el, context, variables, node)
+		.then(function() {
+			value = node.textContent;
+			frag.setAttribute(name, value);
+			return frag;
 		});
 
 	case 'eval':
@@ -4955,6 +4996,22 @@ transformHazardTree: function(el, context, variables, frag) {
 		if (!found) when = otherwise;
 		if (!when) return;
 		return processor.transformChildNodes(when, context, variables, frag); 
+
+	case 'one': // FIXME refactor common parts with `case 'each':`
+		// FIXME attributes should already be in hazardDetails
+		var selector = el.getAttribute('select');
+		var subContext;
+		try {
+			subContext = processor.provider.evaluate(selector, context, variables, false);
+		}
+		catch (err) {
+			Task.postError(err);
+			console.warn('Error evaluating <haz:one select="' + selector + '">. Assumed empty.');
+			return;
+		}
+
+		return processor.transformChildNodes(el, subContext, variables, frag);
+
 
 	case 'each':
 		// FIXME attributes should already be in hazardDetails

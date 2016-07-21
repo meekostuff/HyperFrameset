@@ -63,13 +63,25 @@ The contents of this element will be repeated in the output
 for each item found by the expression. 
 If zero items are found then the contents will not be in the output at all.
 
+#### `<haz:one>` EXPERIMENTAL
+
+``` .html
+<haz:one select="expression">
+```
+
+This is like `<haz:each>` but
+only for the *first* item found by the expression. 
+If zero items are found then the contents will not be in the output at all.
+
+
 #### `<haz:template>`
 
 ``` .html
 <haz:template name="ID">
 ```
 
-The element will be used to *replace* an `<haz:call>` element identified by `ID`.
+This declares a template which will be used 
+to *replace* an `<haz:call>` element identified by `ID`.
 
 #### `<haz:call>`
 
@@ -81,7 +93,18 @@ The element will be *replaced* with
 the contents of the `<haz:template>` element identified by `ID`.
 This template must be in the *current* hazard transform.
 
-**TODO:** `<haz:eval>`, `<haz:text>`, `<haz:mtext>`
+**TODO:** 
+
+- `<haz:apply>`
+- `<haz:template match="expression">`
+- `<haz:eval select="expression">` 
+- `<haz:text select="expression">` 
+- `<haz:mtext select="mexpression">`
+- `<haz:clone>more processing</haz:clone>`
+- `<haz:deepclone>`
+- `<haz:element name="mexpression">`,
+- `<haz:attr name="mexpression">contents</haz:attr>`
+
 
 ### Directives as attributes
 

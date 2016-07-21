@@ -102,12 +102,22 @@
         will not be in the output at all.
       </p>
       <h4>
+        <code>&lt;haz:one&gt;</code> EXPERIMENTAL
+      </h4>
+      <pre><code class="html">&lt;haz:one select="expression"&gt;
+</code></pre>
+      <p>
+        This is like <code>&lt;haz:each&gt;</code> but only for the
+        <em>first</em> item found by the expression. If zero items are found
+        then the contents will not be in the output at all.
+      </p>
+      <h4>
         <code>&lt;haz:template&gt;</code>
       </h4>
       <pre><code class="html">&lt;haz:template name="ID"&gt;
 </code></pre>
       <p>
-        The element will be used to <em>replace</em> an
+        This declares a template which will be used to <em>replace</em> an
         <code>&lt;haz:call&gt;</code> element identified by <code>ID</code>.
       </p>
       <h4>
@@ -122,9 +132,38 @@
         transform.
       </p>
       <p>
-        <strong>TODO:</strong> <code>&lt;haz:eval&gt;</code>,
-        <code>&lt;haz:text&gt;</code>, <code>&lt;haz:mtext&gt;</code>
+        <strong>TODO:</strong>
       </p>
+      <ul>
+        <li>
+          <code>&lt;haz:apply&gt;</code>
+        </li>
+        <li>
+          <code>&lt;haz:template match="expression"&gt;</code>
+        </li>
+        <li>
+          <code>&lt;haz:eval select="expression"&gt;</code>
+        </li>
+        <li>
+          <code>&lt;haz:text select="expression"&gt;</code>
+        </li>
+        <li>
+          <code>&lt;haz:mtext select="mexpression"&gt;</code>
+        </li>
+        <li>
+          <code>&lt;haz:clone&gt;more processing&lt;/haz:clone&gt;</code>
+        </li>
+        <li>
+          <code>&lt;haz:deepclone&gt;</code>
+        </li>
+        <li>
+          <code>&lt;haz:element name="mexpression"&gt;</code>,
+        </li>
+        <li>
+          <code>&lt;haz:attr
+          name="mexpression"&gt;contents&lt;/haz:attr&gt;</code>
+        </li>
+      </ul>
       <h3>
         Directives as attributes
       </h3>
