@@ -24,6 +24,7 @@ create: function(type, options, namespaces) {
 // FIXME textAttr & htmlAttr used in HazardProcessor & CSSDecoder
 var textAttr = '_text';
 var htmlAttr = '_html';
+// TODO what about tagnameAttr, namespaceAttr
 
 var CSSDecoder = (function() {
 
@@ -35,6 +36,7 @@ init: function(node) {
 	this.srcNode = node;
 },
 
+// TODO should matches() support Hazard variables
 matches: function(element, query) { // FIXME refactor common-code in matches / evaluate
 	var queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
 	var selector = queryParts[1];
@@ -77,24 +79,20 @@ evaluate: function(query, context, variables, wantArray) {
 	var queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
 	var selector = queryParts[1];
 	var attr = queryParts[2];
-	var result;
-	if (wantArray) { // haz:each
-		result = findAll(context, selector, variables);
-	}
-	else {
-		var node = find(context, selector, variables);
-		result = node ? [ node ] : [];
-	}
+	var result = find(selector, context, variables, wantArray);
 
 	if (attr) {
 		attr = attr.trim();
 		if (attr.charAt(0) === '@') attr = attr.substr(1);
-		_.forEach(result, function(node, i) {
-			result[i] = getAttr(node, attr);
+
+		if (!wantArray) result = [ result ];
+		result = _.map(result, function(node) {
+			return getAttr(node, attr);
 		});
+		if (!wantArray) result = result[0];
 	}
 
-	return (wantArray) ? result : result[0];
+	return result;
 
 	function getAttr(node, attr) {
 		switch(attr) {
@@ -118,35 +116,75 @@ evaluate: function(query, context, variables, wantArray) {
 
 function matches(element, selectorGroup) {
 	if (selectorGroup.trim() === '') return;
-	var finalSelector = expandSelector(null, selectorGroup, {}, true);
-	return DOM.matches(element, finalSelector);
+	return DOM.matches(element, selectorGroup);
 }
 
-function find(context, selectorGroup, variables) {
-	if (selectorGroup.trim() === '') return context;
-	var finalSelector = expandSelector(context, selectorGroup, variables);
-	return context.querySelector(finalSelector); // FIXME DOM.find
-}
+var uidAttrName = 'meekoid';
 
-function findAll(context, selectorGroup, variables) {
-	if (selectorGroup.trim() === '') return [ context ];
-	var finalSelector = expandSelector(context, selectorGroup, variables);
-	return context.querySelectorAll(finalSelector); // FIXME DOM.findAll
-}
+function find(selectorGroup, context, variables, wantArray) { // FIXME currently only implements `context` expansion
+	selectorGroup = selectorGroup.trim();
+	if (selectorGroup === '') return wantArray ? [ context ] : context;
+	var nullResult = wantArray ? [] : null;
 
-var uidIndex = 0;
-function expandSelector(context, selectorGroup, variables, isRoot) { // FIXME currently only implements `context` expansion
-	if (context.nodeType === 9 || context.nodeType === 11) isRoot = true;
-	var id;
-	if (!isRoot) {
-		id = context.id;
-		if (!id) {
-			id = '__meeko_' + (uidIndex++) + '__';
-			context.id = id;
+	var selectors = selectorGroup.split(','); // FIXME ',' can appear within selectors
+	selectors = _.map(selectors, function(s) { return s.trim(); });
+
+	var invalidVarUse = false;
+	var contextVar;
+	_.forEach(selectors, function(s, i) {
+		var m = s.match(/\\?\$[_a-zA-Z][_a-zA-Z0-9]*\b/g);
+		if (!m) {
+			if (i > 0 && contextVar) {
+				invalidVarUse = true;
+				console.warn('All individual selectors in a selector-group must share same context: ' + selectorGroup);
+			}
+			return; // if no matches then m will be null not []
+		}
+		_.forEach(m, function(varRef, j) {
+			if (varRef.charAt(0) === '\\') return; // Ignore "\$"
+			var varName = varRef.substr(1);
+			var varPos = s.indexOf(varRef);
+			if (j > 0 || varPos > 0) {
+				invalidVarUse = true;
+				console.warn('Invalid use of ' + varRef + ' in ' + selectorGroup);
+				return;
+			}
+			if (i > 0) {
+				if (varName !== contextVar) {
+					invalidVarUse = true;
+					console.warn('All individual selectors in a selector-group must share same context: ' + selectorGroup);
+				}
+				return;
+			}
+			contextVar = varName;
+		});
+	});
+
+	if (invalidVarUse) {
+		console.error('Invalid use of variables in CSS selector. Assuming no match.');
+		return nullResult;
+	}
+
+	if (contextVar) {
+		if (!variables.has(contextVar)) {
+			console.debug('Context variable $' + contextVar + ' not defined for ' + selectorGroup);
+			return nullResult;
+		}
+		context = variables.get(contextVar);
+
+		// NOTE if the selector is just '$variable' then 
+		// context doesn't even need to be a node
+		if (selectorGroup === '$' + contextVar) return context;
+
+		if (!(context && context.nodeType === 1)) {
+			console.debug('Context variable $' + contextVar + ' not an element in ' + selectorGroup);
+			return nullResult;
 		}
 	}
-	var selectors =	selectorGroup.split(',');
-	selectors = _.map(selectors, function(s) { return s.trim(); });
+
+	var isRoot = false;
+	if (context.nodeType === 9 || context.nodeType === 11) isRoot = true;
+
 	selectors = _.filter(selectors, function(s) {
 			switch(s.charAt(0)) {
 			case '+': case '~': return false; // FIXME warning or error
@@ -154,12 +192,31 @@ function expandSelector(context, selectorGroup, variables, isRoot) { // FIXME cu
 			default: return true;
 			}
 		});
+
+	var uid;
+	if (!isRoot) uid = markElement(context);
 	selectors = _.map(selectors, function(s) {
-			return (isRoot) ? s : '#' + id + ' ' + s;
+			if (isRoot) return s;
+			var prefix = '[' + uidAttrName + '=' + uid + ']';
+			return (contextVar) ? 
+				s.replace('$' + contextVar, prefix) : 
+				'*' + prefix + ' ' + s;
 		});
 	
-	return selectors.join(', ');
+	var finalSelector = selectors.join(', ');
+
+	if (wantArray) return DOM.findAll(finalSelector, context);
+	else return DOM.find(finalSelector, context);
 }
+
+var uidIndex = 0;
+function markElement(element) {
+	if (element.hasAttribute(uidAttrName)) return element.getAttribute(uidAttrName);
+	var uid = '__' + (uidIndex++) + '__';
+	element.setAttribute(uidAttrName, uid);
+	return uid;
+}
+
 
 return CSSDecoder;
 })();

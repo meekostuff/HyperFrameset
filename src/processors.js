@@ -244,7 +244,7 @@ function checkElementPerformance(el, namespaces) {
 var hazLangDefinition = 
 	'<otherwise <when@test <each@select <one@select +var@name,select <if@test <unless@test ' +
 	'>choose <template@name,match >eval@select >mtext@select >text@select ' +
-	'call@name apply clone deepclone element@name attr@name';
+	'call@name apply param@name,select clone deepclone element@name attr@name';
 
 var hazLang = _.map(_.words(hazLangDefinition), function(def) {
 	def = def.split('@');
@@ -458,6 +458,7 @@ loadTemplate: function(template) {
 				return false;
 			}
 			if (tag === hazPrefix + 'var') return false;
+			if (tag === hazPrefix + 'param') return false;
 			if (node.nodeType === 3 && !(/\S/).test(node.nodeValue)) return false;
 			if (node.nodeType !== 1) return false;
 			return true;
@@ -526,20 +527,83 @@ function(provider, details) {
 _transform: function(provider, details, frag) {
 	var processor = this;
 	processor.provider = provider;
-	var template = processor.getEntryTemplate()
-	var done = processor.transformChildNodes(template, null, {}, frag);
-	return Promise.resolve(done);
-},
 
-transformChildNodes: function(srcNode, context, variables, frag) {
-	var processor = this;
+	processor.globalParams = _.assign({}, details);
+	processor.globalVars = {};
+	processor.localParams = processor.globalParams;
+	processor.localVars = processor.globalVars;
+	processor.localParamsStack = [];
+	processor.localVarsStack = [];
 
-	return Promise.reduce(null, srcNode.childNodes, function(dummy, current) {
-		return processor.transformNode(current, context, variables, frag);
+	processor.variables = {
+		has: function(key) {
+			var result = 
+				key in processor.localVars ||
+				key in processor.localParams ||
+				key in processor.globalVars ||
+				key in processor.globalParams ||
+				false;
+			return result;
+		},
+		get: function(key) {
+			var result = 
+				key in processor.localVars && processor.localVars[key] ||
+				key in processor.localParams && processor.localParams[key] ||
+				key in processor.globalVars && processor.globalVars[key] ||
+				key in processor.globalParams && processor.globalParams[key] ||
+				undefined;
+			return result;
+		},
+		set: function(key, value, inParams, isGlobal) {
+			var mapName = isGlobal ?
+				( inParams ? 'globalParams' : 'globalVars' ) :
+				( inParams ? 'localParams' : 'localVars' );
+			// NOTE params are write-once
+			if (mapName === 'localParams' && key in processor.localParams) return;
+			if (mapName === 'globalParams' && key in processor.globalParams) return;
+			processor[mapName][key] = value;
+		},
+		push: function(params) {
+			processor.localParamsStack.push(processor.localParams);
+			processor.localVarsStack.push(processor.localVars);
+
+			if (typeof params !== 'object' || params == null) params = {};
+			processor.localParams = params;
+			processor.localVars = {};
+		},
+		pop: function() {
+			processor.localParams = processor.localParamsStack.pop();		
+			processor.localVars = processor.localVarsStack.pop();		
+		}
+	}
+
+	return processor.transformChildNodes(processor.root, null, frag)
+	.then(function() {
+		var template = processor.getEntryTemplate();
+		return processor.transformTemplate(template, null, null, frag);
 	});
 },
 
-transformNode: function(srcNode, context, variables, frag) {
+transformTemplate: function(template, context, params, frag) {
+	var processor = this;
+	processor.variables.push(params);
+
+	return processor.transformChildNodes(template, context, frag)
+	.then(function() { 
+		processor.variables.pop(); 
+		return frag;
+	});
+},
+
+transformChildNodes: function(srcNode, context, frag) {
+	var processor = this;
+
+	return Promise.reduce(null, srcNode.childNodes, function(dummy, current) {
+		return processor.transformNode(current, context, frag);
+	});
+},
+
+transformNode: function(srcNode, context, frag) {
 	var processor = this;
 
 	switch (srcNode.nodeType) {
@@ -553,12 +617,12 @@ transformNode: function(srcNode, context, variables, frag) {
 		return;
 	case 1:
 		var details = srcNode.hazardDetails;
-		if (details.definition) return processor.transformHazardTree(srcNode, context, variables, frag);
-		else return processor.transformTree(srcNode, context, variables, frag);
+		if (details.definition) return processor.transformHazardTree(srcNode, context, frag);
+		else return processor.transformTree(srcNode, context, frag);
 	}
 },
 
-transformHazardTree: function(el, context, variables, frag) {
+transformHazardTree: function(el, context, frag) {
 	var processor = this;
 	var doc = el.ownerDocument;
 
@@ -568,9 +632,49 @@ transformHazardTree: function(el, context, variables, frag) {
 	var invertTest = false; // for haz:if haz:unless
 
 	switch (def.tag) {
-	default: // for unknown (or unhandled like `template`) haz: elements just process the children
-		return processor.transformChildNodes(el, context, variables, frag); 
+	default: // for unknown (or unhandled) haz: elements just process the children
+		return processor.transformChildNodes(el, context, frag); 
 		
+	case 'template':
+		return frag;
+
+	case 'var':
+		var name = el.getAttribute('name');
+		var selector = el.getAttribute('select');
+		var value = context;
+		if (selector) {
+			try {
+				value = processor.provider.evaluate(selector, context, processor.variables, false);
+			}
+			catch (err) {
+				Task.postError(err);
+				console.warn('Error evaluating <haz:var name="' + name + '" select="' + selector + '">. Assumed empty.');
+				value = undefined;
+			}
+		}
+
+		processor.variables.set(name, value);
+		return frag;
+
+	case 'param':
+		var name = el.getAttribute('name');
+		var selector = el.getAttribute('select');
+		var value = context;
+		if (selector) {
+			try {
+				value = processor.provider.evaluate(selector, context, processor.variables, false);
+			}
+			catch (err) {
+				Task.postError(err);
+				console.warn('Error evaluating <haz:param name="' + name + '" select="' + selector + '">. Assumed empty.');
+				value = undefined;
+			}
+		}
+
+		processor.variables.set(name, value, true);
+		return frag;
+
+
 	case 'call':
 		// FIXME attributes should already be in hazardDetails
 		var name = el.getAttribute('name');
@@ -580,54 +684,53 @@ transformHazardTree: function(el, context, variables, frag) {
 			return frag;
 		}
 	
-		return processor.transformChildNodes(template, context, variables, frag); 
+		return processor.transformTemplate(template, context, null, frag); 
 
 	case 'apply': // WARN only applies to DOM-based provider
 		var template = processor.getMatchingTemplate(context);
 		var promise = Promise.resolve(el);
 		if (template) {
-			return processor.transformChildNodes(template, context, variables, frag);
+			return processor.transformTemplate(template, context, null, frag);
 		}
 		var node = context.cloneNode(false);
 		frag.appendChild(node);
 		return Promise.reduce(null, context.childNodes, function(dummy, child) {
-			return processor.transformHazardTree(el, child, variables, node);
+			return processor.transformHazardTree(el, child, node);
 		});
 
 	case 'clone': // WARN only applies to DOM-based providers
 		var node = context.cloneNode(false);
 		frag.appendChild(node);
-		return processor.transformChildNodes(el, context, variables, node);
+		return processor.transformChildNodes(el, context, node);
 
 	case 'deepclone': // WARN only applies to DOM-based providers
 		var node = context.cloneNode(true);
 		frag.appendChild(node);
 		// TODO WARN if el has child-nodes
-		return;
+		return frag;
 
 	case 'element':
 		// FIXME attributes should already be in hazardDetails
 		// FIXME log a warning if this directive has children
 		var mexpr = el.getAttribute('name');
-		var name = evalMExpression(mexpr, processor.filters, processor.provider, context, variables);
+		var name = evalMExpression(mexpr, processor.filters, processor.provider, context, processor.variables);
 		var type = typeof value;
-		if (type !== 'string') return;
+		if (type !== 'string') return frag;
 
 		var node = doc.createElement(name);
 		frag.appendChild(node);
-		return processor.transformChildNodes(el, context, variables, node);
-		return;
+		return processor.transformChildNodes(el, context, node);
 
 	case 'attr':
 		// FIXME attributes should already be in hazardDetails
 		// FIXME log a warning if this directive has children
 		var mexpr = el.getAttribute('name');
-		var name = evalMExpression(mexpr, processor.filters, processor.provider, context, variables);
+		var name = evalMExpression(mexpr, processor.filters, processor.provider, context, processor.variables);
 		var type = typeof value;
-		if (type !== 'string') return;
+		if (type !== 'string') return frag;
 
 		var node = doc.createDocumentFragment();
-		return processor.transformChildNodes(el, context, variables, node)
+		return processor.transformChildNodes(el, context, node)
 		.then(function() {
 			value = node.textContent;
 			frag.setAttribute(name, value);
@@ -638,41 +741,41 @@ transformHazardTree: function(el, context, variables, frag) {
 		// FIXME attributes should already be in hazardDetails
 		// FIXME log a warning if this directive has children
 		var selector = el.getAttribute('select');
-		var value = evalExpression(selector, processor.filters, processor.provider, context, variables, 'node');
+		var value = evalExpression(selector, processor.filters, processor.provider, context, processor.variables, 'node');
 		var type = typeof value;
-		if (type === 'undefined' || type === 'boolean' || value == null) return;
+		if (type === 'undefined' || type === 'boolean' || value == null) return frag;
 		if (!value.nodeType) { // TODO test performance
 			value = htmlToFragment(value, doc);
 		}
 		frag.appendChild(value);
-		return;
+		return frag;
 
 	case 'mtext':
 		// FIXME attributes should already be in hazardDetails
 		// FIXME log a warning if this directive has children
 		var mexpr = el.getAttribute('select');
-		var value = evalMExpression(mexpr, processor.filters, processor.provider, context, variables);
+		var value = evalMExpression(mexpr, processor.filters, processor.provider, context, processor.variables);
 		// FIXME `value` should always already be "text"
-		if (type === 'undefined' || type === 'boolean' || value == null) return;
+		if (type === 'undefined' || type === 'boolean' || value == null) return frag;
 		if (!value.nodeType) {
 			value = doc.createTextNode(value);
 		}
 		frag.appendChild(value);
-		return;
+		return frag;
 
 	case 'text':
 		// FIXME attributes should already be in hazardDetails
 		// FIXME log a warning if this directive has children
 		var expr = el.getAttribute('select');
-		var value = evalExpression(expr, processor.filters, processor.provider, context, variables, 'text');
+		var value = evalExpression(expr, processor.filters, processor.provider, context, processor.variables, 'text');
 		// FIXME `value` should always already be "text"
 		var type = typeof value;
-		if (type === 'undefined' || type === 'boolean' || value == null) return;
+		if (type === 'undefined' || type === 'boolean' || value == null) return frag;
 		if (!value.nodeType) {
 			value = doc.createTextNode(value);
 		}
 		frag.appendChild(value);
-		return;
+		return frag;
 
 	case 'unless':
 		invertTest = true;
@@ -681,7 +784,7 @@ transformHazardTree: function(el, context, variables, frag) {
 		var testVal = el.getAttribute('test');
 		var pass = false;
 		try {
-			pass = evalExpression(testVal, processor.filters, processor.provider, context, variables, 'boolean');
+			pass = evalExpression(testVal, processor.filters, processor.provider, context, processor.variables, 'boolean');
 		}
 		catch (err) {
 			Task.postError(err);
@@ -689,8 +792,8 @@ transformHazardTree: function(el, context, variables, frag) {
 			pass = false;
 		}
 		if (invertTest) pass = !pass;
-		if (!pass) return;
-		return processor.transformChildNodes(el, context, variables, frag); 
+		if (!pass) return frag;
+		return processor.transformChildNodes(el, context, frag); 
 
 	case 'choose':
 		// FIXME attributes should already be in hazardDetails
@@ -707,29 +810,29 @@ transformHazardTree: function(el, context, variables, frag) {
 			}
 			if (childDef.tag !== 'when') return false;
 			var testVal = child.getAttribute('test');
-			var pass = evalExpression(testVal, processor.filters, processor.provider, context, variables, 'boolean');
+			var pass = evalExpression(testVal, processor.filters, processor.provider, context, processor.variables, 'boolean');
 			if (!pass) return false;
 			when = child;
 			return true;
 		});
 		if (!found) when = otherwise;
-		if (!when) return;
-		return processor.transformChildNodes(when, context, variables, frag); 
+		if (!when) return frag;
+		return processor.transformChildNodes(when, context, frag); 
 
 	case 'one': // FIXME refactor common parts with `case 'each':`
 		// FIXME attributes should already be in hazardDetails
 		var selector = el.getAttribute('select');
 		var subContext;
 		try {
-			subContext = processor.provider.evaluate(selector, context, variables, false);
+			subContext = processor.provider.evaluate(selector, context, processor.variables, false);
 		}
 		catch (err) {
 			Task.postError(err);
 			console.warn('Error evaluating <haz:one select="' + selector + '">. Assumed empty.');
-			return;
+			return frag;
 		}
 
-		return processor.transformChildNodes(el, subContext, variables, frag);
+		return processor.transformChildNodes(el, subContext, frag);
 
 
 	case 'each':
@@ -737,53 +840,36 @@ transformHazardTree: function(el, context, variables, frag) {
 		var selector = el.getAttribute('select');
 		var subContexts;
 		try {
-			subContexts = processor.provider.evaluate(selector, context, variables, true);
+			subContexts = processor.provider.evaluate(selector, context, processor.variables, true);
 		}
 		catch (err) {
 			Task.postError(err);
 			console.warn('Error evaluating <haz:each select="' + selector + '">. Assumed empty.');
-			return;
+			return frag;
 		}
 
 		return Promise.reduce(null, subContexts, function(dummy, subContext) {
-			return processor.transformChildNodes(el, subContext, variables, frag);
+			return processor.transformChildNodes(el, subContext, frag);
 		});
 
-	case 'var':
-		var name = el.getAttribute('name');
-		var selector = el.getAttribute('select');
-		var value = context;
-		if (selector) {
-			try {
-				value = processor.provider.evaluate(selector, context, variables, false);
-			}
-			catch (err) {
-				Task.postError(err);
-				console.warn('Error evaluating <haz:var name="' + name + '" select="' + selector + '">. Assumed empty.');
-				value = undefined;
-			}
-		}
-
-		variables[name] = value;
-		return;
 	}
 			
 },
 
-transformTree: function(srcNode, context, variables, frag) { // srcNode is Element
+transformTree: function(srcNode, context, frag) { // srcNode is Element
 	var processor = this;
 	
 	var nodeType = srcNode.nodeType;
 	if (nodeType !== 1) throw Error('transformTree() expects Element');
-	var node = processor.transformSingleElement(srcNode, context, variables);
+	var node = processor.transformSingleElement(srcNode, context);
 	var nodeAsFrag = frag.appendChild(node); // WARN use returned value not `node` ...
 	// ... this allows frag to be a custom object, which in turn 
 	// ... allows a different type of output construction
 
-	return processor.transformChildNodes(srcNode, context, variables, nodeAsFrag);
+	return processor.transformChildNodes(srcNode, context, nodeAsFrag);
 },
 
-transformSingleElement: function(srcNode, context, variables) {
+transformSingleElement: function(srcNode, context) {
 	var processor = this;
 	var details = srcNode.hazardDetails;
 
@@ -793,8 +879,8 @@ transformSingleElement: function(srcNode, context, variables) {
 		var value;
 		try {
 			value = (desc.namespaceURI === HAZARD_MEXPRESSION_URN) ?
-				processMExpression(desc.mexpression, processor.filters, processor.provider, context, variables) :
-				processExpression(desc.expression, processor.filters, processor.provider, context, variables, desc.type);
+				processMExpression(desc.mexpression, processor.filters, processor.provider, context, processor.variables) :
+				processExpression(desc.expression, processor.filters, processor.provider, context, processor.variables, desc.type);
 		}
 		catch (err) {
 			Task.postError(err);
