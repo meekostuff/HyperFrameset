@@ -3665,18 +3665,16 @@ return dateFormat;
 
 
 
-(function() {
+(function(classnamespace) {
 
 var global = this;
 var Meeko = global.Meeko;
 var _ = Meeko.stuff;
 
 
-var filters = Meeko.filters = (function() {
-
 var items = {};
 
-return {
+var filters = {
 
 register: function(name, fn) {
 	if (!/^[_a-zA-Z][_a-zA-Z0-9]*$/.test(name)) { // TODO should be in filters.register()
@@ -3708,11 +3706,21 @@ evaluate: function(name, value, params) {
 	return fn.apply(undefined, args);
 }
 
-
 };
 
-})();
+classnamespace.filters = filters;
 
+}).call(this, this.Meeko);
+
+
+
+
+(function() {
+
+var global = this;
+var Meeko = global.Meeko;
+var _ = Meeko.stuff;
+var filters = Meeko.filters;
 
 // FIXME filters need sanity checking
 filters.register('lowercase', function(value, text) {
