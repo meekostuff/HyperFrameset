@@ -4337,35 +4337,18 @@ JSONDecoder: JSONDecoder
 
 }).call(this, this.Meeko);
 /*!
- * HyperFrameset Processors and Decoders
+ * HyperFrameset Processors
  * Copyright 2014-2015 Sean Hogan (http://meekostuff.net/)
  * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
- */
-
-/* NOTE
-	+ assumes DOMSprockets + HyperFrameset
-*/
-/* TODO
-    + The passing of nodes between documents needs to be audited.
-		Safari and IE10,11 in particular seem to require nodes to be imported / adopted
-		(not fully understood right now)
  */
 
 (function(classnamespace) {
 
 var window = this;
-var document = window.document;
-
 var Meeko = window.Meeko;
-var _ = Meeko.stuff;
-var DOM = Meeko.DOM;
-var Task = Meeko.Task;
-var Promise = Meeko.Promise;
 var filters = Meeko.filters;
-var CustomNamespace = Meeko.CustomNamespace;
-var NamespaceCollection = Meeko.NamespaceCollection;
 
-var processors = Meeko.processors = {
+var processors = {
 
 items: {},
 
@@ -4379,19 +4362,24 @@ create: function(type, options, namespaces) {
 
 }
 
+classnamespace.processors = processors;
 
-/* WARN 
-	on IE11 and Edge, certain elements (or attrs) *not* attached to a document 
-	can trash the layout engine. Examples:
-		- <custom-element>
-		- <element style="...">
-		- <li value="NaN">
-*/
-var FRAGMENTS_ARE_INERT = !(window.HTMLUnknownElement && 
-	'runtimeStyle' in window.HTMLUnknownElement.prototype);
-// NOTE actually IE10 is okay, but no reasonable feature detection has been determined
+}).call(this, this.Meeko);
+/*!
+ * MainProcessor
+ * Copyright 2014-2016 Sean Hogan (http://meekostuff.net/)
+ * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+ */
 
-var MainProcessor = (function() {
+(function(classnamespace) {
+
+var window = this;
+var document = window.document;
+
+var Meeko = window.Meeko;
+var _ = Meeko.stuff;
+var DOM = Meeko.DOM;
+var processors = Meeko.processors;
 
 function MainProcessor(options) {}
 
@@ -4417,13 +4405,31 @@ transform: function(provider, details) { // TODO how to use details?
 	
 });
 
-return MainProcessor;
-})();
+_.assign(classnamespace, {
 
-processors.register('main', MainProcessor);
+MainProcessor: MainProcessor
+
+});
 
 
-var ScriptProcessor = (function() {
+}).call(this, this.Meeko);
+/*!
+ * ScriptProcessor
+ * Copyright 2014-2016 Sean Hogan (http://meekostuff.net/)
+ * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+ */
+
+(function(classnamespace) {
+
+var window = this;
+var document = window.document;
+
+var Meeko = window.Meeko;
+var _ = Meeko.stuff;
+var DOM = Meeko.DOM;
+var Task = Meeko.Task;
+var Promise = Meeko.Promise;
+var processors = Meeko.processors;
 
 function ScriptProcessor(options) {
 	this.processor = options;
@@ -4483,13 +4489,44 @@ transform: function(provider, details) {
 });
 
 
-return ScriptProcessor;
-})();
+_.assign(classnamespace, {
 
-processors.register('script', ScriptProcessor);
+ScriptProcessor: ScriptProcessor
+
+});
 
 
-// FIXME textAttr & htmlAttr used in HazardProcessor & CSSDecoder
+}).call(this, this.Meeko);
+/*!
+ * HazardProcessor
+ * Copyright 2014-2016 Sean Hogan (http://meekostuff.net/)
+ * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+ */
+
+/* NOTE
+	+ assumes DOMSprockets
+*/
+/* TODO
+    + The passing of nodes between documents needs to be audited.
+		Safari and IE10,11 in particular seem to require nodes to be imported / adopted
+		(not fully understood right now)
+ */
+
+(function(classnamespace) {
+
+var window = this;
+var document = window.document;
+
+var Meeko = window.Meeko;
+var _ = Meeko.stuff;
+var DOM = Meeko.DOM;
+var Task = Meeko.Task;
+var Promise = Meeko.Promise;
+var filters = Meeko.filters;
+var processors = Meeko.processors;
+var CustomNamespace = Meeko.CustomNamespace;
+
+// NOTE textAttr & htmlAttr used in HazardProcessor & CSSDecoder
 var textAttr = '_text';
 var htmlAttr = '_html';
 
@@ -4497,7 +4534,16 @@ var PIPE_OPERATOR = '//>';
 
 var HYPERFRAMESET_URN = 'hyperframeset'; // FIXME DRY with libHyperFrameset.js
 
-var HazardProcessor = (function() {
+/* WARN 
+	on IE11 and Edge, certain elements (or attrs) *not* attached to a document 
+	can trash the layout engine. Examples:
+		- <custom-element>
+		- <element style="...">
+		- <li value="NaN">
+*/
+var FRAGMENTS_ARE_INERT = !(window.HTMLUnknownElement && 
+	'runtimeStyle' in window.HTMLUnknownElement.prototype);
+// NOTE actually IE10 is okay, but no reasonable feature detection has been determined
 
 var HAZARD_TRANSFORM_URN = 'HazardTransform';
 var hazDefaultNS = new CustomNamespace({
@@ -5429,19 +5475,33 @@ function processExpression(expr, filters, provider, context, variables, type) { 
 
 }
 
-return HazardProcessor;	
-})();
-
-processors.register('hazard', HazardProcessor);
-
 _.assign(classnamespace, {
 
-MainProcessor: MainProcessor,
-ScriptProcessor: ScriptProcessor,
-HazardProcessor: HazardProcessor,
+HazardProcessor: HazardProcessor
 
 });
 
+
+}).call(this, this.Meeko);
+/*!
+ * Builtin Processors
+ * Copyright 2016 Sean Hogan (http://meekostuff.net/)
+ * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+ */
+
+(function(classnamespace) {
+
+var window = this;
+
+var Meeko = window.Meeko;
+var processors = Meeko.processors;
+var MainProcessor = Meeko.MainProcessor;
+var ScriptProcessor = Meeko.ScriptProcessor;
+var HazardProcessor = Meeko.HazardProcessor;
+
+processors.register('main', MainProcessor);
+processors.register('script', ScriptProcessor);
+processors.register('hazard', HazardProcessor);
 
 }).call(this, this.Meeko);
 /*!
