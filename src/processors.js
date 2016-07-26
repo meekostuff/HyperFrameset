@@ -10,7 +10,6 @@ var global = this;
 var Meeko = global.Meeko;
 var _ = Meeko.stuff;
 var Registry = Meeko.Registry;
-var filters = Meeko.filters;
 
 var processors = new Registry({
 	writeOnce: true,
@@ -26,7 +25,7 @@ _.assign(processors, {
 
 create: function(type, options, namespaces) {
 	var constructor = this.get(type);
-	return new constructor(options, namespaces, filters);
+	return new constructor(options, namespaces);
 }
 
 });

@@ -4444,7 +4444,6 @@ var global = this;
 var Meeko = global.Meeko;
 var _ = Meeko.stuff;
 var Registry = Meeko.Registry;
-var filters = Meeko.filters;
 
 var processors = new Registry({
 	writeOnce: true,
@@ -4460,7 +4459,7 @@ _.assign(processors, {
 
 create: function(type, options, namespaces) {
 	var constructor = this.get(type);
-	return new constructor(options, namespaces, filters);
+	return new constructor(options, namespaces);
 }
 
 });
@@ -4790,8 +4789,7 @@ function htmlToFragment(html, doc) {
 	return result;
 }
 
-function HazardProcessor(options, namespaces, filters) {
-	this.filters = filters;
+function HazardProcessor(options, namespaces) {
 	this.templates = [];
 	this.namespaces = namespaces = namespaces.clone();
 	if (!namespaces.lookupNamespace(HAZARD_TRANSFORM_URN))
@@ -5197,7 +5195,7 @@ transformHazardTree: function(el, context, frag) {
 		// FIXME attributes should already be in hazardDetails
 		// FIXME log a warning if this directive has children
 		var mexpr = el.getAttribute('name');
-		var name = evalMExpression(mexpr, processor.filters, processor.provider, context, processor.variables);
+		var name = evalMExpression(mexpr, processor.provider, context, processor.variables);
 		var type = typeof value;
 		if (type !== 'string') return frag;
 
@@ -5209,7 +5207,7 @@ transformHazardTree: function(el, context, frag) {
 		// FIXME attributes should already be in hazardDetails
 		// FIXME log a warning if this directive has children
 		var mexpr = el.getAttribute('name');
-		var name = evalMExpression(mexpr, processor.filters, processor.provider, context, processor.variables);
+		var name = evalMExpression(mexpr, processor.provider, context, processor.variables);
 		var type = typeof value;
 		if (type !== 'string') return frag;
 
@@ -5225,7 +5223,7 @@ transformHazardTree: function(el, context, frag) {
 		// FIXME attributes should already be in hazardDetails
 		// FIXME log a warning if this directive has children
 		var selector = el.getAttribute('select');
-		var value = evalExpression(selector, processor.filters, processor.provider, context, processor.variables, 'node');
+		var value = evalExpression(selector, processor.provider, context, processor.variables, 'node');
 		var type = typeof value;
 		if (type === 'undefined' || type === 'boolean' || value == null) return frag;
 		if (!value.nodeType) { // TODO test performance
@@ -5238,7 +5236,7 @@ transformHazardTree: function(el, context, frag) {
 		// FIXME attributes should already be in hazardDetails
 		// FIXME log a warning if this directive has children
 		var mexpr = el.getAttribute('select');
-		var value = evalMExpression(mexpr, processor.filters, processor.provider, context, processor.variables);
+		var value = evalMExpression(mexpr, processor.provider, context, processor.variables);
 		// FIXME `value` should always already be "text"
 		if (type === 'undefined' || type === 'boolean' || value == null) return frag;
 		if (!value.nodeType) {
@@ -5251,7 +5249,7 @@ transformHazardTree: function(el, context, frag) {
 		// FIXME attributes should already be in hazardDetails
 		// FIXME log a warning if this directive has children
 		var expr = el.getAttribute('select');
-		var value = evalExpression(expr, processor.filters, processor.provider, context, processor.variables, 'text');
+		var value = evalExpression(expr, processor.provider, context, processor.variables, 'text');
 		// FIXME `value` should always already be "text"
 		var type = typeof value;
 		if (type === 'undefined' || type === 'boolean' || value == null) return frag;
@@ -5268,7 +5266,7 @@ transformHazardTree: function(el, context, frag) {
 		var testVal = el.getAttribute('test');
 		var pass = false;
 		try {
-			pass = evalExpression(testVal, processor.filters, processor.provider, context, processor.variables, 'boolean');
+			pass = evalExpression(testVal, processor.provider, context, processor.variables, 'boolean');
 		}
 		catch (err) {
 			Task.postError(err);
@@ -5294,7 +5292,7 @@ transformHazardTree: function(el, context, frag) {
 			}
 			if (childDef.tag !== 'when') return false;
 			var testVal = child.getAttribute('test');
-			var pass = evalExpression(testVal, processor.filters, processor.provider, context, processor.variables, 'boolean');
+			var pass = evalExpression(testVal, processor.provider, context, processor.variables, 'boolean');
 			if (!pass) return false;
 			when = child;
 			return true;
@@ -5363,8 +5361,8 @@ transformSingleElement: function(srcNode, context) {
 		var value;
 		try {
 			value = (desc.namespaceURI === HAZARD_MEXPRESSION_URN) ?
-				processMExpression(desc.mexpression, processor.filters, processor.provider, context, processor.variables) :
-				processExpression(desc.expression, processor.filters, processor.provider, context, processor.variables, desc.type);
+				processMExpression(desc.mexpression, processor.provider, context, processor.variables) :
+				processExpression(desc.expression, processor.provider, context, processor.variables, desc.type);
 		}
 		catch (err) {
 			Task.postError(err);
@@ -5442,15 +5440,15 @@ function setAttribute(el, attrName, value) {
 	}
 }
 
-function evalMExpression(mexprText, filters, provider, context, variables) {
+function evalMExpression(mexprText, provider, context, variables) {
 	var mexpr = interpretMExpression(mexprText);
-	var result = processMExpression(mexpr, filters, provider, context, variables);
+	var result = processMExpression(mexpr, provider, context, variables);
 	return result;
 }
 
-function evalExpression(exprText, filters, provider, context, variables, type) {
+function evalExpression(exprText, provider, context, variables, type) {
 	var expr = interpretExpression(exprText);
-	var result = processExpression(expr, filters, provider, context, variables, type);
+	var result = processExpression(expr, provider, context, variables, type);
 	return result;
 }
 	
@@ -5511,14 +5509,14 @@ function interpretExpression(exprText) { // FIXME robustness
 }
 
 
-function processMExpression(mexpr, filters, provider, context, variables) {
+function processMExpression(mexpr, provider, context, variables) {
 	var i = 0;
 	return mexpr.template.replace(/\{\{\}\}/g, function(all) {
-		return processExpression(mexpr.expressions[i++], filters, provider, context, variables, 'text');
+		return processExpression(mexpr.expressions[i++], provider, context, variables, 'text');
 	});
 }
 
-function processExpression(expr, filters, provider, context, variables, type) { // FIXME robustness
+function processExpression(expr, provider, context, variables, type) { // FIXME robustness
 	var doc = (context && context.nodeType) ? // TODO which document
 		(context.nodeType === 9 ? context : context.ownerDocument) : 
 		document; 
