@@ -3871,6 +3871,8 @@ var textAttr = '_text';
 var htmlAttr = '_html';
 // TODO what about tagnameAttr, namespaceAttr
 
+CSS_CONTEXT_VARIABLE = '_';
+
 function CSSDecoder(options, namespaces) {}
 
 _.defaults(CSSDecoder.prototype, {
@@ -4013,7 +4015,7 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 			console.debug('Context variable $' + contextVar + ' not defined for ' + selectorGroup);
 			return nullResult;
 		}
-		context = variables.get(contextVar);
+		if (contextVar !== CSS_CONTEXT_VARIABLE) context = variables.get(contextVar);
 
 		// NOTE if the selector is just '$variable' then 
 		// context doesn't even need to be a node
@@ -5313,6 +5315,8 @@ transformHazardTree: function(el, context, frag) {
 			console.warn('Error evaluating <haz:one select="' + selector + '">. Assumed empty.');
 			return frag;
 		}
+
+		if (!subContext) return frag;
 
 		return processor.transformChildNodes(el, subContext, frag);
 
