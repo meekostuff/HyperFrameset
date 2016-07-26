@@ -6,14 +6,12 @@
 
 (function(classnamespace) {
 
-var window = this;
-var document = window.document;
+var global = this;
 
-var Meeko = window.Meeko;
+var Meeko = global.Meeko;
 var _ = Meeko.stuff;
 var DOM = Meeko.DOM;
 var Task = Meeko.Task;
-var Promise = Meeko.Promise;
 var processors = Meeko.processors;
 
 function ScriptProcessor(options) {

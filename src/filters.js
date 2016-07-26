@@ -4,32 +4,19 @@
 var global = this;
 var Meeko = global.Meeko;
 var _ = Meeko.stuff;
+var Registry = Meeko.Registry;
 
-
-var items = {};
-
-var filters = {
-
-register: function(name, fn) {
-	if (!/^[_a-zA-Z][_a-zA-Z0-9]*$/.test(name)) { // TODO should be in filters.register()
-		console.error('registerFilter called with invalid name: ' + name);
-		return; // TODO throw??
+var filters = new Registry({
+	writeOnce: true,
+	testKey: function(key) {
+		return /^[_a-zA-Z][_a-zA-Z0-9]*$/.test(key);
+	},
+	testValue: function(fn) {
+		return typeof fn === 'function';
 	}
-	if (this.has(name)) {
-		console.warn('A filter by that name already exists: ' + name);
-		return; // TODO throw??
-	}
-	items[name] = fn;
-},
+});
 
-has: function(name) {
-	return (name in items);
-},
-
-get: function(name) { 
-	if (!this.has(name)) throw name + ' is not a registered filter';
-	return items[name];
-},
+_.assign(filters, {
 
 evaluate: function(name, value, params) {
 	var fn = this.get(name);
@@ -40,7 +27,7 @@ evaluate: function(name, value, params) {
 	return fn.apply(undefined, args);
 }
 
-};
+});
 
 classnamespace.filters = filters;
 

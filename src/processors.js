@@ -6,23 +6,30 @@
 
 (function(classnamespace) {
 
-var window = this;
-var Meeko = window.Meeko;
+var global = this;
+var Meeko = global.Meeko;
+var _ = Meeko.stuff;
+var Registry = Meeko.Registry;
 var filters = Meeko.filters;
 
-var processors = {
+var processors = new Registry({
+	writeOnce: true,
+	testKey: function(key) {
+		return typeof key === 'string' && /^[_a-zA-Z][_a-zA-Z0-9]*/.test(key);
+	},
+	testValue: function(constructor) {
+		return typeof constructor === 'function';
+	}
+});
 
-items: {},
-
-register: function(type, constructor) {
-	this.items[type] = constructor;
-},
+_.assign(processors, {
 
 create: function(type, options, namespaces) {
-	return new this.items[type](options, namespaces, filters);
+	var constructor = this.get(type);
+	return new constructor(options, namespaces, filters);
 }
 
-}
+});
 
 classnamespace.processors = processors;
 

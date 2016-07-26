@@ -6,10 +6,9 @@
 
 (function(classnamespace) {
 
-var window = this;
-var document = window.document;
+var global = this;
 
-var Meeko = window.Meeko;
+var Meeko = global.Meeko;
 var _ = Meeko.stuff;
 var DOM = Meeko.DOM;
 var processors = Meeko.processors;

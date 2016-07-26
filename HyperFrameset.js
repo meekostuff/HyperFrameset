@@ -3536,6 +3536,62 @@ lookupSelector: function(selector, urn) {
 
 
 }).call(this);
+(function(classnamespace) {
+
+var global = this;
+var Meeko = global.Meeko;
+var _ = Meeko.stuff;
+
+var Registry = function(options) {
+	if (!options || typeof options !== 'object') options = {};
+	this.options = options;
+	this.items = {};
+}
+
+_.assign(Registry.prototype, {
+
+clear: function() {
+	if (this.options.writeOnce) throw Error('Attempted to clear write-once storage');
+	this.items = Object.create(null);
+},
+
+has: function(key) {
+	return key in this.items;
+},
+
+get: function(key) {
+	return this.items[key];
+},
+
+set: function(key, value) {
+	if (this.options.writeOnce && this.has(key)) {
+		throw Error('Attempted to rewrite key ' + key + ' in write-once storage');
+	}
+	if (this.options.keyTest) {
+		var ok = this.options.keyTest(key);
+		if (!ok) throw Error('Invalid key ' + key + ' for storage');
+	}
+	if (this.options.valueTest) {
+		var ok = this.options.valueTest(value);
+		if (!ok) throw Error('Invalid value ' + value + ' for storage');
+	}
+	this.items[key] = value;
+},
+
+'delete': function(key) {
+	if (this.options.writeOnce && this.has(key)) {
+		throw Error('Attempted to delete key ' + key + ' in write-once storage');
+	}
+	delete this.items[key];
+}
+
+});
+
+Registry.prototype.register = Registry.prototype.set;
+
+classnamespace.Registry = Registry;
+
+}).call(this, this.Meeko);
 /*
  * Date Format 1.2.3
  * (c) 2007-2009 Steven Levithan <stevenlevithan.com>
@@ -3670,32 +3726,19 @@ return dateFormat;
 var global = this;
 var Meeko = global.Meeko;
 var _ = Meeko.stuff;
+var Registry = Meeko.Registry;
 
-
-var items = {};
-
-var filters = {
-
-register: function(name, fn) {
-	if (!/^[_a-zA-Z][_a-zA-Z0-9]*$/.test(name)) { // TODO should be in filters.register()
-		console.error('registerFilter called with invalid name: ' + name);
-		return; // TODO throw??
+var filters = new Registry({
+	writeOnce: true,
+	testKey: function(key) {
+		return /^[_a-zA-Z][_a-zA-Z0-9]*$/.test(key);
+	},
+	testValue: function(fn) {
+		return typeof fn === 'function';
 	}
-	if (this.has(name)) {
-		console.warn('A filter by that name already exists: ' + name);
-		return; // TODO throw??
-	}
-	items[name] = fn;
-},
+});
 
-has: function(name) {
-	return (name in items);
-},
-
-get: function(name) { 
-	if (!this.has(name)) throw name + ' is not a registered filter';
-	return items[name];
-},
+_.assign(filters, {
 
 evaluate: function(name, value, params) {
 	var fn = this.get(name);
@@ -3706,7 +3749,7 @@ evaluate: function(name, value, params) {
 	return fn.apply(undefined, args);
 }
 
-};
+});
 
 classnamespace.filters = filters;
 
@@ -3786,33 +3829,47 @@ if (_.dateFormat) filters.register('date', function(value, format, utc) {
 
 (function(classnamespace) {
 
-var window = this;
-var document = window.document;
+var global = this;
 
-var Meeko = window.Meeko;
+var Meeko = global.Meeko;
 var _ = Meeko.stuff;
-var DOM = Meeko.DOM;
+var Registry = Meeko.Registry;
 
-var decoders = Meeko.decoders = {
+var decoders = new Registry({
+	writeOnce: true,
+	testKey: function(key) {
+		return typeof key === 'string' && /^[_a-zA-Z][_a-zA-Z0-9]*/.test(key);
+	},
+	testValue: function(constructor) {
+		return typeof constructor === 'function';
+	}
+});
 
-items: {},
-
-register: function(type, constructor) {
-	this.items[type] = constructor;
-},
+_.assign(decoders, {
 
 create: function(type, options, namespaces) {
-	return new this.items[type](options, namespaces);
+	var constructor = this.get(type);
+	return new constructor(options, namespaces);
 }
 
-}
+});
+
+classnamespace.decoders = decoders;
+
+}).call(this, this.Meeko);
+(function(classnamespace) {
+
+var global = this;
+
+var Meeko = global.Meeko;
+var _ = Meeko.stuff;
+var DOM = Meeko.DOM;
+var decoders = Meeko.decoders;
 
 // FIXME textAttr & htmlAttr used in HazardProcessor & CSSDecoder
 var textAttr = '_text';
 var htmlAttr = '_html';
 // TODO what about tagnameAttr, namespaceAttr
-
-var CSSDecoder = (function() {
 
 function CSSDecoder(options, namespaces) {}
 
@@ -4003,12 +4060,22 @@ function markElement(element) {
 	return uid;
 }
 
+_.assign(classnamespace, {
 
-return CSSDecoder;
-})();
+CSSDecoder: CSSDecoder
 
-decoders.register('css', CSSDecoder);
+});
 
+}).call(this, this.Meeko);
+(function(classnamespace) {
+
+var window = this;
+var document = window.document;
+
+var Meeko = window.Meeko;
+var _ = Meeko.stuff;
+var DOM = Meeko.DOM;
+var decoders = Meeko.decoders;
 
 var Microdata = (function() {
 
@@ -4211,8 +4278,6 @@ getValue: getValue
 })();
 
 
-var MicrodataDecoder = (function() {
-
 function MicrodataDecoder(options, namespaces) {}
 
 _.defaults(MicrodataDecoder.prototype, {
@@ -4274,13 +4339,25 @@ evaluate: function(query, context, variables, wantArray) {
 
 });
 
-return MicrodataDecoder;
-})();
 
-decoders.register('microdata', MicrodataDecoder);
+_.assign(classnamespace, {
+
+Microdata: Microdata,
+MicrodataDecoder: MicrodataDecoder
+
+});
 
 
-var JSONDecoder = (function() { 
+}).call(this, this.Meeko);
+(function(classnamespace) {
+
+var global = this;
+
+var Meeko = global.Meeko;
+var _ = Meeko.stuff;
+var DOM = Meeko.DOM;
+var decoders = Meeko.decoders;
+
 // FIXME not really a JSON decoder since expects JSON input and 
 // doesn't use JSON paths
 
@@ -4329,19 +4406,30 @@ evaluate: function(query, context, variables, wantArray) {
 
 });
 
-return JSONDecoder;
-})();
-
-decoders.register('json', JSONDecoder);
 
 _.assign(classnamespace, {
 
-CSSDecoder: CSSDecoder,
-MicrodataDecoder: MicrodataDecoder,
 JSONDecoder: JSONDecoder
 
 });
 
+
+}).call(this, this.Meeko);
+(function(classnamespace) {
+
+var global = this;
+
+var Meeko = global.Meeko;
+var decoders = Meeko.decoders;
+
+var CSSDecoder = Meeko.CSSDecoder;
+decoders.register('css', CSSDecoder);
+
+var MicrodataDecoder = Meeko.MicrodataDecoder;
+decoders.register('microdata', MicrodataDecoder);
+
+var JSONDecoder = Meeko.JSONDecoder;
+decoders.register('json', JSONDecoder);
 
 }).call(this, this.Meeko);
 /*!
@@ -4352,23 +4440,30 @@ JSONDecoder: JSONDecoder
 
 (function(classnamespace) {
 
-var window = this;
-var Meeko = window.Meeko;
+var global = this;
+var Meeko = global.Meeko;
+var _ = Meeko.stuff;
+var Registry = Meeko.Registry;
 var filters = Meeko.filters;
 
-var processors = {
+var processors = new Registry({
+	writeOnce: true,
+	testKey: function(key) {
+		return typeof key === 'string' && /^[_a-zA-Z][_a-zA-Z0-9]*/.test(key);
+	},
+	testValue: function(constructor) {
+		return typeof constructor === 'function';
+	}
+});
 
-items: {},
-
-register: function(type, constructor) {
-	this.items[type] = constructor;
-},
+_.assign(processors, {
 
 create: function(type, options, namespaces) {
-	return new this.items[type](options, namespaces, filters);
+	var constructor = this.get(type);
+	return new constructor(options, namespaces, filters);
 }
 
-}
+});
 
 classnamespace.processors = processors;
 
@@ -4381,10 +4476,9 @@ classnamespace.processors = processors;
 
 (function(classnamespace) {
 
-var window = this;
-var document = window.document;
+var global = this;
 
-var Meeko = window.Meeko;
+var Meeko = global.Meeko;
 var _ = Meeko.stuff;
 var DOM = Meeko.DOM;
 var processors = Meeko.processors;
@@ -4429,14 +4523,12 @@ MainProcessor: MainProcessor
 
 (function(classnamespace) {
 
-var window = this;
-var document = window.document;
+var global = this;
 
-var Meeko = window.Meeko;
+var Meeko = global.Meeko;
 var _ = Meeko.stuff;
 var DOM = Meeko.DOM;
 var Task = Meeko.Task;
-var Promise = Meeko.Promise;
 var processors = Meeko.processors;
 
 function ScriptProcessor(options) {
@@ -5499,16 +5591,18 @@ HazardProcessor: HazardProcessor
 
 (function(classnamespace) {
 
-var window = this;
+var global = this;
 
-var Meeko = window.Meeko;
+var Meeko = global.Meeko;
 var processors = Meeko.processors;
-var MainProcessor = Meeko.MainProcessor;
-var ScriptProcessor = Meeko.ScriptProcessor;
-var HazardProcessor = Meeko.HazardProcessor;
 
+var MainProcessor = Meeko.MainProcessor;
 processors.register('main', MainProcessor);
+
+var ScriptProcessor = Meeko.ScriptProcessor;
 processors.register('script', ScriptProcessor);
+
+var HazardProcessor = Meeko.HazardProcessor;
 processors.register('hazard', HazardProcessor);
 
 }).call(this, this.Meeko);

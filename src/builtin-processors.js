@@ -6,16 +6,18 @@
 
 (function(classnamespace) {
 
-var window = this;
+var global = this;
 
-var Meeko = window.Meeko;
+var Meeko = global.Meeko;
 var processors = Meeko.processors;
-var MainProcessor = Meeko.MainProcessor;
-var ScriptProcessor = Meeko.ScriptProcessor;
-var HazardProcessor = Meeko.HazardProcessor;
 
+var MainProcessor = Meeko.MainProcessor;
 processors.register('main', MainProcessor);
+
+var ScriptProcessor = Meeko.ScriptProcessor;
 processors.register('script', ScriptProcessor);
+
+var HazardProcessor = Meeko.HazardProcessor;
 processors.register('hazard', HazardProcessor);
 
 }).call(this, this.Meeko);
