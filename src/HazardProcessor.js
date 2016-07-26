@@ -716,6 +716,7 @@ transformHazardTree: function(el, context, frag) {
 			return frag;
 		}
 
+		if (!subContext) return frag;
 		return processor.transformChildNodes(el, subContext, frag);
 
 
