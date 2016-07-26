@@ -4010,7 +4010,7 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 		return nullResult;
 	}
 
-	if (contextVar) {
+	if (contextVar && contextVar !== CSS_CONTEXT_VARIABLE) {
 		if (!variables.has(contextVar)) {
 			console.debug('Context variable $' + contextVar + ' not defined for ' + selectorGroup);
 			return nullResult;
@@ -4050,8 +4050,15 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 	
 	var finalSelector = selectors.join(', ');
 
-	if (wantArray) return DOM.findAll(finalSelector, context);
-	else return DOM.find(finalSelector, context);
+	if (wantArray) {
+		var result = DOM.findAll(finalSelector, context);
+		if (contextVar && DOM.matches(context, finalSelector)) result.unshift(context);
+		return result;
+	}
+	else {
+		if (contextVar && DOM.matches(context, finalSelector)) return context;
+		return DOM.find(finalSelector, context);
+	}
 }
 
 var uidIndex = 0;
