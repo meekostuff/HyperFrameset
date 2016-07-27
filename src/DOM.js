@@ -101,42 +101,66 @@ else _.some(_.words('moz webkit ms o'), function(prefix) {
 
 var matches = matchesSelector ?
 function(element, selector, scope) {
-	if (scope) selector = absolutizeSelector(selector, scope);
-	return matchesSelector(element, selector);
+return scopeify(function(absSelector) {
+
+	return matchesSelector(element, absSelector);
+
+}, selector, scope);
 } :
 function() { throw Error('matches not supported'); } // NOTE fallback
 
 var closest = matchesSelector ?
 function(element, selector, scope) {
-	if (scope) selector = absolutizeSelector(selector, scope);
+return scopeify(function(absSelector) {
+
 	for (var el=element; el && el.nodeType === 1 && el!==scope; el=el.parentNode) {
-		if (matchesSelector(el, selector)) return el;
+		if (matchesSelector(el, absSelector)) return el;
 	}
-	return;
+
+}, selector, scope);
 } :
 function() { throw Error('closest not supported'); } // NOTE fallback
 
-function absolutizeSelector(selector, scope) { // WARN does not handle relative selectors that start with sibling selectors
+function scopeify(fn, selector, scope) {
+	var absSelector = selector;
+	if (scope) {
+		var uid = uniqueId(scope);
+		scope.setAttribute(nodeIdProperty, uid);
+		absSelector = absolutizeSelector(selector, scope);
+	}
+
+	var result = fn(absSelector);
+
+	if (scope) {
+		scope.removeAttribute(nodeIdProperty);
+	}
+
+	return result;
+}
+
+function absolutizeSelector(selectorGroup, scope) { // WARN does not handle relative selectors that start with sibling selectors
 	switch (scope.nodeType) {
 	case 1:
 		break;
 	case 9: case 11:
 		// TODO what to do with document / fragment
-		return selector;
+		return selectorGroup;
 	default:
 		// TODO should other node types throw??
-		return selector;
+		return selectorGroup;
 	}
-	var nodeId;
-	if (scope.hasAttribute(nodeIdProperty)) {
-		nodeId = scope.getAttribute(nodeIdProperty);
-	}
-	else {
-		nodeId = uniqueId(scope);
-		scope.setAttribute(nodeIdProperty, nodeId);
-	}
-	var scopePrefix = '[' + nodeIdProperty + '=' + nodeId + ']' + ' ';
-	return scopePrefix + selector.replace(/,(?![^(]*\))/g, ', ' + scopePrefix); // COMMA (,) that is not inside BRACKETS. Technically: not followed by a RHB ')' unless first followed by LHB '(' 
+	
+	var nodeId = uniqueId(scope);
+	var scopeSelector = '[' + nodeIdProperty + '=' + nodeId + ']';
+
+	// split on COMMA (,) that is not inside BRACKETS. Technically: not followed by a RHB ')' or ']' unless first followed by LHB '(' or '[' 
+	var selectors = selectorGroup.split(/,(?![^\(]*\)|[^\[]*\])/);
+	selectors = _.map(selectors, function(s) {
+		if (/^:scope\b/.test(s)) return s.replace(/^:scope\b/, scopeSelector);
+		else return scopeSelector + ' ' + s;
+	});
+		
+	return selectors.join(', ');
 }
 
 var findId = function(id, doc) {
@@ -148,26 +172,27 @@ var findId = function(id, doc) {
 }
 
 var findAll = document.querySelectorAll ?
-function(selector, node, scope) {
+function(selector, node, scope, inclusive) {
 	if (!node) node = document;
 	if (!node.querySelectorAll) return [];
-	if (scope) {
-		if (!scope.nodeType) scope = node; // `true` but not the scope element
-		selector = absolutizeSelector(selector, scope);
-	}
-	return _.map(node.querySelectorAll(selector));
+	if (scope && !scope.nodeType) scope = node; // `true` but not the scope element
+	return scopeify(function(absSelector) {
+		var result = _.map(node.querySelectorAll(absSelector));
+		if (inclusive && matchesSelector(node, absSelector)) result.unshift(node);
+		return result;
+	}, selector, scope);
 } :
 function() { throw Error('findAll() not supported'); };
 
 var find = document.querySelector ?
-function(selector, node, scope) {
+function(selector, node, scope, inclusive) {
 	if (!node) node = document;
 	if (!node.querySelector) return null;
-	if (scope) {
-		if (!scope.nodeType) scope = node; // `true` but not the scope element
-		selector = absolutizeSelector(selector, scope);
-	}
-	return node.querySelector(selector);
+	if (scope && !scope.nodeType) scope = node; // `true` but not the scope element
+	return scopeify(function(absSelector) {
+		if (inclusive && matchesSelector(node, absSelector)) return node;
+		return node.querySelector(absSelector);
+	}, selector, scope);
 } :
 function() { throw Error('find() not supported'); };
 
