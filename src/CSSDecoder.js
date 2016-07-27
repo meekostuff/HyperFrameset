@@ -109,8 +109,7 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 	selectorGroup = selectorGroup.trim();
 	if (selectorGroup === '') return wantArray ? [ context ] : context;
 	var nullResult = wantArray ? [] : null;
-
-	var selectors = selectorGroup.split(','); // FIXME ',' can appear within selectors
+	var selectors = selectorGroup.split(/,(?![^\(]*\)|[^\[]*\])/);
 	selectors = _.map(selectors, function(s) { return s.trim(); });
 
 	var invalidVarUse = false;
@@ -181,26 +180,21 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 
 	if (selectors.length <= 0) return nullResult;
 
-	var uid;
-	if (!isRoot) uid = markElement(context);
 	selectors = _.map(selectors, function(s) {
 			if (isRoot) return s;
-			var prefix = '[' + DOM.uniqueIdAttr + '=' + uid + ']';
+			var prefix = ':scope';
 			return (contextVar) ? 
 				s.replace('$' + contextVar, prefix) : 
-				'*' + prefix + ' ' + s;
+				prefix + ' ' + s;
 		});
 	
 	var finalSelector = selectors.join(', ');
 
 	if (wantArray) {
-		var result = DOM.findAll(finalSelector, context);
-		if (contextVar && DOM.matches(context, finalSelector)) result.unshift(context);
-		return result;
+		return DOM.findAll(finalSelector, context, !isRoot, !isRoot);
 	}
 	else {
-		if (contextVar && DOM.matches(context, finalSelector)) return context;
-		return DOM.find(finalSelector, context);
+		return DOM.find(finalSelector, context, !isRoot, !isRoot);
 	}
 }
 
