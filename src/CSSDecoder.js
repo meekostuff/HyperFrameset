@@ -105,8 +105,6 @@ function matches(element, selectorGroup) {
 	return DOM.matches(element, selectorGroup);
 }
 
-var uidAttrName = 'meekoid';
-
 function find(selectorGroup, context, variables, wantArray) { // FIXME currently only implements `context` expansion
 	selectorGroup = selectorGroup.trim();
 	if (selectorGroup === '') return wantArray ? [ context ] : context;
@@ -173,17 +171,21 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 
 	selectors = _.filter(selectors, function(s) {
 			switch(s.charAt(0)) {
-			case '+': case '~': return false; // FIXME warning or error
+			case '+': case '~': 
+				console.warn('Siblings of context-node cannot be selected in ' + selectorGroup);
+				return false;
 			case '>': return (isRoot) ? false : true; // FIXME probably should be allowed even if isRoot
 			default: return true;
 			}
 		});
 
+	if (selectors.length <= 0) return nullResult;
+
 	var uid;
 	if (!isRoot) uid = markElement(context);
 	selectors = _.map(selectors, function(s) {
 			if (isRoot) return s;
-			var prefix = '[' + uidAttrName + '=' + uid + ']';
+			var prefix = '[' + DOM.uniqueIdAttr + '=' + uid + ']';
 			return (contextVar) ? 
 				s.replace('$' + contextVar, prefix) : 
 				'*' + prefix + ' ' + s;
@@ -202,13 +204,13 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 	}
 }
 
-var uidIndex = 0;
-function markElement(element) {
-	if (element.hasAttribute(uidAttrName)) return element.getAttribute(uidAttrName);
-	var uid = '__' + (uidIndex++) + '__';
-	element.setAttribute(uidAttrName, uid);
+function markElement(context) {
+	if (context.hasAttribute(DOM.uniqueIdAttr)) return context.getAttribute(DOM.uniqueIdAttr);
+	var uid = DOM.uniqueId(context);
+	context.setAttribute(DOM.uniqueIdAttr, uid);
 	return uid;
 }
+
 
 _.assign(classnamespace, {
 

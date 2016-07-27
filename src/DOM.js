@@ -32,7 +32,8 @@ var DOM = Meeko.DOM = (function() {
 
 // TODO A node-manager API would be useful elsewhere
 
-var nodeIdProperty = vendorPrefix + 'ID';
+var nodeIdSuffix = Math.round(Math.random() * 1000000);
+var nodeIdProperty = '__' + vendorPrefix + nodeIdSuffix;
 var nodeCount = 0; // used to generated node IDs
 var nodeTable = []; // list of tagged nodes
 var nodeStorage = {}; // hash of storage for nodes, keyed off `nodeIdProperty`
@@ -40,7 +41,7 @@ var nodeStorage = {}; // hash of storage for nodes, keyed off `nodeIdProperty`
 var uniqueId = function(node) {
 	var nodeId = node[nodeIdProperty];
 	if (nodeId) return nodeId;
-	nodeId = '__' + vendorPrefix + '_' + nodeCount++;
+	nodeId = '__' + nodeCount++;
 	node[nodeIdProperty] = nodeId; // WARN would need `new String(nodeId)` in IE<=8
 			// so that node cloning doesn't copy the node ID property
 	nodeTable.push(node);
@@ -126,9 +127,15 @@ function absolutizeSelector(selector, scope) { // WARN does not handle relative 
 		// TODO should other node types throw??
 		return selector;
 	}
-	var id = scope.id;
-	if (!id) id = scope.id = uniqueId(scope);
-	var scopePrefix = '#' + id + ' ';
+	var nodeId;
+	if (scope.hasAttribute(nodeIdProperty)) {
+		nodeId = scope.getAttribute(nodeIdProperty);
+	}
+	else {
+		nodeId = uniqueId(scope);
+		scope.setAttribute(nodeIdProperty, nodeId);
+	}
+	var scopePrefix = '[' + nodeIdProperty + '=' + nodeId + ']' + ' ';
 	return scopePrefix + selector.replace(/,(?![^(]*\))/g, ', ' + scopePrefix); // COMMA (,) that is not inside BRACKETS. Technically: not followed by a RHB ')' unless first followed by LHB '(' 
 }
 
@@ -532,6 +539,7 @@ function onLoaded(e) {
 })();
 
 return {
+	uniqueIdAttr: nodeIdProperty,
 	uniqueId: uniqueId, setData: setData, getData: getData, hasData: hasData, // FIXME releaseNodes
 	getTagName: getTagName,
 	contains: contains, matches: matches,
