@@ -1180,10 +1180,24 @@ load: function(response) { // FIXME need a teardown method that releases child-f
 insert: function(bodyElement) { // FIXME need a teardown method that releases child-frames	
 	var frame = this;
 	
+	var options = frame.options;
+
 	// FIXME .bodyElement will probably become .bodies[] for transition animations.
-	if (frame.bodyElement) sprockets.removeNode(frame.bodyElement);
+	if (frame.bodyElement) {
+		if (options && options.bodyLeft) {
+			try { options.bodyLeft(frame, frame.bodyElement); } 
+			catch (err) { Task.postError(err); }
+		}
+		sprockets.removeNode(frame.bodyElement);
+	}
+
 	sprockets.insertNode('beforeend', frame.element, bodyElement);
 	frame.bodyElement = bodyElement;
+
+	if (options && options.bodyEntered) {
+		try { options.bodyEntered(frame, frame.bodyElement); } 
+		catch (err) { Task.postError(err); }
+	}
 },
 
 });
