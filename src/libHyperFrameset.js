@@ -99,8 +99,8 @@ _.assign(Interface, {
 attached: function(handlers) {
 	var object = this;
 	var element = object.element;
-	if (!element.hasAttribute('configid')) return;
-	var configID = _.words(element.getAttribute('configid'))[0];	
+	if (!element.hasAttribute('config')) return;
+	var configID = _.words(element.getAttribute('config'))[0];	
 	var options = framer.definition.configData[configID];
 	if (!options) return;
 	_.forEach(events, function(type) {
@@ -128,8 +128,8 @@ sprockets.registerElement(tag, Interface);
 // NOTE handlers are registered for "body@submit,reset,input,change" in HFrameset
 function registerBodyAsPseudoForm(object, handlers) {
 	var element = object.element;
-	if (!element.hasAttribute('configid')) return;
-	var configID = _.words(element.getAttribute('configid'))[0];	
+	if (!element.hasAttribute('config')) return;
+	var configID = _.words(element.getAttribute('config'))[0];	
 	var options = framer.definition.configData[configID];
 	if (!options) return;
 
@@ -357,8 +357,8 @@ init: function(el) {
 	while (node = el.firstChild) frag.appendChild(node); // NOTE no adoption
 
 	var options;
-	if (el.hasAttribute('configid')) {
-		var configID = _.words(el.getAttribute('configid'))[0];
+	if (el.hasAttribute('config')) {
+		var configID = _.words(el.getAttribute('config'))[0];
 		options = framesetDef.configData[configID];
 	}
 	var processor = transform.processor = processors.create(transform.type, options, framesetDef.namespaces);
@@ -521,15 +521,15 @@ preprocess: function() {
 		}
 		if (!scriptFor) scriptFor = script.parentNode;
 		
-		// FIXME @configID shouldn't be hard-wired here
-		var configID = scriptFor.hasAttribute('configID') ? 
-			scriptFor.getAttribute('configID') :
+		// FIXME @config shouldn't be hard-wired here
+		var configID = scriptFor.hasAttribute('config') ? 
+			scriptFor.getAttribute('config') :
 			'';
-		// TODO we can add more than one configID to an element but only first is used
+		// TODO we can add more than one @config to an element but only first is used
 		configID = configID ?
 			configID.replace(/\s*$/, ' ' + sourceURL) :
 			sourceURL;
-		scriptFor.setAttribute('configID', configID);
+		scriptFor.setAttribute('config', configID);
 
 		var fnText = 'return (' + script.text + '\n);';
 
@@ -728,8 +728,8 @@ iAttached: function(handlers) {
 	var object = this;
 	object.options = {};
 	var element = object.element;
-	if (!element.hasAttribute('configid')) return;
-	var configID = _.words(element.getAttribute('configid'))[0];	
+	if (!element.hasAttribute('config')) return;
+	var configID = _.words(element.getAttribute('config'))[0];	
 	var options = framer.definition.configData[configID];
 	object.options = options;
 }
