@@ -5808,68 +5808,31 @@ processors.register('hazard', HazardProcessor);
 
 }).call(this, this.Meeko);
 /*!
- * HyperFrameset
+ * HyperFrameset definitions
  * Copyright 2009-2016 Sean Hogan (http://meekostuff.net/)
  * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
  */
 
-/* NOTE
-	+ assumes DOMSprockets
-*/
-/* TODO
-    + substantial error handling and notification needs to be added
-    + <link rel="self" />
-    + Would be nice if more of the internal functions were called as method, eg DOM.ready()...
-        this would allow the boot-script to modify them as appropriate
-    + Up-front feature testing to prevent boot on unsupportable platorms...
-        e.g. can't create HTML documents
-    + use requestAnimationFrame() when available
-    + The passing of nodes between documents needs to be audited.
-		Safari and IE10,11 in particular seem to require nodes to be imported / adopted
-		(not fully understood right now)
- */
+(function(classnamespace) {
 
-(function() {
+var global = this;
 
-var window = this;
-var document = window.document;
-
-
-if (!window.XMLHttpRequest) throw Error('HyperFrameset requires native XMLHttpRequest');
-
-
-var _ = Meeko.stuff; // provided by DOMSprockets
-
+var Meeko = global.Meeko;
+var _ = Meeko.stuff;
 var Task = Meeko.Task;
 var Promise = Meeko.Promise;
-var URL = Meeko.URL;
-
-/*
- ### DOM utility functions
- */
 
 var DOM = Meeko.DOM;
-var htmlParser = Meeko.htmlParser;
-var httpProxy = Meeko.httpProxy;
+var URL = Meeko.URL;
 var CustomNamespace = Meeko.CustomNamespace;
 var NamespaceCollection = Meeko.NamespaceCollection;
-var scriptQueue = Meeko.scriptQueue;
 
-var historyManager = Meeko.historyManager;
-var sprockets = Meeko.sprockets;
-var controllers = Meeko.controllers;
 var filters = Meeko.filters;
 var decoders = Meeko.decoders;
 var processors = Meeko.processors;
 
 
 /* BEGIN HFrameset code */
-
-var framer = Meeko.framer = (function() {
-
-// FIXME DRY these @rel values with boot.js
-var FRAMESET_REL = 'frameset'; // NOTE http://lists.w3.org/Archives/Public/www-html/1996Dec/0143.html
-var SELF_REL = 'self';
 
 var HYPERFRAMESET_URN = 'hyperframeset';
 var hfDefaultNamespace = new CustomNamespace({
@@ -5878,114 +5841,6 @@ var hfDefaultNamespace = new CustomNamespace({
 	urn: HYPERFRAMESET_URN
 });
 
-
-function registerFormElements() {
-
-var eventConfig = 'form@submit,reset,input,change,invalid input,textarea@input,change,invalid,focus,blur select,fieldset@change,invalid,focus,blur button@click';
-
-var eventTable = (function(config) {
-
-var table = {};
-_.forEach(config.split(/\s+/), function(combo) {
-	var m = combo.split('@');
-	var tags = m[0].split(',');
-	var events = m[1].split(',');
-	_.forEach(tags, function(tag) {
-		table[tag] = _.map(events);
-	});
-});
-
-return table;
-
-})(eventConfig);
-
-
-_.forOwn(eventTable, function(events, tag) {
-
-var Interface = sprockets.evolve(sprockets.RoleType, {});
-_.assign(Interface, {
-
-attached: function(handlers) {
-	var object = this;
-	var element = object.element;
-	if (!element.hasAttribute('config')) return;
-	var configID = _.words(element.getAttribute('config'))[0];	
-	var options = framer.definition.configData[configID];
-	if (!options) return;
-	_.forEach(events, function(type) {
-		var ontype = 'on' + type;
-		var callback = options[ontype];
-		if (!callback) return;
-
-		var fn = function() { callback.apply(object, arguments); };
-		object[ontype] = fn;
-		handlers.push({
-			type: type,
-			action: fn
-		});
-	});
-}
-
-});
-
-sprockets.registerElement(tag, Interface);
-
-});
-
-} // END registerFormElements()
-
-// NOTE handlers are registered for "body@submit,reset,input,change" in HFrameset
-function registerBodyAsPseudoForm(object, handlers) {
-	var element = object.element;
-	if (!element.hasAttribute('config')) return;
-	var configID = _.words(element.getAttribute('config'))[0];	
-	var options = framer.definition.configData[configID];
-	if (!options) return;
-
-	var events = _.words('submit reset change input');
-	var needClickWatcher = false;
-
-	_.forEach(events, function(type) {
-		var ontype = 'on' + type;
-		var callback = options[ontype];
-		if (!callback) return;
-
-		var fn = function(e) { 
-			if (DOM.closest(e.target, 'form')) return;
-			callback.apply(object, arguments); 
-		};
-		object[ontype] = fn;
-		handlers.push({
-			type: type,
-			action: fn
-		});
-		
-		switch (type) {
-		default: break;
-		case 'submit': case 'reset': needClickWatcher = true;
-		}
-	});
-
-	if (needClickWatcher) {
-		document.addEventListener('click', function(e) { 
-			if (DOM.closest(e.target, 'form')) return;
-			var type = e.target.type;
-			if (!(type === 'submit' || type === 'reset')) return;
-			Task.asap(function() {
-				var pseudoEvent = document.createEvent('CustomEvent');
-				// NOTE pseudoEvent.detail = e.target
-				pseudoEvent.initCustomEvent(type, true, true, e.target);
-				pseudoEvent.preventDefault();
-				element.dispatchEvent(pseudoEvent);
-			});
-		}, false);
-	}
-}
-
-
-/*
- * HyperFrameset definitions
- */
 
 var hfHeadTags = _.words('title meta link style script');
 
@@ -6028,7 +5883,7 @@ render: function(resource, condition, details) {
 	var framesetDef = frameDef.framesetDefinition;
 	if (!details) details = {};
 	_.defaults(details, { // TODO more details??
-		scope: framer.scope,
+		scope: framesetDef.scope,
 		url: resource && resource.url,
 		mainSelector: frameDef.mainSelector,
 	});
@@ -6209,7 +6064,8 @@ _.defaults(HFramesetDefinition.prototype, {
 init: function(doc, settings) {
 	var framesetDef = this;
 	_.defaults(framesetDef, {
-		url: settings.framesetURL
+		url: settings.framesetURL,
+		scope: settings.scope
 	});
 
 	var namespaces = framesetDef.namespaces = CustomNamespace.getNamespaces(doc);
@@ -6260,12 +6116,22 @@ init: function(doc, settings) {
 		script.text += '\n//# sourceURL=' + sourceURL;
 	});
 
-	
+	// Move all <script for> in <head> to <body>
 	var firstChild = doc.body.firstChild;
 	_.forEach(DOM.findAll('script[for]', doc.head), function(script) {
 		doc.body.insertBefore(script, firstChild);
 		script.setAttribute('for', '');
 		console.info('Moved <script for> in frameset <head> to <body>');
+	});
+
+	// Move all non-@for, javascript <script> in <body> to <head>
+	_.forEach(DOM.findAll('script', doc.body), function(script) {
+		// ignore non-javascript scripts
+		if (script.type && !/^text\/javascript/.test(script.type)) return;
+		// ignore @for scripts
+		if (script.hasAttribute('for')) return;
+		doc.head.appendChild(script);
+		console.info('Moved <script> in frameset <body> to <head>');
 	});
 
 	var allowedScope = 'panel, frame';
@@ -6291,6 +6157,7 @@ preprocess: function() {
 		// Ignore non-javascript scripts
 		if (script.type && !/^text\/javascript/.test(script.type)) return;
 
+		// TODO probably don't need this as handled by init()
 		if (script.hasAttribute('src')) { // external javascript in <body> is invalid
 			console.warn('Frameset <body> may not contain external scripts: \n' +
 				script.cloneNode(false).outerHTML);
@@ -6300,21 +6167,15 @@ preprocess: function() {
 
 		var sourceURL = script.getAttribute('sourceurl');
 
+		// TODO probably don't need this as handled by init()
 		if (!script.hasAttribute('for')) {
-			var newScript = script.cloneNode(true);
-
-			try {
-				DOM.insertNode('beforeend', document.head, newScript);
-			}
-			catch(err) { // TODO test if this actually catches script errors
-				console.warn('Error evaluating inline script in frameset:\n' +
+			console.warn('Frameset <body> may not contain non-@for scripts:\n' +
 					framesetDef.url + '#' + script.id);
-				Task.postError(err);
-			}
-			script.parentNode.removeChild(script); // physical <script> no longer needed
+			script.parentNode.removeChild(script); 
 			return;
 		}
 
+		// TODO should this be handled by init() ??
 		if (script.getAttribute('for') !== '') {
 			console.warn('<script> may only contain EMPTY @for: \n' +
 				script.cloneNode(false).outerHTML);
@@ -6448,7 +6309,7 @@ function rebaseURL(url, baseURL) {
 
 function normalizeScopedStyles(doc, allowedScopeSelector) {
 	var scopedStyles = DOM.findAll('style[scoped]', doc.body);
-	var dummyDoc = document.implementation.createHTMLDocument('');
+	var dummyDoc = DOM.createHTMLDocument('', doc);
 	_.forEach(scopedStyles, function(el, index) {
 		var scope = el.parentNode;
 		if (!DOM.matches(scope, allowedScopeSelector)) {
@@ -6519,6 +6380,187 @@ function forRules(parentRule, callback, context) {
 return HFramesetDefinition;	
 })();
 
+
+_.defaults(HFramesetDefinition, {
+
+HYPERFRAMESET_URN: HYPERFRAMESET_URN
+
+});
+
+_.defaults(classnamespace, {
+
+	HFrameDefinition: HFrameDefinition,
+	HFramesetDefinition: HFramesetDefinition,
+	HBodyDefinition: HBodyDefinition,
+	HTransformDefinition: HTransformDefinition
+
+});
+
+}).call(this, this.Meeko);
+
+/*!
+ * HyperFrameset
+ * Copyright 2009-2016 Sean Hogan (http://meekostuff.net/)
+ * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+ */
+
+/* NOTE
+	+ assumes DOMSprockets
+*/
+/* TODO
+    + substantial error handling and notification needs to be added
+    + <link rel="self" />
+    + Would be nice if more of the internal functions were called as method, eg DOM.ready()...
+        this would allow the boot-script to modify them as appropriate
+    + Up-front feature testing to prevent boot on unsupportable platorms...
+        e.g. can't create HTML documents
+    + use requestAnimationFrame() when available
+    + The passing of nodes between documents needs to be audited.
+		Safari and IE10,11 in particular seem to require nodes to be imported / adopted
+		(not fully understood right now)
+ */
+
+(function() {
+
+var window = this;
+var document = window.document;
+
+var Meeko = window.Meeko;
+var _ = Meeko.stuff; // provided by DOMSprockets
+
+var Task = Meeko.Task;
+var Promise = Meeko.Promise;
+var URL = Meeko.URL;
+
+/*
+ ### DOM utility functions
+ */
+
+var DOM = Meeko.DOM;
+var htmlParser = Meeko.htmlParser;
+var httpProxy = Meeko.httpProxy;
+var CustomNamespace = Meeko.CustomNamespace;
+var NamespaceCollection = Meeko.NamespaceCollection;
+var scriptQueue = Meeko.scriptQueue;
+
+var historyManager = Meeko.historyManager;
+var sprockets = Meeko.sprockets;
+var controllers = Meeko.controllers;
+
+var HFramesetDefinition = Meeko.HFramesetDefinition;
+var HYPERFRAMESET_URN = HFramesetDefinition.HYPERFRAMESET_URN;
+
+
+/* BEGIN HFrameset code */
+
+var framer = Meeko.framer = (function() {
+
+// FIXME DRY these @rel values with boot.js
+var FRAMESET_REL = 'frameset'; // NOTE http://lists.w3.org/Archives/Public/www-html/1996Dec/0143.html
+var SELF_REL = 'self';
+
+function registerFormElements() {
+
+var eventConfig = 'form@submit,reset,input,change,invalid input,textarea@input,change,invalid,focus,blur select,fieldset@change,invalid,focus,blur button@click';
+
+var eventTable = (function(config) {
+
+var table = {};
+_.forEach(config.split(/\s+/), function(combo) {
+	var m = combo.split('@');
+	var tags = m[0].split(',');
+	var events = m[1].split(',');
+	_.forEach(tags, function(tag) {
+		table[tag] = _.map(events);
+	});
+});
+
+return table;
+
+})(eventConfig);
+
+
+_.forOwn(eventTable, function(events, tag) {
+
+var Interface = sprockets.evolve(sprockets.RoleType, {});
+_.assign(Interface, {
+
+attached: function(handlers) {
+	var object = this;
+	var element = object.element;
+	if (!element.hasAttribute('config')) return;
+	var configID = _.words(element.getAttribute('config'))[0];	
+	var options = framer.definition.configData[configID];
+	if (!options) return;
+	_.forEach(events, function(type) {
+		var ontype = 'on' + type;
+		var callback = options[ontype];
+		if (!callback) return;
+
+		var fn = function() { callback.apply(object, arguments); };
+		object[ontype] = fn;
+		handlers.push({
+			type: type,
+			action: fn
+		});
+	});
+}
+
+});
+
+sprockets.registerElement(tag, Interface);
+
+});
+
+} // END registerFormElements()
+
+// NOTE handlers are registered for "body@submit,reset,input,change" in HFrameset
+function registerBodyAsPseudoForm(object, handlers) {
+	var element = object.element;
+	if (!element.hasAttribute('config')) return;
+	var configID = _.words(element.getAttribute('config'))[0];	
+	var options = framer.definition.configData[configID];
+	if (!options) return;
+
+	var events = _.words('submit reset change input');
+	var needClickWatcher = false;
+
+	_.forEach(events, function(type) {
+		var ontype = 'on' + type;
+		var callback = options[ontype];
+		if (!callback) return;
+
+		var fn = function(e) { 
+			if (DOM.closest(e.target, 'form')) return;
+			callback.apply(object, arguments); 
+		};
+		object[ontype] = fn;
+		handlers.push({
+			type: type,
+			action: fn
+		});
+		
+		switch (type) {
+		default: break;
+		case 'submit': case 'reset': needClickWatcher = true;
+		}
+	});
+
+	if (needClickWatcher) {
+		document.addEventListener('click', function(e) { 
+			if (DOM.closest(e.target, 'form')) return;
+			var type = e.target.type;
+			if (!(type === 'submit' || type === 'reset')) return;
+			Task.asap(function() {
+				var pseudoEvent = document.createEvent('CustomEvent');
+				// NOTE pseudoEvent.detail = e.target
+				pseudoEvent.initCustomEvent(type, true, true, e.target);
+				pseudoEvent.preventDefault();
+				element.dispatchEvent(pseudoEvent);
+			});
+		}, false);
+	}
+}
 
 /*
  * HyperFrameset sprockets
@@ -7871,8 +7913,6 @@ config: function(options) {
 
 _.defaults(framer, {
 
-	HFrameDefinition: HFrameDefinition,
-	HFramesetDefinition: HFramesetDefinition,
 	HFrame: HFrame,
 	HFrameset: HFrameset,
 	Layer: Layer,
@@ -7889,5 +7929,5 @@ return framer;
 
 // end framer defn
 
-}).call(window);
+}).call(this);
 
