@@ -1495,7 +1495,7 @@ var createHTMLDocument = function(title, srcDoc) { // modern browsers. IE >= 9
 		doc.appendChild(docEl);
 	}
 	else {
-		doc = srcDoc.implementation.createHTMLDocument('');
+		doc = srcDoc.implementation.createHTMLDocument(title);
 	}
 	return doc;
 }
