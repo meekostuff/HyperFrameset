@@ -34,7 +34,11 @@ clone: function() {
 },
 
 lookupTagName: function(name) { return this.prefix + name; },
-lookupSelector: function(name) { return this.selectorPrefix + name; }
+lookupSelector: function(selector) {
+	var prefix = this.selectorPrefix;
+	var tags = selector.split(/\s*,\s*|\s+/);
+	return _.map(tags, function(tag) { return prefix + tag; }).join(', ');
+}
 
 });
 
@@ -149,8 +153,7 @@ lookupTagNameNS: function(name, urn) {
 lookupSelector: function(selector, urn) {
 	var nsDef = this.lookupNamespace(urn);
 	if (!nsDef) return selector;
-	var tags = selector.split(/\s*,\s*|\s+/);
-	return _.map(tags, function(tag) { return nsDef.lookupSelector(tag); }).join(', ');
+	return nsDef.lookupSelector(selector);
 }
 
 });

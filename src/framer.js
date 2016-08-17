@@ -153,7 +153,8 @@ start: function(startOptions) {
 			if (acceptDefault === false) e.preventDefault();
 		}, false);
 		
-		Meeko.framesetElements.register(); // framesetElements.register();
+		var namespace = framer.definition.namespaces.lookupNamespace(HYPERFRAMESET_URN);
+		Meeko.framesetElements.register(namespace); // framesetElements.register();
 		Meeko.formElements.register(); // formElements.register();
 
 		return sprockets.start({ manual: true }); // FIXME should be a promise
@@ -351,7 +352,7 @@ frameEntered: function(frame) {
 	var parentElement = DOM.closest(frame.element.parentNode, namespaces.lookupSelector('frame', HYPERFRAMESET_URN)); // TODO frame.element.parentNode.ariaClosest('frame')
 	if (parentElement) parentFrame = parentElement.$;
 	else {
-		parentElement = document.body; // TODO  frame.elenent.parentNode.ariaClosest('frameset'); 
+		parentElement = document.body; // TODO  frame.element.parentNode.ariaClosest('frameset'); 
 		parentFrame = parentElement.$;
 	}
 	parentFrame.frameEntered(frame);

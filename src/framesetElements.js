@@ -20,16 +20,13 @@ var Task = Meeko.Task;
 var Promise = Meeko.Promise;
 var URL = Meeko.URL;
 var DOM = Meeko.DOM;
-var CustomNamespace = Meeko.CustomNamespace;
-var NamespaceCollection = Meeko.NamespaceCollection;
 
 var configData = Meeko.configData;
 var sprockets = Meeko.sprockets;
 var controllers = Meeko.controllers;
 var framer = Meeko.framer; // TODO remove `framer` dependency
 
-var HFramesetDefinition = Meeko.HFramesetDefinition;
-var HYPERFRAMESET_URN = HFramesetDefinition.HYPERFRAMESET_URN;
+var namespace;
 
 /*
  * HyperFrameset sprockets
@@ -219,13 +216,9 @@ role: 'group',
 
 owns: {
 	get: function() { 
-		var namespaces = framer.definition.namespaces;
 		return _.filter(this.element.children, function(el) { 
 			return DOM.matches(el, 
-				namespaces.lookupSelector(
-					'hlayout, vlayout, deck, rdeck, panel, frame', 
-					HYPERFRAMESET_URN
-				)
+				namespace.lookupSelector('hlayout, vlayout, deck, rdeck, panel, frame')
 			); 
 		}); 
 	}
@@ -236,12 +229,11 @@ owns: {
 _.assign(Layout, {
 
 iEnteredDocument: function() {
-	var namespaces = framer.definition.namespaces;
 	var element = this.element;
 	var parent = element.parentNode;
 
 	// FIXME dimension setting should occur before becoming visible
-	if (DOM.matches(parent, namespaces.lookupSelector('layer', HYPERFRAMESET_URN))) { // TODO vh, vw not tested on various platforms
+	if (DOM.matches(parent, namespace.lookupSelector('layer'))) { // TODO vh, vw not tested on various platforms
 		var height = this.attr('height'); // TODO css unit parsing / validation
 		if (!height) height = '100vh';
 		else height = height.replace('%', 'vh');
@@ -256,7 +248,7 @@ iEnteredDocument: function() {
 	
 	function normalizeChild(node) {
 		var element = this;
-		if (DOM.matches(node, namespaces.lookupSelector('hlayout, vlayout, deck, rdeck, panel, frame', HYPERFRAMESET_URN))) return; 
+		if (DOM.matches(node, namespace.lookupSelector('hlayout, vlayout, deck, rdeck, panel, frame'))) return; 
 		switch (node.nodeType) {
 		case 1: // hide non-layout elements
 			node.hidden = true;
@@ -639,41 +631,41 @@ return HFrameset;
 })();
 
 
-function registerFramesetElements() {
+function registerFramesetElements(ns) {
 
-var namespaces = framer.definition.namespaces;
+namespace = ns; // TODO assert ns instanceof CustomNamespace
 
 sprockets.registerElement('body', HFrameset);
-sprockets.registerElement(namespaces.lookupSelector('frame', HYPERFRAMESET_URN), HFrame);
+sprockets.registerElement(namespace.lookupSelector('frame'), HFrame);
 
-sprockets.registerElement(namespaces.lookupSelector('layer', HYPERFRAMESET_URN), Layer);
-sprockets.registerElement(namespaces.lookupSelector('popup', HYPERFRAMESET_URN), Popup);
-sprockets.registerElement(namespaces.lookupSelector('panel', HYPERFRAMESET_URN), Panel);
-sprockets.registerElement(namespaces.lookupSelector('vlayout', HYPERFRAMESET_URN), VLayout);
-sprockets.registerElement(namespaces.lookupSelector('hlayout', HYPERFRAMESET_URN), HLayout);
-sprockets.registerElement(namespaces.lookupSelector('deck', HYPERFRAMESET_URN), Deck);
-sprockets.registerElement(namespaces.lookupSelector('rdeck', HYPERFRAMESET_URN), ResponsiveDeck);
+sprockets.registerElement(namespace.lookupSelector('layer'), Layer);
+sprockets.registerElement(namespace.lookupSelector('popup'), Popup);
+sprockets.registerElement(namespace.lookupSelector('panel'), Panel);
+sprockets.registerElement(namespace.lookupSelector('vlayout'), VLayout);
+sprockets.registerElement(namespace.lookupSelector('hlayout'), HLayout);
+sprockets.registerElement(namespace.lookupSelector('deck'), Deck);
+sprockets.registerElement(namespace.lookupSelector('rdeck'), ResponsiveDeck);
 
 var cssText = [
 '*[hidden] { display: none !important; }', // TODO maybe not !important
 'html, body { margin: 0; padding: 0; }',
 'html { width: 100%; height: 100%; }',
-namespaces.lookupSelector('layer, popup, hlayout, vlayout, deck, rdeck, panel, frame, body', HYPERFRAMESET_URN) + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
-namespaces.lookupSelector('layer', HYPERFRAMESET_URN) + ' { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; }',
-namespaces.lookupSelector('hlayout, vlayout, deck, rdeck', HYPERFRAMESET_URN) + ' { display: block; width: 0; height: 0; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
-namespaces.lookupSelector('hlayout, vlayout, deck, rdeck', HYPERFRAMESET_URN) + ' { width: 100%; height: 100%; }', // FIXME should be 0,0 before manual calculations
-namespaces.lookupSelector('frame, panel', HYPERFRAMESET_URN) + ' { display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
-namespaces.lookupSelector('body', HYPERFRAMESET_URN) + ' { display: block; width: auto; height: auto; margin: 0; }',
-namespaces.lookupSelector('popup', HYPERFRAMESET_URN) + ' { display: block; position: relative; width: 0; height: 0; }',
-namespaces.lookupSelector('popup', HYPERFRAMESET_URN) + ' > * { position: absolute; top: 0; left: 0; }', // TODO or change 'body' styling above
-namespaces.lookupSelector('vlayout', HYPERFRAMESET_URN) + ' { height: 100%; }',
-namespaces.lookupSelector('hlayout', HYPERFRAMESET_URN) + ' { width: 100%; overflow-y: hidden; }',
-namespaces.lookupSelector('vlayout', HYPERFRAMESET_URN) + ' > * { display: block; float: left; width: 100%; height: auto; text-align: left; }',
-namespaces.lookupSelector('vlayout', HYPERFRAMESET_URN) + ' > *::after { clear: both; }',
-namespaces.lookupSelector('hlayout', HYPERFRAMESET_URN) + ' > * { display: block; float: left; width: auto; height: 100%; vertical-align: top; overflow-y: auto; }',
-namespaces.lookupSelector('hlayout', HYPERFRAMESET_URN) + '::after { clear: both; }',
-namespaces.lookupSelector('deck', HYPERFRAMESET_URN) + ' > * { width: 100%; height: 100%; }',
-namespaces.lookupSelector('rdeck', HYPERFRAMESET_URN) + ' > * { width: 0; height: 0; }',
+namespace.lookupSelector('layer, popup, hlayout, vlayout, deck, rdeck, panel, frame, body') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
+namespace.lookupSelector('layer') + ' { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; }',
+namespace.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { display: block; width: 0; height: 0; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+namespace.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { width: 100%; height: 100%; }', // FIXME should be 0,0 before manual calculations
+namespace.lookupSelector('frame, panel') + ' { display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+namespace.lookupSelector('body') + ' { display: block; width: auto; height: auto; margin: 0; }',
+namespace.lookupSelector('popup') + ' { display: block; position: relative; width: 0; height: 0; }',
+namespace.lookupSelector('popup') + ' > * { position: absolute; top: 0; left: 0; }', // TODO or change 'body' styling above
+namespace.lookupSelector('vlayout') + ' { height: 100%; }',
+namespace.lookupSelector('hlayout') + ' { width: 100%; overflow-y: hidden; }',
+namespace.lookupSelector('vlayout') + ' > * { display: block; float: left; width: 100%; height: auto; text-align: left; }',
+namespace.lookupSelector('vlayout') + ' > *::after { clear: both; }',
+namespace.lookupSelector('hlayout') + ' > * { display: block; float: left; width: auto; height: 100%; vertical-align: top; overflow-y: auto; }',
+namespace.lookupSelector('hlayout') + '::after { clear: both; }',
+namespace.lookupSelector('deck') + ' > * { width: 100%; height: 100%; }',
+namespace.lookupSelector('rdeck') + ' > * { width: 0; height: 0; }',
 ].join('\n');
 
 var style = document.createElement('style');
