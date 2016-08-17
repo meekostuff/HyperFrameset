@@ -23,6 +23,7 @@ var DOM = Meeko.DOM;
 var CustomNamespace = Meeko.CustomNamespace;
 var NamespaceCollection = Meeko.NamespaceCollection;
 
+var configData = Meeko.configData;
 var sprockets = Meeko.sprockets;
 var controllers = Meeko.controllers;
 var framer = Meeko.framer; // TODO remove `framer` dependency
@@ -49,7 +50,7 @@ iAttached: function(handlers) {
 	var element = object.element;
 	if (!element.hasAttribute('config')) return;
 	var configID = _.words(element.getAttribute('config'))[0];	
-	var options = framer.definition.configData[configID];
+	var options = configData.get(configID);
 	object.options = options;
 }
 

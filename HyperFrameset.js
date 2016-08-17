@@ -5807,6 +5807,28 @@ var HazardProcessor = Meeko.HazardProcessor;
 processors.register('hazard', HazardProcessor);
 
 }).call(this, this.Meeko);
+
+(function(classnamespace) {
+
+var global = this;
+var Meeko = global.Meeko;
+var _ = Meeko.stuff;
+var Registry = Meeko.Registry;
+
+var configData = new Registry({
+	writeOnce: true,
+	testKey: function(key) {
+		return typeof key === 'string';
+	},
+	testValue: function(o) {
+		return o != null && typeof o === 'object';
+	}
+});
+
+classnamespace.configData = configData;
+
+}).call(this, this.Meeko);
+
 /*!
  * HyperFrameset definitions
  * Copyright 2009-2016 Sean Hogan (http://meekostuff.net/)
@@ -5826,6 +5848,7 @@ var DOM = Meeko.DOM;
 var URL = Meeko.URL;
 var CustomNamespace = Meeko.CustomNamespace;
 var NamespaceCollection = Meeko.NamespaceCollection;
+var configData = Meeko.configData;
 
 var filters = Meeko.filters;
 var decoders = Meeko.decoders;
@@ -6023,7 +6046,7 @@ init: function(el) {
 	var options;
 	if (el.hasAttribute('config')) {
 		var configID = _.words(el.getAttribute('config'))[0];
-		options = framesetDef.configData[configID];
+		options = configData.get(configID);
 	}
 	var processor = transform.processor = processors.create(transform.type, options, framesetDef.namespaces);
 	processor.loadTemplate(frag);
@@ -6148,7 +6171,6 @@ preprocess: function() {
 	var framesetDef = this;
 	var body = framesetDef.element;
 	_.defaults(framesetDef, {
-		configData: {}, // Indexed by @sourceURL
 		frames: {} // all hyperframe definitions. Indexed by @defid (which may be auto-generated)
 	});
 
@@ -6206,7 +6228,7 @@ preprocess: function() {
 		try {
 			var fn = Function(fnText);
 			var object = fn();
-			framesetDef.configData[sourceURL] = object;
+			configData.set(sourceURL, object);
 		}
 		catch(err) { 
 			console.warn('Error evaluating inline script in frameset:\n' +
@@ -7178,6 +7200,7 @@ var DOM = Meeko.DOM;
 var CustomNamespace = Meeko.CustomNamespace;
 var NamespaceCollection = Meeko.NamespaceCollection;
 
+var configData = Meeko.configData;
 var sprockets = Meeko.sprockets;
 var controllers = Meeko.controllers;
 var framer = Meeko.framer; // TODO remove `framer` dependency
@@ -7204,7 +7227,7 @@ iAttached: function(handlers) {
 	var element = object.element;
 	if (!element.hasAttribute('config')) return;
 	var configID = _.words(element.getAttribute('config'))[0];	
-	var options = framer.definition.configData[configID];
+	var options = configData.get(configID);
 	object.options = options;
 }
 
@@ -7878,8 +7901,9 @@ var Task = Meeko.Task;
 var Promise = Meeko.Promise;
 var URL = Meeko.URL;
 var DOM = Meeko.DOM;
+var configData = Meeko.configData;
+
 var sprockets = Meeko.sprockets;
-var framer = Meeko.framer; // FIXME remove `framer` dependency
 
 var eventConfig = 'form@submit,reset,input,change,invalid input,textarea@input,change,invalid,focus,blur select,fieldset@change,invalid,focus,blur button@click';
 
@@ -7921,7 +7945,7 @@ attached: function(handlers) {
 	var element = object.element;
 	if (!element.hasAttribute('config')) return;
 	var configID = _.words(element.getAttribute('config'))[0];	
-	var options = framer.definition.configData[configID];
+	var options = configData.get(configID);
 	if (!options) return;
 	_.forEach(events, function(type) {
 		var ontype = 'on' + type;
@@ -7953,7 +7977,7 @@ attached: function(handlers) {
 	var element = object.element;
 	if (!element.hasAttribute('config')) return;
 	var configID = _.words(element.getAttribute('config'))[0];	
-	var options = framer.definition.configData[configID];
+	var options = configData.get(configID);
 	if (!options) return;
 
 	var events = _.words('submit reset change input');

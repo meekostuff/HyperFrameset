@@ -19,8 +19,9 @@ var Task = Meeko.Task;
 var Promise = Meeko.Promise;
 var URL = Meeko.URL;
 var DOM = Meeko.DOM;
+var configData = Meeko.configData;
+
 var sprockets = Meeko.sprockets;
-var framer = Meeko.framer; // FIXME remove `framer` dependency
 
 var eventConfig = 'form@submit,reset,input,change,invalid input,textarea@input,change,invalid,focus,blur select,fieldset@change,invalid,focus,blur button@click';
 
@@ -62,7 +63,7 @@ attached: function(handlers) {
 	var element = object.element;
 	if (!element.hasAttribute('config')) return;
 	var configID = _.words(element.getAttribute('config'))[0];	
-	var options = framer.definition.configData[configID];
+	var options = configData.get(configID);
 	if (!options) return;
 	_.forEach(events, function(type) {
 		var ontype = 'on' + type;
@@ -94,7 +95,7 @@ attached: function(handlers) {
 	var element = object.element;
 	if (!element.hasAttribute('config')) return;
 	var configID = _.words(element.getAttribute('config'))[0];	
-	var options = framer.definition.configData[configID];
+	var options = configData.get(configID);
 	if (!options) return;
 
 	var events = _.words('submit reset change input');

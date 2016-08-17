@@ -17,6 +17,7 @@ var DOM = Meeko.DOM;
 var URL = Meeko.URL;
 var CustomNamespace = Meeko.CustomNamespace;
 var NamespaceCollection = Meeko.NamespaceCollection;
+var configData = Meeko.configData;
 
 var filters = Meeko.filters;
 var decoders = Meeko.decoders;
@@ -214,7 +215,7 @@ init: function(el) {
 	var options;
 	if (el.hasAttribute('config')) {
 		var configID = _.words(el.getAttribute('config'))[0];
-		options = framesetDef.configData[configID];
+		options = configData.get(configID);
 	}
 	var processor = transform.processor = processors.create(transform.type, options, framesetDef.namespaces);
 	processor.loadTemplate(frag);
@@ -339,7 +340,6 @@ preprocess: function() {
 	var framesetDef = this;
 	var body = framesetDef.element;
 	_.defaults(framesetDef, {
-		configData: {}, // Indexed by @sourceURL
 		frames: {} // all hyperframe definitions. Indexed by @defid (which may be auto-generated)
 	});
 
@@ -397,7 +397,7 @@ preprocess: function() {
 		try {
 			var fn = Function(fnText);
 			var object = fn();
-			framesetDef.configData[sourceURL] = object;
+			configData.set(sourceURL, object);
 		}
 		catch(err) { 
 			console.warn('Error evaluating inline script in frameset:\n' +
