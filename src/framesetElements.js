@@ -32,14 +32,14 @@ var namespace;
  * HyperFrameset sprockets
  */
 
-// All HyperFrameset sprockets inherit from Base
-var Base = (function() {
+// All HyperFrameset sprockets inherit from HBase
+var HBase = (function() {
 
-var Base = sprockets.evolve(sprockets.RoleType, {
+var HBase = sprockets.evolve(sprockets.RoleType, {
 
 });
 
-_.assign(Base, {
+_.assign(HBase, {
 
 iAttached: function(handlers) {
 	var object = this;
@@ -53,55 +53,13 @@ iAttached: function(handlers) {
 
 });
 
-return Base;
+return HBase;
 })();
-
-// Almost all HyperFrameset sprockets inherit from Link
-var Link = (function() {
-
-var Link = sprockets.evolve(Base, {
-
-role: 'link', // FIXME probably doesn't match functionality of aria "link"
-
-lookup: function(url, details) {
-	var link = this;
-	var options = link.options;
-	if (!options || !options.lookup) return false;
-	var partial = options.lookup(url, details);
-	if (partial === '' || partial === true) return true;
-	if (partial == null || partial === false) return false;
-	return framer.inferChangeset(url, partial);
-}
-
-});
-
-_.assign(Link, {
-
-iAttached: function(handlers) {
-	var object = this;
-	var options = object.options;
-	if (!options.lookup) return;
-
-	handlers.push({
-		type: 'requestnavigation',
-		action: function(e) {
-			if (e.defaultPrevented) return;
-			var acceptDefault = framer.onRequestNavigation(e, this);
-			if (acceptDefault === false) e.preventDefault();
-		}
-	});
-}
-
-});
-
-return Link;
-})();
-
 
 
 var Layer = (function() {
 
-var Layer = sprockets.evolve(Base, {
+var Layer = sprockets.evolve(HBase, {
 
 role: 'layer'
 
@@ -116,7 +74,7 @@ iAttached: function(handlers) {
 },
 
 attached: function(handlers) {
-	Base.iAttached.call(this, handlers);
+	HBase.iAttached.call(this, handlers);
 	Layer.iAttached.call(this, handlers);
 }
 
@@ -127,7 +85,7 @@ return Layer;
 
 var Popup = (function() {
 
-var Popup = sprockets.evolve(Base, {
+var Popup = sprockets.evolve(HBase, {
 
 role: 'popup',
 
@@ -136,7 +94,7 @@ role: 'popup',
 _.assign(Popup, {
 
 attached: function(handlers) {
-	Base.iAttached.call(this, handlers);
+	HBase.iAttached.call(this, handlers);
 },
 
 iEnteredDocument: function() {
@@ -162,7 +120,7 @@ return Popup;
 
 var Panel = (function() {
 
-var Panel = sprockets.evolve(Link, {
+var Panel = sprockets.evolve(HBase, {
 
 role: 'panel',
 
@@ -182,8 +140,7 @@ iAttached: function(handlers) {
 }, 
 
 attached: function(handlers) {
-	Base.iAttached.call(this, handlers);
-	Link.iAttached.call(this, handlers);
+	HBase.iAttached.call(this, handlers);
 	Panel.iAttached.call(this, handlers);
 },
 
@@ -210,7 +167,7 @@ return Panel;
 
 var Layout = (function() { // a Layout is a list of Panel (or other Layout) and perhaps separators for hlayout, vlayout
 
-var Layout = sprockets.evolve(Link, {
+var Layout = sprockets.evolve(HBase, {
 
 role: 'group',
 
@@ -292,8 +249,7 @@ iAttached: function() {
 },
 
 attached: function(handlers) {
-	Base.iAttached.call(this, handlers);
-	Link.iAttached.call(this, handlers);
+	HBase.iAttached.call(this, handlers);
 	Panel.iAttached.call(this, handlers);
 	VLayout.iAttached.call(this, handlers);
 },
@@ -316,8 +272,7 @@ var HLayout = sprockets.evolve(Layout, {
 _.assign(HLayout, {
 
 attached: function(handlers) {
-	Base.iAttached.call(this, handlers);
-	Link.iAttached.call(this, handlers);
+	HBase.iAttached.call(this, handlers);
 	Panel.iAttached.call(this, handlers);
 },
 
@@ -363,8 +318,7 @@ activedescendant: {
 _.assign(Deck, {
 
 attached: function(handlers) {
-	Base.iAttached.call(this, handlers);
-	Link.iAttached.call(this, handlers);
+	HBase.iAttached.call(this, handlers);
 	Panel.iAttached.call(this, handlers);
 },
 
@@ -406,8 +360,7 @@ var ResponsiveDeck = sprockets.evolve(Deck, {
 _.assign(ResponsiveDeck, {
 
 attached: function(handlers) {
-	Base.iAttached.call(this, handlers);
-	Link.iAttached.call(this, handlers);
+	HBase.iAttached.call(this, handlers);
 	Panel.iAttached.call(this, handlers);
 	Deck.iAttached.call(this, handlers);
 },
@@ -529,8 +482,7 @@ iAttached: function() {
     });
 },
 attached: function(handlers) {
-	Base.iAttached.call(this, handlers);
-	Link.iAttached.call(this, handlers);
+	HBase.iAttached.call(this, handlers);
 	Panel.iAttached.call(this, handlers);
 	HFrame.iAttached.call(this, handlers);
 },
@@ -558,7 +510,7 @@ return HFrame;
 
 var HFrameset = (function() {
 	
-var HFrameset = sprockets.evolve(Link, {
+var HFrameset = sprockets.evolve(HBase, {
 
 role: 'frameset',
 isFrameset: true,
@@ -604,8 +556,7 @@ iAttached: function() {
 	});
 }, 
 attached: function(handlers) {
-	Base.iAttached.call(this, handlers);
-	Link.iAttached.call(this, handlers);
+	HBase.iAttached.call(this, handlers);
 	HFrameset.iAttached.call(this, handlers);
 	Meeko.ConfigurableBody.attached.call(this, handlers); // FIXME
 },
@@ -682,6 +633,7 @@ register: registerFramesetElements
 
 _.defaults(classnamespace, {
 
+	HBase: HBase,
 	HFrame: HFrame,
 	HFrameset: HFrameset,
 	Layer: Layer,
@@ -695,3 +647,4 @@ _.defaults(classnamespace, {
 
 
 }).call(this, this.Meeko);
+

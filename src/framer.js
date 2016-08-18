@@ -45,7 +45,6 @@ var FRAMESET_REL = 'frameset'; // NOTE http://lists.w3.org/Archives/Public/www-h
 var SELF_REL = 'self';
 
 
-
 var framer = {};
 
 _.defaults(framer, {
@@ -153,6 +152,7 @@ start: function(startOptions) {
 			if (acceptDefault === false) e.preventDefault();
 		}, false);
 		
+		retargetFramesetElements();
 		var namespace = framer.definition.namespaces.lookupNamespace(HYPERFRAMESET_URN);
 		Meeko.framesetElements.register(namespace); // framesetElements.register();
 		Meeko.formElements.register(); // formElements.register();
@@ -743,6 +743,45 @@ var notify = function(msg) { // FIXME this isn't being used called everywhere it
 	}
 	else return Promise.resolve();
 }
+
+
+// FIXME Hack to allow all HyperFrameset sprockets to retarget requestnavigation events
+function retargetFramesetElements() {
+
+var HBase = Meeko.HBase;
+_.assign(HBase.prototype, {
+
+lookup: function(url, details) {
+	var link = this;
+	var options = link.options;
+	if (!options || !options.lookup) return false;
+	var partial = options.lookup(url, details);
+	if (partial === '' || partial === true) return true;
+	if (partial == null || partial === false) return false;
+	return framer.inferChangeset(url, partial);
+}
+
+});
+
+HBase._iAttached = HBase.iAttached;
+
+HBase.iAttached = function(handlers) {
+	HBase._iAttached.call(this, handlers);
+	var object = this;
+	var options = object.options;
+	if (!options.lookup) return;
+
+	handlers.push({
+		type: 'requestnavigation',
+		action: function(e) {
+			if (e.defaultPrevented) return;
+			var acceptDefault = framer.onRequestNavigation(e, this);
+			if (acceptDefault === false) e.preventDefault();
+		}
+	});
+}
+
+} // end retarget
 
 
 
