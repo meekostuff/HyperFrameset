@@ -24,9 +24,19 @@ var DOM = Meeko.DOM;
 var configData = Meeko.configData;
 var sprockets = Meeko.sprockets;
 var controllers = Meeko.controllers;
-var framer = Meeko.framer; // TODO remove `framer` dependency
+var namespace; // will be set by external call to registerFramesetElements()
 
-var namespace;
+var Registry = Meeko.Registry;
+
+var frameDefinitions = new Registry({
+	writeOnce: true,
+	testKey: function(key) {
+		return typeof key === 'string';
+	},
+	testValue: function(o) {
+		return o != null && typeof o === 'object';
+	}
+});
 
 /*
  * HyperFrameset sprockets
@@ -41,7 +51,7 @@ var HBase = sprockets.evolve(sprockets.RoleType, {
 
 _.assign(HBase, {
 
-iAttached: function(handlers) {
+attached: function(handlers) {
 	var object = this;
 	object.options = {};
 	var element = object.element;
@@ -49,7 +59,11 @@ iAttached: function(handlers) {
 	var configID = _.words(element.getAttribute('config'))[0];	
 	var options = configData.get(configID);
 	object.options = options;
-}
+},
+
+enteredDocument: function() {}, // WARN void method: don't remove
+
+leftDocument: function() {} // WARN void method: don't remove
 
 });
 
@@ -69,13 +83,18 @@ var zIndex = 1;
 
 _.assign(Layer, {
 
-iAttached: function(handlers) {
+attached: function(handlers) {
+	HBase.attached.call(this, handlers);
+
 	this.css('z-index', zIndex++);
 },
 
-attached: function(handlers) {
-	HBase.iAttached.call(this, handlers);
-	Layer.iAttached.call(this, handlers);
+enteredDocument: function() {
+	HBase.enteredDocument.call(this);
+},
+
+leftDocument: function() {
+	HBase.leftDocument.call(this);
 }
 
 });
@@ -94,10 +113,12 @@ role: 'popup',
 _.assign(Popup, {
 
 attached: function(handlers) {
-	HBase.iAttached.call(this, handlers);
+	HBase.attached.call(this, handlers);
 },
 
-iEnteredDocument: function() {
+enteredDocument: function() {
+	HBase.enteredDocument.call(this);
+
 	var panel = this;
 	var name = panel.attr('name'); 
 	var value = panel.attr('value'); 
@@ -109,8 +130,8 @@ iEnteredDocument: function() {
 	});
 },
 
-enteredDocument: function() {
-	Popup.iEnteredDocument.call(this);
+leftDocument: function() {
+	HBase.leftDocument.call(this);
 }
 
 });
@@ -128,7 +149,9 @@ role: 'panel',
 
 _.assign(Panel, {
 
-iAttached: function(handlers) {
+attached: function(handlers) {
+	HBase.attached.call(this, handlers);
+
 	var overflow = this.attr('overflow');
 	if (overflow) this.css('overflow', overflow); // FIXME sanity check
 	var height = this.attr('height');
@@ -139,12 +162,9 @@ iAttached: function(handlers) {
 	if (minWidth) this.css('min-width', minWidth); // FIXME units
 }, 
 
-attached: function(handlers) {
-	HBase.iAttached.call(this, handlers);
-	Panel.iAttached.call(this, handlers);
-},
+enteredDocument: function() {
+	HBase.enteredDocument.call(this);
 
-iEnteredDocument: function() {
 	var panel = this;
 	var name = panel.attr('name'); 
 	var value = panel.attr('value'); 
@@ -156,9 +176,10 @@ iEnteredDocument: function() {
 	});
 },
 
-enteredDocument: function() {
-	Panel.iEnteredDocument.call(this);
+leftDocument: function() {
+	HBase.leftDocument.call(this);
 }
+
 
 });
 
@@ -185,7 +206,13 @@ owns: {
 
 _.assign(Layout, {
 
-iEnteredDocument: function() {
+attached: function(handlers) {
+	Panel.attached.call(this, handlers);
+},
+
+enteredDocument: function() {
+	Panel.enteredDocument.call(this);
+
 	var element = this.element;
 	var parent = element.parentNode;
 
@@ -226,9 +253,8 @@ iEnteredDocument: function() {
 	}
 },
 
-enteredDocument: function() {
-	Panel.iEnteredDocument.call(this);
-	Layout.iEnteredDocument.call(this);
+leftDocument: function() {
+	Panel.leftDocument.call(this);
 }
 
 });
@@ -243,20 +269,19 @@ var VLayout = sprockets.evolve(Layout, {
 
 _.assign(VLayout, {
 
-iAttached: function() {
+attached: function(handlers) {
+	Panel.attached.call(this, handlers);
+
 	var hAlign = this.attr('align'); // FIXME assert left/center/right/justify - also start/end (stretch?)
 	if (hAlign) this.css('text-align', hAlign); // NOTE defaults defined in <style> above
 },
 
-attached: function(handlers) {
-	HBase.iAttached.call(this, handlers);
-	Panel.iAttached.call(this, handlers);
-	VLayout.iAttached.call(this, handlers);
+enteredDocument: function() {
+	Layout.enteredDocument.call(this);
 },
 
-enteredDocument: function() {
-	Panel.iEnteredDocument.call(this);
-	Layout.iEnteredDocument.call(this);
+leftDocument: function() {
+	Layout.leftDocument.call(this);
 }
 
 });
@@ -272,22 +297,22 @@ var HLayout = sprockets.evolve(Layout, {
 _.assign(HLayout, {
 
 attached: function(handlers) {
-	HBase.iAttached.call(this, handlers);
-	Panel.iAttached.call(this, handlers);
+	Layout.attached.call(this, handlers);
 },
 
-iEnteredDocument: function() {
+enteredDocument: function() {
+	Layout.enteredDocument.call(this);
+
 	var vAlign = this.attr('align'); // FIXME assert top/middle/bottom/baseline - also start/end (stretch?)
 	_.forEach(this.ariaGet('owns'), function(panel) {
 		if (vAlign) panel.$.css('vertical-align', vAlign);
 	});
 },
 
-enteredDocument: function() {
-	Panel.iEnteredDocument.call(this);
-	Layout.iEnteredDocument.call(this);
-	HLayout.iEnteredDocument.call(this);
+leftDocument: function() {
+	Layout.leftDocument.call(this);
 }
+
 
 });
 
@@ -318,11 +343,12 @@ activedescendant: {
 _.assign(Deck, {
 
 attached: function(handlers) {
-	HBase.iAttached.call(this, handlers);
-	Panel.iAttached.call(this, handlers);
+	Layout.attached.call(this, handlers);
 },
 
-iEnteredDocument: function() {
+enteredDocument: function() {
+	Layout.enteredDocument.call(this);
+
 	var deck = this;
 	var name = deck.attr('name'); 
 	if (!name) {
@@ -341,9 +367,8 @@ iEnteredDocument: function() {
 
 },
 
-enteredDocument: function() {
-	Layout.iEnteredDocument.call(this);
-	Deck.iEnteredDocument.call(this);
+leftDocument: function() {
+	Layout.leftDocument.call(this);
 }
 
 });
@@ -360,12 +385,12 @@ var ResponsiveDeck = sprockets.evolve(Deck, {
 _.assign(ResponsiveDeck, {
 
 attached: function(handlers) {
-	HBase.iAttached.call(this, handlers);
-	Panel.iAttached.call(this, handlers);
-	Deck.iAttached.call(this, handlers);
+	Deck.attached.call(this, handlers);
 },
 
-iEnteredDocument: function() {
+enteredDocument: function() {
+	Deck.enteredDocument.call(this);
+
 	var width = parseFloat(window.getComputedStyle(this.element, null).width);
 	var panels = this.ariaGet('owns');
 	var activePanel = _.find(panels, function(panel) {
@@ -382,11 +407,8 @@ iEnteredDocument: function() {
 	}
 },
 
-enteredDocument: function() {
-	Layout.iEnteredDocument.call(this);
-	Panel.iEnteredDocument.call(this);
-	Deck.iEnteredDocument.call(this);
-	ResponsiveDeck.iEnteredDocument.call(this);
+leftDocument: function() {
+	Deck.leftDocument.call(this);
 }
 
 });
@@ -400,15 +422,6 @@ var HFrame = (function() {
 var HFrame = sprockets.evolve(Panel, {
 
 role: 'frame',
-
-frameEntered: function(frame) {
-	this.frames.push(frame);
-},
-
-frameLeft: function(frame) {
-	var index = this.frames.indexOf(frame);
-	this.frames.splice(index);
-},
 
 preload: function(request) {
 	var frame = this;
@@ -469,37 +482,26 @@ insert: function(bodyElement) { // FIXME need a teardown method that releases ch
 
 _.assign(HFrame, {
 
-iAttached: function() {
+attached: function(handlers) {
+	Panel.attached.call(this, handlers);
+
 	var frame = this;
 	var def = frame.attr('def');
-	frame.definition = framer.definition.frames[def];
+	frame.definition = frameDefinitions.get(def); // FIXME assert frameDefinitions.has(def)
 	_.defaults(frame, {
-		frames: [],
 		bodyElement: null,
 		targetname: frame.attr('targetname'),
 		src: frame.attr('src'),
 		mainSelector: frame.attr('main') // TODO consider using a hash in `@src`
     });
 },
-attached: function(handlers) {
-	HBase.iAttached.call(this, handlers);
-	Panel.iAttached.call(this, handlers);
-	HFrame.iAttached.call(this, handlers);
-},
-iEnteredDocument: function() {
-	var frame = this;
-	framer.frameEntered(frame);
-},
+
 enteredDocument: function() {
-	Panel.iEnteredDocument.call(this);
-	HFrame.iEnteredDocument.call(this);
+	Panel.enteredDocument.call(this);
 },
-iLeftDocument: function() {
-	var frame = this;
-	framer.frameLeft(frame);
-},
+
 leftDocument: function() {
-	this.iLeftDocument();
+	Panel.leftDocument.call(this);
 }
 
 });
@@ -507,86 +509,10 @@ leftDocument: function() {
 return HFrame;	
 })();
 
-
-var HFrameset = (function() {
-	
-var HFrameset = sprockets.evolve(HBase, {
-
-role: 'frameset',
-isFrameset: true,
-
-frameEntered: function(frame) {
-	this.frames.push(frame);
-},
-
-frameLeft: function(frame) {
-	var index = this.frames.indexOf(frame);
-	this.frames.splice(index);
-},
-
-render: function() {
-
-	var frameset = this;
-	var definition = frameset.definition;
-	var dstBody = this.element;
-
-	var srcBody = definition.render();
-	
-	return Promise.pipe(null, [
-
-	function() {
-		_.forEach(_.map(srcBody.childNodes), function(node) {
-			sprockets.insertNode('beforeend', dstBody, node);
-		});
-	}
-
-	]);
-
-}
-
-});
-
-_.assign(HFrameset, {
-
-iAttached: function() {
-	var frameset = this;
-	frameset.definition = framer.definition;
-	_.defaults(frameset, {
-		frames: []
-	});
-}, 
-attached: function(handlers) {
-	HBase.iAttached.call(this, handlers);
-	HFrameset.iAttached.call(this, handlers);
-	Meeko.ConfigurableBody.attached.call(this, handlers); // FIXME
-},
-iEnteredDocument: function() {
-	var frameset = this;
-	framer.framesetEntered(frameset);
-	frameset.render();
-},
-enteredDocument: function() {
-	HFrameset.iEnteredDocument.call(this);
-},
-iLeftDocument: function() { // FIXME should never be called??
-	var frameset = this;
-	framer.framesetLeft(frameset);
-},
-leftDocument: function() {
-	HFrameset.iLeftDocument.call(this);
-}
-
-});
-
-return HFrameset;
-})();
-
-
 function registerFramesetElements(ns) {
 
 namespace = ns; // TODO assert ns instanceof CustomNamespace
 
-sprockets.registerElement('body', HFrameset);
 sprockets.registerElement(namespace.lookupSelector('frame'), HFrame);
 
 sprockets.registerElement(namespace.lookupSelector('layer'), Layer);
@@ -599,8 +525,6 @@ sprockets.registerElement(namespace.lookupSelector('rdeck'), ResponsiveDeck);
 
 var cssText = [
 '*[hidden] { display: none !important; }', // TODO maybe not !important
-'html, body { margin: 0; padding: 0; }',
-'html { width: 100%; height: 100%; }',
 namespace.lookupSelector('layer, popup, hlayout, vlayout, deck, rdeck, panel, frame, body') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
 namespace.lookupSelector('layer') + ' { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; }',
 namespace.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { display: block; width: 0; height: 0; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
@@ -635,13 +559,13 @@ _.defaults(classnamespace, {
 
 	HBase: HBase,
 	HFrame: HFrame,
-	HFrameset: HFrameset,
 	Layer: Layer,
 	HLayout: HLayout,
 	VLayout: VLayout,
 	Deck: Deck,
 	ResponsiveDeck: ResponsiveDeck,
-	framesetElements: framesetElements
+	framesetElements: framesetElements,
+	frameDefinitions: frameDefinitions
 
 });
 

@@ -35,8 +35,9 @@ var NamespaceCollection = Meeko.NamespaceCollection;
 var historyManager = Meeko.historyManager;
 var sprockets = Meeko.sprockets;
 
-// FIXME var formElements = Meeko.formElements;
-// FIXME var framesetElements = Meeko.framesetElements;
+var formElements = Meeko.formElements;
+var framesetElements = Meeko.framesetElements;
+var frameDefinitions = Meeko.frameDefinitions; // FIXME "exported" from framesetElements
 var HFramesetDefinition = Meeko.HFramesetDefinition;
 var HYPERFRAMESET_URN = HFramesetDefinition.HYPERFRAMESET_URN;
 
@@ -152,10 +153,13 @@ start: function(startOptions) {
 			if (acceptDefault === false) e.preventDefault();
 		}, false);
 		
+		registerFrames(framer.definition);
+		interceptFrameElements();
 		retargetFramesetElements();
+		registerFramesetElement(); // registerElement('body', HFrameset), etc
 		var namespace = framer.definition.namespaces.lookupNamespace(HYPERFRAMESET_URN);
-		Meeko.framesetElements.register(namespace); // framesetElements.register();
-		Meeko.formElements.register(); // formElements.register();
+		framesetElements.register(namespace);
+		formElements.register();
 
 		return sprockets.start({ manual: true }); // FIXME should be a promise
 	},
@@ -744,8 +748,131 @@ var notify = function(msg) { // FIXME this isn't being used called everywhere it
 	else return Promise.resolve();
 }
 
+function registerFrames(framesetDef) {
+	_.forOwn(framesetDef.frames, function(o, key) {
+		frameDefinitions.set(key, o);
+	});
+}
 
-// FIXME Hack to allow all HyperFrameset sprockets to retarget requestnavigation events
+// FIXME Monkey-patch to allow creation of tree of frames
+function interceptFrameElements() {
+
+var HFrame = Meeko.HFrame;
+
+_.assign(HFrame.prototype, {
+
+frameEntered: function(frame) {
+	this.frames.push(frame);
+},
+
+frameLeft: function(frame) {
+	var index = this.frames.indexOf(frame);
+	this.frames.splice(index);
+}
+
+});
+
+HFrame._attached = HFrame.attached;
+HFrame._enteredDocument = HFrame.enteredDocument;
+HFrame._leftDocument = HFrame.leftDocument;
+
+_.assign(HFrame, {
+
+attached: function(handlers) {
+	HFrame._attached.call(this, handlers);
+
+	this.frames = [];
+},
+
+enteredDocument: function() {
+	HFrame._enteredDocument.call(this);
+
+	var frame = this;
+	Meeko.framer.frameEntered(frame); // TODO remove `framer` dependency
+},
+
+leftDocument: function() {
+	HFrame._leftDocument.call(this);
+	
+	var frame = this;
+	Meeko.framer.frameLeft(frame); // TODO remove `framer` dependency
+}
+
+});
+
+} // end patch
+
+
+var HFrameset = (function() {
+	
+var HBase = Meeko.HBase;
+var HFrameset = sprockets.evolve(HBase, {
+
+role: 'frameset',
+isFrameset: true,
+
+frameEntered: function(frame) {
+	this.frames.push(frame);
+},
+
+frameLeft: function(frame) {
+	var index = this.frames.indexOf(frame);
+	this.frames.splice(index);
+},
+
+render: function() {
+
+	var frameset = this;
+	var definition = frameset.definition;
+	var dstBody = this.element;
+
+	var srcBody = definition.render();
+	
+	return Promise.pipe(null, [
+
+	function() {
+		_.forEach(_.map(srcBody.childNodes), function(node) {
+			sprockets.insertNode('beforeend', dstBody, node);
+		});
+	}
+
+	]);
+
+}
+
+});
+
+_.assign(HFrameset, {
+
+attached: function(handlers) {
+	HBase.attached.call(this, handlers);
+
+	var frameset = this;
+	frameset.definition = Meeko.framer.definition; // TODO remove `framer` dependency
+	_.defaults(frameset, {
+		frames: []
+	});
+
+	Meeko.ConfigurableBody.attached.call(this, handlers); // FIXME
+}, 
+
+enteredDocument: function() {
+	var frameset = this;
+	framer.framesetEntered(frameset); // TODO remove `framer` dependency
+	frameset.render();
+},
+
+leftDocument: function() { // FIXME should never be called??
+	var frameset = this;
+	framer.framesetLeft(frameset); // TODO remove `framer` dependency
+}
+
+});
+
+return HFrameset;
+})();
+
+// FIXME Monkey-patch to allow all HyperFrameset sprockets to retarget requestnavigation events
 function retargetFramesetElements() {
 
 var HBase = Meeko.HBase;
@@ -763,10 +890,10 @@ lookup: function(url, details) {
 
 });
 
-HBase._iAttached = HBase.iAttached;
+HBase._attached = HBase.attached;
 
-HBase.iAttached = function(handlers) {
-	HBase._iAttached.call(this, handlers);
+HBase.attached = function(handlers) {
+	HBase._attached.call(this, handlers);
 	var object = this;
 	var options = object.options;
 	if (!options.lookup) return;
@@ -783,10 +910,24 @@ HBase.iAttached = function(handlers) {
 
 } // end retarget
 
+function registerFramesetElement() {
+
+	sprockets.registerElement('body', HFrameset);
+	var cssText = [
+	'html, body { margin: 0; padding: 0; }',
+	'html { width: 100%; height: 100%; }'
+	];
+	var style = document.createElement('style');
+	style.textContent = cssText;
+	document.head.insertBefore(style, document.head.firstChild);
+
+}
+
 
 
 _.defaults(classnamespace, {
 
+	HFrameset: HFrameset,
 	framer: framer
 
 });
