@@ -51,32 +51,49 @@ var cache = [];
 
 function cacheAdd(request, response) {
 	var rq = _.defaults({}, request);
-	var resp = _.defaults({}, response);
-	resp.document = DOM.cloneDocument(response.document); // TODO handle other response types
-	cache.push({
-		request: rq,
-		response: resp
-	});
+	var resp;
+
+	var entry = {
+		invalid: false,
+		request: rq
+	};
+
+	if (Promise.isPromise(response)) entry.response = response.then(
+		cloneResponse,
+		function(status) { 
+			entry.invalid = true; 
+			entry.response = null; 
+		}
+	);
+	else entry.response = cloneResponse(response);
+
+	cache.push(entry);
 }
 
 function cacheLookup(request) {
-	var response;
-	_.some(cache, function(entry) {
+	var entry = _.find(cache, function(entry) {
 		if (!cacheMatch(request, entry)) return false;
-		response = entry.response;
 		return true;
 	});
-	if (!response) return;
+	if (!(entry && entry.response)) return;
+	var response = entry.response;
+	if (Promise.isPromise(response)) return response.then(cloneResponse);
+	else return cloneResponse(response);
+}
+
+function cacheMatch(request, entry) {
+	if (entry.invalid || entry.response == null) return false;
+	if (request.url !== entry.request.url) return false;
+	// FIXME what testing is appropriate?? `method`, other headers??
+	return true;
+}
+
+function cloneResponse(response) {
 	var resp = _.defaults({}, response);
 	resp.document = DOM.cloneDocument(response.document); // TODO handle other response types
 	return resp;
 }
 
-function cacheMatch(request, entry) {
-	if (request.url !== entry.request.url) return false;
-	// FIXME what testing is appropriate?? `method`, other headers??
-	return true;
-}
 
 var httpProxy = {
 
