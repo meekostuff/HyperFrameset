@@ -63,7 +63,9 @@ var Layer = (function() {
 
 var Layer = sprockets.evolve(HBase, {
 
-role: 'layer'
+role: 'layer',
+
+isLayer: true
 
 });
 
@@ -83,6 +85,10 @@ enteredDocument: function() {
 
 leftDocument: function() {
 	HBase.leftDocument.call(this);
+},
+
+isLayer: function(element) {
+	return !!element.$.isLayer;
 }
 
 });
@@ -199,10 +205,12 @@ var Layout = sprockets.evolve(HBase, {
 
 role: 'group',
 
+isLayout: true,
+
 owns: {
 	get: function() { 
 		return _.filter(this.element.children, function(el) { 
-			return DOM.matches(el, Panel.isPanel);
+			return DOM.matches(el, function(el) { return Panel.isPanel(el) || Layout.isLayout(el); });
 		}); 
 	}
 }
@@ -232,7 +240,7 @@ adjustBox: function() {
 	var parent = element.parentNode;
 
 	// FIXME dimension setting should occur before becoming visible
-	if (!DOM.matches(parent, namespace.lookupSelector('layer'))) return;
+	if (!DOM.matches(parent, Layer.isLayer)) return;
 	// TODO vh, vw not tested on various platforms
 	var height = this.attr('height'); // TODO css unit parsing / validation
 	if (!height) height = '100vh';
@@ -247,6 +255,10 @@ adjustBox: function() {
 normalizeChildren: function() {
 	var element = this.element;
 	_.forEach(_.map(element.childNodes), normalizeChild, element);
+},
+
+isLayout: function(element) {
+	return !!element.$.isLayout;
 }
 
 });
@@ -255,7 +267,7 @@ function normalizeChild(node) {
 	var element = this;
 	switch (node.nodeType) {
 	case 1: // hide non-layout elements
-		if (DOM.matches(node, Panel.isPanel)) return;
+		if (DOM.matches(node, function(el) { return Panel.isPanel(el) || Layout.isLayout(el); })) return;
 		node.hidden = true;
 		return;
 	case 3: // hide text nodes by wrapping in <wbr hidden>
