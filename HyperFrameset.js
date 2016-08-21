@@ -3226,7 +3226,7 @@ var defaultInfo = {
 }
 
 // NOTE cache, etc is currently used only for landing page
-// FIXME cacheLookup doesn't indicate if a resource is currently being fetched
+// TODO test that cacheAdd/Lookup doesn't trigger new XHR when url already pending
 // TODO an API like ServiceWorker may be more appropriate
 var cache = [];
 
