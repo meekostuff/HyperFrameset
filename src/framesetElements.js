@@ -52,6 +52,16 @@ var HBase = sprockets.evolve(sprockets.RoleType, {
 _.assign(HBase, {
 
 attached: function(handlers) {
+	HBase.connectOptions.call(this);
+},
+
+enteredDocument: function() { // WARN void method: don't remove
+},
+
+leftDocument: function() { // WARN void method: don't remove
+},
+
+connectOptions: function() {
 	var object = this;
 	object.options = {};
 	var element = object.element;
@@ -59,12 +69,7 @@ attached: function(handlers) {
 	var configID = _.words(element.getAttribute('config'))[0];	
 	var options = configData.get(configID);
 	object.options = options;
-},
-
-enteredDocument: function() {}, // WARN void method: don't remove
-
-leftDocument: function() {} // WARN void method: don't remove
-
+}
 });
 
 return HBase;
@@ -119,6 +124,14 @@ attached: function(handlers) {
 enteredDocument: function() {
 	HBase.enteredDocument.call(this);
 
+	Popup.connectController.call(this);
+},
+
+leftDocument: function() {
+	HBase.leftDocument.call(this);
+},
+
+connectController: function() {
 	var panel = this;
 	var name = panel.attr('name'); 
 	var value = panel.attr('value'); 
@@ -128,10 +141,6 @@ enteredDocument: function() {
 	controllers.listen(name, function(values) {
 		panel.ariaToggle('hidden', !(_.includes(values, value)));
 	});
-},
-
-leftDocument: function() {
-	HBase.leftDocument.call(this);
 }
 
 });
@@ -152,6 +161,22 @@ _.assign(Panel, {
 attached: function(handlers) {
 	HBase.attached.call(this, handlers);
 
+	Panel.adjustBox.call(this);
+},
+
+enteredDocument: function() {
+	HBase.enteredDocument.call(this);
+
+	Panel.connectController.call(this);
+},
+
+leftDocument: function() {
+	HBase.leftDocument.call(this);
+
+	// TODO disconnectController
+},
+
+adjustBox: function() {
 	var overflow = this.attr('overflow');
 	if (overflow) this.css('overflow', overflow); // FIXME sanity check
 	var height = this.attr('height');
@@ -162,9 +187,7 @@ attached: function(handlers) {
 	if (minWidth) this.css('min-width', minWidth); // FIXME units
 }, 
 
-enteredDocument: function() {
-	HBase.enteredDocument.call(this);
-
+connectController: function() {
 	var panel = this;
 	var name = panel.attr('name'); 
 	var value = panel.attr('value'); 
@@ -174,12 +197,7 @@ enteredDocument: function() {
 	controllers.listen(name, function(values) {
 		panel.ariaToggle('hidden', !(_.includes(values, value)));
 	});
-},
-
-leftDocument: function() {
-	HBase.leftDocument.call(this);
 }
-
 
 });
 
@@ -213,54 +231,64 @@ attached: function(handlers) {
 enteredDocument: function() {
 	Panel.enteredDocument.call(this);
 
-	var element = this.element;
-	var parent = element.parentNode;
-
-	// FIXME dimension setting should occur before becoming visible
-	if (DOM.matches(parent, namespace.lookupSelector('layer'))) { // TODO vh, vw not tested on various platforms
-		var height = this.attr('height'); // TODO css unit parsing / validation
-		if (!height) height = '100vh';
-		else height = height.replace('%', 'vh');
-		this.css('height', height); // FIXME units
-		var width = this.attr('width'); // TODO css unit parsing / validation
-		if (!width) width = '100vw';
-		else width = width.replace('%', 'vw');
-		if (width) this.css('width', width); // FIXME units
-	}
-	_.forEach(_.map(element.childNodes), normalizeChild, element);
+	Layout.adjustBox.call(this);
+	Layout.normalizeChildren.call(this);
 	return;
-	
-	function normalizeChild(node) {
-		var element = this;
-		if (DOM.matches(node, namespace.lookupSelector('hlayout, vlayout, deck, rdeck, panel, frame'))) return; 
-		switch (node.nodeType) {
-		case 1: // hide non-layout elements
-			node.hidden = true;
-			return;
-		case 3: // hide text nodes by wrapping in <wbr hidden>
-			if (/^\s*$/.test(node.nodeValue )) {
-				element.removeChild(node);
-				return;
-			}
-			var wbr = element.ownerDocument.createElement('wbr');
-			wbr.hidden = true;
-			element.replaceChild(wbr, node); // NOTE no adoption
-			wbr.appendChild(node); // NOTE no adoption
-			return;
-		default:
-			return;
-		}
-	}
 },
 
 leftDocument: function() {
 	Panel.leftDocument.call(this);
+},
+
+adjustBox: function() {
+	var element = this.element;
+	var parent = element.parentNode;
+
+	// FIXME dimension setting should occur before becoming visible
+	if (!DOM.matches(parent, namespace.lookupSelector('layer'))) return;
+	// TODO vh, vw not tested on various platforms
+	var height = this.attr('height'); // TODO css unit parsing / validation
+	if (!height) height = '100vh';
+	else height = height.replace('%', 'vh');
+	this.css('height', height); // FIXME units
+	var width = this.attr('width'); // TODO css unit parsing / validation
+	if (!width) width = '100vw';
+	else width = width.replace('%', 'vw');
+	if (width) this.css('width', width); // FIXME units
+},
+
+normalizeChildren: function() {
+	var element = this.element;
+	_.forEach(_.map(element.childNodes), normalizeChild, element);
 }
 
 });
 
+function normalizeChild(node) {
+	var element = this;
+	if (DOM.matches(node, namespace.lookupSelector('hlayout, vlayout, deck, rdeck, panel, frame'))) return; 
+	switch (node.nodeType) {
+	case 1: // hide non-layout elements
+		node.hidden = true;
+		return;
+	case 3: // hide text nodes by wrapping in <wbr hidden>
+		if (/^\s*$/.test(node.nodeValue )) {
+			element.removeChild(node);
+			return;
+		}
+		var wbr = element.ownerDocument.createElement('wbr');
+		wbr.hidden = true;
+		element.replaceChild(wbr, node); // NOTE no adoption
+		wbr.appendChild(node); // NOTE no adoption
+		return;
+	default:
+		return;
+	}
+}
+
 return Layout;
 })();
+
 
 var VLayout = (function() {
 
@@ -270,7 +298,7 @@ var VLayout = sprockets.evolve(Layout, {
 _.assign(VLayout, {
 
 attached: function(handlers) {
-	Panel.attached.call(this, handlers);
+	Layout.attached.call(this, handlers);
 
 	var hAlign = this.attr('align'); // FIXME assert left/center/right/justify - also start/end (stretch?)
 	if (hAlign) this.css('text-align', hAlign); // NOTE defaults defined in <style> above
@@ -347,8 +375,20 @@ attached: function(handlers) {
 },
 
 enteredDocument: function() {
-	Layout.enteredDocument.call(this);
+	// WARN don't want Panel.connectController() so implement this long-hand
+	HBase.enteredDocument.call(this);
 
+	Layout.adjustBox.call(this);
+	Layout.normalizeChildren.call(this);
+
+	Deck.connectController.call(this);
+},
+
+leftDocument: function() {
+	Layout.leftDocument.call(this);
+},
+
+connectController: function() {
 	var deck = this;
 	var name = deck.attr('name'); 
 	if (!name) {
@@ -365,10 +405,6 @@ enteredDocument: function() {
 		if (activePanel) deck.ariaSet('activedescendant', activePanel);
 	});
 
-},
-
-leftDocument: function() {
-	Layout.leftDocument.call(this);
 }
 
 });
@@ -391,6 +427,14 @@ attached: function(handlers) {
 enteredDocument: function() {
 	Deck.enteredDocument.call(this);
 
+	ResponsiveDeck.refresh.call(this);
+},
+
+leftDocument: function() {
+	Deck.leftDocument.call(this);
+},
+
+refresh: function() { // TODO should this be static method?
 	var width = parseFloat(window.getComputedStyle(this.element, null).width);
 	var panels = this.ariaGet('owns');
 	var activePanel = _.find(panels, function(panel) {
@@ -405,10 +449,6 @@ enteredDocument: function() {
 		activePanel.$.css('width', '100%');
 		this.ariaSet('activedescendant', activePanel);
 	}
-},
-
-leftDocument: function() {
-	Deck.leftDocument.call(this);
 }
 
 });
