@@ -1106,23 +1106,31 @@ else _.some(_.words('moz webkit ms o'), function(prefix) {
 
 var matches = matchesSelector ?
 function(element, selector, scope) {
-return scopeify(function(absSelector) {
-
-	return matchesSelector(element, absSelector);
-
-}, selector, scope);
+	if (!(element && element.nodeType === 1)) return false;
+	if (typeof selector === 'function') return selector(element, scope);
+	return scopeify(function(absSelector) {
+		return matchesSelector(element, absSelector);
+	}, selector, scope);
 } :
 function() { throw Error('matches not supported'); } // NOTE fallback
 
 var closest = matchesSelector ?
 function(element, selector, scope) {
-return scopeify(function(absSelector) {
-
-	for (var el=element; el && el.nodeType === 1 && el!==scope; el=el.parentNode) {
-		if (matchesSelector(el, absSelector)) return el;
+	if (typeof selector === 'function') {
+		for (var el=element; el && el!==scope; el=el.parentNode) {
+			if (el.nodeType !== 1) continue;
+			if (selector(el, scope)) return el;
+		}
+		return null;
 	}
+	return scopeify(function(absSelector) {
 
-}, selector, scope);
+		for (var el=element; el && el!==scope; el=el.parentNode) {
+			if (el.nodeType !== 1) continue;
+			if (matchesSelector(el, absSelector)) return el;
+		}
+
+	}, selector, scope);
 } :
 function() { throw Error('closest not supported'); } // NOTE fallback
 
@@ -6009,7 +6017,7 @@ formElements: formElements
 
 }).call(this, this.Meeko);
 /*!
- * HyperFrameset Elements
+ * HyperFrameset Layout Elements
  * Copyright 2009-2016 Sean Hogan (http://meekostuff.net/)
  * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
  */
@@ -6024,35 +6032,18 @@ var window = this;
 var document = window.document;
 
 var Meeko = window.Meeko;
-var _ = Meeko.stuff; // provided by DOMSprockets
-
-var Task = Meeko.Task;
-var Promise = Meeko.Promise;
-var URL = Meeko.URL;
+var _ = Meeko.stuff;
 var DOM = Meeko.DOM;
-
 var configData = Meeko.configData;
 var sprockets = Meeko.sprockets;
 var controllers = Meeko.controllers;
 var namespace; // will be set by external call to registerFramesetElements()
 
-var Registry = Meeko.Registry;
-
-var frameDefinitions = new Registry({
-	writeOnce: true,
-	testKey: function(key) {
-		return typeof key === 'string';
-	},
-	testValue: function(o) {
-		return o != null && typeof o === 'object';
-	}
-});
-
 /*
  * HyperFrameset sprockets
  */
 
-// All HyperFrameset sprockets inherit from HBase
+// All HyperFrameset sprockets will inherit from HBase
 var HBase = (function() {
 
 var HBase = sprockets.evolve(sprockets.RoleType, {
@@ -6164,6 +6155,8 @@ var Panel = sprockets.evolve(HBase, {
 
 role: 'panel',
 
+isPanel: true
+
 });
 
 _.assign(Panel, {
@@ -6207,6 +6200,10 @@ connectController: function() {
 	controllers.listen(name, function(values) {
 		panel.ariaToggle('hidden', !(_.includes(values, value)));
 	});
+},
+
+isPanel: function(element) {
+	return !!element.$.isPanel;
 }
 
 });
@@ -6223,9 +6220,7 @@ role: 'group',
 owns: {
 	get: function() { 
 		return _.filter(this.element.children, function(el) { 
-			return DOM.matches(el, 
-				namespace.lookupSelector('hlayout, vlayout, deck, rdeck, panel, frame')
-			); 
+			return DOM.matches(el, Panel.isPanel);
 		}); 
 	}
 }
@@ -6276,9 +6271,9 @@ normalizeChildren: function() {
 
 function normalizeChild(node) {
 	var element = this;
-	if (DOM.matches(node, namespace.lookupSelector('hlayout, vlayout, deck, rdeck, panel, frame'))) return; 
 	switch (node.nodeType) {
 	case 1: // hide non-layout elements
+		if (DOM.matches(node, Panel.isPanel)) return;
 		node.hidden = true;
 		return;
 	case 3: // hide text nodes by wrapping in <wbr hidden>
@@ -6467,11 +6462,114 @@ return ResponsiveDeck;
 })();
 
 
+function registerLayoutElements(ns) {
+
+namespace = ns; // TODO assert ns instanceof CustomNamespace
+
+sprockets.registerElement(namespace.lookupSelector('layer'), Layer);
+sprockets.registerElement(namespace.lookupSelector('popup'), Popup);
+sprockets.registerElement(namespace.lookupSelector('panel'), Panel);
+sprockets.registerElement(namespace.lookupSelector('vlayout'), VLayout);
+sprockets.registerElement(namespace.lookupSelector('hlayout'), HLayout);
+sprockets.registerElement(namespace.lookupSelector('deck'), Deck);
+sprockets.registerElement(namespace.lookupSelector('rdeck'), ResponsiveDeck);
+
+var cssText = [
+'*[hidden] { display: none !important; }', // TODO maybe not !important
+namespace.lookupSelector('layer, popup, hlayout, vlayout, deck, rdeck, panel, body') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
+namespace.lookupSelector('layer') + ' { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; }',
+namespace.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { display: block; width: 0; height: 0; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+namespace.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { width: 100%; height: 100%; }', // FIXME should be 0,0 before manual calculations
+namespace.lookupSelector('panel') + ' { display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+namespace.lookupSelector('body') + ' { display: block; width: auto; height: auto; margin: 0; }',
+namespace.lookupSelector('popup') + ' { display: block; position: relative; width: 0; height: 0; }',
+namespace.lookupSelector('popup') + ' > * { position: absolute; top: 0; left: 0; }', // TODO or change 'body' styling above
+namespace.lookupSelector('vlayout') + ' { height: 100%; }',
+namespace.lookupSelector('hlayout') + ' { width: 100%; overflow-y: hidden; }',
+namespace.lookupSelector('vlayout') + ' > * { display: block; float: left; width: 100%; height: auto; text-align: left; }',
+namespace.lookupSelector('vlayout') + ' > *::after { clear: both; }',
+namespace.lookupSelector('hlayout') + ' > * { display: block; float: left; width: auto; height: 100%; vertical-align: top; overflow-y: auto; }',
+namespace.lookupSelector('hlayout') + '::after { clear: both; }',
+namespace.lookupSelector('deck') + ' > * { width: 100%; height: 100%; }',
+namespace.lookupSelector('rdeck') + ' > * { width: 0; height: 0; }',
+].join('\n');
+
+var style = document.createElement('style');
+style.textContent = cssText;
+document.head.insertBefore(style, document.head.firstChild);
+
+} // END registerLayoutElements()
+
+var layoutElements = {
+
+register: registerLayoutElements
+
+}
+
+_.defaults(classnamespace, {
+
+	HBase: HBase,
+	Layer: Layer,
+	Popup: Popup,
+	Panel: Panel,
+	HLayout: HLayout,
+	VLayout: VLayout,
+	Deck: Deck,
+	ResponsiveDeck: ResponsiveDeck,
+	layoutElements: layoutElements
+
+});
+
+
+}).call(this, this.Meeko);
+
+/*!
+ * HyperFrameset Elements
+ * Copyright 2009-2016 Sean Hogan (http://meekostuff.net/)
+ * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+ */
+
+/* NOTE
+	+ assumes DOMSprockets
+*/
+
+(function(classnamespace) {
+
+var window = this;
+var document = window.document;
+
+var Meeko = window.Meeko;
+var _ = Meeko.stuff;
+var Task = Meeko.Task;
+var Promise = Meeko.Promise;
+var URL = Meeko.URL;
+var DOM = Meeko.DOM;
+
+var sprockets = Meeko.sprockets;
+var namespace; // will be set by external call to registerFrameElements()
+
+var Registry = Meeko.Registry;
+
+var frameDefinitions = new Registry({
+	writeOnce: true,
+	testKey: function(key) {
+		return typeof key === 'string';
+	},
+	testValue: function(o) {
+		return o != null && typeof o === 'object';
+	}
+});
+
+var HBase = Meeko.HBase; // All HyperFrameset sprockets inherit from HBase
+var Panel = Meeko.Panel;
+
 var HFrame = (function() {
 
 var HFrame = sprockets.evolve(Panel, {
 
 role: 'frame',
+
+isFrame: true,
 
 preload: function(request) {
 	var frame = this;
@@ -6552,6 +6650,10 @@ enteredDocument: function() {
 
 leftDocument: function() {
 	Panel.leftDocument.call(this);
+},
+
+isFrame: function(element) {
+	return !!element.$.isFrame;
 }
 
 });
@@ -6559,62 +6661,33 @@ leftDocument: function() {
 return HFrame;	
 })();
 
-function registerFramesetElements(ns) {
+function registerFrameElements(ns) {
 
 namespace = ns; // TODO assert ns instanceof CustomNamespace
 
 sprockets.registerElement(namespace.lookupSelector('frame'), HFrame);
 
-sprockets.registerElement(namespace.lookupSelector('layer'), Layer);
-sprockets.registerElement(namespace.lookupSelector('popup'), Popup);
-sprockets.registerElement(namespace.lookupSelector('panel'), Panel);
-sprockets.registerElement(namespace.lookupSelector('vlayout'), VLayout);
-sprockets.registerElement(namespace.lookupSelector('hlayout'), HLayout);
-sprockets.registerElement(namespace.lookupSelector('deck'), Deck);
-sprockets.registerElement(namespace.lookupSelector('rdeck'), ResponsiveDeck);
-
 var cssText = [
-'*[hidden] { display: none !important; }', // TODO maybe not !important
-namespace.lookupSelector('layer, popup, hlayout, vlayout, deck, rdeck, panel, frame, body') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
-namespace.lookupSelector('layer') + ' { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; }',
-namespace.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { display: block; width: 0; height: 0; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
-namespace.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { width: 100%; height: 100%; }', // FIXME should be 0,0 before manual calculations
-namespace.lookupSelector('frame, panel') + ' { display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
-namespace.lookupSelector('body') + ' { display: block; width: auto; height: auto; margin: 0; }',
-namespace.lookupSelector('popup') + ' { display: block; position: relative; width: 0; height: 0; }',
-namespace.lookupSelector('popup') + ' > * { position: absolute; top: 0; left: 0; }', // TODO or change 'body' styling above
-namespace.lookupSelector('vlayout') + ' { height: 100%; }',
-namespace.lookupSelector('hlayout') + ' { width: 100%; overflow-y: hidden; }',
-namespace.lookupSelector('vlayout') + ' > * { display: block; float: left; width: 100%; height: auto; text-align: left; }',
-namespace.lookupSelector('vlayout') + ' > *::after { clear: both; }',
-namespace.lookupSelector('hlayout') + ' > * { display: block; float: left; width: auto; height: 100%; vertical-align: top; overflow-y: auto; }',
-namespace.lookupSelector('hlayout') + '::after { clear: both; }',
-namespace.lookupSelector('deck') + ' > * { width: 100%; height: 100%; }',
-namespace.lookupSelector('rdeck') + ' > * { width: 0; height: 0; }',
+namespace.lookupSelector('frame') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
+namespace.lookupSelector('frame') + ' { display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }' // FIXME text-align: start
 ].join('\n');
 
 var style = document.createElement('style');
 style.textContent = cssText;
 document.head.insertBefore(style, document.head.firstChild);
 
-} // END registerHyperFramesetElements()
+} // END registerFrameElements()
 
-var framesetElements = {
+var frameElements = {
 
-register: registerFramesetElements
+register: registerFrameElements
 
 }
 
 _.defaults(classnamespace, {
 
-	HBase: HBase,
 	HFrame: HFrame,
-	Layer: Layer,
-	HLayout: HLayout,
-	VLayout: VLayout,
-	Deck: Deck,
-	ResponsiveDeck: ResponsiveDeck,
-	framesetElements: framesetElements,
+	frameElements: frameElements,
 	frameDefinitions: frameDefinitions
 
 });
@@ -7251,10 +7324,12 @@ var historyManager = Meeko.historyManager;
 var sprockets = Meeko.sprockets;
 
 var formElements = Meeko.formElements;
-var framesetElements = Meeko.framesetElements;
-var frameDefinitions = Meeko.frameDefinitions; // FIXME "exported" from framesetElements
+var layoutElements = Meeko.layoutElements;
+var frameElements = Meeko.frameElements;
+var frameDefinitions = Meeko.frameDefinitions; // FIXME "exported" from frameElements
 var HFramesetDefinition = Meeko.HFramesetDefinition;
 var HYPERFRAMESET_URN = HFramesetDefinition.HYPERFRAMESET_URN;
+var HFrame = Meeko.HFrame;
 
 // FIXME DRY these @rel values with boot.js
 var FRAMESET_REL = 'frameset'; // NOTE http://lists.w3.org/Archives/Public/www-html/1996Dec/0143.html
@@ -7371,9 +7446,10 @@ start: function(startOptions) {
 		registerFrames(framer.definition);
 		interceptFrameElements();
 		retargetFramesetElements();
-		registerFramesetElement(); // registerElement('body', HFrameset), etc
 		var namespace = framer.definition.namespaces.lookupNamespace(HYPERFRAMESET_URN);
-		framesetElements.register(namespace);
+		layoutElements.register(namespace);
+		frameElements.register(namespace);
+		registerFramesetElement();
 		formElements.register();
 
 		return sprockets.start({ manual: true }); // FIXME should be a promise
@@ -7568,7 +7644,7 @@ framesetLeft: function(frameset) { // WARN this should never happen
 frameEntered: function(frame) {
 	var namespaces = framer.definition.namespaces;
 	var parentFrame;
-	var parentElement = DOM.closest(frame.element.parentNode, namespaces.lookupSelector('frame', HYPERFRAMESET_URN)); // TODO frame.element.parentNode.ariaClosest('frame')
+	var parentElement = DOM.closest(frame.element.parentNode, HFrame.isFrame); // TODO frame.element.parentNode.ariaClosest('frame')
 	if (parentElement) parentFrame = parentElement.$;
 	else {
 		parentElement = document.body; // TODO  frame.element.parentNode.ariaClosest('frameset'); 
@@ -7971,8 +8047,6 @@ function registerFrames(framesetDef) {
 
 // FIXME Monkey-patch to allow creation of tree of frames
 function interceptFrameElements() {
-
-var HFrame = Meeko.HFrame;
 
 _.assign(HFrame.prototype, {
 

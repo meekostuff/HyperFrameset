@@ -36,10 +36,12 @@ var historyManager = Meeko.historyManager;
 var sprockets = Meeko.sprockets;
 
 var formElements = Meeko.formElements;
-var framesetElements = Meeko.framesetElements;
-var frameDefinitions = Meeko.frameDefinitions; // FIXME "exported" from framesetElements
+var layoutElements = Meeko.layoutElements;
+var frameElements = Meeko.frameElements;
+var frameDefinitions = Meeko.frameDefinitions; // FIXME "exported" from frameElements
 var HFramesetDefinition = Meeko.HFramesetDefinition;
 var HYPERFRAMESET_URN = HFramesetDefinition.HYPERFRAMESET_URN;
+var HFrame = Meeko.HFrame;
 
 // FIXME DRY these @rel values with boot.js
 var FRAMESET_REL = 'frameset'; // NOTE http://lists.w3.org/Archives/Public/www-html/1996Dec/0143.html
@@ -156,9 +158,10 @@ start: function(startOptions) {
 		registerFrames(framer.definition);
 		interceptFrameElements();
 		retargetFramesetElements();
-		registerFramesetElement(); // registerElement('body', HFrameset), etc
 		var namespace = framer.definition.namespaces.lookupNamespace(HYPERFRAMESET_URN);
-		framesetElements.register(namespace);
+		layoutElements.register(namespace);
+		frameElements.register(namespace);
+		registerFramesetElement();
 		formElements.register();
 
 		return sprockets.start({ manual: true }); // FIXME should be a promise
@@ -353,7 +356,7 @@ framesetLeft: function(frameset) { // WARN this should never happen
 frameEntered: function(frame) {
 	var namespaces = framer.definition.namespaces;
 	var parentFrame;
-	var parentElement = DOM.closest(frame.element.parentNode, namespaces.lookupSelector('frame', HYPERFRAMESET_URN)); // TODO frame.element.parentNode.ariaClosest('frame')
+	var parentElement = DOM.closest(frame.element.parentNode, HFrame.isFrame); // TODO frame.element.parentNode.ariaClosest('frame')
 	if (parentElement) parentFrame = parentElement.$;
 	else {
 		parentElement = document.body; // TODO  frame.element.parentNode.ariaClosest('frameset'); 
@@ -756,8 +759,6 @@ function registerFrames(framesetDef) {
 
 // FIXME Monkey-patch to allow creation of tree of frames
 function interceptFrameElements() {
-
-var HFrame = Meeko.HFrame;
 
 _.assign(HFrame.prototype, {
 

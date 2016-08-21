@@ -1,5 +1,5 @@
 /*!
- * HyperFrameset Elements
+ * HyperFrameset Layout Elements
  * Copyright 2009-2016 Sean Hogan (http://meekostuff.net/)
  * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
  */
@@ -14,35 +14,18 @@ var window = this;
 var document = window.document;
 
 var Meeko = window.Meeko;
-var _ = Meeko.stuff; // provided by DOMSprockets
-
-var Task = Meeko.Task;
-var Promise = Meeko.Promise;
-var URL = Meeko.URL;
+var _ = Meeko.stuff;
 var DOM = Meeko.DOM;
-
 var configData = Meeko.configData;
 var sprockets = Meeko.sprockets;
 var controllers = Meeko.controllers;
 var namespace; // will be set by external call to registerFramesetElements()
 
-var Registry = Meeko.Registry;
-
-var frameDefinitions = new Registry({
-	writeOnce: true,
-	testKey: function(key) {
-		return typeof key === 'string';
-	},
-	testValue: function(o) {
-		return o != null && typeof o === 'object';
-	}
-});
-
 /*
  * HyperFrameset sprockets
  */
 
-// All HyperFrameset sprockets inherit from HBase
+// All HyperFrameset sprockets will inherit from HBase
 var HBase = (function() {
 
 var HBase = sprockets.evolve(sprockets.RoleType, {
@@ -154,6 +137,8 @@ var Panel = sprockets.evolve(HBase, {
 
 role: 'panel',
 
+isPanel: true
+
 });
 
 _.assign(Panel, {
@@ -197,6 +182,10 @@ connectController: function() {
 	controllers.listen(name, function(values) {
 		panel.ariaToggle('hidden', !(_.includes(values, value)));
 	});
+},
+
+isPanel: function(element) {
+	return !!element.$.isPanel;
 }
 
 });
@@ -213,9 +202,7 @@ role: 'group',
 owns: {
 	get: function() { 
 		return _.filter(this.element.children, function(el) { 
-			return DOM.matches(el, 
-				namespace.lookupSelector('hlayout, vlayout, deck, rdeck, panel, frame')
-			); 
+			return DOM.matches(el, Panel.isPanel);
 		}); 
 	}
 }
@@ -266,9 +253,9 @@ normalizeChildren: function() {
 
 function normalizeChild(node) {
 	var element = this;
-	if (DOM.matches(node, namespace.lookupSelector('hlayout, vlayout, deck, rdeck, panel, frame'))) return; 
 	switch (node.nodeType) {
 	case 1: // hide non-layout elements
+		if (DOM.matches(node, Panel.isPanel)) return;
 		node.hidden = true;
 		return;
 	case 3: // hide text nodes by wrapping in <wbr hidden>
@@ -457,103 +444,9 @@ return ResponsiveDeck;
 })();
 
 
-var HFrame = (function() {
-
-var HFrame = sprockets.evolve(Panel, {
-
-role: 'frame',
-
-preload: function(request) {
-	var frame = this;
-	return Promise.pipe(request, [
-		
-	function(request) { return frame.definition.render(request, 'loading'); },
-	function(result) {
-		if (!result) return;
-		return frame.insert(result);
-	}
-	
-	]);
-},
-
-load: function(response) { // FIXME need a teardown method that releases child-frames	
-	var frame = this;
-	if (response) frame.src = response.url;
-	// else a no-src frame
-	return Promise.pipe(response, [
-	
-	function(response) { 
-		return frame.definition.render(response, 'loaded', {
-			mainSelector: frame.mainSelector
-			}); 
-	},
-	function(result) {
-		if (!result) return;
-		return frame.insert(result);
-	}
-
-	]);
-},
-
-insert: function(bodyElement) { // FIXME need a teardown method that releases child-frames	
-	var frame = this;
-	
-	var options = frame.options;
-
-	// FIXME .bodyElement will probably become .bodies[] for transition animations.
-	if (frame.bodyElement) {
-		if (options && options.bodyLeft) {
-			try { options.bodyLeft(frame, frame.bodyElement); } 
-			catch (err) { Task.postError(err); }
-		}
-		sprockets.removeNode(frame.bodyElement);
-	}
-
-	sprockets.insertNode('beforeend', frame.element, bodyElement);
-	frame.bodyElement = bodyElement;
-
-	if (options && options.bodyEntered) {
-		try { options.bodyEntered(frame, frame.bodyElement); } 
-		catch (err) { Task.postError(err); }
-	}
-},
-
-});
-
-_.assign(HFrame, {
-
-attached: function(handlers) {
-	Panel.attached.call(this, handlers);
-
-	var frame = this;
-	var def = frame.attr('def');
-	frame.definition = frameDefinitions.get(def); // FIXME assert frameDefinitions.has(def)
-	_.defaults(frame, {
-		bodyElement: null,
-		targetname: frame.attr('targetname'),
-		src: frame.attr('src'),
-		mainSelector: frame.attr('main') // TODO consider using a hash in `@src`
-    });
-},
-
-enteredDocument: function() {
-	Panel.enteredDocument.call(this);
-},
-
-leftDocument: function() {
-	Panel.leftDocument.call(this);
-}
-
-});
-
-return HFrame;	
-})();
-
-function registerFramesetElements(ns) {
+function registerLayoutElements(ns) {
 
 namespace = ns; // TODO assert ns instanceof CustomNamespace
-
-sprockets.registerElement(namespace.lookupSelector('frame'), HFrame);
 
 sprockets.registerElement(namespace.lookupSelector('layer'), Layer);
 sprockets.registerElement(namespace.lookupSelector('popup'), Popup);
@@ -565,11 +458,11 @@ sprockets.registerElement(namespace.lookupSelector('rdeck'), ResponsiveDeck);
 
 var cssText = [
 '*[hidden] { display: none !important; }', // TODO maybe not !important
-namespace.lookupSelector('layer, popup, hlayout, vlayout, deck, rdeck, panel, frame, body') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
+namespace.lookupSelector('layer, popup, hlayout, vlayout, deck, rdeck, panel, body') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
 namespace.lookupSelector('layer') + ' { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; }',
 namespace.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { display: block; width: 0; height: 0; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
 namespace.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { width: 100%; height: 100%; }', // FIXME should be 0,0 before manual calculations
-namespace.lookupSelector('frame, panel') + ' { display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+namespace.lookupSelector('panel') + ' { display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
 namespace.lookupSelector('body') + ' { display: block; width: auto; height: auto; margin: 0; }',
 namespace.lookupSelector('popup') + ' { display: block; position: relative; width: 0; height: 0; }',
 namespace.lookupSelector('popup') + ' > * { position: absolute; top: 0; left: 0; }', // TODO or change 'body' styling above
@@ -587,25 +480,25 @@ var style = document.createElement('style');
 style.textContent = cssText;
 document.head.insertBefore(style, document.head.firstChild);
 
-} // END registerHyperFramesetElements()
+} // END registerLayoutElements()
 
-var framesetElements = {
+var layoutElements = {
 
-register: registerFramesetElements
+register: registerLayoutElements
 
 }
 
 _.defaults(classnamespace, {
 
 	HBase: HBase,
-	HFrame: HFrame,
 	Layer: Layer,
+	Popup: Popup,
+	Panel: Panel,
 	HLayout: HLayout,
 	VLayout: VLayout,
 	Deck: Deck,
 	ResponsiveDeck: ResponsiveDeck,
-	framesetElements: framesetElements,
-	frameDefinitions: frameDefinitions
+	layoutElements: layoutElements
 
 });
 

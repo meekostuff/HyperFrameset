@@ -101,23 +101,31 @@ else _.some(_.words('moz webkit ms o'), function(prefix) {
 
 var matches = matchesSelector ?
 function(element, selector, scope) {
-return scopeify(function(absSelector) {
-
-	return matchesSelector(element, absSelector);
-
-}, selector, scope);
+	if (!(element && element.nodeType === 1)) return false;
+	if (typeof selector === 'function') return selector(element, scope);
+	return scopeify(function(absSelector) {
+		return matchesSelector(element, absSelector);
+	}, selector, scope);
 } :
 function() { throw Error('matches not supported'); } // NOTE fallback
 
 var closest = matchesSelector ?
 function(element, selector, scope) {
-return scopeify(function(absSelector) {
-
-	for (var el=element; el && el.nodeType === 1 && el!==scope; el=el.parentNode) {
-		if (matchesSelector(el, absSelector)) return el;
+	if (typeof selector === 'function') {
+		for (var el=element; el && el!==scope; el=el.parentNode) {
+			if (el.nodeType !== 1) continue;
+			if (selector(el, scope)) return el;
+		}
+		return null;
 	}
+	return scopeify(function(absSelector) {
 
-}, selector, scope);
+		for (var el=element; el && el!==scope; el=el.parentNode) {
+			if (el.nodeType !== 1) continue;
+			if (matchesSelector(el, absSelector)) return el;
+		}
+
+	}, selector, scope);
 } :
 function() { throw Error('closest not supported'); } // NOTE fallback
 
