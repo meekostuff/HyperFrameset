@@ -355,8 +355,10 @@ loadTemplate: function(template) {
 		var entryTemplate = el.ownerDocument.createElement(hazPrefix + 'template');
 		_.forEach(contentNodes, function(node) {
 			entryTemplate.appendChild(node);
-		});
-		el.insertBefore(entryTemplate, firstExplicitTemplate);
+		}); 
+		// NOTE in IE10 el.insertBefore(node, refNode) throws if refNode is undefined
+		if (firstExplicitTemplate) el.insertBefore(entryTemplate, firstExplicitTemplate);
+		else el.appendChild(entryTemplate);
 		processor.templates.unshift(entryTemplate);
 	}
 

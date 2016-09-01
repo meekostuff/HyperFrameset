@@ -19,6 +19,7 @@ var Task = Meeko.Task;
 var Promise = Meeko.Promise;
 var URL = Meeko.URL;
 var DOM = Meeko.DOM;
+var httpProxy = Meeko.httpProxy;
 
 var sprockets = Meeko.sprockets;
 var namespace; // will be set by external call to registerFrameElements()
@@ -101,6 +102,45 @@ insert: function(bodyElement) { // FIXME need a teardown method that releases ch
 	}
 },
 
+refresh: function() {
+	var frame = this;
+	var element = this.element;
+	var src = frame.attr('src');
+
+	return Promise.resolve().then(function() {
+
+		if (src == null) { // a non-src frame
+			return frame.load(null, { condition: 'loaded' });
+		}
+
+		if (src === '') {
+			return; // FIXME frame.load(null, { condition: 'uninitialized' })
+		}
+
+		var fullURL = URL(src);
+		var nohash = fullURL.nohash;
+		var hash = fullURL.hash;
+
+		var request = { method: 'get', url: nohash, responseType: 'document'};
+		var response;
+
+		return Promise.pipe(null, [ // FIXME how to handle `hash` if present??
+
+			function() { return frame.preload(request); },
+			function() { return httpProxy.load(nohash, request); },
+			function(resp) { response = resp; },
+			function() { return DOM.whenVisible(element); },
+			function() { 
+				// TODO there are probably better ways to monitor @src
+				if (frame.attr('src') !== src) return; // WARN abort since src has changed
+				return frame.load(response); 
+			}
+
+		]);
+
+	});
+}
+
 });
 
 _.assign(HFrame, {
@@ -117,21 +157,70 @@ attached: function(handlers) {
 		src: frame.attr('src'),
 		mainSelector: frame.attr('main') // TODO consider using a hash in `@src`
     });
+
+	HFrame.observeAttributes.call(this, 'src');
 },
 
 enteredDocument: function() {
 	Panel.enteredDocument.call(this);
+	this.refresh();
 },
 
 leftDocument: function() {
 	Panel.leftDocument.call(this);
+	
+	this.attributeObserver.disconnect();
 },
 
+attributeChanged: function(attrName) {
+	if (attrName === 'src') this.refresh();
+},
+
+observeAttributes: function() {
+	var attrList = [].splice.call(arguments, 0);
+	var frame = this;
+	var element = frame.element;
+	var observer = observeAttributes(element, function(attrName) {
+		HFrame.attributeChanged.call(frame, attrName);
+	}, attrList);
+	frame.attributeObserver = observer;
+},
+	
 isFrame: function(element) {
 	return !!element.$.isFrame;
 }
 
 });
+
+var observeAttributes = (window.MutationObserver) ?
+function(element, callback, attrList) {
+	var observer = new MutationObserver(function(mutations, observer) {
+		_.forEach(mutations, function(record) {
+			if (record.type !== 'attributes') return;
+			callback.call(record.target, record.attributeName);
+		});
+	});
+	observer.observe(element, { attributes: true, attributeFilter: attrList, subtree: false });
+	
+	return observer;
+} :
+function(element, callback, attrList) { // otherwise assume MutationEvents (IE10). 
+	function handleEvent(e) {
+		if (e.target !== e.currentTarget) return;
+		e.stopPropagation();
+		if (attrList && attrList.length > 0 && attrList.indexOf(e.attrName) < 0) return;
+		Task.asap(function() { callback.call(e.target, e.attrName); });
+	}
+
+	element.addEventListener('DOMAttrModified', handleEvent, true);
+	return { 
+		disconnect: function() {
+			element.removeEventListener('DOMAttrModified', handleEvent, true);	
+		}
+	};
+
+};
+
 
 return HFrame;	
 })();

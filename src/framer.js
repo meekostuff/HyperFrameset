@@ -368,33 +368,6 @@ frameEntered: function(frame) {
 	if (frame.targetname === framer.currentChangeset.target) { // FIXME should only be used at startup
 		frame.attr('src', framer.currentChangeset.url);
 	}
-
-	DOM.whenVisible(frame.element).then(function() { // FIXME could be clash with loadFrames() above
-
-	var src = frame.attr('src');
-
-	if (src == null) { // a non-src frame
-		return frame.load(null, { condition: 'loaded' });
-	}
-
-	if (src === '') {
-		return; // FIXME frame.load(null, { condition: 'uninitialized' })
-	}
-	
-	var fullURL = URL(src);
-	var nohash = fullURL.nohash;
-	var hash = fullURL.hash;
-	
-	var request = { method: 'get', url: nohash, responseType: 'document'};
-	return Promise.pipe(null, [ // FIXME how to handle `hash` if present??
-	
-	function() { return frame.preload(request); },
-	function() { return httpProxy.load(nohash, request); },
-	function(response) { return frame.load(response); }
-
-	]);
-
-	});
 },
 
 frameLeft: function(frame) {
@@ -573,18 +546,15 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 	},
 	function() {
 		_.forEach(frames, function(frame) {
-			frame.preload(request);
+			frame.attr('src', fullURL);
 		});
 	},
-	function() {
+	function() { // NOTE .load() is just to sync pushState
 		return httpProxy.load(nohash, request)
 		.then(function(resp) { response = resp; });
 	},
 	function() { // FIXME how to handle `hash` if present??
-		if (changeState) return historyManager.pushState(changeset, '', url, function(state) {
-				loadFrames(frames, response);
-			});
-		else return loadFrames(frames, response);
+		if (changeState) return historyManager.pushState(changeset, '', url, function(state) {});
 	},
 	function() { // FIXME need to wait for the DOM to stabilize before this notification
 		if (mustNotify) return notify({ // FIXME need a timeout on notify
@@ -598,15 +568,6 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 		
 	]);
 
-	function loadFrames(frames, response) { // TODO promisify
-		_.forEach(frames, function(frame) {
-			frame.attr('src', response.url);
-			DOM.whenVisible(frame.element).then(function() {
-				frame.load(response); // FIXME this can potentially clash with framer.frameEntered code
-			});
-		});
-	}
-	
 	function recurseFrames(parentFrame, fn) {
 		_.forEach(parentFrame.frames, function(frame) {
 			var found = fn(frame);
@@ -780,23 +741,18 @@ HFrame._leftDocument = HFrame.leftDocument;
 _.assign(HFrame, {
 
 attached: function(handlers) {
-	HFrame._attached.call(this, handlers);
-
 	this.frames = [];
+	HFrame._attached.call(this, handlers);
 },
 
 enteredDocument: function() {
+	framer.frameEntered(this);
 	HFrame._enteredDocument.call(this);
-
-	var frame = this;
-	Meeko.framer.frameEntered(frame); // TODO remove `framer` dependency
 },
 
 leftDocument: function() {
+	framer.frameLeft(this); 
 	HFrame._leftDocument.call(this);
-	
-	var frame = this;
-	Meeko.framer.frameLeft(frame); // TODO remove `framer` dependency
 }
 
 });

@@ -1325,7 +1325,6 @@ if (window.MutationObserver) {
 else if (SUPPORTS_ATTRMODIFIED) {
 	
 	document.addEventListener('DOMAttrModified', function(e) {
-		e.stopPropagation();
 		if (e.attrName !== 'hidden') return;
 		triggerVisibilityChangeEvent(e.target);
 	}, true);
@@ -5183,8 +5182,10 @@ loadTemplate: function(template) {
 		var entryTemplate = el.ownerDocument.createElement(hazPrefix + 'template');
 		_.forEach(contentNodes, function(node) {
 			entryTemplate.appendChild(node);
-		});
-		el.insertBefore(entryTemplate, firstExplicitTemplate);
+		}); 
+		// NOTE in IE10 el.insertBefore(node, refNode) throws if refNode is undefined
+		if (firstExplicitTemplate) el.insertBefore(entryTemplate, firstExplicitTemplate);
+		else el.appendChild(entryTemplate);
 		processor.templates.unshift(entryTemplate);
 	}
 
@@ -6556,6 +6557,7 @@ var Task = Meeko.Task;
 var Promise = Meeko.Promise;
 var URL = Meeko.URL;
 var DOM = Meeko.DOM;
+var httpProxy = Meeko.httpProxy;
 
 var sprockets = Meeko.sprockets;
 var namespace; // will be set by external call to registerFrameElements()
@@ -6638,6 +6640,45 @@ insert: function(bodyElement) { // FIXME need a teardown method that releases ch
 	}
 },
 
+refresh: function() {
+	var frame = this;
+	var element = this.element;
+	var src = frame.attr('src');
+
+	return Promise.resolve().then(function() {
+
+		if (src == null) { // a non-src frame
+			return frame.load(null, { condition: 'loaded' });
+		}
+
+		if (src === '') {
+			return; // FIXME frame.load(null, { condition: 'uninitialized' })
+		}
+
+		var fullURL = URL(src);
+		var nohash = fullURL.nohash;
+		var hash = fullURL.hash;
+
+		var request = { method: 'get', url: nohash, responseType: 'document'};
+		var response;
+
+		return Promise.pipe(null, [ // FIXME how to handle `hash` if present??
+
+			function() { return frame.preload(request); },
+			function() { return httpProxy.load(nohash, request); },
+			function(resp) { response = resp; },
+			function() { return DOM.whenVisible(element); },
+			function() { 
+				// TODO there are probably better ways to monitor @src
+				if (frame.attr('src') !== src) return; // WARN abort since src has changed
+				return frame.load(response); 
+			}
+
+		]);
+
+	});
+}
+
 });
 
 _.assign(HFrame, {
@@ -6654,21 +6695,70 @@ attached: function(handlers) {
 		src: frame.attr('src'),
 		mainSelector: frame.attr('main') // TODO consider using a hash in `@src`
     });
+
+	HFrame.observeAttributes.call(this, 'src');
 },
 
 enteredDocument: function() {
 	Panel.enteredDocument.call(this);
+	this.refresh();
 },
 
 leftDocument: function() {
 	Panel.leftDocument.call(this);
+	
+	this.attributeObserver.disconnect();
 },
 
+attributeChanged: function(attrName) {
+	if (attrName === 'src') this.refresh();
+},
+
+observeAttributes: function() {
+	var attrList = [].splice.call(arguments, 0);
+	var frame = this;
+	var element = frame.element;
+	var observer = observeAttributes(element, function(attrName) {
+		HFrame.attributeChanged.call(frame, attrName);
+	}, attrList);
+	frame.attributeObserver = observer;
+},
+	
 isFrame: function(element) {
 	return !!element.$.isFrame;
 }
 
 });
+
+var observeAttributes = (window.MutationObserver) ?
+function(element, callback, attrList) {
+	var observer = new MutationObserver(function(mutations, observer) {
+		_.forEach(mutations, function(record) {
+			if (record.type !== 'attributes') return;
+			callback.call(record.target, record.attributeName);
+		});
+	});
+	observer.observe(element, { attributes: true, attributeFilter: attrList, subtree: false });
+	
+	return observer;
+} :
+function(element, callback, attrList) { // otherwise assume MutationEvents (IE10). 
+	function handleEvent(e) {
+		if (e.target !== e.currentTarget) return;
+		e.stopPropagation();
+		if (attrList && attrList.length > 0 && attrList.indexOf(e.attrName) < 0) return;
+		Task.asap(function() { callback.call(e.target, e.attrName); });
+	}
+
+	element.addEventListener('DOMAttrModified', handleEvent, true);
+	return { 
+		disconnect: function() {
+			element.removeEventListener('DOMAttrModified', handleEvent, true);	
+		}
+	};
+
+};
+
 
 return HFrame;	
 })();
@@ -7668,33 +7758,6 @@ frameEntered: function(frame) {
 	if (frame.targetname === framer.currentChangeset.target) { // FIXME should only be used at startup
 		frame.attr('src', framer.currentChangeset.url);
 	}
-
-	DOM.whenVisible(frame.element).then(function() { // FIXME could be clash with loadFrames() above
-
-	var src = frame.attr('src');
-
-	if (src == null) { // a non-src frame
-		return frame.load(null, { condition: 'loaded' });
-	}
-
-	if (src === '') {
-		return; // FIXME frame.load(null, { condition: 'uninitialized' })
-	}
-	
-	var fullURL = URL(src);
-	var nohash = fullURL.nohash;
-	var hash = fullURL.hash;
-	
-	var request = { method: 'get', url: nohash, responseType: 'document'};
-	return Promise.pipe(null, [ // FIXME how to handle `hash` if present??
-	
-	function() { return frame.preload(request); },
-	function() { return httpProxy.load(nohash, request); },
-	function(response) { return frame.load(response); }
-
-	]);
-
-	});
 },
 
 frameLeft: function(frame) {
@@ -7873,18 +7936,15 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 	},
 	function() {
 		_.forEach(frames, function(frame) {
-			frame.preload(request);
+			frame.attr('src', fullURL);
 		});
 	},
-	function() {
+	function() { // NOTE .load() is just to sync pushState
 		return httpProxy.load(nohash, request)
 		.then(function(resp) { response = resp; });
 	},
 	function() { // FIXME how to handle `hash` if present??
-		if (changeState) return historyManager.pushState(changeset, '', url, function(state) {
-				loadFrames(frames, response);
-			});
-		else return loadFrames(frames, response);
+		if (changeState) return historyManager.pushState(changeset, '', url, function(state) {});
 	},
 	function() { // FIXME need to wait for the DOM to stabilize before this notification
 		if (mustNotify) return notify({ // FIXME need a timeout on notify
@@ -7898,15 +7958,6 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 		
 	]);
 
-	function loadFrames(frames, response) { // TODO promisify
-		_.forEach(frames, function(frame) {
-			frame.attr('src', response.url);
-			DOM.whenVisible(frame.element).then(function() {
-				frame.load(response); // FIXME this can potentially clash with framer.frameEntered code
-			});
-		});
-	}
-	
 	function recurseFrames(parentFrame, fn) {
 		_.forEach(parentFrame.frames, function(frame) {
 			var found = fn(frame);
@@ -8080,23 +8131,18 @@ HFrame._leftDocument = HFrame.leftDocument;
 _.assign(HFrame, {
 
 attached: function(handlers) {
-	HFrame._attached.call(this, handlers);
-
 	this.frames = [];
+	HFrame._attached.call(this, handlers);
 },
 
 enteredDocument: function() {
+	framer.frameEntered(this);
 	HFrame._enteredDocument.call(this);
-
-	var frame = this;
-	Meeko.framer.frameEntered(frame); // TODO remove `framer` dependency
 },
 
 leftDocument: function() {
+	framer.frameLeft(this); 
 	HFrame._leftDocument.call(this);
-	
-	var frame = this;
-	Meeko.framer.frameLeft(frame); // TODO remove `framer` dependency
 }
 
 });

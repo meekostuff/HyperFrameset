@@ -320,7 +320,6 @@ if (window.MutationObserver) {
 else if (SUPPORTS_ATTRMODIFIED) {
 	
 	document.addEventListener('DOMAttrModified', function(e) {
-		e.stopPropagation();
 		if (e.attrName !== 'hidden') return;
 		triggerVisibilityChangeEvent(e.target);
 	}, true);
