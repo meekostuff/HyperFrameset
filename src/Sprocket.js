@@ -582,6 +582,16 @@ insertNode: function(conf, refNode, node) {
 	case 'afterend': refNode.parentNode.insertBefore(node, refNode.nextSibling); break;
 	case 'afterbegin': refNode.insertBefore(node, refNode.firstChild); break;
 	case 'beforeend': refNode.appendChild(node); break;
+
+	case 'replace': 
+		var parent = refNode.parentNode;
+		var next = refNode.nextSibling;
+		parent.removeChild(refNode); // TODO refactor?? these two lines ...
+		nodeRemoved(refNode); // ... are equivalent to removeNode()
+		if (next) parent.insertBefore(node, next);
+		else parent.appendChild(node);
+		break;
+
 	default: throw Error('Unsupported configuration in sprockets.insertNode: ' + conf);
 	// TODO maybe case 'replace' which will call sprockets.removeNode() first
 	}
