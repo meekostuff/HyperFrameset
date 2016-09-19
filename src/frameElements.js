@@ -73,14 +73,15 @@ load: function(response) { // FIXME need a teardown method that releases child-f
 	},
 	function(result) {
 		if (!result) return;
-		return frame.insert(result);
+		return frame.insert(result, frame.element.hasAttribute('replace'));
 	}
 
 	]);
 },
 
-insert: function(bodyElement) { // FIXME need a teardown method that releases child-frames	
+insert: function(bodyElement, replace) { // FIXME need a teardown method that releases child-frames	
 	var frame = this;
+	var element = frame.element;
 	
 	var options = frame.options;
 
@@ -91,6 +92,12 @@ insert: function(bodyElement) { // FIXME need a teardown method that releases ch
 			catch (err) { Task.postError(err); }
 		}
 		sprockets.removeNode(frame.bodyElement);
+	}
+
+	if (replace) {
+		var frag = DOM.adoptContents(bodyElement, element.ownerDocument);
+		sprockets.insertNode('replace', element, frag);
+		return;
 	}
 
 	sprockets.insertNode('beforeend', frame.element, bodyElement);
