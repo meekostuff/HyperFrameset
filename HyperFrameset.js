@@ -2227,6 +2227,10 @@ insertNode: function(conf, refNode, node) {
 	var doc = refNode.ownerDocument;
 	if (doc !== document || !DOM.contains(document, refNode)) throw Error('sprockets.insertNode must insert into `document`');
 	if (doc.adoptNode) node = doc.adoptNode(node); // Safari 5 was throwing because imported nodes had been added to a document node
+
+	var nodes = [ node ];
+	if (node.nodeType === 11) nodes = _.map(node.childNodes);
+
 	switch(conf) {
 	case 'beforebegin': refNode.parentNode.insertBefore(node, refNode); break;
 	case 'afterend': refNode.parentNode.insertBefore(node, refNode.nextSibling); break;
@@ -2235,7 +2239,8 @@ insertNode: function(conf, refNode, node) {
 	default: throw Error('Unsupported configuration in sprockets.insertNode: ' + conf);
 	// TODO maybe case 'replace' which will call sprockets.removeNode() first
 	}
-	nodeInserted(node);
+	
+	_.forEach(nodes, nodeInserted);
 	return node;
 },
 
