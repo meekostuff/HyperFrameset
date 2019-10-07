@@ -16,24 +16,24 @@ init: function(object) {
 evaluate: function(query, context, variables, wantArray) {
 	if (!context) context = this.object;
 
-	var query = query.trim();
-	var pathParts;
+	query = query.trim();
+	let pathParts;
 
 	if (query === '.') return (wantArray) ? [ context ] : context;
 
-	var m = query.match(/^\^/);
+	let m = query.match(/^\^/);
 	if (m && m.length) {
 		query = query.substr(m[0].length);
 		context = this.object;
 	}
 	pathParts = query.split('.');
 	
-	var resultList = [ context ];
+	let resultList = [ context ];
 	_.forEach(pathParts, function(relPath, i) {
-		var parents = resultList;
+		let parents = resultList;
 		resultList = [];
 		_.forEach(parents, function(item) {
-			var child = item[relPath];
+			let child = item[relPath];
 			if (child != null) {
 				if (Array.isArray(child)) [].push.apply(resultList, child);
 				else resultList.push(child);
@@ -43,7 +43,7 @@ evaluate: function(query, context, variables, wantArray) {
 
 	if (wantArray) return resultList;
 
-	var value = resultList[0];
+	let value = resultList[0];
 	return value;
 }
 

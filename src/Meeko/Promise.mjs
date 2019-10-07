@@ -6,10 +6,10 @@
 import * as _ from './stuff.mjs';
 import Task from './Task.mjs';
 
-var Promise = function(init) { // `init` is called as init(resolve, reject)
+let Promise = function(init) { // `init` is called as init(resolve, reject)
 	if (!(this instanceof Promise)) return new Promise(init);
 	
-	var promise = this;
+	let promise = this;
 	promise._initialize();
 
 	try { init(resolve, reject); }
@@ -40,8 +40,8 @@ var Promise = function(init) { // `init` is called as init(resolve, reject)
 _.defaults(Promise, {
 
 applyTo: function(object) {
-	var resolver = {}
-	var promise = new Promise(function(resolve, reject) {
+	let resolver = {}
+	let promise = new Promise(function(resolve, reject) {
 		resolver.resolve = resolve;
 		resolver.reject = reject;
 	});
@@ -63,7 +63,7 @@ isThenable: function(value) {
 _.defaults(Promise.prototype, {
 
 _initialize: function() {
-	var promise = this;
+	let promise = this;
 	_.defaults(promise, {
 		/* 
 			use lazy creation for callback lists - 
@@ -90,7 +90,7 @@ inspectState: function() {
 },
 
 _fulfil: function(result, sync) { // NOTE equivalent to 'fulfil algorithm'. External calls MUST NOT use sync
-	var promise = this;
+	let promise = this;
 	if (!promise.isPending) return;
 	promise.isPending = false;
 	promise.isRejected = false;
@@ -100,7 +100,7 @@ _fulfil: function(result, sync) { // NOTE equivalent to 'fulfil algorithm'. Exte
 },
 
 _resolve: function(value, sync) { // NOTE equivalent to 'resolve algorithm'. External calls MUST NOT use sync
-	var promise = this;
+	let promise = this;
 	if (!promise.isPending) return;
 	if (Promise.isPromise(value) && !value.isPending) {
 		if (value.isFulfilled) promise._fulfil(value.value, sync);
@@ -123,7 +123,7 @@ _resolve: function(value, sync) { // NOTE equivalent to 'resolve algorithm'. Ext
 },
 
 _reject: function(error, sync) { // NOTE equivalent to 'reject algorithm'. External calls MUST NOT use sync
-	var promise = this;
+	let promise = this;
 	if (!promise.isPending) return;
 	promise.isPending = false;
 	promise.isFulfilled = false;
@@ -136,7 +136,7 @@ _reject: function(error, sync) { // NOTE equivalent to 'reject algorithm'. Exter
 },
 
 _requestProcessing: function(sync) { // NOTE schedule callback processing. TODO may want to disable sync option
-	var promise = this;
+	let promise = this;
 	if (promise.isPending) return;
 	if (!promise._willCatch) return;
 	if (promise._processing) return;
@@ -155,9 +155,9 @@ _requestProcessing: function(sync) { // NOTE schedule callback processing. TODO 
 },
 
 _process: function() { // NOTE process a promises callbacks
-	var promise = this;
-	var result;
-	var callbacks, cb;
+	let promise = this;
+	let result;
+	let callbacks, cb;
 	if (promise.isFulfilled) {
 		result = promise.value;
 		callbacks = promise._fulfilCallbacks;
@@ -177,13 +177,13 @@ _process: function() { // NOTE process a promises callbacks
 },
 
 then: function(fulfilCallback, rejectCallback) {
-	var promise = this;
+	let promise = this;
 	return new Promise(function(resolve, reject) {
-		var fulfilWrapper = fulfilCallback ?
+		let fulfilWrapper = fulfilCallback ?
 			wrapResolve(fulfilCallback, resolve, reject) :
 			function(value) { resolve(value); }
 	
-		var rejectWrapper = rejectCallback ?
+		let rejectWrapper = rejectCallback ?
 			wrapResolve(rejectCallback, resolve, reject) :
 			function(error) { reject(error); }
 	
@@ -201,7 +201,7 @@ then: function(fulfilCallback, rejectCallback) {
 },
 
 'catch': function(rejectCallback) { // WARN 'catch' is unexpected identifier in IE8-
-	var promise = this;
+	let promise = this;
 	return promise.then(undefined, rejectCallback);
 }
 
@@ -212,7 +212,7 @@ then: function(fulfilCallback, rejectCallback) {
 function wrapResolve(callback, resolve, reject) {
 	return function() {
 		try {
-			var value = callback.apply(undefined, arguments);
+			let value = callback.apply(undefined, arguments);
 			resolve(value);
 		} catch (error) {
 			reject(error);
@@ -225,7 +225,7 @@ _.defaults(Promise, {
 
 resolve: function(value) {
 	if (Promise.isPromise(value)) return value;
-	var promise = Object.create(Promise.prototype);
+	let promise = Object.create(Promise.prototype);
 	promise._initialize();
 	promise._resolve(value);
 	return promise;
@@ -247,13 +247,13 @@ return new Promise(function(resolve, reject) {
    delay(timeout) returns a promise which fulfils after timeout ms
    pipe(startValue, [fn1, fn2, ...]) will call functions sequentially
  */
-var wait = (function() { // TODO wait() isn't used much. Can it be simpler?
+let wait = (function() { // TODO wait() isn't used much. Can it be simpler?
 	
-var tests = [];
+let tests = [];
 
 function wait(fn) {
-	var test = { fn: fn };
-	var promise = Promise.applyTo(test);
+	let test = { fn: fn };
+	let promise = Promise.applyTo(test);
 	asapTest(test);
 	return promise;
 }
@@ -270,13 +270,13 @@ function asapTest(test) {
 }
 
 function deferTest(test) {
-	var started = tests.length > 0;
+	let started = tests.length > 0;
 	tests.push(test);
 	if (!started) Task.defer(poller);
 }
 
 function poller() {
-	var currentTests = tests;
+	let currentTests = tests;
 	tests = [];
 	_.forEach(currentTests, asapTest);
 }
@@ -319,9 +319,9 @@ function delay(timeout) { // FIXME delay(timeout, value_or_fn_or_promise)
 }
 
 function pipe(startValue, fnList) { // TODO make more efficient with sync introspection
-	var promise = Promise.resolve(startValue);
-	for (var n=fnList.length, i=0; i<n; i++) {
-		var fn = fnList[i];
+	let promise = Promise.resolve(startValue);
+	for (let n=fnList.length, i=0; i<n; i++) {
+		let fn = fnList[i];
 		promise = promise.then(fn);
 	}
 	return promise;
@@ -329,24 +329,24 @@ function pipe(startValue, fnList) { // TODO make more efficient with sync intros
 
 function reduce(accumulator, a, fn, context) {
 return new Promise(function(resolve, reject) {
-	var length = a.length;
-	var i = 0;
+	let length = a.length;
+	let i = 0;
 
-	var predictor = new TimeoutPredictor(256, 2);
+	let predictor = new TimeoutPredictor(256, 2);
 	process(accumulator);
 	return;
 
 	function process(acc) {
-		var prevTime;
-		var j = 0;
-		var timeoutCount = 1;
+		let prevTime;
+		let j = 0;
+		let timeoutCount = 1;
 
 		while (i < length) {
 			if (Promise.isThenable(acc)) {
 				if (!Promise.isPromise(acc) || !acc.isFulfilled) {
 					acc.then(process, reject);
 					if (j <= 0 || !prevTime || i >= length) return;
-					var currTime = Task.getTime(true);
+					let currTime = Task.getTime(true);
 					predictor.update(j, prevTime - currTime);
 					return;
 				}
@@ -364,7 +364,7 @@ return new Promise(function(resolve, reject) {
 			if (j < timeoutCount) continue;
 
 			// update timeout counter data
-			var currTime = Task.getTime(true); // NOTE *remaining* time
+			let currTime = Task.getTime(true); // NOTE *remaining* time
 			if (prevTime) predictor.update(j, prevTime - currTime); // NOTE based on *remaining* time
 			if (currTime <= 0) {
 				// Could use Promise.resolve(acc).then(process, reject)
@@ -384,7 +384,7 @@ return new Promise(function(resolve, reject) {
 
 function TimeoutPredictor(max, mult) { // FIXME test args are valid
 	if (!(this instanceof TimeoutPredictor)) return new TimeoutPredictor(max, mult);
-	var predictor = this;
+	let predictor = this;
 	_.assign(predictor, {
 		count: 0,
 		totalTime: 0,
@@ -397,16 +397,16 @@ function TimeoutPredictor(max, mult) { // FIXME test args are valid
 _.assign(TimeoutPredictor.prototype, {
 
 update: function(count, delta) {
-	var predictor = this;
+	let predictor = this;
 	predictor.count += count;
 	predictor.totalTime += delta;
 },
 
 getTimeoutCount: function(remainingTime) {
-	var predictor = this;
+	let predictor = this;
 	if (predictor.count <= 0) return 1;
-	var avgTime = predictor.totalTime / predictor.count;
-	var n = Math.floor( remainingTime / avgTime );
+	let avgTime = predictor.totalTime / predictor.count;
+	let n = Math.floor( remainingTime / avgTime );
 	if (n <= 0) return 1;
 	if (n < predictor.currLimit) return n;
 	n = predictor.currLimit;

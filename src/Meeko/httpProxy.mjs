@@ -8,9 +8,9 @@ import htmlParser from './htmlParser.mjs';
 /*
 	HTML_IN_XHR indicates if XMLHttpRequest supports HTML parsing
 */
-var HTML_IN_XHR = (function() { // FIXME more testing, especially Webkit
+const HTML_IN_XHR = (function() { // FIXME more testing, especially Webkit
 	if (!window.XMLHttpRequest) return false;
-	var xhr = new XMLHttpRequest;
+	let xhr = new XMLHttpRequest;
 	if (!('responseType' in xhr)) return false;
 	if (!('response' in xhr)) return false;
 	xhr.open('get', document.URL, true);
@@ -32,11 +32,11 @@ var HTML_IN_XHR = (function() { // FIXME more testing, especially Webkit
 })();
 
 
-var httpProxy = (function() {
+let httpProxy = (function() {
 
-	var methods = _.words('get'); // TODO words('get post put delete');
-	var responseTypes = _.words('document'); // TODO words('document json text');
-	var defaultInfo = {
+	let methods = _.words('get'); // TODO words('get post put delete');
+	let responseTypes = _.words('document'); // TODO words('document json text');
+	let defaultInfo = {
 		method: 'get',
 		responseType: 'document'
 	}
@@ -44,13 +44,13 @@ var httpProxy = (function() {
 // NOTE cache, etc is currently used only for landing page
 // TODO test that cacheAdd/Lookup doesn't trigger new XHR when url already pending
 // TODO an API like ServiceWorker may be more appropriate
-	var cache = [];
+	let cache = [];
 
 	function cacheAdd(request, response) {
-		var rq = _.defaults({}, request);
-		var resp;
+		let rq = _.defaults({}, request);
+		let resp;
 
-		var entry = {
+		let entry = {
 			invalid: false,
 			request: rq
 		};
@@ -68,12 +68,12 @@ var httpProxy = (function() {
 	}
 
 	function cacheLookup(request) {
-		var entry = _.find(cache, function (entry) {
+		let entry = _.find(cache, function (entry) {
 			if (!cacheMatch(request, entry)) return false;
 			return true;
 		});
 		if (!(entry && entry.response)) return;
-		var response = entry.response;
+		let response = entry.response;
 		if (Promise.isPromise(response)) return response.then(cloneResponse);
 		else return cloneResponse(response);
 	}
@@ -86,21 +86,21 @@ var httpProxy = (function() {
 	}
 
 	function cloneResponse(response) {
-		var resp = _.defaults({}, response);
+		let resp = _.defaults({}, response);
 		resp.document = DOM.cloneDocument(response.document); // TODO handle other response types
 		return resp;
 	}
 
 
-	var httpProxy = {
+	let httpProxy = {
 
 		HTML_IN_XHR: HTML_IN_XHR,
 
 		add: function (response) { // NOTE this is only for the landing page
-			var url = response.url;
+			let url = response.url;
 			if (!url) throw Error('Invalid url in response object');
 			if (!_.includes(responseTypes, response.type)) throw Error('Invalid type in response object');
-			var request = {
+			let request = {
 				url: response.url
 			}
 			_.defaults(request, defaultInfo);
@@ -118,7 +118,7 @@ var httpProxy = (function() {
 		},
 
 		load: function (url, requestInfo) {
-			var info = {
+			let info = {
 				url: url
 			};
 			if (requestInfo) _.defaults(info, requestInfo);
@@ -130,9 +130,9 @@ var httpProxy = (function() {
 
 	}
 
-	var request = function (info) {
-		var sendText = null;
-		var method = _.lc(info.method);
+	let request = function (info) {
+		let sendText = null;
+		let method = _.lc(info.method);
 		switch (method) {
 			case 'post':
 				throw Error('POST not supported'); // FIXME proper error handling
@@ -140,7 +140,7 @@ var httpProxy = (function() {
 				return doRequest(info);
 				break;
 			case 'get':
-				var response = cacheLookup(info);
+				let response = cacheLookup(info);
 				if (response) return Promise.resolve(response);
 				return doRequest(info)
 					.then(function (response) {
@@ -154,12 +154,12 @@ var httpProxy = (function() {
 		}
 	}
 
-	var doRequest = function (info) {
+	let doRequest = function (info) {
 		return new Promise(function (resolve, reject) {
-			var method = info.method;
-			var url = info.url;
-			var sendText = info.body; // FIXME not-implemented
-			var xhr = new XMLHttpRequest;
+			let method = info.method;
+			let url = info.url;
+			let sendText = info.body; // FIXME not-implemented
+			let xhr = new XMLHttpRequest;
 			xhr.onreadystatechange = onchange;
 			xhr.open(method, url, true);
 			if (HTML_IN_XHR) {
@@ -173,7 +173,7 @@ var httpProxy = (function() {
 
 			function onchange() { // FIXME rewrite this to use onload/onerror/onabort/ontimeout
 				if (xhr.readyState != 4) return;
-				var protocol = new URL(url).protocol;
+				let protocol = new URL(url).protocol;
 				switch (protocol) {
 					case 'http:':
 					case 'https:':
@@ -204,14 +204,14 @@ var httpProxy = (function() {
 			}
 
 			function onload() {
-				var result = handleResponse(xhr, info);
+				let result = handleResponse(xhr, info);
 				resolve(result);
 			}
 		});
 	}
 
 	function handleResponse(xhr, info) { // TODO handle info.responseType
-		var response = {
+		let response = {
 			url: info.url,
 			type: info.responseType,
 			status: xhr.status,

@@ -2,7 +2,7 @@
 import * as _ from './stuff.mjs';
 import Task from './Task.mjs';
 
-var controllers = {
+let controllers = {
 
 values: {},
 
@@ -26,7 +26,7 @@ set: function(name, value) {
         if (!this.has(name)) throw name + ' is not a registered controller';
         if (value === false || value == null) value = [];
         else if (typeof value === 'string' || !('length' in value)) value = [ value ];
-        var oldValue = this.values[name];
+        let oldValue = this.values[name];
         if (_.difference(value, oldValue).length <= 0) return;
         this.values[name] = value;
         _.forEach(this.listeners[name], function(listener) {
@@ -37,7 +37,7 @@ set: function(name, value) {
 listen: function(name, listener) {
         if (!this.has(name)) throw name + ' is not a registered controller';
         this.listeners[name].push(listener);
-        var value = this.values[name];
+        let value = this.values[name];
         Task.asap(function() { listener(value) });
 }
 

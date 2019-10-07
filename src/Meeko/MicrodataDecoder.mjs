@@ -1,8 +1,8 @@
 import * as _ from './stuff.mjs';
 
-var document = window.document;
+let document = window.document;
 
-var Microdata = (function() {
+let Microdata = (function() {
 
 function intersects(a1, a2) { // TODO add to Meeko.stuff
 	return _.some(a1, function(i1) {
@@ -13,14 +13,14 @@ function intersects(a1, a2) { // TODO add to Meeko.stuff
 }
 
 function walkTree(root, skipRoot, callback) { // callback(el) must return NodeFilter code
-	var walker = document.createNodeIterator(
+	let walker = document.createNodeIterator(
 			root,
 			1,
 			acceptNode,
 			null // IE9 throws if this irrelavent argument isn't passed
 		);
 	
-	var el;
+	let el;
 	while (el = walker.nextNode());
 
 	function acceptNode(el) {
@@ -31,30 +31,30 @@ function walkTree(root, skipRoot, callback) { // callback(el) must return NodeFi
 
 // TODO copied from DOMSprockets. Could be a generic "class"
 
-var nodeIdProperty = '__microdata__';
-var nodeCount = 0; // used to generated node IDs
-var nodeStorage = {}; // hash of storage for nodes, keyed off `nodeIdProperty`
+let nodeIdProperty = '__microdata__';
+let nodeCount = 0; // used to generated node IDs
+let nodeStorage = {}; // hash of storage for nodes, keyed off `nodeIdProperty`
 
-var uniqueId = function(node) {
-	var nodeId = node[nodeIdProperty];
+let uniqueId = function(node) {
+	let nodeId = node[nodeIdProperty];
 	if (nodeId) return nodeId;
 	nodeId = nodeCount++; // TODO stringify??
 	node[nodeIdProperty] = new String(nodeId); // NOTE so that node cloning in old IE doesn't copy the node ID property
 	return nodeId;
 }
 
-var setData = function(node, data) { // FIXME assert node is element
-	var nodeId = uniqueId(node);
+let setData = function(node, data) { // FIXME assert node is element
+	let nodeId = uniqueId(node);
 	nodeStorage[nodeId] = data;
 }
 
-var hasData = function(node) {
-	var nodeId = node[nodeIdProperty];
+let hasData = function(node) {
+	let nodeId = node[nodeIdProperty];
 	return !nodeId ? false : nodeId in nodeStorage;
 }
 
-var getData = function(node) { // TODO should this throw if no data?
-	var nodeId = node[nodeIdProperty];
+let getData = function(node) { // TODO should this throw if no data?
+	let nodeId = node[nodeIdProperty];
 	if (!nodeId) return;
 	return nodeStorage[nodeId];
 }
@@ -63,16 +63,16 @@ var getData = function(node) { // TODO should this throw if no data?
 function getItems(rootNode, type) {
 	if (!hasData(rootNode)) parse(rootNode);
 
-	var scope = getData(rootNode);
-	var typeList = 
+	let scope = getData(rootNode);
+	let typeList =
 		(typeof type === 'string') ? _.words(type.trim()) :
 		type && type.length ? type :
 		[];
 			
-	var resultList = [];
+	let resultList = [];
 
 	_.forEach(scope.properties.names, function(propName) {
-		var propList = scope.properties.namedItem(propName);
+		let propList = scope.properties.namedItem(propName);
 		_.forEach(propList, function(prop) {
 			if (prop.isScope) [].push.apply(resultList, getItems(prop.element, typeList));
 		});
@@ -92,20 +92,20 @@ function getItems(rootNode, type) {
 
 function getProperties(el) {
 	if (!hasData(el)) return;
-	var desc = getData(el);
+	let desc = getData(el);
 	if (!desc.isScope) return;
 	return desc.properties;
 }
 
 function parse(rootNode) {
 	if (!rootNode) rootNode = document;
-	var desc = getScopeDesc(rootNode);
+	let desc = getScopeDesc(rootNode);
 }
 
 function getScopeDesc(scopeEl) {
 	if (hasData(scopeEl)) return getData(scopeEl);
 	
-	var scopeDesc = {
+	let scopeDesc = {
 		element: scopeEl,
 		isScope: true,
 		type: scopeEl.nodeType === 1 || _.words(scopeEl.getAttribute('itemtype')),
@@ -114,11 +114,11 @@ function getScopeDesc(scopeEl) {
 	}
 
 	walkTree(scopeEl, true, function(el) {
-		var isScope = el.hasAttribute('itemscope');
-		var propName = el.getAttribute('itemprop');
+		let isScope = el.hasAttribute('itemscope');
+		let propName = el.getAttribute('itemprop');
 		if (!(isScope || propName)) return NodeFilter.FILTER_SKIP;
 		
-		var item = isScope ? getScopeDesc(el) : getPropDesc(el);
+		let item = isScope ? getScopeDesc(el) : getPropDesc(el);
 		if (propName) scopeDesc.properties.addNamedItem(propName, el);
 		else scopeDesc.childScopes.push(el);
 
@@ -131,7 +131,7 @@ function getScopeDesc(scopeEl) {
 	
 function getValue(el) {
 	if (hasData(el)) return getData(el).value;
-	var desc = getPropDesc(el);
+	let desc = getPropDesc(el);
 	setData(el, desc);
 	return desc.value;
 }
@@ -139,9 +139,9 @@ function getValue(el) {
 function getPropDesc(el) {
 	if (hasData(el)) return getData(el);
 
-	var name = el.getAttribute('itemprop');
+	let name = el.getAttribute('itemprop');
 	
-	var prop = {
+	let prop = {
 		name: name,
 		value: evaluate(el)
 	}
@@ -151,22 +151,22 @@ function getPropDesc(el) {
 }
 
 function evaluate(el) {
-	var tagName = el.tagName.toLowerCase();
-	var attrName = valueAttr[tagName];
+	let tagName = el.tagName.toLowerCase();
+	let attrName = valueAttr[tagName];
 	if (attrName) return el[attrName] || el.getAttribute(attrName);
 
 	return el;
 }
 
 function createHTMLPropertiesCollection() {
-	var list = [];
+	let list = [];
 	list.names = [];
 	list.nodeLists = {};
 	_.assign(list, HTMLPropertiesCollection.prototype);
 	return list;
 }
 
-var HTMLPropertiesCollection = function() {}
+let HTMLPropertiesCollection = function() {}
 _.assign(HTMLPropertiesCollection.prototype, {
 
 namedItem: function(name) {
@@ -185,9 +185,9 @@ addNamedItem: function(name, el) {
 });
 
 
-var valueAttr = {};
+let valueAttr = {};
 _.forEach(_.words("meta@content link@href a@href area@href img@src video@src audio@src source@src track@src iframe@src embed@src object@data time@datetime data@value meter@value"), function(text) {
-	var m = text.split("@"), tagName = m[0], attrName = m[1];
+	let m = text.split("@"), tagName = m[0], attrName = m[1];
 	valueAttr[tagName] = attrName;
 });
 
@@ -215,14 +215,14 @@ init: function(node) {
 evaluate: function(query, context, variables, wantArray) {
 	if (!context) context = this.rootNode;
 
-	var query = query.trim();
-	var startAtRoot = false;
-	var baseSchema;
-	var pathParts;
+	query = query.trim();
+	let startAtRoot = false;
+	let baseSchema;
+	let pathParts;
 
 	if (query === '.') return (wantArray) ? [ context ] : context;
 
-	var m = query.match(/^(?:(\^)?\[([^\]]*)\]\.)/);
+	let m = query.match(/^(?:(\^)?\[([^\]]*)\]\.)/);
 	if (m && m.length) {
 		query = query.substr(m[0].length);
 		startAtRoot = !!m[1];
@@ -230,21 +230,21 @@ evaluate: function(query, context, variables, wantArray) {
 	}
 	pathParts = _.words(query.trim());
 	
-	var nodes;
+	let nodes;
 	if (baseSchema) {
 		if (startAtRoot) context = this.view;
 		nodes = Microdata.getItems(context, baseSchema);	
 	}
 	else nodes = [ context ];
 
-	var resultList = nodes;
+	let resultList = nodes;
 	_.forEach(pathParts, function(relPath, i) {
-		var parents = resultList;
+		let parents = resultList;
 		resultList = [];
 		_.forEach(parents, function(el) {
-			var props = Microdata.getProperties(el);
+			let props = Microdata.getProperties(el);
 			if (!props) return;
-			var nodeList = props.namedItem(relPath);
+			let nodeList = props.namedItem(relPath);
 			if (!nodeList) return;
 			[].push.apply(resultList, nodeList);
 		});
@@ -252,7 +252,7 @@ evaluate: function(query, context, variables, wantArray) {
 
 	// now convert elements to values
 	resultList = _.map(resultList, function(el) {
-		var props = Microdata.getProperties(el);
+		let props = Microdata.getProperties(el);
 		if (props) return el;
 		return Microdata.getValue(el);
 	});

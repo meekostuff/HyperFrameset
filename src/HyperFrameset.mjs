@@ -33,7 +33,7 @@ import framer, { HFrameset } from './Meeko/framer.mjs';
 
 (function() {
 
-    var stuff = _.assign({}, _);
+    let stuff = _.assign({}, _);
     stuff.dateFormat = dateFormat;
 
     if (!this.Meeko) this.Meeko = {};

@@ -2,14 +2,14 @@ import * as _ from './stuff.mjs';
 import Promise from './Promise.mjs';
 
 // wrapper for `history` mostly to provide locking around state-updates and throttling of popstate events
-var historyManager = (function() {
+let historyManager = (function() {
 
-var historyManager = {};
+let historyManager = {};
 
-var stateTag = 'HyperFrameset';
-var currentState;
-var popStateHandler;
-var started = false;
+const STATE_TAG = 'HyperFrameset';
+let currentState;
+let popStateHandler;
+let started = false;
 
 _.defaults(historyManager, {
 
@@ -22,7 +22,7 @@ return scheduler.now(function() {
 	if (started) throw Error('historyManager has already started');
 	started = true;
 	popStateHandler = onPopState;
-	var newState = State.create(data, title, url);
+	let newState = State.create(data, title, url);
 	if (history.replaceState) {
 		history.replaceState(newState.settings, title, url);
 	}
@@ -33,7 +33,7 @@ return scheduler.now(function() {
 
 newState: function(data, title, url, useReplace, callback) {
 return scheduler.now(function() {
-	var newState = State.create(data, title, url);
+	let newState = State.create(data, title, url);
 	if (history.replaceState) {
 		if (useReplace) history.replaceState(newState.settings, title, url);
 		else history.pushState(newState.settings, title, url);
@@ -57,8 +57,8 @@ if (history.replaceState) window.addEventListener('popstate', function(e) {
 		if (e.stopImmediatePropagation) e.stopImmediatePropagation();
 		else e.stopPropagation();
 		
-		var newSettings = e.state;
-		if (!newSettings[stateTag]) {
+		let newSettings = e.state;
+		if (!newSettings[STATE_TAG]) {
 			console.warn('Ignoring invalid PopStateEvent');
 			return;
 		}
@@ -70,19 +70,19 @@ if (history.replaceState) window.addEventListener('popstate', function(e) {
 	}, true);
 
 function State(settings) {
-	if (!settings[stateTag]) throw Error('Invalid settings for new State');
+	if (!settings[STATE_TAG]) throw Error('Invalid settings for new State');
 	this.settings = settings;
 }
 
 State.create = function(data, title, url) {
-	var timeStamp = +(new Date);
-	var settings = {
+	let timeStamp = +(new Date);
+	let settings = {
 		title: title,
 		url: url,
 		timeStamp: timeStamp,
 		data: data
 	};
-	settings[stateTag] = true;
+	settings[STATE_TAG] = true;
 	return new State(settings);
 }
 
@@ -93,7 +93,7 @@ getData: function() {
 },
 
 update: function(data, callback) { // FIXME not being used. Can it be reomved?
-	var state = this;
+	let state = this;
 	return Promise.resolve(function() {
 		if (state !== currentState) throw Error('Cannot update state: not current');
 		return scheduler.now(function() {
@@ -110,11 +110,11 @@ return historyManager;
 })();
 
 
-var scheduler = (function() { // NOTE only used in historyManager
+let scheduler = (function() { // NOTE only used in historyManager
 
-var queue = [];
-var maxSize = 1;
-var processing = false;
+let queue = [];
+let maxSize = 1;
+let processing = false;
 
 function bump() {
 	if (processing) return;
@@ -127,13 +127,13 @@ function process() {
 		processing = false;
 		return;
 	}
-	var task = queue.shift();
-	var promise = Promise.defer(task.fn);
+	let task = queue.shift();
+	let promise = Promise.defer(task.fn);
 	promise.then(process, process);
 	promise.then(task.resolve, task.reject);
 }
 
-var scheduler = {
+let scheduler = {
 	
 now: function(fn, fail) {
 	return this.whenever(fn, fail, 0);

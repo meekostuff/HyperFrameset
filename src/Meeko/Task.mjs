@@ -17,35 +17,35 @@ const frameInterval = 1000 / frameRate;
 const frameExecutionRatio = 0.75; // FIXME another boot-option??
 const frameExecutionTimeout = frameInterval * frameExecutionRatio;
 
-var performance = window.performance && window.performance.now ? window.performance :
+let performance = window.performance && window.performance.now ? window.performance :
 	Date.now ? Date :
 	{
 		now: function() { return (new Date).getTime(); }
 	};
 
-var schedule = (function() {
+let schedule = (function() {
 	// See http://creativejs.com/resources/requestanimationframe/
-	var fn = window.requestAnimationFrame;
+	let fn = window.requestAnimationFrame;
 	if (fn) return fn;
 
 	_.some(_.words('moz ms o webkit'), function(vendor) {
-		var name = vendor + 'RequestAnimationFrame';
+		let name = vendor + 'RequestAnimationFrame';
 		if (!window[name]) return false;
 		fn = window[name];
 		return true;
 	});
 	if (fn) return fn;
 
-	var lastTime = 0;
-	var callback;
+	let lastTime = 0;
+	let callback;
 	fn = function(cb, element) {
 		if (callback) throw 'schedule() only allows one callback at a time';
 		callback = cb;
-		var currTime = performance.now();
-		var timeToCall = Math.max(0, frameInterval - (currTime - lastTime));
-		var id = window.setTimeout(function() {
+		let currTime = performance.now();
+		let timeToCall = Math.max(0, frameInterval - (currTime - lastTime));
+		let id = window.setTimeout(function() {
 			lastTime = performance.now();
-			var cb = callback;
+			let cb = callback;
 			callback = undefined;
 			cb(lastTime, element); 
 		}, timeToCall);
@@ -56,11 +56,11 @@ var schedule = (function() {
 })();
 
 
-var asapQueue = [];
-var deferQueue = [];
-var errorQueue = [];
-var scheduled = false;
-var processing = false;
+let asapQueue = [];
+let deferQueue = [];
+let errorQueue = [];
+let scheduled = false;
+let processing = false;
 
 function asap(fn) {
 	asapQueue.push(fn);
@@ -91,8 +91,8 @@ function delay(fn, timeout) {
 	}, timeout);
 }
 
-var execStats = {};
-var frameStats = {};
+let execStats = {};
+let frameStats = {};
 
 function resetStats() {
 	_.forEach([execStats, frameStats], function(stats) {
@@ -115,8 +115,8 @@ function updateStats(stats, currTime) {
 }
 
 function getStats() {
-	var exec = _.assign({}, execStats);
-	var frame = _.assign({}, frameStats);
+	let exec = _.assign({}, execStats);
+	let frame = _.assign({}, frameStats);
 	exec.avgTime = exec.totalTime / exec.count;
 	frame.avgTime = frame.totalTime / frame.count;
 	return {
@@ -125,21 +125,21 @@ function getStats() {
 	}
 }
 
-var lastStartTime = performance.now();
+let lastStartTime = performance.now();
 function getTime(bRemaining) {
-	var delta = performance.now() - lastStartTime;
+	let delta = performance.now() - lastStartTime;
 	if (!bRemaining) return delta;
 	return frameExecutionTimeout - delta;
 }
 
-var idle = true;
+let idle = true;
 function processTasks() {
-	var startTime = performance.now();
+	let startTime = performance.now();
 	if (!idle) updateStats(frameStats, startTime - lastStartTime);
 	lastStartTime = startTime;
 	processing = true;
-	var fn;
-	var currTime;
+	let fn;
+	let currTime;
 	while (asapQueue.length) {
 		fn = asapQueue.shift();
 		if (typeof fn !== 'function') continue;
@@ -169,15 +169,15 @@ function postError(error) {
 	errorQueue.push(error);
 }
 
-var throwErrors = (function() {
+let throwErrors = (function() {
 
-var evType = vendorPrefix + '-error';
+let evType = vendorPrefix + '-error';
 function throwErrors() {
-	var handlers = createThrowers(errorQueue);
+	let handlers = createThrowers(errorQueue);
 	_.forEach(handlers, function(handler) {
 		window.addEventListener(evType, handler, false);
 	});
-	var e = document.createEvent('Event');
+	let e = document.createEvent('Event');
 	e.initEvent(evType, true, true);
 	window.dispatchEvent(e);
 	_.forEach(handlers, function(handler) {

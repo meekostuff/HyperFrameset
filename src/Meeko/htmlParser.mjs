@@ -8,10 +8,10 @@ import Promise from './Promise.mjs';
 	HTML_IN_DOMPARSER indicates if DOMParser supports 'text/html' parsing. Historically only Firefox did.
 	Cross-browser support coming? https://developer.mozilla.org/en-US/docs/Web/API/DOMParser#Browser_compatibility
 */
-var HTML_IN_DOMPARSER = (function() {
+const HTML_IN_DOMPARSER = (function() {
 
 	try {
-		var doc = (new DOMParser).parseFromString('', 'text/html');
+		let doc = (new DOMParser).parseFromString('', 'text/html');
 		return !!doc;
 	}
 	catch(err) { return false; }
@@ -28,7 +28,7 @@ var HTML_IN_DOMPARSER = (function() {
 */
 function normalize(doc, details) { 
 
-	var baseURL = URL(details.url);
+	let baseURL = URL(details.url);
 
 	_.forEach(DOM.findAll('style', doc.body), function(node) {
 		if (node.hasAttribute('scoped')) return; // ignore
@@ -37,10 +37,10 @@ function normalize(doc, details) {
 	
 	_.forEach(DOM.findAll('style', doc), function(node) {
 		// TODO the following rewrites url() property values but isn't robust
-		var text = node.textContent;
-		var replacements = 0;
+		let text = node.textContent;
+		let replacements = 0;
 		text = text.replace(/\burl\(\s*(['"]?)([^\r\n]*)\1\s*\)/ig, function(match, quote, url) {
-				var absURL = baseURL.resolve(url);
+				let absURL = baseURL.resolve(url);
 				if (absURL === url) return match;
 				replacements++;
 				return "url(" + quote + absURL + quote + ")";
@@ -54,21 +54,21 @@ function normalize(doc, details) {
 /*
 	resolveAll() resolves all URL attributes
 */
-var urlAttributes = URL.attributes;
+let urlAttributes = URL.attributes;
 
 function resolveAll(doc, baseURL) {
 
 	return Promise.pipe(null, [
 
 	function () {
-		var selector = Object.keys(urlAttributes).join(', ');
+		let selector = Object.keys(urlAttributes).join(', ');
 		return DOM.findAll(selector, doc);
 	},
 
 	function(nodeList) {
 		return Promise.reduce(null, nodeList, function(dummy, el) {
-			var tag = DOM.getTagName(el);
-			var attrList = urlAttributes[tag];
+			let tag = DOM.getTagName(el);
+			let attrList = urlAttributes[tag];
 			_.forOwn(attrList, function(attrDesc, attrName) {
 				if (!el.hasAttribute(attrName)) return;
 				attrDesc.resolve(el, baseURL);
@@ -89,7 +89,7 @@ function nativeParser(html, details) {
 	return Promise.pipe(null, [
 		
 	function() {
-		var doc = (new DOMParser).parseFromString(html, 'text/html');
+		let doc = (new DOMParser).parseFromString(html, 'text/html');
 		return normalize(doc, details);
 	}
 	
@@ -101,13 +101,13 @@ function innerHTMLParser(html, details) {
 	return Promise.pipe(null, [
 		
 	function() {
-		var doc = DOM.createHTMLDocument('');
-		var docElement = doc.documentElement;
+		let doc = DOM.createHTMLDocument('');
+		let docElement = doc.documentElement;
 		docElement.innerHTML = html;
-		var m = html.match(/<html(?=\s|>)(?:[^>]*)>/i); // WARN this assumes there are no comments containing '<html' and no attributes containing '>'.
-		var div = document.createElement('div');
+		let m = html.match(/<html(?=\s|>)(?:[^>]*)>/i); // WARN this assumes there are no comments containing '<html' and no attributes containing '>'.
+		let div = document.createElement('div');
 		div.innerHTML = m[0].replace(/^<html/i, '<div');
-		var htmlElement = div.firstChild;
+		let htmlElement = div.firstChild;
 		DOM.copyAttributes(docElement, htmlElement);
 		return doc;
 	},

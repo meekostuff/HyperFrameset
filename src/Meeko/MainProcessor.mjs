@@ -15,15 +15,15 @@ loadTemplate: function(template) {
 },
 
 transform: function(provider, details) { // TODO how to use details?
-	var srcNode = provider.srcNode;
-	var srcDoc = srcNode.nodeType === 9 ? srcNode : srcNode.ownerDocument;
-	var main;
+	let srcNode = provider.srcNode;
+	let srcDoc = srcNode.nodeType === 9 ? srcNode : srcNode.ownerDocument;
+	let main;
 	if (!main) main = DOM.find('main, [role=main]', srcNode);
 	if (!main && srcNode === srcDoc) main = srcDoc.body;
 	if (!main) main = srcNode;
 
-	var frag = srcDoc.createDocumentFragment();
-	var node;
+	let frag = srcDoc.createDocumentFragment();
+	let node;
 	while (node = main.firstChild) frag.appendChild(node); // NOTE no adoption
 	return frag;
 }

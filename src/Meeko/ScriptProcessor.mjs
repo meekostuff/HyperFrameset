@@ -15,7 +15,7 @@ function ScriptProcessor(options) {
 _.defaults(ScriptProcessor.prototype, {
 
 loadTemplate: function(template) {
-	var script;
+	let script;
 	_.forEach(_.map(template.childNodes), function(node) {
 		switch (node.nodeType) {
 		case 1: // Element
@@ -55,7 +55,7 @@ loadTemplate: function(template) {
 },
 
 transform: function(provider, details) {
-	var srcNode = provider.srcNode;
+	let srcNode = provider.srcNode;
 	if (!this.processor || !this.processor.transform) {
 		console.warn('"script" transform template did not produce valid transform object');
 		return;

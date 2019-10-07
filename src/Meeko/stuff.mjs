@@ -28,20 +28,20 @@ function kebabCase(str) {
 }
 
 function includes(a, item) {
-	for (var n=a.length, i=0; i<n; i++) if (a[i] === item) return true;
+	for (let n=a.length, i=0; i<n; i++) if (a[i] === item) return true;
 	return false;
 }
 
-function forEach(a, fn, context) { for (var n=a.length, i=0; i<n; i++) fn.call(context, a[i], i, a); }
+function forEach(a, fn, context) { for (let n=a.length, i=0; i<n; i++) fn.call(context, a[i], i, a); }
 
-function some(a, fn, context) { for (var n=a.length, i=0; i<n; i++) { if (fn.call(context, a[i], i, a)) return true; } return false; }
+function some(a, fn, context) { for (let n=a.length, i=0; i<n; i++) { if (fn.call(context, a[i], i, a)) return true; } return false; }
 
-function every(a, fn, context) { for (var n=a.length, i=0; i<n; i++) { if (!fn.call(context, a[i], i, a)) return false; } return true; }
+function every(a, fn, context) { for (let n=a.length, i=0; i<n; i++) { if (!fn.call(context, a[i], i, a)) return false; } return true; }
 
 function map(a, fn, context) {
-	var output = [];
-	for (var n=a.length, i=0; i<n; i++) {
-		var value = a[i];
+	let output = [];
+	for (let n=a.length, i=0; i<n; i++) {
+		let value = a[i];
 		output[i] = fn ? 
 			fn.call(context, value, i, a) :
 			value;
@@ -50,18 +50,18 @@ function map(a, fn, context) {
 }
 
 function filter(a, fn, context) {
-	var output = [];
-	for (var n=a.length, i=0; i<n; i++) {
-		var success = fn.call(context, a[i], i, a);
+	let output = [];
+	for (let n=a.length, i=0; i<n; i++) {
+		let success = fn.call(context, a[i], i, a);
 		if (success) output.push(a[i]);
 	}
 	return output;
 }
 
 function _find(a, fn, context, byIndex) {
-	for (var n=a.length, i=0; i<n; i++) {
-		var item = a[i];
-		var success = fn.call(context, item, i, a);
+	for (let n=a.length, i=0; i<n; i++) {
+		let item = a[i];
+		let success = fn.call(context, item, i, a);
 		if (success) return byIndex ? i : item;
 	}
 	return byIndex ? -1 : undefined;
@@ -76,7 +76,7 @@ function find(a, fn, context) {
 }
 
 function without(a1, a2) {
-	var result = [];
+	let result = [];
 	forEach(a1, function(item) {
 		if (includes(a2, item) || includes(result, item)) return;
 		result.push(item);
@@ -85,7 +85,7 @@ function without(a1, a2) {
 }
 
 function difference(a1, a2) {
-	var result = [].concat(
+	let result = [].concat(
 		without(a1, a2),
 		without(a2, a1)
 	);
@@ -95,21 +95,21 @@ function difference(a1, a2) {
 function words(text) { return text.split(/\s+/); }
 
 function forIn(object, fn, context) {
-	for (var key in object) {
+	for (let key in object) {
 		fn.call(context, object[key], key, object);
 	}
 }
 
 function forOwn(object, fn, context) {
-	var keys = Object.keys(object);
-	for (var i=0, n=keys.length; i<n; i++) {
-		var key = keys[i];
+	let keys = Object.keys(object);
+	for (let i=0, n=keys.length; i<n; i++) {
+		let key = keys[i];
 		fn.call(context, object[key], key, object);
 	}
 }
 
 function isEmpty(o) { // NOTE lodash supports arrays and strings too
-	if (o) for (var p in o) if (o.hasOwnProperty(p)) return false;
+	if (o) for (let p in o) if (o.hasOwnProperty(p)) return false;
 	return true;
 }
 

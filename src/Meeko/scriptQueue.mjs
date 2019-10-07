@@ -8,7 +8,7 @@ import * as _ from './stuff.mjs';
 import Promise from './Promise.mjs';
 import * as DOM from './DOM.mjs';
 
-var document = window.document;
+let document = window.document;
 
 /*
  WARN: This description comment was from the former scriptQueue implementation.
@@ -28,13 +28,13 @@ var document = window.document;
 	
  FIXME scriptQueue.push should also accept functions
 */
-var queue = [],
+let queue = [],
 	emptying = false;
 
-var testScript = document.createElement('script'),
+let testScript = document.createElement('script'),
 	supportsSync = (testScript.async === true);
 
-var scriptQueue = {
+let scriptQueue = {
 
 push: function(node) {
 return new Promise(function(resolve, reject) {
@@ -55,7 +55,7 @@ return new Promise(function(resolve, reject) {
 		return;
 	}
 
-	var script = document.createElement('script');
+	let script = document.createElement('script');
 
 	if (node.src) addListeners(); // WARN must use `node.src` because attrs not copied to `script` yet
 	
@@ -71,11 +71,11 @@ return new Promise(function(resolve, reject) {
 	script.type = 'text/javascript';
 	
 	// enabledFu resolves after script is inserted
-	var enabledFu = Promise.applyTo();
+	let enabledFu = Promise.applyTo();
 	
-	var prev = queue[queue.length - 1], prevScript = prev && prev.script;
+	let prev = queue[queue.length - 1], prevScript = prev && prev.script;
 
-	var triggerFu; // triggerFu allows this script to be enabled, i.e. inserted
+	let triggerFu; // triggerFu allows this script to be enabled, i.e. inserted
 	if (prev) {
 		if (prevScript.hasAttribute('async') || script.src && supportsSync && !script.hasAttribute('async')) triggerFu = prev.enabled;
 		else triggerFu = prev.complete; 
@@ -84,10 +84,10 @@ return new Promise(function(resolve, reject) {
 	
 	triggerFu.then(enable, enable);
 
-	var completeFu = Promise.applyTo();
+	let completeFu = Promise.applyTo();
 	completeFu.then(resolve, reject);
 
-	var current = { script: script, complete: completeFu, enabled: enabledFu };
+	let current = { script: script, complete: completeFu, enabled: enabledFu };
 	queue.push(current);
 	return;
 
@@ -124,7 +124,7 @@ return new Promise(function(resolve, reject) {
 	}
 	
 	function spliceItem(a, item) {
-		for (var n=a.length, i=0; i<n; i++) {
+		for (let n=a.length, i=0; i<n; i++) {
 			if (a[i] !== item) continue;
 			a.splice(i, 1);
 			return;
@@ -144,7 +144,7 @@ return new Promise(function(resolve, reject) {
 		return;
 	}
 	_.forEach(queue, function(value, i) {
-		var acceptCallback = function() {
+		let acceptCallback = function() {
 			if (queue.length <= 0) {
 				emptying = false;
 				resolve();

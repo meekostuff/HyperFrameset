@@ -1,6 +1,6 @@
 import Registry from './Registry.mjs';
 
-var configData = new Registry({
+let configData = new Registry({
 	writeOnce: true,
 	testKey: function(key) {
 		return typeof key === 'string';

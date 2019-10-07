@@ -1,7 +1,7 @@
 
 import * as _ from './stuff.mjs';
 
-var document = window.document;
+let document = window.document;
 
 /*
  ### URL utility functions
@@ -10,9 +10,9 @@ var document = window.document;
 // TODO Ideally this URL is read-only compatible with DOM4 URL
 // NOTE This could use `document.createElement('a').href = url` except DOM is too slow
 
-var URL = function(href, base) {
+let URL = function(href, base) {
 	if (!(this instanceof URL)) return new URL(href, base);
-	var baseURL;
+	let baseURL;
 	if (base) baseURL = typeof base === 'string' ? new URL(base) : base;
 	init.call(this, href, baseURL);
 }
@@ -23,20 +23,20 @@ function init(href, baseURL) {
 		_.assign(this, new URL(href));
 	}
 	else {
-		var url = parse(href);
-		for (var key in url) this[key] = url[key]; // _.assign(this, url);
+		let url = parse(href);
+		for (let key in url) this[key] = url[key]; // _.assign(this, url);
 		enhance(this);
 	}
 }
 
-var keys = ['source','protocol','hostname','port','pathname','search','hash'];
-var parser = /^([^:\/?#]+:)?(?:\/\/([^:\/?#]*)(?::(\d*))?)?([^?#]*)?(\?[^#]*)?(#.*)?$/;
+let keys = ['source','protocol','hostname','port','pathname','search','hash'];
+let parser = /^([^:\/?#]+:)?(?:\/\/([^:\/?#]*)(?::(\d*))?)?([^?#]*)?(\?[^#]*)?(#.*)?$/;
 
 function parse(href) {
 	href = href.trim();
-	var m = parser.exec(href);
-	var url = {};
-	for (var n=keys.length, i=0; i<n; i++) url[keys[i]] = m[i] || '';
+	let m = parser.exec(href);
+	let url = {};
+	for (let n=keys.length, i=0; i<n; i++) url[keys[i]] = m[i] || '';
 	return url;
 }
 
@@ -51,7 +51,7 @@ function enhance(url) {
 	}
 	if (!url.origin || url.origin === 'null') url.origin = url.protocol + '//' + url.host;
 	if (!url.pathname) url.pathname = '/';
-	var pathParts = url.pathname.split('/'); // creates an array of at least 2 strings with the first string empty: ['', ...]
+	let pathParts = url.pathname.split('/'); // creates an array of at least 2 strings with the first string empty: ['', ...]
 	pathParts.shift(); // leaves an array of at least 1 string [...]
 	url.filename = pathParts.pop(); // filename could be ''
 	url.basepath = pathParts.length ? '/' + pathParts.join('/') + '/' : '/'; // either '/rel-path-prepended-by-slash/' or '/'
@@ -65,8 +65,8 @@ function enhance(url) {
 URL.prototype.resolve = function resolve(relHref) {
 	relHref = relHref.trim();
 	if (!this.supportsResolve) return relHref;
-	var substr1 = relHref.charAt(0), substr2 = relHref.substr(0,2);
-	var absHref =
+	let substr1 = relHref.charAt(0), substr2 = relHref.substr(0,2);
+	let absHref =
 		/^[a-zA-Z0-9-]+:/.test(relHref) ? relHref :
 		substr2 == '//' ? this.protocol + relHref :
 		substr1 == '/' ? this.origin + relHref :
@@ -75,8 +75,8 @@ URL.prototype.resolve = function resolve(relHref) {
 		substr1 != '.' ? this.base + relHref :
 		substr2 == './' ? this.base + relHref.replace('./', '') :
 		(function() {
-			var myRel = relHref;
-			var myDir = this.basepath;
+			let myRel = relHref;
+			let myDir = this.basepath;
 			while (myRel.substr(0,3) == '../') {
 				myRel = myRel.replace('../', '');
 				myDir = myDir.replace(/[^\/]+\/$/, '');
@@ -86,12 +86,12 @@ URL.prototype.resolve = function resolve(relHref) {
 	return absHref;
 }
 
-var urlAttributes = URL.attributes = (function() {
+let urlAttributes = URL.attributes = (function() {
 	
 function AttributeDescriptor(tagName, attrName, loads, compound) {
-	var testEl = document.createElement(tagName);
-	var supported = attrName in testEl;
-	var lcAttr = _.lc(attrName); // NOTE for longDesc, etc
+	let testEl = document.createElement(tagName);
+	let supported = attrName in testEl;
+	let lcAttr = _.lc(attrName); // NOTE for longDesc, etc
 	_.defaults(this, { // attrDesc
 		tagName: tagName,
 		attrName: attrName,
@@ -104,16 +104,16 @@ function AttributeDescriptor(tagName, attrName, loads, compound) {
 _.defaults(AttributeDescriptor.prototype, {
 
 resolve: function(el, baseURL) {
-	var attrName = this.attrName;
-	var url = el.getAttribute(attrName);
+	let attrName = this.attrName;
+	let url = el.getAttribute(attrName);
 	if (url == null) return;
-	var finalURL = this.resolveURL(url, baseURL)
+	let finalURL = this.resolveURL(url, baseURL)
 	if (finalURL !== url) el.setAttribute(attrName, finalURL);
 },
 
 resolveURL: function(url, baseURL) {
-	var relURL = url.trim();
-	var finalURL = relURL;
+	let relURL = url.trim();
+	let finalURL = relURL;
 	switch (relURL.charAt(0)) {
 		case '': // empty, but not null. TODO should this be a warning??
 			break;
@@ -127,14 +127,14 @@ resolveURL: function(url, baseURL) {
 
 });
 
-var urlAttributes = {};
+let urlAttributes = {};
 _.forEach(_.words('link@<href script@<src img@<longDesc,<src,+srcset iframe@<longDesc,<src object@<data embed@<src video@<poster,<src audio@<src source@<src,+srcset input@formAction,<src button@formAction,<src a@+ping,href area@href q@cite blockquote@cite ins@cite del@cite form@action'), function(text) {
-	var m = text.split('@'), tagName = m[0], attrs = m[1];
-	var attrList = urlAttributes[tagName] = {};
+	let m = text.split('@'), tagName = m[0], attrs = m[1];
+	let attrList = urlAttributes[tagName] = {};
 	_.forEach(attrs.split(','), function(attrName) {
-		var downloads = false;
-		var compound = false;
-		var modifier = attrName.charAt(0);
+		let downloads = false;
+		let compound = false;
+		let modifier = attrName.charAt(0);
 		switch (modifier) {
 		case '<':
 			downloads = true;
@@ -150,7 +150,7 @@ _.forEach(_.words('link@<href script@<src img@<longDesc,<src,+srcset iframe@<lon
 });
 
 function resolveSrcset(urlSet, baseURL) {
-	var urlList = urlSet.split(/\s*,\s*/); // FIXME this assumes URLs don't contain ','
+	let urlList = urlSet.split(/\s*,\s*/); // FIXME this assumes URLs don't contain ','
 	_.forEach(urlList, function(urlDesc, i) {
 		urlList[i] = urlDesc.replace(/^\s*(\S+)(?=\s|$)/, function(all, url) { return baseURL.resolve(url); });
 	});
@@ -161,7 +161,7 @@ urlAttributes['img']['srcset'].resolveURL = resolveSrcset;
 urlAttributes['source']['srcset'].resolveURL = resolveSrcset;
 
 urlAttributes['a']['ping'].resolveURL = function(urlSet, baseURL) {
-	var urlList = urlSet.split(/\s+/);
+	let urlList = urlSet.split(/\s+/);
 	_.forEach(urlList, function(url, i) {
 		urlList[i] = baseURL.resolve(url);
 	});

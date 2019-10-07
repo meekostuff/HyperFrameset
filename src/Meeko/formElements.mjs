@@ -14,17 +14,17 @@ import * as DOM from './DOM.mjs';
 import configData from './configData.mjs';
 import sprockets from './Sprocket.mjs';
 
-var document = window.document;
+let document = window.document;
 
-var eventConfig = 'form@submit,reset,input,change,invalid input,textarea@input,change,invalid,focus,blur select,fieldset@change,invalid,focus,blur button@click';
+const eventConfig = 'form@submit,reset,input,change,invalid input,textarea@input,change,invalid,focus,blur select,fieldset@change,invalid,focus,blur button@click';
 
-var eventTable = (function(config) {
+let eventTable = (function(config) {
 
-var table = {};
+let table = {};
 _.forEach(config.split(/\s+/), function(combo) {
-	var m = combo.split('@');
-	var tags = m[0].split(',');
-	var events = m[1].split(',');
+	let m = combo.split('@');
+	let tags = m[0].split(',');
+	let events = m[1].split(',');
 	_.forEach(tags, function(tag) {
 		table[tag] = _.map(events);
 	});
@@ -35,36 +35,36 @@ return table;
 })(eventConfig);
 
 
-var elements = {};
-var interfaces = {};
+let elements = {};
+let interfaces = {};
 
 function registerFormElements() {
 	_.forOwn(elements, function(ClassName, tag) {
-		var Interface = interfaces[ClassName];
+		let Interface = interfaces[ClassName];
 		sprockets.registerElement(tag, Interface);
 	});
 }
 
 _.forOwn(eventTable, function(events, tag) {
 
-var ClassName = 'Configurable' + _.ucFirst(tag);
+let ClassName = 'Configurable' + _.ucFirst(tag);
 
-var Interface = sprockets.evolve(sprockets.RoleType, {});
+let Interface = sprockets.evolve(sprockets.RoleType, {});
 _.assign(Interface, {
 
 attached: function(handlers) {
-	var object = this;
-	var element = object.element;
+	let object = this;
+	let element = object.element;
 	if (!element.hasAttribute('config')) return;
-	var configID = _.words(element.getAttribute('config'))[0];	
-	var options = configData.get(configID);
+	let configID = _.words(element.getAttribute('config'))[0];
+	let options = configData.get(configID);
 	if (!options) return;
 	_.forEach(events, function(type) {
-		var ontype = 'on' + type;
-		var callback = options[ontype];
+		let ontype = 'on' + type;
+		let callback = options[ontype];
 		if (!callback) return;
 
-		var fn = function() { callback.apply(object, arguments); };
+		let fn = function() { callback.apply(object, arguments); };
 		object[ontype] = fn;
 		handlers.push({
 			type: type,
@@ -81,26 +81,26 @@ elements[tag] = ClassName;
 });
 
 // NOTE handlers are registered for "body@submit,reset,input,change" in HFrameset
-var ConfigurableBody = sprockets.evolve(sprockets.RoleType, {});
+let ConfigurableBody = sprockets.evolve(sprockets.RoleType, {});
 _.assign(ConfigurableBody, {
 
 attached: function(handlers) {
-	var object = this;
-	var element = object.element;
+	let object = this;
+	let element = object.element;
 	if (!element.hasAttribute('config')) return;
-	var configID = _.words(element.getAttribute('config'))[0];	
-	var options = configData.get(configID);
+	let configID = _.words(element.getAttribute('config'))[0];
+	let options = configData.get(configID);
 	if (!options) return;
 
-	var events = _.words('submit reset change input');
-	var needClickWatcher = false;
+	let events = _.words('submit reset change input');
+	let needClickWatcher = false;
 
 	_.forEach(events, function(type) {
-		var ontype = 'on' + type;
-		var callback = options[ontype];
+		let ontype = 'on' + type;
+		let callback = options[ontype];
 		if (!callback) return;
 
-		var fn = function(e) { 
+		let fn = function(e) {
 			if (DOM.closest(e.target, 'form')) return;
 			callback.apply(object, arguments); 
 		};
@@ -119,10 +119,10 @@ attached: function(handlers) {
 	if (needClickWatcher) {
 		document.addEventListener('click', function(e) { 
 			if (DOM.closest(e.target, 'form')) return;
-			var type = e.target.type;
+			let type = e.target.type;
 			if (!(type === 'submit' || type === 'reset')) return;
 			Task.asap(function() {
-				var pseudoEvent = document.createEvent('CustomEvent');
+				let pseudoEvent = document.createEvent('CustomEvent');
 				// NOTE pseudoEvent.detail = e.target
 				pseudoEvent.initCustomEvent(type, true, true, e.target);
 				pseudoEvent.preventDefault();
@@ -137,7 +137,7 @@ attached: function(handlers) {
 elements['body'] = 'ConfigurableBody';
 interfaces['ConfigurableBody'] = ConfigurableBody;
 
-var formElements = {
+let formElements = {
 
 	register: registerFormElements
 

@@ -7,7 +7,7 @@
 import * as _ from './stuff.mjs';
 import Registry from './Registry.mjs';
 
-var processors = new Registry({
+let processors = new Registry({
 	writeOnce: true,
 	testKey: function(key) {
 		return typeof key === 'string' && /^[_a-zA-Z][_a-zA-Z0-9]*/.test(key);
@@ -20,7 +20,7 @@ var processors = new Registry({
 _.assign(processors, {
 
 create: function(type, options, namespaces) {
-	var constructor = this.get(type);
+	let constructor = this.get(type);
 	return new constructor(options, namespaces);
 }
 

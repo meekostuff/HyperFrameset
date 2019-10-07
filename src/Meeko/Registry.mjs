@@ -1,6 +1,6 @@
 import * as _ from './stuff.mjs';
 
-var Registry = function(options) {
+let Registry = function(options) {
 	if (!options || typeof options !== 'object') options = {};
 	this.options = options;
 	this.items = {};
@@ -26,11 +26,11 @@ set: function(key, value) {
 		throw Error('Attempted to rewrite key ' + key + ' in write-once storage');
 	}
 	if (this.options.keyTest) {
-		var ok = this.options.keyTest(key);
+		let ok = this.options.keyTest(key);
 		if (!ok) throw Error('Invalid key ' + key + ' for storage');
 	}
 	if (this.options.valueTest) {
-		var ok = this.options.valueTest(value);
+		let ok = this.options.valueTest(value);
 		if (!ok) throw Error('Invalid value ' + value + ' for storage');
 	}
 	this.items[key] = value;

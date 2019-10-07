@@ -27,8 +27,8 @@ filters.register('if_unless', function(value, yep, nope) {
 filters.register('map', function(value, dict) { // dict can be {} or []
 
 	if (Array.isArray(dict)) {
-		var patterns = _.filter(dict, function(item, i) { return !(i % 2); });
-		var results = _.filter(dict, function(item, i) { return !!(i % 2); });
+		let patterns = _.filter(dict, function(item, i) { return !(i % 2); });
+		let results = _.filter(dict, function(item, i) { return !!(i % 2); });
 		_.some(patterns, function(pattern, i) {
 			// FIXME what if pattern not RegExp && not string??
 			if (!(pattern instanceof RegExp)) pattern = new RegExp('^' + pattern + '$');
@@ -46,7 +46,7 @@ filters.register('map', function(value, dict) { // dict can be {} or []
 filters.register('match', function(value, pattern, yep, nope) {
 	// FIXME what if pattern not RegExp && not string??
 	if (!(pattern instanceof RegExp)) pattern = new RegExp('^' + pattern + '$'); // FIXME sanity TODO case-insensitive??
-	var bMatch = pattern.test(value);
+	let bMatch = pattern.test(value);
 	if (yep != null && bMatch) return yep;
 	if (nope != null && !bMatch) return nope;
 	return bMatch;

@@ -22,21 +22,21 @@ import * as _ from './stuff.mjs';
 import Task from './Task.mjs';
 import * as DOM from './DOM.mjs';
 
-var document = window.document;
+let document = window.document;
 
-var sprockets = (function() {
+let sprockets = (function() {
 /* FIXME
 	- auto DOM monitoring for node insertion / removal should be a start() option
 	- manual control must allow attached, enteredView, leftView lifecycle management
 	- binding registration must be blocked after sprockets.start()
 */
 
-var sprockets = {};
+let sprockets = {};
 
-var activeListeners = {};
+let activeListeners = {};
 
 function attachBinding(definition, element) {
-	var binding;
+	let binding;
 	if (DOM.hasData(element)) {
 		binding = DOM.getData(element);
 		if (binding.definition !== rule.definition) throw Error('Mismatch between definition and binding already present');
@@ -51,7 +51,7 @@ function attachBinding(definition, element) {
 
 function enableBinding(element) {
 	if (!DOM.hasData(element)) throw Error('No binding attached to element');
-	var binding = DOM.getData(element);
+	let binding = DOM.getData(element);
 	if (!binding.inDocument) binding.enteredDocumentCallback();
 }
 
@@ -59,15 +59,15 @@ function enableBinding(element) {
 
 function detachBinding(element) {
 	if (!DOM.hasData(element)) throw Error('No binding attached to element');
-	var binding = DOM.getData(element);
+	let binding = DOM.getData(element);
 	if (binding.inDocument) binding.leftDocumentCallback();
 	binding.detach();
 	DOM.setData(element, null);
 }
 
 
-var Binding = function(definition) {
-	var binding = this;
+let Binding = function(definition) {
+	let binding = this;
 	binding.definition = definition;
 	binding.object = Object.create(definition.prototype);
 	binding.handlers = definition.handlers ? _.map(definition.handlers) : [];
@@ -78,18 +78,18 @@ var Binding = function(definition) {
 _.assign(Binding, {
 
 getInterface: function(element) {
-	var nodeData = DOM.getData(element);
+	let nodeData = DOM.getData(element);
 	if (nodeData && nodeData.object) return nodeData;
 },
 
 enteredDocumentCallback: function(element) {
-	var binding = Binding.getInterface(element);
+	let binding = Binding.getInterface(element);
 	if (!binding) return;
 	binding.enteredDocumentCallback();
 },
 
 leftDocumentCallback: function(element) {
-	var binding = Binding.getInterface(element);
+	let binding = Binding.getInterface(element);
 	if (!binding) return;
 	binding.leftDocumentCallback();
 },
@@ -111,50 +111,50 @@ manageEvent: function(type) {
 _.assign(Binding.prototype, {
 
 attach: function(element) {
-	var binding = this;
-	var definition = binding.definition;
-	var object = binding.object;
+	let binding = this;
+	let definition = binding.definition;
+	let object = binding.object;
 
 	object.element = element; 
 	binding.attachedCallback();
 
 	_.forEach(binding.handlers, function(handler) {
-		var listener = binding.addHandler(handler); // handler might be ignored ...
+		let listener = binding.addHandler(handler); // handler might be ignored ...
 		if (listener) binding.listeners.push(listener);// ... resulting in an undefined listener
 	});
 },
 
 attachedCallback: function() {
-	var binding = this;
-	var definition = binding.definition;
-	var object = binding.object;
+	let binding = this;
+	let definition = binding.definition;
+	let object = binding.object;
 
 	binding.inDocument = false;
 	if (definition.attached) definition.attached.call(object, binding.handlers); // FIXME try/catch
 },
 
 enteredDocumentCallback: function() {
-	var binding = this;
-	var definition = binding.definition;
-	var object = binding.object;
+	let binding = this;
+	let definition = binding.definition;
+	let object = binding.object;
 
 	binding.inDocument = true;
 	if (definition.enteredDocument) definition.enteredDocument.call(object);	
 },
 
 leftDocumentCallback: function() {
-	var binding = this;
-	var definition = binding.definition;
-	var object = binding.object;
+	let binding = this;
+	let definition = binding.definition;
+	let object = binding.object;
 
 	binding.inDocument = false;
 	if (definition.leftDocument) definition.leftDocument.call(object);	
 },
 
 detach: function() {
-	var binding = this;
-	var definition = binding.definition;
-	var object = binding.object;
+	let binding = this;
+	let definition = binding.definition;
+	let object = binding.object;
 
 	_.forEach(binding.listeners, binding.removeListener, binding);
 	binding.listeners.length = 0;
@@ -163,27 +163,27 @@ detach: function() {
 },
 
 detachedCallback: function() {
-	var binding = this;
-	var definition = binding.definition;
-	var object = binding.object;
+	let binding = this;
+	let definition = binding.definition;
+	let object = binding.object;
 	
 	binding.inDocument = null;
 	if (definition.detached) definition.detached.call(object);	
 },
 
 addHandler: function(handler) {
-	var binding = this;
-	var object = binding.object;
-	var element = object.element;
-	var type = handler.type;
-	var capture = (handler.eventPhase == 1); // Event.CAPTURING_PHASE
+	let binding = this;
+	let object = binding.object;
+	let element = object.element;
+	let type = handler.type;
+	let capture = (handler.eventPhase == 1); // Event.CAPTURING_PHASE
 	if (capture) {
 		console.warn('Capture phase for events not supported');
 		return; // FIXME should this convert to bubbling instead??
 	}
 
 	Binding.manageEvent(type);
-	var fn = function(event) {
+	let fn = function(event) {
 		if (fn.normalize) event = fn.normalize(event);
 		try {
 			return handleEvent.call(object, event, handler);
@@ -200,12 +200,12 @@ addHandler: function(handler) {
 },
 
 removeListener: function(fn) {
-	var binding = this;
-	var object = binding.object;
-	var element = object.element;
-	var type = fn.type;
-	var capture = fn.capture;
-	var target = (element === document.documentElement && _.includes(redirectedWindowEvents, type)) ? window : element; 
+	let binding = this;
+	let object = binding.object;
+	let element = object.element;
+	let type = fn.type;
+	let capture = fn.capture;
+	let target = (element === document.documentElement && _.includes(redirectedWindowEvents, type)) ? window : element;
 	target.removeEventListener(type, fn, capture);	
 },
 
@@ -219,14 +219,14 @@ if (!('defaultPrevented' in Event.prototype)) { // NOTE ensure defaultPrevented 
 }
 
 function handleEvent(event, handler) {
-	var bindingImplementation = this;
-	var target = event.target;
-	var current = bindingImplementation.element;
+	let bindingImplementation = this;
+	let target = event.target;
+	let current = bindingImplementation.element;
 	if (!DOM.hasData(current)) throw Error('Handler called on non-bound element');
 	if (!matchesEvent(handler, event, true)) return; // NOTE the phase check is below
-	var delegator = current;
+	let delegator = current;
 	if (handler.delegator) {
-		var el = DOM.closest(target, handler.delegator, current);
+		let el = DOM.closest(target, handler.delegator, current);
 		if (!el) return;
 		delegator = el;
 	}
@@ -245,7 +245,7 @@ function handleEvent(event, handler) {
 	}
 
 	if (handler.action) {
-		var result = handler.action.call(bindingImplementation, event, delegator);
+		let result = handler.action.call(bindingImplementation, event, delegator);
 		if (result === false) event.preventDefault();
 	}
 	return;
@@ -256,14 +256,14 @@ function handleEvent(event, handler) {
 	TODO: better reporting of invalid content
 */
 
-var convertXBLHandler = function(config) {
-	var handler = {}
+let convertXBLHandler = function(config) {
+	let handler = {}
 	handler.type = config.event;
 	if (null == config.event) console.warn('Invalid handler: event property undeclared');
 
 	function lookupValue(attrName, lookup) {
-		var attrValue = config[attrName];
-		var result;
+		let attrValue = config[attrName];
+		let result;
 		if (attrValue) {
 			result = lookup[attrValue];
 			if (null == result) console.info('Ignoring invalid property ' + attrName + ': ' + attrValue);
@@ -289,13 +289,13 @@ var convertXBLHandler = function(config) {
 	}) || false;
 	
 	function attrText_to_numArray(attr) {				
-		var attrText = config[attr];
+		let attrText = config[attr];
 		if (!attrText) return null;
-		var result = [];
-		var strings = attrText.split(/\s+/);
-		for (var n=strings.length, i=0; i<n; i++) {
-			var text = strings[i];
-			var num = Number(text);
+		let result = [];
+		let strings = attrText.split(/\s+/);
+		for (let n=strings.length, i=0; i<n; i++) {
+			let text = strings[i];
+			let num = Number(text);
 			if (NaN != num && Math.floor(num) == num) result.push(num);
 		}
 		return result;
@@ -310,10 +310,10 @@ var convertXBLHandler = function(config) {
 	// keyboard
 	handler.key = config.key;
 	handler.keyLocation = [];
-	var keyLocationText = config['key-location']
-	var keyLocationStrings =  (keyLocationText) ? keyLocationText.split(/\s+/) : [];
-	for (var n=keyLocationStrings.length, i=0; i<n; i++) {
-		var text = keyLocationStrings[i];
+	let keyLocationText = config['key-location']
+	let keyLocationStrings =  (keyLocationText) ? keyLocationText.split(/\s+/) : [];
+	for (let n=keyLocationStrings.length, i=0; i<n; i++) {
+		let text = keyLocationStrings[i];
 		switch (text) {
 			case 'standard': handler.keyLocation.push(KeyboardEvent.DOM_KEY_LOCATION_STANDARD); break;
 			case 'left': handler.keyLocation.push(KeyboardEvent.DOM_KEY_LOCATION_LEFT); break;
@@ -332,10 +332,10 @@ var convertXBLHandler = function(config) {
 	// FIXME not supported anymore
 	handler.attrName = config['attr-name'];
 	handler.attrChange = [];
-	var attrChangeText = config['attr-change'];
-	var attrChangeStrings =  (attrChangeText) ? attrChangeText.split(/\s+/) : [];
-	for (var n=attrChangeStrings.length, i=0; i<n; i++) {
-		var text = attrChangeStrings[i];
+	let attrChangeText = config['attr-change'];
+	let attrChangeStrings =  (attrChangeText) ? attrChangeText.split(/\s+/) : [];
+	for (let n=attrChangeStrings.length, i=0; i<n; i++) {
+		let text = attrChangeStrings[i];
 		switch (text) {
 			case 'modification': handler.attrChange.push(MutationEvent.MODIFICATION); break;
 			case 'addition': handler.attrChange.push(MutationEvent.ADDITION); break;
@@ -349,15 +349,15 @@ var convertXBLHandler = function(config) {
 	// TODO should handler.modifiers be {} or []?
 	if (null != config['modifiers']) {
 		handler.modifiers = [];
-		var modifiersText = config['modifiers'];
-		var modifiersStrings = (modifiersText) ? modifiersText.split(/\s+/) : [];
-		for (var n=modifiersStrings, i=0; i<n; i++) {
-			var text = modifiersStrings[i];
-			var m;
+		let modifiersText = config['modifiers'];
+		let modifiersStrings = (modifiersText) ? modifiersText.split(/\s+/) : [];
+		for (let n=modifiersStrings, i=0; i<n; i++) {
+			let text = modifiersStrings[i];
+			let m;
 			m = /^([+-]?)([a-z]+)(\??)$/.exec(text);
 			if (m) {
-				var key = m[2];
-				var condition = 1; // MUST
+				let key = m[2];
+				let condition = 1; // MUST
 				if (m[3]) condition = 0; // OPTIONAL
 				else if (m[1] == '+') condition = 1; // MUST
 				else if (m[1] == '-') condition = -1; // MUST NOT
@@ -371,7 +371,7 @@ var convertXBLHandler = function(config) {
 	return handler;
 }
 
-var EventModules = {};
+let EventModules = {};
 EventModules.AllEvents = {};
 registerModule('FocusEvents', 'focus blur focusin focusout');
 registerModule('MouseEvents', 'click dblclick mousedown mouseup mouseover mouseout mousemove mousewheel');
@@ -379,7 +379,7 @@ registerModule('KeyboardEvents', 'keydown keyup');
 registerModule('UIEvents', 'load unload abort error select change submit reset resize scroll');
 
 function registerModule(modName, evTypes) {
-	var mod = {};
+	let mod = {};
 	EventModules[modName] = mod;
 	_.forEach(_.words(evTypes), registerEvent, mod);
 }
@@ -388,19 +388,19 @@ function registerEvent(evType) {
 	this[evType] = true;
 }
 
-var matchesEvent = function(handler, event, ignorePhase) {
+let matchesEvent = function(handler, event, ignorePhase) {
 	// type
-	var xblEvents = EventModules.AllEvents;
-	var xblMouseEvents = EventModules.MouseEvents;
-	var xblKeyboardEvents = EventModules.KeyboardEvents;
-	var xblUIEvents = EventModules.UIEvents;
+	let xblEvents = EventModules.AllEvents;
+	let xblMouseEvents = EventModules.MouseEvents;
+	let xblKeyboardEvents = EventModules.KeyboardEvents;
+	let xblUIEvents = EventModules.UIEvents;
 
 	if (event.type != handler.type) return false;
 
 	// phase
 	if (!ignorePhase && !phaseMatchesEvent(handler.eventPhase, event)) return false;
 	
-	var evType = event.type;
+	let evType = event.type;
 
 	// MouseEvents
 	if (evType in xblMouseEvents) { // FIXME needs testing. Bound to be cross-platform issues still
@@ -408,7 +408,7 @@ var matchesEvent = function(handler, event, ignorePhase) {
 			if (!_.includes(handler.button, event.button) == -1) return false;
 		}
 		if (handler.clickCount && handler.clickCount.length) { 
-			var count = 1;
+			let count = 1;
 			// if ('dblclick' == event.type) count = 2;
 			if ('click' == event.type) count = (event.detail) ? event.detail : 1;
 			if (!_.includes(handler.clickCount, count)) return false;
@@ -420,14 +420,14 @@ var matchesEvent = function(handler, event, ignorePhase) {
 
 	// KeyboardEvents
 	// NOTE some of these are non-standard
-	var ourKeyIdentifiers = {
+	let ourKeyIdentifiers = {
 		Backspace: 'U+0008', Delete: 'U+007F', Escape: 'U+001B', Space: 'U+0020', Tab: 'U+0009'
 	}
 
 	if (evType in xblKeyboardEvents) {
 		if (handler.key) {
-			var success = false;
-			var keyId = event.keyIdentifier;
+			let success = false;
+			let keyId = event.keyIdentifier;
 			if (/^U\+00....$/.test(keyId)) { // TODO Needed for Safari-2. It would be great if this test could be done elsewhere
 				keyId = keyId.replace(/^U\+00/, 'U+');
 			}
@@ -449,26 +449,26 @@ var matchesEvent = function(handler, event, ignorePhase) {
 	return true;
 }
 
-var modifiersMatchEvent = function(modifiers, event) {
+let modifiersMatchEvent = function(modifiers, event) {
 	// TODO comprehensive modifiers list
 	// event.getModifierState() -> evMods
 	// Need to account for any positives
 	// Fields are set to -1 when accounted for
-	var evMods = {
+	let evMods = {
 		control: event.ctrlKey,
 		shift: event.shiftKey,
 		alt: event.altKey,
 		meta: event.metaKey
 	};
 
-	var evMods_any = event.ctrlKey || event.shiftKey || event.altKey || event.metaKey;
-	var evMods_none = !evMods_any;
+	let evMods_any = event.ctrlKey || event.shiftKey || event.altKey || event.metaKey;
+	let evMods_none = !evMods_any;
 
-	var any = false;
+	let any = false;
 
 	if (modifiers)	{
-		for (var i=0, n=modifiers.length; i<n; i++) {
-			var modifier = modifiers[i];
+		for (let i=0, n=modifiers.length; i<n; i++) {
+			let modifier = modifiers[i];
 			switch (modifier.key) {
 				case 'none':
 					if (evMods_any) return false;
@@ -479,7 +479,7 @@ var modifiersMatchEvent = function(modifiers, event) {
 					break;
 	
 				default:
-					var active = evMods[modifier.key];
+					let active = evMods[modifier.key];
 					switch (modifier.condition) {
 						case -1:
 							if (active) return false;
@@ -499,16 +499,16 @@ var modifiersMatchEvent = function(modifiers, event) {
 	if (any) return true;
 	
 	// Fail if any positive modifiers not accounted for
-	for (var key in evMods) {
+	for (let key in evMods) {
 		if (evMods[key] > 0) return false;
 	}
 	return true;
 }
 
-var isPrototypeOf = {}.isPrototypeOf ?
+let isPrototypeOf = {}.isPrototypeOf ?
 function(prototype, object) { return prototype.isPrototypeOf(object); } :
 function(prototype, object) {
-	for (var current=object.__proto__; current; current=current.__proto__) if (current === prototype) return true;
+	for (let current=object.__proto__; current; current=current.__proto__) if (current === prototype) return true;
 	return false;
 };
 
@@ -529,27 +529,27 @@ function BindingRule(selector, bindingDefn) {
 }
 
 
-var bindingRules = sprockets.rules = [];
+let bindingRules = sprockets.rules = [];
 
 function findAllBindees(root, bExcludeRoot) {
-	var selector = _.map(bindingRules, function(rule) { return rule.selector; })
+	let selector = _.map(bindingRules, function(rule) { return rule.selector; })
 		.join(', ');
-	var result = DOM.findAll(selector, root);
+	let result = DOM.findAll(selector, root);
 	if (!bExcludeRoot && DOM.matches(root, selector)) result.unshift(root);
 	return result;
 }
 
-var started = false;
-var manualDOM = false;
+let started = false;
+let manualDOM = false;
 
 _.assign(sprockets, {
 
 registerElement: function(tagName, defn) { // FIXME test tagName
 	if (started) throw Error('sprockets management already started');
 	if (defn.rules) console.warn('registerElement() does not support rules. Try registerComposite()');
-	var bindingDefn = new BindingDefinition(defn);
-	var selector = tagName + ', [is=' + tagName + ']'; // TODO why should @is be supported??
-	var rule = new BindingRule(selector, bindingDefn);
+	let bindingDefn = new BindingDefinition(defn);
+	let selector = tagName + ', [is=' + tagName + ']'; // TODO why should @is be supported??
+	let rule = new BindingRule(selector, bindingDefn);
 	bindingRules.push(rule);
 	return rule;
 },
@@ -565,11 +565,11 @@ start: function(options) {
 insertNode: function(conf, refNode, node) {
 	if (!started) throw Error('sprockets management has not started yet');
 	if (!manualDOM) throw Error('Must not use sprockets.insertNode: auto DOM monitoring');
-	var doc = refNode.ownerDocument;
+	let doc = refNode.ownerDocument;
 	if (doc !== document || !DOM.contains(document, refNode)) throw Error('sprockets.insertNode must insert into `document`');
 	if (doc.adoptNode) node = doc.adoptNode(node); // Safari 5 was throwing because imported nodes had been added to a document node
 
-	var nodes = [ node ];
+	let nodes = [ node ];
 	if (node.nodeType === 11) nodes = _.map(node.childNodes);
 
 	switch(conf) {
@@ -579,8 +579,8 @@ insertNode: function(conf, refNode, node) {
 	case 'beforeend': refNode.appendChild(node); break;
 
 	case 'replace': 
-		var parent = refNode.parentNode;
-		var next = refNode.nextSibling;
+		let parent = refNode.parentNode;
+		let next = refNode.nextSibling;
 		parent.removeChild(refNode); // TODO refactor?? these two lines ...
 		nodeRemoved(refNode); // ... are equivalent to removeNode()
 		if (next) parent.insertBefore(node, next);
@@ -598,7 +598,7 @@ insertNode: function(conf, refNode, node) {
 removeNode: function(node) {
 	if (!started) throw Error('sprockets management has not started yet');
 	if (!manualDOM) throw Error('Must not use sprockets.insertNode: auto DOM monitoring');
-	var doc = node.ownerDocument;
+	let doc = node.ownerDocument;
 	if (doc !== document || !DOM.contains(document, node)) throw Error('sprockets.removeNode must remove from `document`');
 	node.parentNode.removeChild(node);
 	nodeRemoved(node);
@@ -608,16 +608,16 @@ removeNode: function(node) {
 
 });
 
-var nodeInserted = function(node) { // NOTE called AFTER node inserted into document
+let nodeInserted = function(node) { // NOTE called AFTER node inserted into document
 	if (!started) throw Error('sprockets management has not started yet');
 	if (node.nodeType !== 1) return;
 
-	var bindees = findAllBindees(node);
-	var composites = [];
+	let bindees = findAllBindees(node);
+	let composites = [];
 	_.forEach(bindees, function(el) {
 		_.some(bindingRules, function(rule) {
 			if (!DOM.matches(el, rule.selector)) return false;
-			var binding = attachBinding(rule.definition, el);
+			let binding = attachBinding(rule.definition, el);
 			if (binding && binding.rules) composites.push(el);
 			return true;
 		});
@@ -628,7 +628,7 @@ var nodeInserted = function(node) { // NOTE called AFTER node inserted into docu
 	});
 
 
-	var composite = sprockets.getComposite(node);
+	let composite = sprockets.getComposite(node);
 	if (composite) applyCompositedRules(node, composite);
 
 	while (composite = composites.shift()) applyCompositedRules(composite);
@@ -637,27 +637,27 @@ var nodeInserted = function(node) { // NOTE called AFTER node inserted into docu
 		
 	function applyCompositedRules(node, composite) {
 		if (!composite) composite = node;
-		var rules = getRules(composite);
+		let rules = getRules(composite);
 		if (rules.length <= 0) return;
 
-		var walker = createCompositeWalker(node, false); // don't skipRoot
-		var el;
+		let walker = createCompositeWalker(node, false); // don't skipRoot
+		let el;
 		while (el = walker.nextNode()) {
 			_.forEach(rules, function(rule) {
-				var selector = rule.selector; // FIXME absolutizeSelector??
+				let selector = rule.selector; // FIXME absolutizeSelector??
 				if (!DOM.matches(el, selector)) return;
-				var binding = attachBinding(rule.definition, el);
+				let binding = attachBinding(rule.definition, el);
 				rule.callback.call(binding.object, el);
 			});
 		}
 	}
 	
 	function getRules(composite) { // buffer uses unshift so LIFO
-		var rules = [];
-		var binding = DOM.getData(composite);
+		let rules = [];
+		let binding = DOM.getData(composite);
 		_.forEach(binding.rules, function(rule) {
 			if (!rule.callback) return;
-			var clonedRule = _.assign({}, rule);
+			let clonedRule = _.assign({}, rule);
 			clonedRule.composite = composite;
 			rules.unshift(clonedRule);
 		});
@@ -666,22 +666,22 @@ var nodeInserted = function(node) { // NOTE called AFTER node inserted into docu
 	
 }
 
-var nodeRemoved = function(node) { // NOTE called AFTER node removed document
+let nodeRemoved = function(node) { // NOTE called AFTER node removed document
 	if (!started) throw Error('sprockets management has not started yet');
 	if (node.nodeType !== 1) return;
 
 	// TODO leftComponentCallback. Might be hard to implement *after* node is removed
 	// FIXME the following logic maybe completely wrong
-	var nodes = DOM.findAll('*', node);
+	let nodes = DOM.findAll('*', node);
 	nodes.unshift(node);
 	_.forEach(nodes, Binding.leftDocumentCallback);
 }
 
 // FIXME this auto DOM Monitoring could have horrible performance for DOM sorting operations
 // It would be nice to have a list of moved nodes that could potentially be ignored
-var observe = (window.MutationObserver) ?
+let observe = (window.MutationObserver) ?
 function(onInserted, onRemoved) {
-	var observer = new MutationObserver(function(mutations, observer) {
+	let observer = new MutationObserver(function(mutations, observer) {
 		if (!started) return;
 		_.forEach(mutations, function(record) {
 			if (record.type !== 'childList') return;
@@ -712,8 +712,8 @@ function(onInserted, onRemoved) { // otherwise assume MutationEvents. TODO is th
 };
 
 
-var SprocketDefinition = function(prototype) {
-	var constructor = function(element) {
+let SprocketDefinition = function(prototype) {
+	let constructor = function(element) {
 		return sprockets.cast(element, constructor);
 	}
 	constructor.prototype = prototype;
@@ -724,8 +724,8 @@ var SprocketDefinition = function(prototype) {
 _.assign(sprockets, {
 
 registerSprocket: function(selector, definition, callback) { // WARN this can promote any element into a composite
-	var rule = {};
-	var composite;
+	let rule = {};
+	let composite;
 	if (typeof selector === 'string') {
 		_.assign(rule, {
 			selector: selector
@@ -737,12 +737,12 @@ registerSprocket: function(selector, definition, callback) { // WARN this can pr
 		composite = selector.composite;
 		delete rule.composite;
 	}
-	var nodeData = DOM.getData(composite); // NOTE nodeData should always be a binding
+	let nodeData = DOM.getData(composite); // NOTE nodeData should always be a binding
 	if (!nodeData) {
 		nodeData = {};
 		DOM.setData(composite, nodeData);
 	}
-	var nodeRules = nodeData.rules;
+	let nodeRules = nodeData.rules;
 	if (!nodeRules) nodeRules = nodeData.rules = [];
 	rule.definition = definition;
 	rule.callback = callback;
@@ -754,19 +754,19 @@ register: function(options, sprocket) {
 },
 
 registerComposite: function(tagName, definition) {
-	var defn = _.assign({}, definition);
-	var rules = defn.rules;
+	let defn = _.assign({}, definition);
+	let rules = defn.rules;
 	delete defn.rules;
 	if (!rules) console.warn('registerComposite() called without any sprocket rules. Try registerElement()');
-	var onattached = defn.attached;
+	let onattached = defn.attached;
 	defn.attached = function() {
-		var object = this;
+		let object = this;
 		if (rules) _.forEach(rules, function(rule) {
-			var selector = {
+			let selector = {
 				composite: object.element
 			}
-			var definition = {};
-			var callback;
+			let definition = {};
+			let callback;
 			if (Array.isArray(rule)) {
 				selector.selector = rule[0];
 				definition = rule[1];
@@ -785,12 +785,12 @@ registerComposite: function(tagName, definition) {
 },
 
 registerComponent: function(tagName, sprocket, extras) {
-	var defn = { prototype: sprocket.prototype };
+	let defn = { prototype: sprocket.prototype };
 	if (extras) {
 		defn.handlers = extras.handlers;
 		if (extras.sprockets) _.forEach(extras.sprockets, function(oldRule) {
 			if (!defn.rules) defn.rules = [];
-			var rule = {
+			let rule = {
 				selector: oldRule.matches,
 				definition: oldRule.sprocket,
 				callback: oldRule.enteredComponent
@@ -804,10 +804,10 @@ registerComponent: function(tagName, sprocket, extras) {
 },
 
 evolve: function(base, properties) {
-	var prototype = Object.create(base.prototype);
-	var sub = new SprocketDefinition(prototype);
-	var baseProperties = base.prototype.__properties__ || {};
-	var subProperties = prototype.__properties__ = {};
+	let prototype = Object.create(base.prototype);
+	let sub = new SprocketDefinition(prototype);
+	let baseProperties = base.prototype.__properties__ || {};
+	let subProperties = prototype.__properties__ = {};
 	_.forOwn(baseProperties, function(desc, name) {
 		subProperties[name] = Object.create(desc);
 	});
@@ -816,12 +816,12 @@ evolve: function(base, properties) {
 },
 
 defineProperties: function(sprocket, properties) {
-	var prototype = sprocket.prototype;
-	var definition = prototype.__properties__ || (prototype.__properties__ = {});
+	let prototype = sprocket.prototype;
+	let definition = prototype.__properties__ || (prototype.__properties__ = {});
 	_.forOwn(properties, function(desc, name) {
 		switch (typeof desc) {
 		case 'object':
-			var propDesc = definition[name] || (definition[name] = {});
+			let propDesc = definition[name] || (definition[name] = {});
 			_.assign(propDesc, desc);
 			Object.defineProperty(prototype, name, {
 				get: function() { throw Error('Attempt to get an ARIA property'); },
@@ -840,42 +840,42 @@ getPropertyDescriptor: function(sprocket, prop) {
 },
 
 _matches: function(element, sprocket, rule) { // internal utility method which is passed a "cached" rule
-	var binding = Binding.getInterface(element);
+	let binding = Binding.getInterface(element);
 	if (binding) return prototypeMatchesSprocket(binding.object, sprocket);
 	if (rule && DOM.matches(element, rule.selector)) return true; // TODO should make rules scoped by rule.composite
 	return false;
 },
 
 matches: function(element, sprocket, inComposite) {
-	var composite;
+	let composite;
 	if (inComposite) {
 		composite = sprockets.getComposite(element);
 		if (!composite) return false;
 	}
-	var rule = getMatchingSprocketRule(element.parentNode, sprocket, inComposite);
+	let rule = getMatchingSprocketRule(element.parentNode, sprocket, inComposite);
 	return sprockets._matches(element, sprocket, rule);
 },
 
 closest: function(element, sprocket, inComposite) {
-	var composite;
+	let composite;
 	if (inComposite) {
 		composite = sprockets.getComposite(element);
 		if (!composite) return;
 	}
-	var rule = getMatchingSprocketRule(element.parentNode, sprocket, inComposite);
-	for (var node=element; node && node.nodeType === 1; node=node.parentNode) {
+	let rule = getMatchingSprocketRule(element.parentNode, sprocket, inComposite);
+	for (let node=element; node && node.nodeType === 1; node=node.parentNode) {
 		if (sprockets._matches(node, sprocket, rule)) return node;
 		if (node === composite) return;
 	}
 },
 
 findAll: function(element, sprocket) { // FIXME this search is blocked by descendant composites (scopes). Is this appropriate?
-	var nodeList = [];
-	var rule = getMatchingSprocketRule(element, sprocket);
+	let nodeList = [];
+	let rule = getMatchingSprocketRule(element, sprocket);
 	if (!rule) return nodeList;
-	var walker = createCompositeWalker(element, true); // skipRoot
+	let walker = createCompositeWalker(element, true); // skipRoot
 	
-	var node;
+	let node;
 	while (node = walker.nextNode()) {
 		if (DOM.matches(node, rule.selector)) nodeList.push(node);
 	}
@@ -883,11 +883,11 @@ findAll: function(element, sprocket) { // FIXME this search is blocked by descen
 },
 
 find: function(element, sprocket) { // FIXME this search is blocked by descendant composites (scopes). Is this appropriate?
-	var rule = getMatchingSprocketRule(element, sprocket);
+	let rule = getMatchingSprocketRule(element, sprocket);
 	if (!rule) return null;
-	var walker = createCompositeWalker(element, true); // skipRoot
+	let walker = createCompositeWalker(element, true); // skipRoot
 	
-	var node;
+	let node;
 	while (node = walker.nextNode()) {
 		if (DOM.matches(node, rule.selector)) return node;
 	}
@@ -895,29 +895,29 @@ find: function(element, sprocket) { // FIXME this search is blocked by descendan
 },
 
 cast: function(element, sprocket) {
-	var object = sprockets.getInterface(element);
+	let object = sprockets.getInterface(element);
 	if (prototypeMatchesSprocket(object, sprocket)) return object;
 	throw Error('Attached sprocket is not compatible');
 },
 
 getInterface: function(element) {
-	var binding = Binding.getInterface(element);
+	let binding = Binding.getInterface(element);
 	if (binding) return binding.object;
-	var rule = getSprocketRule(element);
+	let rule = getSprocketRule(element);
 	if (!rule) 	throw Error('No sprocket declared'); // WARN should never happen - should be a universal fallback
-	var binding = attachBinding(rule.definition, element);
+	binding = attachBinding(rule.definition, element);
 	return binding.object;
 },
 
 isComposite: function(node) {
 	if (!DOM.hasData(node)) return false;
-	var nodeData = DOM.getData(node);
+	let nodeData = DOM.getData(node);
 	if (!nodeData.rules) return false;
 	return true;
 },
 
 getComposite: function(element) { // WARN this can return `document`. Not sure if that should count
-	for (var node=element; node; node=node.parentNode) {
+	for (let node=element; node; node=node.parentNode) {
 		if (sprockets.isComposite(node)) return node;
 	}
 }
@@ -925,16 +925,16 @@ getComposite: function(element) { // WARN this can return `document`. Not sure i
 });
 
 function getSprocketRule(element) {
-	var sprocketRule;
-	var composite = sprockets.getComposite(element);
+	let sprocketRule;
+	let composite = sprockets.getComposite(element);
 	sprocketRule = getRuleFromComposite(composite, element);
 	if (sprocketRule) return sprocketRule;
 	return getRuleFromComposite(document, element);
 }
 
 function getRuleFromComposite(composite, element) {
-	var sprocketRule;
-	var nodeData = DOM.getData(composite);
+	let sprocketRule;
+	let nodeData = DOM.getData(composite);
 	_.some(nodeData.rules, function(rule) {
 		if (!DOM.matches(element, rule.selector)) return false; // TODO should be using relative selector
 		sprocketRule = { composite: composite };
@@ -945,16 +945,16 @@ function getRuleFromComposite(composite, element) {
 }
 
 function getMatchingSprocketRule(element, sprocket, inComposite) {
-	var sprocketRule;
-	var composite = sprockets.getComposite(element);
+	let sprocketRule;
+	let composite = sprockets.getComposite(element);
 	sprocketRule = getMatchingRuleFromComposite(composite, sprocket);
 	if (inComposite || sprocketRule) return sprocketRule;
 	return getMatchingRuleFromComposite(document, sprocket);
 }
 
 function getMatchingRuleFromComposite(composite, sprocket) {
-	var sprocketRule;
-	var nodeData = DOM.getData(composite);
+	let sprocketRule;
+	let nodeData = DOM.getData(composite);
 	_.some(nodeData.rules, function(rule) {
 		if (typeof sprocket === 'string') {
 			if (rule.definition.prototype.role !== sprocket) return false;
@@ -987,7 +987,7 @@ function createCompositeWalker(root, skipRoot) {
 	}
 }
 
-var basePrototype = {};
+let basePrototype = {};
 sprockets.Base = new SprocketDefinition(basePrototype); // NOTE now we can extend basePrototype
 
 return sprockets;
@@ -998,7 +998,7 @@ return sprockets;
 /* Extend BaseSprocket.prototype */
 (function() {
 
-var Base = sprockets.Base;
+let Base = sprockets.Base;
 
 _.assign(Base.prototype, {
 
@@ -1010,42 +1010,42 @@ closest: function(selector, scope) { return DOM.closest(this.element, selector, 
 contains: function(otherNode) { return DOM.contains(this.element, otherNode); },
 
 attr: function(name, value) {
-	var element = this.element;
+	let element = this.element;
 	if (typeof value === 'undefined') return element.getAttribute(name);
 	if (value == null) element.removeAttribute(name);
 	else element.setAttribute(name, value);
 },
 hasClass: function(token) {
-	var element = this.element;
-	var text = element.getAttribute('class');
+	let element = this.element;
+	let text = element.getAttribute('class');
 	if (!text) return false;
 	return _.includes(_.words(text), token);
 },
 addClass: function(token) {
-	var element = this.element;
-	var text = element.getAttribute('class');
+	let element = this.element;
+	let text = element.getAttribute('class');
 	if (!text) {
 		element.setAttribute('class', token);
 		return;
 	}
 	if (_.includes(_.words(text), token)) return;
-	var n = text.length,
+	let n = text.length,
 		space = (n && text.charAt(n-1) !== ' ') ? ' ' : '';
 	text += space + token;
 	element.setAttribute('class', text);
 },
 removeClass: function(token) {
-	var element = this.element;
-	var text = element.getAttribute('class');
+	let element = this.element;
+	let text = element.getAttribute('class');
 	if (!text) return;
-	var prev = _.words(text);
-	var next = [];
+	let prev = _.words(text);
+	let next = [];
 	_.forEach(prev, function(str) { if (str !== token) next.push(str); });
 	if (prev.length === next.length) return;
 	element.setAttribute('class', next.join(' '));
 },
 toggleClass: function(token, force) {
-	var found = this.hasClass(token);
+	let found = this.hasClass(token);
 	if (found) {
 		if (force) return true;
 		this.removeClass(token);
@@ -1058,8 +1058,8 @@ toggleClass: function(token, force) {
 	}
 },
 css: function(name, value) {
-	var element = this.element;
-	var isKebabCase = (name.indexOf('-') >= 0);
+	let element = this.element;
+	let isKebabCase = (name.indexOf('-') >= 0);
 	if (typeof value === 'undefined') return isKebabCase ? element.style.getPropertyValue(name) : element.style[name];
 	if (value == null || value === '') {
 		if (isKebabCase) element.style.removeProperty(name);
@@ -1079,7 +1079,7 @@ trigger: function(type, params) {
 });
 
 // Element.prototype.hidden and visibilitychange event
-var Element = window.Element || window.HTMLElement;
+let Element = window.Element || window.HTMLElement;
 
 Object.defineProperty(Element.prototype, '$', {
 	get: function() { return sprockets.getInterface(this); }
@@ -1089,21 +1089,21 @@ Object.defineProperty(Element.prototype, '$', {
 
 (function() {
 
-var ariaProperties = { // TODO this lookup is only for default values
+let ariaProperties = { // TODO this lookup is only for default values
 	hidden: false,
 	selected: false,
 	expanded: true
 }
 
-var Base = sprockets.Base;
+let Base = sprockets.Base;
 
-var ARIA = sprockets.evolve(Base, {
+let ARIA = sprockets.evolve(Base, {
 
 role: 'roletype',
 
 aria: function(name, value) {
-	var element = this.element;
-	var defn = ariaProperties[name];
+	let element = this.element;
+	let defn = ariaProperties[name];
 	if (defn == null) throw Error('No such aria property: ' + name);
 
 	if (name === 'hidden') {
@@ -1113,10 +1113,10 @@ aria: function(name, value) {
 		return;
 	}
 	
-	var ariaName = 'aria-' + name;
-	var type = typeof defn;
+	let ariaName = 'aria-' + name;
+	let type = typeof defn;
 	if (typeof value === 'undefined') {
-		var result = element.getAttribute(ariaName);
+		let result = element.getAttribute(ariaName);
 		switch(type) {
 		case 'string': default: return result;
 		case 'boolean': return result === 'false' ? false : result == null ? undefined : true;
@@ -1128,24 +1128,24 @@ aria: function(name, value) {
 			element.setAttribute(ariaName, value);
 			break;
 		case 'boolean':
-			var bool = value === 'false' ? 'false' : value === false ? 'false' : 'true';
+			let bool = value === 'false' ? 'false' : value === false ? 'false' : 'true';
 			element.setAttribute(ariaName, bool);
 			break;
 	}
 },
 
 ariaCan: function(name, value) {
-	var desc = this.__properties__[name];
+	let desc = this.__properties__[name];
 	if (!desc) throw Error('Property not defined: ' + name);
 	if (desc.type !== 'boolean' || desc.can && !desc.can.call(this)) return false;
 	return true;
 },
 
 ariaToggle: function(name, value) {
-	var desc = this.__properties__[name];
+	let desc = this.__properties__[name];
 	if (!desc) throw Error('Property not defined: ' + name);
 	if (desc.type !== 'boolean' || desc.can && !desc.can.call(this)) throw Error('Property can not toggle: ' + name);
-	var oldValue = desc.get.call(this);
+	let oldValue = desc.get.call(this);
 	
 	if (typeof value === 'undefined') desc.set.call(this, !oldValue);
 	else desc.set.call(this, !!value);
@@ -1153,20 +1153,20 @@ ariaToggle: function(name, value) {
 },
 
 ariaGet: function(name) {
-	var desc = this.__properties__[name];
+	let desc = this.__properties__[name];
 	if (!desc) throw Error('Property not defined: ' + name);
 	return desc.get.call(this); // TODO type and error handling
 },
 
 ariaSet: function(name, value) {
-	var desc = this.__properties__[name];
+	let desc = this.__properties__[name];
 	if (!desc) throw Error('Property not defined: ' + name);
 	return desc.set.call(this, value); // TODO type and error handling
 }
 
 });
 
-var RoleType = sprockets.evolve(ARIA, {
+let RoleType = sprockets.evolve(ARIA, {
 
 hidden: {
 	type: 'boolean',
@@ -1181,7 +1181,7 @@ sprockets.ARIA = ARIA;
 sprockets.RoleType = RoleType;
 sprockets.register('*', RoleType);
 
-var Element = window.Element || window.HTMLElement;
+let Element = window.Element || window.HTMLElement;
 
 _.defaults(Element.prototype, { // NOTE this assumes that the declared sprocket for every element is derived from ARIA
 

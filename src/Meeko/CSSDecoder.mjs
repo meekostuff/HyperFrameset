@@ -2,8 +2,8 @@ import * as _ from './stuff.mjs';
 import * as DOM from './DOM.mjs'
 
 // FIXME textAttr & htmlAttr used in HazardProcessor & CSSDecoder
-var textAttr = '_text';
-var htmlAttr = '_html';
+const textAttr = '_text';
+const htmlAttr = '_html';
 // TODO what about tagnameAttr, namespaceAttr
 
 const CSS_CONTEXT_VARIABLE = '_';
@@ -18,13 +18,12 @@ init: function(node) {
 
 // TODO should matches() support Hazard variables
 matches: function(element, query) { // FIXME refactor common-code in matches / evaluate
-	var queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
-	var selector = queryParts[1];
-	var attr = queryParts[2];
-	var result;
+	let queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
+	let selector = queryParts[1];
+	let attr = queryParts[2];
 	if (!matches(element, selector)) return;
-	var node = element;
-	var result = node;
+	let node = element;
+	let result = node;
 
 	if (attr) {
 		attr = attr.trim();
@@ -40,7 +39,7 @@ matches: function(element, query) { // FIXME refactor common-code in matches / e
 		case textAttr: 
 			return node.textContent;
 		case htmlAttr:
-			var frag = doc.createDocumentFragment();
+			let frag = doc.createDocumentFragment();
 			_.forEach(node.childNodes, function(child) { 
 				frag.appendChild(doc.importNode(child, true)); // TODO does `child` really need to be cloned??
 			});
@@ -55,11 +54,11 @@ matches: function(element, query) { // FIXME refactor common-code in matches / e
 
 evaluate: function(query, context, variables, wantArray) {
 	if (!context) context = this.srcNode;
-	var doc = context.nodeType === 9 ? context : context.ownerDocument; // FIXME which document??
-	var queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
-	var selector = queryParts[1];
-	var attr = queryParts[2];
-	var result = find(selector, context, variables, wantArray);
+	let doc = context.nodeType === 9 ? context : context.ownerDocument; // FIXME which document??
+	let queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
+	let selector = queryParts[1];
+	let attr = queryParts[2];
+	let result = find(selector, context, variables, wantArray);
 
 	if (attr) {
 		attr = attr.trim();
@@ -80,7 +79,7 @@ evaluate: function(query, context, variables, wantArray) {
 		case textAttr: 
 			return node.textContent;
 		case htmlAttr:
-			var frag = doc.createDocumentFragment();
+			let frag = doc.createDocumentFragment();
 			_.forEach(node.childNodes, function(child) { 
 				frag.appendChild(doc.importNode(child, true)); // TODO does `child` really need to be cloned??
 			});
@@ -102,14 +101,14 @@ function matches(element, selectorGroup) {
 function find(selectorGroup, context, variables, wantArray) { // FIXME currently only implements `context` expansion
 	selectorGroup = selectorGroup.trim();
 	if (selectorGroup === '') return wantArray ? [ context ] : context;
-	var nullResult = wantArray ? [] : null;
-	var selectors = selectorGroup.split(/,(?![^\(]*\)|[^\[]*\])/);
+	let nullResult = wantArray ? [] : null;
+	let selectors = selectorGroup.split(/,(?![^\(]*\)|[^\[]*\])/);
 	selectors = _.map(selectors, function(s) { return s.trim(); });
 
-	var invalidVarUse = false;
-	var contextVar;
+	let invalidVarUse = false;
+	let contextVar;
 	_.forEach(selectors, function(s, i) {
-		var m = s.match(/\\?\$[_a-zA-Z][_a-zA-Z0-9]*\b/g);
+		let m = s.match(/\\?\$[_a-zA-Z][_a-zA-Z0-9]*\b/g);
 		if (!m) {
 			if (i > 0 && contextVar) {
 				invalidVarUse = true;
@@ -119,8 +118,8 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 		}
 		_.forEach(m, function(varRef, j) {
 			if (varRef.charAt(0) === '\\') return; // Ignore "\$"
-			var varName = varRef.substr(1);
-			var varPos = s.indexOf(varRef);
+			let varName = varRef.substr(1);
+			let varPos = s.indexOf(varRef);
 			if (j > 0 || varPos > 0) {
 				invalidVarUse = true;
 				console.warn('Invalid use of ' + varRef + ' in ' + selectorGroup);
@@ -159,7 +158,7 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 		}
 	}
 
-	var isRoot = false;
+	let isRoot = false;
 	if (context.nodeType === 9 || context.nodeType === 11) isRoot = true;
 
 	selectors = _.filter(selectors, function(s) {
@@ -176,13 +175,13 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 
 	selectors = _.map(selectors, function(s) {
 			if (isRoot) return s;
-			var prefix = ':scope';
+			let prefix = ':scope';
 			return (contextVar) ? 
 				s.replace('$' + contextVar, prefix) : 
 				prefix + ' ' + s;
 		});
 	
-	var finalSelector = selectors.join(', ');
+	let finalSelector = selectors.join(', ');
 
 	if (wantArray) {
 		return DOM.findAll(finalSelector, context, !isRoot, !isRoot);
@@ -194,7 +193,7 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 
 function markElement(context) {
 	if (context.hasAttribute(DOM.uniqueIdAttr)) return context.getAttribute(DOM.uniqueIdAttr);
-	var uid = DOM.uniqueId(context);
+	let uid = DOM.uniqueId(context);
 	context.setAttribute(DOM.uniqueIdAttr, uid);
 	return uid;
 }

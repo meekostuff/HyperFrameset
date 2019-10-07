@@ -15,8 +15,8 @@
 	 * The mask defaults to dateFormat.masks.default.
 	 */
 
-	var dateFormat = function () {
-		var	token = /d{1,4}|m{1,4}|yy(?:yy)?|([HhMsTt])\1?|[LloSZ]|"[^"]*"|'[^']*'/g,
+	let dateFormat = function () {
+		let	token = /d{1,4}|m{1,4}|yy(?:yy)?|([HhMsTt])\1?|[LloSZ]|"[^"]*"|'[^']*'/g,
 			timezone = /\b(?:[PMCEA][SDP]T|(?:Pacific|Mountain|Central|Eastern|Atlantic) (?:Standard|Daylight|Prevailing) Time|(?:GMT|UTC)(?:[-+]\d{4})?)\b/g,
 			timezoneClip = /[^-+\dA-Z]/g,
 			pad = function (val, len) {
@@ -28,7 +28,7 @@
 
 		// Regexes and supporting functions are cached through closure
 		return function (date, mask, utc) {
-			var dF = dateFormat;
+			let dF = dateFormat;
 
 			// You can't provide utc if you skip other args (use the "UTC:" mask prefix)
 			if (arguments.length == 1 && Object.prototype.toString.call(date) == "[object String]" && !/\d/.test(date)) {
@@ -48,7 +48,7 @@
 				utc = true;
 			}
 
-			var	_ = utc ? "getUTC" : "get",
+			let	_ = utc ? "getUTC" : "get",
 				d = date[_ + "Date"](),
 				D = date[_ + "Day"](),
 				m = date[_ + "Month"](),
@@ -152,20 +152,20 @@
 	}
 
 	function includes(a, item) {
-		for (var n=a.length, i=0; i<n; i++) if (a[i] === item) return true;
+		for (let n=a.length, i=0; i<n; i++) if (a[i] === item) return true;
 		return false;
 	}
 
-	function forEach(a, fn, context) { for (var n=a.length, i=0; i<n; i++) fn.call(context, a[i], i, a); }
+	function forEach(a, fn, context) { for (let n=a.length, i=0; i<n; i++) fn.call(context, a[i], i, a); }
 
-	function some(a, fn, context) { for (var n=a.length, i=0; i<n; i++) { if (fn.call(context, a[i], i, a)) return true; } return false; }
+	function some(a, fn, context) { for (let n=a.length, i=0; i<n; i++) { if (fn.call(context, a[i], i, a)) return true; } return false; }
 
-	function every(a, fn, context) { for (var n=a.length, i=0; i<n; i++) { if (!fn.call(context, a[i], i, a)) return false; } return true; }
+	function every(a, fn, context) { for (let n=a.length, i=0; i<n; i++) { if (!fn.call(context, a[i], i, a)) return false; } return true; }
 
 	function map(a, fn, context) {
-		var output = [];
-		for (var n=a.length, i=0; i<n; i++) {
-			var value = a[i];
+		let output = [];
+		for (let n=a.length, i=0; i<n; i++) {
+			let value = a[i];
 			output[i] = fn ? 
 				fn.call(context, value, i, a) :
 				value;
@@ -174,18 +174,18 @@
 	}
 
 	function filter(a, fn, context) {
-		var output = [];
-		for (var n=a.length, i=0; i<n; i++) {
-			var success = fn.call(context, a[i], i, a);
+		let output = [];
+		for (let n=a.length, i=0; i<n; i++) {
+			let success = fn.call(context, a[i], i, a);
 			if (success) output.push(a[i]);
 		}
 		return output;
 	}
 
 	function _find(a, fn, context, byIndex) {
-		for (var n=a.length, i=0; i<n; i++) {
-			var item = a[i];
-			var success = fn.call(context, item, i, a);
+		for (let n=a.length, i=0; i<n; i++) {
+			let item = a[i];
+			let success = fn.call(context, item, i, a);
 			if (success) return byIndex ? i : item;
 		}
 		return byIndex ? -1 : undefined;
@@ -200,7 +200,7 @@
 	}
 
 	function without(a1, a2) {
-		var result = [];
+		let result = [];
 		forEach(a1, function(item) {
 			if (includes(a2, item) || includes(result, item)) return;
 			result.push(item);
@@ -209,7 +209,7 @@
 	}
 
 	function difference(a1, a2) {
-		var result = [].concat(
+		let result = [].concat(
 			without(a1, a2),
 			without(a2, a1)
 		);
@@ -219,21 +219,21 @@
 	function words(text) { return text.split(/\s+/); }
 
 	function forIn(object, fn, context) {
-		for (var key in object) {
+		for (let key in object) {
 			fn.call(context, object[key], key, object);
 		}
 	}
 
 	function forOwn(object, fn, context) {
-		var keys = Object.keys(object);
-		for (var i=0, n=keys.length; i<n; i++) {
-			var key = keys[i];
+		let keys = Object.keys(object);
+		for (let i=0, n=keys.length; i<n; i++) {
+			let key = keys[i];
 			fn.call(context, object[key], key, object);
 		}
 	}
 
 	function isEmpty(o) { // NOTE lodash supports arrays and strings too
-		if (o) for (var p in o) if (o.hasOwnProperty(p)) return false;
+		if (o) for (let p in o) if (o.hasOwnProperty(p)) return false;
 		return true;
 	}
 
@@ -278,7 +278,7 @@
 		assign: assign
 	});
 
-	var Registry = function(options) {
+	let Registry = function(options) {
 		if (!options || typeof options !== 'object') options = {};
 		this.options = options;
 		this.items = {};
@@ -304,11 +304,11 @@
 			throw Error('Attempted to rewrite key ' + key + ' in write-once storage');
 		}
 		if (this.options.keyTest) {
-			var ok = this.options.keyTest(key);
+			let ok = this.options.keyTest(key);
 			if (!ok) throw Error('Invalid key ' + key + ' for storage');
 		}
 		if (this.options.valueTest) {
-			var ok = this.options.valueTest(value);
+			let ok = this.options.valueTest(value);
 			if (!ok) throw Error('Invalid value ' + value + ' for storage');
 		}
 		this.items[key] = value;
@@ -339,35 +339,35 @@
 	const frameExecutionRatio = 0.75; // FIXME another boot-option??
 	const frameExecutionTimeout = frameInterval * frameExecutionRatio;
 
-	var performance = window.performance && window.performance.now ? window.performance :
+	let performance = window.performance && window.performance.now ? window.performance :
 		Date.now ? Date :
 		{
 			now: function() { return (new Date).getTime(); }
 		};
 
-	var schedule = (function() {
+	let schedule = (function() {
 		// See http://creativejs.com/resources/requestanimationframe/
-		var fn = window.requestAnimationFrame;
+		let fn = window.requestAnimationFrame;
 		if (fn) return fn;
 
 		some(words('moz ms o webkit'), function(vendor) {
-			var name = vendor + 'RequestAnimationFrame';
+			let name = vendor + 'RequestAnimationFrame';
 			if (!window[name]) return false;
 			fn = window[name];
 			return true;
 		});
 		if (fn) return fn;
 
-		var lastTime = 0;
-		var callback;
+		let lastTime = 0;
+		let callback;
 		fn = function(cb, element) {
 			if (callback) throw 'schedule() only allows one callback at a time';
 			callback = cb;
-			var currTime = performance.now();
-			var timeToCall = Math.max(0, frameInterval - (currTime - lastTime));
-			var id = window.setTimeout(function() {
+			let currTime = performance.now();
+			let timeToCall = Math.max(0, frameInterval - (currTime - lastTime));
+			let id = window.setTimeout(function() {
 				lastTime = performance.now();
-				var cb = callback;
+				let cb = callback;
 				callback = undefined;
 				cb(lastTime, element); 
 			}, timeToCall);
@@ -378,11 +378,11 @@
 	})();
 
 
-	var asapQueue = [];
-	var deferQueue = [];
-	var errorQueue = [];
-	var scheduled = false;
-	var processing = false;
+	let asapQueue = [];
+	let deferQueue = [];
+	let errorQueue = [];
+	let scheduled = false;
+	let processing = false;
 
 	function asap(fn) {
 		asapQueue.push(fn);
@@ -413,8 +413,8 @@
 		}, timeout);
 	}
 
-	var execStats = {};
-	var frameStats = {};
+	let execStats = {};
+	let frameStats = {};
 
 	function resetStats() {
 		forEach([execStats, frameStats], function(stats) {
@@ -437,8 +437,8 @@
 	}
 
 	function getStats() {
-		var exec = assign({}, execStats);
-		var frame = assign({}, frameStats);
+		let exec = assign({}, execStats);
+		let frame = assign({}, frameStats);
 		exec.avgTime = exec.totalTime / exec.count;
 		frame.avgTime = frame.totalTime / frame.count;
 		return {
@@ -447,21 +447,21 @@
 		}
 	}
 
-	var lastStartTime = performance.now();
+	let lastStartTime = performance.now();
 	function getTime(bRemaining) {
-		var delta = performance.now() - lastStartTime;
+		let delta = performance.now() - lastStartTime;
 		if (!bRemaining) return delta;
 		return frameExecutionTimeout - delta;
 	}
 
-	var idle = true;
+	let idle = true;
 	function processTasks() {
-		var startTime = performance.now();
+		let startTime = performance.now();
 		if (!idle) updateStats(frameStats, startTime - lastStartTime);
 		lastStartTime = startTime;
 		processing = true;
-		var fn;
-		var currTime;
+		let fn;
+		let currTime;
 		while (asapQueue.length) {
 			fn = asapQueue.shift();
 			if (typeof fn !== 'function') continue;
@@ -491,15 +491,15 @@
 		errorQueue.push(error);
 	}
 
-	var throwErrors = (function() {
+	let throwErrors = (function() {
 
-	var evType = vendorPrefix + '-error';
+	let evType = vendorPrefix + '-error';
 	function throwErrors() {
-		var handlers = createThrowers(errorQueue);
+		let handlers = createThrowers(errorQueue);
 		forEach(handlers, function(handler) {
 			window.addEventListener(evType, handler, false);
 		});
-		var e = document.createEvent('Event');
+		let e = document.createEvent('Event');
 		e.initEvent(evType, true, true);
 		window.dispatchEvent(e);
 		forEach(handlers, function(handler) {
@@ -539,10 +539,10 @@
 	 WARN: This was based on early DOM Futures specification. This has been evolved towards ES6 Promises.
 	 */
 
-	var Promise = function(init) { // `init` is called as init(resolve, reject)
+	let Promise = function(init) { // `init` is called as init(resolve, reject)
 		if (!(this instanceof Promise)) return new Promise(init);
 		
-		var promise = this;
+		let promise = this;
 		promise._initialize();
 
 		try { init(resolve, reject); }
@@ -573,8 +573,8 @@
 	defaults(Promise, {
 
 	applyTo: function(object) {
-		var resolver = {};
-		var promise = new Promise(function(resolve, reject) {
+		let resolver = {};
+		let promise = new Promise(function(resolve, reject) {
 			resolver.resolve = resolve;
 			resolver.reject = reject;
 		});
@@ -596,7 +596,7 @@
 	defaults(Promise.prototype, {
 
 	_initialize: function() {
-		var promise = this;
+		let promise = this;
 		defaults(promise, {
 			/* 
 				use lazy creation for callback lists - 
@@ -623,7 +623,7 @@
 	},
 
 	_fulfil: function(result, sync) { // NOTE equivalent to 'fulfil algorithm'. External calls MUST NOT use sync
-		var promise = this;
+		let promise = this;
 		if (!promise.isPending) return;
 		promise.isPending = false;
 		promise.isRejected = false;
@@ -633,7 +633,7 @@
 	},
 
 	_resolve: function(value, sync) { // NOTE equivalent to 'resolve algorithm'. External calls MUST NOT use sync
-		var promise = this;
+		let promise = this;
 		if (!promise.isPending) return;
 		if (Promise.isPromise(value) && !value.isPending) {
 			if (value.isFulfilled) promise._fulfil(value.value, sync);
@@ -656,7 +656,7 @@
 	},
 
 	_reject: function(error, sync) { // NOTE equivalent to 'reject algorithm'. External calls MUST NOT use sync
-		var promise = this;
+		let promise = this;
 		if (!promise.isPending) return;
 		promise.isPending = false;
 		promise.isFulfilled = false;
@@ -669,7 +669,7 @@
 	},
 
 	_requestProcessing: function(sync) { // NOTE schedule callback processing. TODO may want to disable sync option
-		var promise = this;
+		let promise = this;
 		if (promise.isPending) return;
 		if (!promise._willCatch) return;
 		if (promise._processing) return;
@@ -688,9 +688,9 @@
 	},
 
 	_process: function() { // NOTE process a promises callbacks
-		var promise = this;
-		var result;
-		var callbacks, cb;
+		let promise = this;
+		let result;
+		let callbacks, cb;
 		if (promise.isFulfilled) {
 			result = promise.value;
 			callbacks = promise._fulfilCallbacks;
@@ -710,13 +710,13 @@
 	},
 
 	then: function(fulfilCallback, rejectCallback) {
-		var promise = this;
+		let promise = this;
 		return new Promise(function(resolve, reject) {
-			var fulfilWrapper = fulfilCallback ?
+			let fulfilWrapper = fulfilCallback ?
 				wrapResolve(fulfilCallback, resolve, reject) :
 				function(value) { resolve(value); };
 		
-			var rejectWrapper = rejectCallback ?
+			let rejectWrapper = rejectCallback ?
 				wrapResolve(rejectCallback, resolve, reject) :
 				function(error) { reject(error); };
 		
@@ -734,7 +734,7 @@
 	},
 
 	'catch': function(rejectCallback) { // WARN 'catch' is unexpected identifier in IE8-
-		var promise = this;
+		let promise = this;
 		return promise.then(undefined, rejectCallback);
 	}
 
@@ -745,7 +745,7 @@
 	function wrapResolve(callback, resolve, reject) {
 		return function() {
 			try {
-				var value = callback.apply(undefined, arguments);
+				let value = callback.apply(undefined, arguments);
 				resolve(value);
 			} catch (error) {
 				reject(error);
@@ -758,7 +758,7 @@
 
 	resolve: function(value) {
 		if (Promise.isPromise(value)) return value;
-		var promise = Object.create(Promise.prototype);
+		let promise = Object.create(Promise.prototype);
 		promise._initialize();
 		promise._resolve(value);
 		return promise;
@@ -780,13 +780,13 @@
 	   delay(timeout) returns a promise which fulfils after timeout ms
 	   pipe(startValue, [fn1, fn2, ...]) will call functions sequentially
 	 */
-	var wait = (function() { // TODO wait() isn't used much. Can it be simpler?
+	let wait = (function() { // TODO wait() isn't used much. Can it be simpler?
 		
-	var tests = [];
+	let tests = [];
 
 	function wait(fn) {
-		var test = { fn: fn };
-		var promise = Promise.applyTo(test);
+		let test = { fn: fn };
+		let promise = Promise.applyTo(test);
 		asapTest(test);
 		return promise;
 	}
@@ -803,13 +803,13 @@
 	}
 
 	function deferTest(test) {
-		var started = tests.length > 0;
+		let started = tests.length > 0;
 		tests.push(test);
 		if (!started) Task.defer(poller);
 	}
 
 	function poller() {
-		var currentTests = tests;
+		let currentTests = tests;
 		tests = [];
 		forEach(currentTests, asapTest);
 	}
@@ -852,9 +852,9 @@
 	}
 
 	function pipe(startValue, fnList) { // TODO make more efficient with sync introspection
-		var promise = Promise.resolve(startValue);
-		for (var n=fnList.length, i=0; i<n; i++) {
-			var fn = fnList[i];
+		let promise = Promise.resolve(startValue);
+		for (let n=fnList.length, i=0; i<n; i++) {
+			let fn = fnList[i];
 			promise = promise.then(fn);
 		}
 		return promise;
@@ -862,24 +862,24 @@
 
 	function reduce(accumulator, a, fn, context) {
 	return new Promise(function(resolve, reject) {
-		var length = a.length;
-		var i = 0;
+		let length = a.length;
+		let i = 0;
 
-		var predictor = new TimeoutPredictor(256, 2);
+		let predictor = new TimeoutPredictor(256, 2);
 		process(accumulator);
 		return;
 
 		function process(acc) {
-			var prevTime;
-			var j = 0;
-			var timeoutCount = 1;
+			let prevTime;
+			let j = 0;
+			let timeoutCount = 1;
 
 			while (i < length) {
 				if (Promise.isThenable(acc)) {
 					if (!Promise.isPromise(acc) || !acc.isFulfilled) {
 						acc.then(process, reject);
 						if (j <= 0 || !prevTime || i >= length) return;
-						var currTime = Task.getTime(true);
+						let currTime = Task.getTime(true);
 						predictor.update(j, prevTime - currTime);
 						return;
 					}
@@ -897,7 +897,7 @@
 				if (j < timeoutCount) continue;
 
 				// update timeout counter data
-				var currTime = Task.getTime(true); // NOTE *remaining* time
+				let currTime = Task.getTime(true); // NOTE *remaining* time
 				if (prevTime) predictor.update(j, prevTime - currTime); // NOTE based on *remaining* time
 				if (currTime <= 0) {
 					// Could use Promise.resolve(acc).then(process, reject)
@@ -917,7 +917,7 @@
 
 	function TimeoutPredictor(max, mult) { // FIXME test args are valid
 		if (!(this instanceof TimeoutPredictor)) return new TimeoutPredictor(max, mult);
-		var predictor = this;
+		let predictor = this;
 		assign(predictor, {
 			count: 0,
 			totalTime: 0,
@@ -930,16 +930,16 @@
 	assign(TimeoutPredictor.prototype, {
 
 	update: function(count, delta) {
-		var predictor = this;
+		let predictor = this;
 		predictor.count += count;
 		predictor.totalTime += delta;
 	},
 
 	getTimeoutCount: function(remainingTime) {
-		var predictor = this;
+		let predictor = this;
 		if (predictor.count <= 0) return 1;
-		var avgTime = predictor.totalTime / predictor.count;
-		var n = Math.floor( remainingTime / avgTime );
+		let avgTime = predictor.totalTime / predictor.count;
+		let n = Math.floor( remainingTime / avgTime );
 		if (n <= 0) return 1;
 		if (n < predictor.currLimit) return n;
 		n = predictor.currLimit;
@@ -959,7 +959,7 @@
 		asap: asap$1, defer: defer$1, delay: delay$1, wait: wait, pipe: pipe, reduce: reduce
 	});
 
-	var document$1 = window.document;
+	let document$1 = window.document;
 
 	/*
 	 ### URL utility functions
@@ -968,9 +968,9 @@
 	// TODO Ideally this URL is read-only compatible with DOM4 URL
 	// NOTE This could use `document.createElement('a').href = url` except DOM is too slow
 
-	var URL = function(href, base) {
+	let URL = function(href, base) {
 		if (!(this instanceof URL)) return new URL(href, base);
-		var baseURL;
+		let baseURL;
 		if (base) baseURL = typeof base === 'string' ? new URL(base) : base;
 		init.call(this, href, baseURL);
 	};
@@ -981,20 +981,20 @@
 			assign(this, new URL(href));
 		}
 		else {
-			var url = parse(href);
-			for (var key in url) this[key] = url[key]; // _.assign(this, url);
+			let url = parse(href);
+			for (let key in url) this[key] = url[key]; // _.assign(this, url);
 			enhance(this);
 		}
 	}
 
-	var keys = ['source','protocol','hostname','port','pathname','search','hash'];
-	var parser = /^([^:\/?#]+:)?(?:\/\/([^:\/?#]*)(?::(\d*))?)?([^?#]*)?(\?[^#]*)?(#.*)?$/;
+	let keys = ['source','protocol','hostname','port','pathname','search','hash'];
+	let parser = /^([^:\/?#]+:)?(?:\/\/([^:\/?#]*)(?::(\d*))?)?([^?#]*)?(\?[^#]*)?(#.*)?$/;
 
 	function parse(href) {
 		href = href.trim();
-		var m = parser.exec(href);
-		var url = {};
-		for (var n=keys.length, i=0; i<n; i++) url[keys[i]] = m[i] || '';
+		let m = parser.exec(href);
+		let url = {};
+		for (let n=keys.length, i=0; i<n; i++) url[keys[i]] = m[i] || '';
 		return url;
 	}
 
@@ -1009,7 +1009,7 @@
 		}
 		if (!url.origin || url.origin === 'null') url.origin = url.protocol + '//' + url.host;
 		if (!url.pathname) url.pathname = '/';
-		var pathParts = url.pathname.split('/'); // creates an array of at least 2 strings with the first string empty: ['', ...]
+		let pathParts = url.pathname.split('/'); // creates an array of at least 2 strings with the first string empty: ['', ...]
 		pathParts.shift(); // leaves an array of at least 1 string [...]
 		url.filename = pathParts.pop(); // filename could be ''
 		url.basepath = pathParts.length ? '/' + pathParts.join('/') + '/' : '/'; // either '/rel-path-prepended-by-slash/' or '/'
@@ -1022,8 +1022,8 @@
 	URL.prototype.resolve = function resolve(relHref) {
 		relHref = relHref.trim();
 		if (!this.supportsResolve) return relHref;
-		var substr1 = relHref.charAt(0), substr2 = relHref.substr(0,2);
-		var absHref =
+		let substr1 = relHref.charAt(0), substr2 = relHref.substr(0,2);
+		let absHref =
 			/^[a-zA-Z0-9-]+:/.test(relHref) ? relHref :
 			substr2 == '//' ? this.protocol + relHref :
 			substr1 == '/' ? this.origin + relHref :
@@ -1032,8 +1032,8 @@
 			substr1 != '.' ? this.base + relHref :
 			substr2 == './' ? this.base + relHref.replace('./', '') :
 			(function() {
-				var myRel = relHref;
-				var myDir = this.basepath;
+				let myRel = relHref;
+				let myDir = this.basepath;
 				while (myRel.substr(0,3) == '../') {
 					myRel = myRel.replace('../', '');
 					myDir = myDir.replace(/[^\/]+\/$/, '');
@@ -1043,12 +1043,12 @@
 		return absHref;
 	};
 
-	var urlAttributes = URL.attributes = (function() {
+	let urlAttributes = URL.attributes = (function() {
 		
 	function AttributeDescriptor(tagName, attrName, loads, compound) {
-		var testEl = document$1.createElement(tagName);
-		var supported = attrName in testEl;
-		var lcAttr = lc(attrName); // NOTE for longDesc, etc
+		let testEl = document$1.createElement(tagName);
+		let supported = attrName in testEl;
+		let lcAttr = lc(attrName); // NOTE for longDesc, etc
 		defaults(this, { // attrDesc
 			tagName: tagName,
 			attrName: attrName,
@@ -1061,16 +1061,16 @@
 	defaults(AttributeDescriptor.prototype, {
 
 	resolve: function(el, baseURL) {
-		var attrName = this.attrName;
-		var url = el.getAttribute(attrName);
+		let attrName = this.attrName;
+		let url = el.getAttribute(attrName);
 		if (url == null) return;
-		var finalURL = this.resolveURL(url, baseURL);
+		let finalURL = this.resolveURL(url, baseURL);
 		if (finalURL !== url) el.setAttribute(attrName, finalURL);
 	},
 
 	resolveURL: function(url, baseURL) {
-		var relURL = url.trim();
-		var finalURL = relURL;
+		let relURL = url.trim();
+		let finalURL = relURL;
 		switch (relURL.charAt(0)) {
 			case '': // empty, but not null. TODO should this be a warning??
 				break;
@@ -1084,14 +1084,14 @@
 
 	});
 
-	var urlAttributes = {};
+	let urlAttributes = {};
 	forEach(words('link@<href script@<src img@<longDesc,<src,+srcset iframe@<longDesc,<src object@<data embed@<src video@<poster,<src audio@<src source@<src,+srcset input@formAction,<src button@formAction,<src a@+ping,href area@href q@cite blockquote@cite ins@cite del@cite form@action'), function(text) {
-		var m = text.split('@'), tagName = m[0], attrs = m[1];
-		var attrList = urlAttributes[tagName] = {};
+		let m = text.split('@'), tagName = m[0], attrs = m[1];
+		let attrList = urlAttributes[tagName] = {};
 		forEach(attrs.split(','), function(attrName) {
-			var downloads = false;
-			var compound = false;
-			var modifier = attrName.charAt(0);
+			let downloads = false;
+			let compound = false;
+			let modifier = attrName.charAt(0);
 			switch (modifier) {
 			case '<':
 				downloads = true;
@@ -1107,7 +1107,7 @@
 	});
 
 	function resolveSrcset(urlSet, baseURL) {
-		var urlList = urlSet.split(/\s*,\s*/); // FIXME this assumes URLs don't contain ','
+		let urlList = urlSet.split(/\s*,\s*/); // FIXME this assumes URLs don't contain ','
 		forEach(urlList, function(urlDesc, i) {
 			urlList[i] = urlDesc.replace(/^\s*(\S+)(?=\s|$)/, function(all, url) { return baseURL.resolve(url); });
 		});
@@ -1118,7 +1118,7 @@
 	urlAttributes['source']['srcset'].resolveURL = resolveSrcset;
 
 	urlAttributes['a']['ping'].resolveURL = function(urlSet, baseURL) {
-		var urlList = urlSet.split(/\s+/);
+		let urlList = urlSet.split(/\s+/);
 		forEach(urlList, function(url, i) {
 			urlList[i] = baseURL.resolve(url);
 		});
@@ -1137,7 +1137,7 @@
 
 	const vendorPrefix$1 = 'meeko'; // FIXME DRY with other instances of `vendorPrefix`
 
-	var document$2 = window.document;
+	let document$2 = window.document;
 
 	/*
 	 ### DOM utility functions
@@ -1150,12 +1150,12 @@
 
 	const nodeIdSuffix = Math.round(Math.random() * 1000000);
 	const nodeIdProperty = '__' + vendorPrefix$1 + nodeIdSuffix;
-	var nodeCount = 0; // used to generated node IDs
-	var nodeTable = []; // list of tagged nodes
-	var nodeStorage = {}; // hash of storage for nodes, keyed off `nodeIdProperty`
+	let nodeCount = 0; // used to generated node IDs
+	let nodeTable = []; // list of tagged nodes
+	let nodeStorage = {}; // hash of storage for nodes, keyed off `nodeIdProperty`
 
 	function uniqueId(node) {
-		var nodeId = node[nodeIdProperty];
+		let nodeId = node[nodeIdProperty];
 		if (nodeId) return nodeId;
 		nodeId = '__' + nodeCount++;
 		node[nodeIdProperty] = nodeId; // WARN would need `new String(nodeId)` in IE<=8
@@ -1165,27 +1165,27 @@
 	}
 
 	function setData(node, data) { // FIXME assert node is element
-		var nodeId = uniqueId(node);
+		let nodeId = uniqueId(node);
 		nodeStorage[nodeId] = data;
 	}
 
 	function hasData(node) {
-		var nodeId = node[nodeIdProperty];
+		let nodeId = node[nodeIdProperty];
 		return !nodeId ? false : nodeId in nodeStorage;
 	}
 
 	function getData(node) { // TODO should this throw if no data?
-		var nodeId = node[nodeIdProperty];
+		let nodeId = node[nodeIdProperty];
 		if (!nodeId) return;
 		return nodeStorage[nodeId];
 	}
 
 	function releaseNodes(callback, context) { // FIXME this is never called
-		for (var i=nodeTable.length-1; i>=0; i--) {
-			var node = nodeTable[i];
+		for (let i=nodeTable.length-1; i>=0; i--) {
+			let node = nodeTable[i];
 			delete nodeTable[i];
 			if (callback) callback.call(context, node);
-			var nodeId = node[nodeIdProperty];
+			let nodeId = node[nodeIdProperty];
 			delete nodeStorage[nodeId];
 		}
 		nodeTable.length = 0;
@@ -1195,13 +1195,13 @@
 		return el && el.nodeType === 1 ? lc(el.tagName) : '';
 	}
 
-	var matchesSelector;
+	let matchesSelector;
 
 	if (document$2.documentElement.matches) matchesSelector = function(element, selector) {
 		return (element && element.nodeType === 1) ? element.matches(selector) : false; 
 	};
 	else some(words('moz webkit ms o'), function(prefix) {
-		var method = prefix + 'MatchesSelector';
+		let method = prefix + 'MatchesSelector';
 		if (document$2.documentElement[method]) {
 			matchesSelector = function(element, selector) { return (element && element.nodeType === 1) ? element[method](selector) : false; };
 			return true;
@@ -1210,7 +1210,7 @@
 	});
 
 
-	var matches = matchesSelector ?
+	let matches = matchesSelector ?
 	function(element, selector, scope) {
 		if (!(element && element.nodeType === 1)) return false;
 		if (typeof selector === 'function') return selector(element, scope);
@@ -1220,10 +1220,10 @@
 	} :
 	function() { throw Error('matches not supported'); }; // NOTE fallback
 
-	var closest = matchesSelector ?
+	let closest = matchesSelector ?
 	function(element, selector, scope) {
 		if (typeof selector === 'function') {
-			for (var el=element; el && el!==scope; el=el.parentNode) {
+			for (let el=element; el && el!==scope; el=el.parentNode) {
 				if (el.nodeType !== 1) continue;
 				if (selector(el, scope)) return el;
 			}
@@ -1231,7 +1231,7 @@
 		}
 		return scopeify(function(absSelector) {
 
-			for (var el=element; el && el!==scope; el=el.parentNode) {
+			for (let el=element; el && el!==scope; el=el.parentNode) {
 				if (el.nodeType !== 1) continue;
 				if (matchesSelector(el, absSelector)) return el;
 			}
@@ -1241,14 +1241,14 @@
 	function() { throw Error('closest not supported'); }; // NOTE fallback
 
 	function scopeify(fn, selector, scope) {
-		var absSelector = selector;
+		let absSelector = selector;
 		if (scope) {
-			var uid = uniqueId(scope);
+			let uid = uniqueId(scope);
 			scope.setAttribute(nodeIdProperty, uid);
 			absSelector = absolutizeSelector(selector, scope);
 		}
 
-		var result = fn(absSelector);
+		let result = fn(absSelector);
 
 		if (scope) {
 			scope.removeAttribute(nodeIdProperty);
@@ -1269,11 +1269,11 @@
 			return selectorGroup;
 		}
 		
-		var nodeId = uniqueId(scope);
-		var scopeSelector = '[' + nodeIdProperty + '=' + nodeId + ']';
+		let nodeId = uniqueId(scope);
+		let scopeSelector = '[' + nodeIdProperty + '=' + nodeId + ']';
 
 		// split on COMMA (,) that is not inside BRACKETS. Technically: not followed by a RHB ')' or ']' unless first followed by LHB '(' or '[' 
-		var selectors = selectorGroup.split(/,(?![^\(]*\)|[^\[]*\])/);
+		let selectors = selectorGroup.split(/,(?![^\(]*\)|[^\[]*\])/);
 		selectors = map(selectors, function(s) {
 			if (/^:scope\b/.test(s)) return s.replace(/^:scope\b/, scopeSelector);
 			else return scopeSelector + ' ' + s;
@@ -1290,20 +1290,20 @@
 		// WARN would need a work around for broken getElementById in IE <= 7
 	}
 
-	var findAll = document$2.querySelectorAll ?
+	let findAll = document$2.querySelectorAll ?
 	function(selector, node, scope, inclusive) {
 		if (!node) node = document$2;
 		if (!node.querySelectorAll) return [];
 		if (scope && !scope.nodeType) scope = node; // `true` but not the scope element
 		return scopeify(function(absSelector) {
-			var result = map(node.querySelectorAll(absSelector));
+			let result = map(node.querySelectorAll(absSelector));
 			if (inclusive && matchesSelector(node, absSelector)) result.unshift(node);
 			return result;
 		}, selector, scope);
 	} :
 	function() { throw Error('findAll() not supported'); };
 
-	var find$1 = document$2.querySelector ?
+	let find$1 = document$2.querySelector ?
 	function(selector, node, scope, inclusive) {
 		if (!node) node = document$2;
 		if (!node.querySelector) return null;
@@ -1325,9 +1325,9 @@
 			if (!refNode2 || refNode2.parentNode !== refNode.parentNode) throw Error('siblings() startNode and stopNode are not siblings');
 		}
 		
-		var nodeList = [];
+		let nodeList = [];
 		if (!refNode || !refNode.parentNode) return nodeList;
-		var node, stopNode, first = refNode.parentNode.firstChild;
+		let node, stopNode, first = refNode.parentNode.firstChild;
 
 		switch (conf) {
 		case 'starting': node = refNode; break;
@@ -1346,7 +1346,7 @@
 		return nodeList;
 	}
 
-	var contains = // WARN `contains()` means contains-or-isSameNode
+	let contains = // WARN `contains()` means contains-or-isSameNode
 	document$2.documentElement.contains && function(node, otherNode) {
 		if (node === otherNode) return true;
 		if (node.contains) return node.contains(otherNode);
@@ -1361,17 +1361,17 @@
 			params = type;
 			type = params.type;
 		}
-		var bubbles = params && 'bubbles' in params ? !!params.bubbles : true;
-		var cancelable = params && 'cancelable' in params ? !!params.cancelable : true;
+		let bubbles = params && 'bubbles' in params ? !!params.bubbles : true;
+		let cancelable = params && 'cancelable' in params ? !!params.cancelable : true;
 		if (typeof type !== 'string') throw Error('trigger() called with invalid event type');
-		var detail = params && params.detail;
-		var event = document$2.createEvent('CustomEvent');
+		let detail = params && params.detail;
+		let event = document$2.createEvent('CustomEvent');
 		event.initCustomEvent(type, bubbles, cancelable, detail);
 		if (params) defaults(event, params);
 		return target.dispatchEvent(event);
 	}
 
-	var managedEvents = [];
+	let managedEvents = [];
 
 	function manageEvent(type) {
 		if (includes(managedEvents, type)) return;
@@ -1383,9 +1383,9 @@
 		}, true);
 	}
 
-	var SUPPORTS_ATTRMODIFIED = (function() {
-		var supported = false;
-		var div = document$2.createElement('div');
+	const SUPPORTS_ATTRMODIFIED = (function() {
+		let supported = false;
+		let div = document$2.createElement('div');
 		div.addEventListener('DOMAttrModified', function(e) { supported = true; }, false);
 		div.setAttribute('hidden', '');
 		return supported;
@@ -1394,11 +1394,11 @@
 	// DOM node visibilitychange implementation and monitoring
 	if (!('hidden' in document$2.documentElement)) { // implement 'hidden' for older browsers
 
-		var head = document$2.head;
+		let head = document$2.head;
 		// NOTE on <=IE8 this needs a styleSheet work-around
-		var style = document$2.createElement('style');
+		let style = document$2.createElement('style');
 
-		var cssText = '*[hidden] { display: none; }\n';
+		let cssText = '*[hidden] { display: none; }\n';
 		style.textContent = cssText;
 
 		head.insertBefore(style, head.firstChild);
@@ -1410,8 +1410,8 @@
 				else this.removeAttribute('hidden');
 
 				// IE9 has a reflow bug. The following forces a reflow. FIXME can we stop suporting IE9
-				var elementDisplayStyle = this.style.display;
-				var computedDisplayStyle = window.getComputedStyle(this, null);
+				let elementDisplayStyle = this.style.display;
+				let computedDisplayStyle = window.getComputedStyle(this, null);
 				this.style.display = computedDisplayStyle;
 				this.style.display = elementDisplayStyle;
 			}
@@ -1420,7 +1420,7 @@
 
 	if (window.MutationObserver) {
 
-		var observer = new MutationObserver(function(mutations, observer) {
+		let observer = new MutationObserver(function(mutations, observer) {
 			forEach(mutations, function(entry) {
 				triggerVisibilityChangeEvent(entry.target);
 			});
@@ -1440,24 +1440,24 @@
 
 	// FIXME this should use observers, not events
 	function triggerVisibilityChangeEvent(target) {
-		var visibilityState = target.hidden ? 'hidden' : 'visible';
+		let visibilityState = target.hidden ? 'hidden' : 'visible';
 		dispatchEvent(target, 'visibilitychange', { bubbles: false, cancelable: false, detail: visibilityState }); // NOTE doesn't bubble to avoid clash with same event on document (and also performance)
 	}
 
 	function isVisible(element) {
-		var closestHidden = closest(element, '[hidden]');
+		let closestHidden = closest(element, '[hidden]');
 		return (!closestHidden);
 	}
 
 
 	function whenVisible(element) { // FIXME this quite possibly causes leaks if closestHidden is removed from document before removeEventListener
 		return new Promise(function(resolve, reject) {
-			var closestHidden = closest(element, '[hidden]');
+			let closestHidden = closest(element, '[hidden]');
 			if (!closestHidden) {
 				resolve();
 				return;
 			}
-			var listener = function(e) {
+			let listener = function(e) {
 				if (e.target.hidden) return;
 				closestHidden.removeEventListener('visibilitychange', listener, false);
 				whenVisible(element).then(resolve);
@@ -1468,7 +1468,7 @@
 
 
 	function insertNode(conf, refNode, node) { // like imsertAdjacentHTML but with a node and auto-adoption
-		var doc = refNode.ownerDocument;
+		let doc = refNode.ownerDocument;
 		if (doc.adoptNode) node = doc.adoptNode(node); // Safari 5 was throwing because imported nodes had been added to a document node
 		switch(conf) {
 
@@ -1489,7 +1489,7 @@
 		case 'empty':
 		case 'contents': 
 			// TODO empty(refNode);
-			var child;
+			let child;
 			while (child = refNode.firstChild) refNode.removeChild(child);
 			refNode.appendChild(node);
 			break;
@@ -1499,8 +1499,8 @@
 
 	function adoptContents(parentNode, doc) {
 		if (!doc) doc = document$2;
-		var frag = doc.createDocumentFragment();
-		var node;
+		let frag = doc.createDocumentFragment();
+		let node;
 		while (node = parentNode.firstChild) frag.appendChild(doc.adoptNode(node));
 		return frag;
 	}
@@ -1525,14 +1525,14 @@
 			// handle IE
 			if (node.readyState) return readyStateLookup[node.readyState];
 
-			var sheet = node.sheet;
+			let sheet = node.sheet;
 
 			// handle webkit
 			if (!sheet) return false;
 
 			try {
 				// Firefox should throw if not loaded or cross-domain
-				var rules = sheet.rules || sheet.cssRules;
+				let rules = sheet.rules || sheet.cssRules;
 				return true;
 			} 
 			catch (error) {
@@ -1567,13 +1567,13 @@
 	}
 
 	const CREATE_DOCUMENT_COPIES_URL = (function() {
-		var doc = document$2.implementation.createHTMLDocument('');
+		let doc = document$2.implementation.createHTMLDocument('');
 		return doc.URL === document$2.URL;
 	})();
 
 	const CLONE_DOCUMENT_COPIES_URL = (function() {
 		try {
-			var doc = document$2.cloneNode(false);
+			let doc = document$2.cloneNode(false);
 			if (doc.URL === document$2.URL) return true;
 		}
 		catch (err) { }
@@ -1586,7 +1586,7 @@
 	function createDocument(srcDoc) { // modern browsers. IE >= 9
 		if (!srcDoc) srcDoc = document$2;
 		// TODO find doctype element??
-		var doc;
+		let doc;
 		if (CREATE_DOCUMENT_WITH_CLONE) { 
 			doc = srcDoc.cloneNode(false);
 		}
@@ -1600,10 +1600,10 @@
 	function createHTMLDocument(title, srcDoc) { // modern browsers. IE >= 9
 		if (!srcDoc) srcDoc = document$2;
 		// TODO find doctype element??
-		var doc;
+		let doc;
 		if (CREATE_DOCUMENT_WITH_CLONE) { 
 			doc = srcDoc.cloneNode(false);
-			var docEl = doc.createElement('html');
+			let docEl = doc.createElement('html');
 			docEl.innerHTML = '<head><title>' + title + '</title></head><body></body>';
 			doc.appendChild(docEl);
 		}
@@ -1614,14 +1614,14 @@
 	}
 
 	function cloneDocument(srcDoc) {
-		var doc = createDocument(srcDoc);
-		var docEl = doc.importNode(srcDoc.documentElement, true);
+		let doc = createDocument(srcDoc);
+		let docEl = doc.importNode(srcDoc.documentElement, true);
 		doc.appendChild(docEl); // NOTE already adopted
 
 		// WARN sometimes IE9/IE10/IE11 doesn't read the content of inserted <style>
 		// NOTE this doesn't seem to matter on IE10+. The following is precautionary
 		forEach(findAll('style', doc), function(node) {
-			var sheet = node.sheet;
+			let sheet = node.sheet;
 			if (!sheet || sheet.cssText == null) return;
 			if (sheet.cssText != '') return;
 			node.textContent = node.textContent;
@@ -1632,13 +1632,13 @@
 
 	function scrollToId(id) { // FIXME this isn't being used
 		if (id) {
-			var el = findId(id);
+			let el = findId(id);
 			if (el) el.scrollIntoView(true);
 		}
 		else window.scroll(0, 0);
 	}
 
-	var readyStateLookup = { // used in domReady() and checkStyleSheets()
+	let readyStateLookup = { // used in domReady() and checkStyleSheets()
 		'uninitialized': false,
 		'loading': false,
 		'interactive': false,
@@ -1646,11 +1646,11 @@
 		'complete': true
 	};
 
-	var domReady = (function() { // WARN this assumes that document.readyState is valid or that content is ready...
+	let domReady = (function() { // WARN this assumes that document.readyState is valid or that content is ready...
 
-	var readyState = document$2.readyState;
-	var loaded = readyState ? readyStateLookup[readyState] : true;
-	var queue = [];
+	let readyState = document$2.readyState;
+	let loaded = readyState ? readyStateLookup[readyState] : true;
+	let queue = [];
 
 	function domReady(fn) {
 		if (typeof fn !== 'function') return;
@@ -1663,7 +1663,7 @@
 		queue.length = 0;
 	}
 
-	var events = {
+	let events = {
 		'DOMContentLoaded': document$2,
 		'load': window
 	};
@@ -1720,7 +1720,7 @@
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
 
-	var document$3 = window.document;
+	let document$3 = window.document;
 
 	/*
 	 WARN: This description comment was from the former scriptQueue implementation.
@@ -1740,13 +1740,13 @@
 		
 	 FIXME scriptQueue.push should also accept functions
 	*/
-	var queue = [],
+	let queue = [],
 		emptying = false;
 
-	var testScript = document$3.createElement('script'),
+	let testScript = document$3.createElement('script'),
 		supportsSync = (testScript.async === true);
 
-	var scriptQueue = {
+	let scriptQueue = {
 
 	push: function(node) {
 	return new Promise(function(resolve, reject) {
@@ -1767,7 +1767,7 @@
 			return;
 		}
 
-		var script = document$3.createElement('script');
+		let script = document$3.createElement('script');
 
 		if (node.src) addListeners(); // WARN must use `node.src` because attrs not copied to `script` yet
 		
@@ -1783,11 +1783,11 @@
 		script.type = 'text/javascript';
 		
 		// enabledFu resolves after script is inserted
-		var enabledFu = Promise.applyTo();
+		let enabledFu = Promise.applyTo();
 		
-		var prev = queue[queue.length - 1], prevScript = prev && prev.script;
+		let prev = queue[queue.length - 1], prevScript = prev && prev.script;
 
-		var triggerFu; // triggerFu allows this script to be enabled, i.e. inserted
+		let triggerFu; // triggerFu allows this script to be enabled, i.e. inserted
 		if (prev) {
 			if (prevScript.hasAttribute('async') || script.src && supportsSync && !script.hasAttribute('async')) triggerFu = prev.enabled;
 			else triggerFu = prev.complete; 
@@ -1796,10 +1796,10 @@
 		
 		triggerFu.then(enable, enable);
 
-		var completeFu = Promise.applyTo();
+		let completeFu = Promise.applyTo();
 		completeFu.then(resolve, reject);
 
-		var current = { script: script, complete: completeFu, enabled: enabledFu };
+		let current = { script: script, complete: completeFu, enabled: enabledFu };
 		queue.push(current);
 		return;
 
@@ -1836,7 +1836,7 @@
 		}
 		
 		function spliceItem(a, item) {
-			for (var n=a.length, i=0; i<n; i++) {
+			for (let n=a.length, i=0; i<n; i++) {
 				if (a[i] !== item) continue;
 				a.splice(i, 1);
 				return;
@@ -1856,7 +1856,7 @@
 			return;
 		}
 		forEach(queue, function(value, i) {
-			var acceptCallback = function() {
+			let acceptCallback = function() {
 				if (queue.length <= 0) {
 					emptying = false;
 					resolve();
@@ -1876,19 +1876,19 @@
 	 Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	*/
 
-	var document$4 = window.document;
+	let document$4 = window.document;
 
-	var sprockets = (function() {
+	let sprockets = (function() {
 	/* FIXME
 		- auto DOM monitoring for node insertion / removal should be a start() option
 		- manual control must allow attached, enteredView, leftView lifecycle management
 		- binding registration must be blocked after sprockets.start()
 	*/
 
-	var sprockets = {};
+	let sprockets = {};
 
 	function attachBinding(definition, element) {
-		var binding;
+		let binding;
 		if (hasData(element)) {
 			binding = getData(element);
 			if (binding.definition !== rule.definition) throw Error('Mismatch between definition and binding already present');
@@ -1903,13 +1903,13 @@
 
 	function enableBinding(element) {
 		if (!hasData(element)) throw Error('No binding attached to element');
-		var binding = getData(element);
+		let binding = getData(element);
 		if (!binding.inDocument) binding.enteredDocumentCallback();
 	}
 
 
-	var Binding = function(definition) {
-		var binding = this;
+	let Binding = function(definition) {
+		let binding = this;
 		binding.definition = definition;
 		binding.object = Object.create(definition.prototype);
 		binding.handlers = definition.handlers ? map(definition.handlers) : [];
@@ -1920,18 +1920,18 @@
 	assign(Binding, {
 
 	getInterface: function(element) {
-		var nodeData = getData(element);
+		let nodeData = getData(element);
 		if (nodeData && nodeData.object) return nodeData;
 	},
 
 	enteredDocumentCallback: function(element) {
-		var binding = Binding.getInterface(element);
+		let binding = Binding.getInterface(element);
 		if (!binding) return;
 		binding.enteredDocumentCallback();
 	},
 
 	leftDocumentCallback: function(element) {
-		var binding = Binding.getInterface(element);
+		let binding = Binding.getInterface(element);
 		if (!binding) return;
 		binding.leftDocumentCallback();
 	},
@@ -1953,50 +1953,50 @@
 	assign(Binding.prototype, {
 
 	attach: function(element) {
-		var binding = this;
-		var definition = binding.definition;
-		var object = binding.object;
+		let binding = this;
+		let definition = binding.definition;
+		let object = binding.object;
 
 		object.element = element; 
 		binding.attachedCallback();
 
 		forEach(binding.handlers, function(handler) {
-			var listener = binding.addHandler(handler); // handler might be ignored ...
+			let listener = binding.addHandler(handler); // handler might be ignored ...
 			if (listener) binding.listeners.push(listener);// ... resulting in an undefined listener
 		});
 	},
 
 	attachedCallback: function() {
-		var binding = this;
-		var definition = binding.definition;
-		var object = binding.object;
+		let binding = this;
+		let definition = binding.definition;
+		let object = binding.object;
 
 		binding.inDocument = false;
 		if (definition.attached) definition.attached.call(object, binding.handlers); // FIXME try/catch
 	},
 
 	enteredDocumentCallback: function() {
-		var binding = this;
-		var definition = binding.definition;
-		var object = binding.object;
+		let binding = this;
+		let definition = binding.definition;
+		let object = binding.object;
 
 		binding.inDocument = true;
 		if (definition.enteredDocument) definition.enteredDocument.call(object);	
 	},
 
 	leftDocumentCallback: function() {
-		var binding = this;
-		var definition = binding.definition;
-		var object = binding.object;
+		let binding = this;
+		let definition = binding.definition;
+		let object = binding.object;
 
 		binding.inDocument = false;
 		if (definition.leftDocument) definition.leftDocument.call(object);	
 	},
 
 	detach: function() {
-		var binding = this;
-		var definition = binding.definition;
-		var object = binding.object;
+		let binding = this;
+		let definition = binding.definition;
+		let object = binding.object;
 
 		forEach(binding.listeners, binding.removeListener, binding);
 		binding.listeners.length = 0;
@@ -2005,27 +2005,27 @@
 	},
 
 	detachedCallback: function() {
-		var binding = this;
-		var definition = binding.definition;
-		var object = binding.object;
+		let binding = this;
+		let definition = binding.definition;
+		let object = binding.object;
 		
 		binding.inDocument = null;
 		if (definition.detached) definition.detached.call(object);	
 	},
 
 	addHandler: function(handler) {
-		var binding = this;
-		var object = binding.object;
-		var element = object.element;
-		var type = handler.type;
-		var capture = (handler.eventPhase == 1); // Event.CAPTURING_PHASE
+		let binding = this;
+		let object = binding.object;
+		let element = object.element;
+		let type = handler.type;
+		let capture = (handler.eventPhase == 1); // Event.CAPTURING_PHASE
 		if (capture) {
 			console.warn('Capture phase for events not supported');
 			return; // FIXME should this convert to bubbling instead??
 		}
 
 		Binding.manageEvent(type);
-		var fn = function(event) {
+		let fn = function(event) {
 			if (fn.normalize) event = fn.normalize(event);
 			try {
 				return handleEvent.call(object, event, handler);
@@ -2042,12 +2042,12 @@
 	},
 
 	removeListener: function(fn) {
-		var binding = this;
-		var object = binding.object;
-		var element = object.element;
-		var type = fn.type;
-		var capture = fn.capture;
-		var target = (element === document$4.documentElement && includes(redirectedWindowEvents, type)) ? window : element; 
+		let binding = this;
+		let object = binding.object;
+		let element = object.element;
+		let type = fn.type;
+		let capture = fn.capture;
+		let target = (element === document$4.documentElement && includes(redirectedWindowEvents, type)) ? window : element;
 		target.removeEventListener(type, fn, capture);	
 	},
 
@@ -2061,14 +2061,14 @@
 	}
 
 	function handleEvent(event, handler) {
-		var bindingImplementation = this;
-		var target = event.target;
-		var current = bindingImplementation.element;
+		let bindingImplementation = this;
+		let target = event.target;
+		let current = bindingImplementation.element;
 		if (!hasData(current)) throw Error('Handler called on non-bound element');
 		if (!matchesEvent(handler, event, true)) return; // NOTE the phase check is below
-		var delegator = current;
+		let delegator = current;
 		if (handler.delegator) {
-			var el = closest(target, handler.delegator, current);
+			let el = closest(target, handler.delegator, current);
 			if (!el) return;
 			delegator = el;
 		}
@@ -2087,13 +2087,13 @@
 		}
 
 		if (handler.action) {
-			var result = handler.action.call(bindingImplementation, event, delegator);
+			let result = handler.action.call(bindingImplementation, event, delegator);
 			if (result === false) event.preventDefault();
 		}
 		return;
 	}
 
-	var EventModules = {};
+	let EventModules = {};
 	EventModules.AllEvents = {};
 	registerModule('FocusEvents', 'focus blur focusin focusout');
 	registerModule('MouseEvents', 'click dblclick mousedown mouseup mouseover mouseout mousemove mousewheel');
@@ -2101,7 +2101,7 @@
 	registerModule('UIEvents', 'load unload abort error select change submit reset resize scroll');
 
 	function registerModule(modName, evTypes) {
-		var mod = {};
+		let mod = {};
 		EventModules[modName] = mod;
 		forEach(words(evTypes), registerEvent, mod);
 	}
@@ -2110,16 +2110,16 @@
 		this[evType] = true;
 	}
 
-	var matchesEvent = function(handler, event, ignorePhase) {
-		var xblMouseEvents = EventModules.MouseEvents;
-		var xblKeyboardEvents = EventModules.KeyboardEvents;
+	let matchesEvent = function(handler, event, ignorePhase) {
+		let xblMouseEvents = EventModules.MouseEvents;
+		let xblKeyboardEvents = EventModules.KeyboardEvents;
 
 		if (event.type != handler.type) return false;
 
 		// phase
 		if (!ignorePhase && !phaseMatchesEvent(handler.eventPhase, event)) return false;
 		
-		var evType = event.type;
+		let evType = event.type;
 
 		// MouseEvents
 		if (evType in xblMouseEvents) { // FIXME needs testing. Bound to be cross-platform issues still
@@ -2127,7 +2127,7 @@
 				if (!includes(handler.button, event.button) == -1) return false;
 			}
 			if (handler.clickCount && handler.clickCount.length) { 
-				var count = 1;
+				let count = 1;
 				// if ('dblclick' == event.type) count = 2;
 				if ('click' == event.type) count = (event.detail) ? event.detail : 1;
 				if (!includes(handler.clickCount, count)) return false;
@@ -2139,13 +2139,13 @@
 
 		// KeyboardEvents
 		// NOTE some of these are non-standard
-		var ourKeyIdentifiers = {
+		let ourKeyIdentifiers = {
 			Backspace: 'U+0008', Delete: 'U+007F', Escape: 'U+001B', Space: 'U+0020', Tab: 'U+0009'
 		};
 
 		if (evType in xblKeyboardEvents) {
 			if (handler.key) {
-				var keyId = event.keyIdentifier;
+				let keyId = event.keyIdentifier;
 				if (/^U\+00....$/.test(keyId)) { // TODO Needed for Safari-2. It would be great if this test could be done elsewhere
 					keyId = keyId.replace(/^U\+00/, 'U+');
 				}
@@ -2161,25 +2161,25 @@
 		return true;
 	};
 
-	var modifiersMatchEvent = function(modifiers, event) {
+	let modifiersMatchEvent = function(modifiers, event) {
 		// TODO comprehensive modifiers list
 		// event.getModifierState() -> evMods
 		// Need to account for any positives
 		// Fields are set to -1 when accounted for
-		var evMods = {
+		let evMods = {
 			control: event.ctrlKey,
 			shift: event.shiftKey,
 			alt: event.altKey,
 			meta: event.metaKey
 		};
 
-		var evMods_any = event.ctrlKey || event.shiftKey || event.altKey || event.metaKey;
+		let evMods_any = event.ctrlKey || event.shiftKey || event.altKey || event.metaKey;
 
-		var any = false;
+		let any = false;
 
 		if (modifiers)	{
-			for (var i=0, n=modifiers.length; i<n; i++) {
-				var modifier = modifiers[i];
+			for (let i=0, n=modifiers.length; i<n; i++) {
+				let modifier = modifiers[i];
 				switch (modifier.key) {
 					case 'none':
 						if (evMods_any) return false;
@@ -2190,7 +2190,7 @@
 						break;
 		
 					default:
-						var active = evMods[modifier.key];
+						let active = evMods[modifier.key];
 						switch (modifier.condition) {
 							case -1:
 								if (active) return false;
@@ -2210,16 +2210,16 @@
 		if (any) return true;
 		
 		// Fail if any positive modifiers not accounted for
-		for (var key in evMods) {
+		for (let key in evMods) {
 			if (evMods[key] > 0) return false;
 		}
 		return true;
 	};
 
-	var isPrototypeOf = {}.isPrototypeOf ?
+	let isPrototypeOf = {}.isPrototypeOf ?
 	function(prototype, object) { return prototype.isPrototypeOf(object); } :
 	function(prototype, object) {
-		for (var current=object.__proto__; current; current=current.__proto__) if (current === prototype) return true;
+		for (let current=object.__proto__; current; current=current.__proto__) if (current === prototype) return true;
 		return false;
 	};
 
@@ -2240,27 +2240,27 @@
 	}
 
 
-	var bindingRules = sprockets.rules = [];
+	let bindingRules = sprockets.rules = [];
 
 	function findAllBindees(root, bExcludeRoot) {
-		var selector = map(bindingRules, function(rule) { return rule.selector; })
+		let selector = map(bindingRules, function(rule) { return rule.selector; })
 			.join(', ');
-		var result = findAll(selector, root);
+		let result = findAll(selector, root);
 		if (!bExcludeRoot && matches(root, selector)) result.unshift(root);
 		return result;
 	}
 
-	var started = false;
-	var manualDOM = false;
+	let started = false;
+	let manualDOM = false;
 
 	assign(sprockets, {
 
 	registerElement: function(tagName, defn) { // FIXME test tagName
 		if (started) throw Error('sprockets management already started');
 		if (defn.rules) console.warn('registerElement() does not support rules. Try registerComposite()');
-		var bindingDefn = new BindingDefinition(defn);
-		var selector = tagName + ', [is=' + tagName + ']'; // TODO why should @is be supported??
-		var rule = new BindingRule(selector, bindingDefn);
+		let bindingDefn = new BindingDefinition(defn);
+		let selector = tagName + ', [is=' + tagName + ']'; // TODO why should @is be supported??
+		let rule = new BindingRule(selector, bindingDefn);
 		bindingRules.push(rule);
 		return rule;
 	},
@@ -2276,11 +2276,11 @@
 	insertNode: function(conf, refNode, node) {
 		if (!started) throw Error('sprockets management has not started yet');
 		if (!manualDOM) throw Error('Must not use sprockets.insertNode: auto DOM monitoring');
-		var doc = refNode.ownerDocument;
+		let doc = refNode.ownerDocument;
 		if (doc !== document$4 || !contains(document$4, refNode)) throw Error('sprockets.insertNode must insert into `document`');
 		if (doc.adoptNode) node = doc.adoptNode(node); // Safari 5 was throwing because imported nodes had been added to a document node
 
-		var nodes = [ node ];
+		let nodes = [ node ];
 		if (node.nodeType === 11) nodes = map(node.childNodes);
 
 		switch(conf) {
@@ -2290,8 +2290,8 @@
 		case 'beforeend': refNode.appendChild(node); break;
 
 		case 'replace': 
-			var parent = refNode.parentNode;
-			var next = refNode.nextSibling;
+			let parent = refNode.parentNode;
+			let next = refNode.nextSibling;
 			parent.removeChild(refNode); // TODO refactor?? these two lines ...
 			nodeRemoved(refNode); // ... are equivalent to removeNode()
 			if (next) parent.insertBefore(node, next);
@@ -2309,7 +2309,7 @@
 	removeNode: function(node) {
 		if (!started) throw Error('sprockets management has not started yet');
 		if (!manualDOM) throw Error('Must not use sprockets.insertNode: auto DOM monitoring');
-		var doc = node.ownerDocument;
+		let doc = node.ownerDocument;
 		if (doc !== document$4 || !contains(document$4, node)) throw Error('sprockets.removeNode must remove from `document`');
 		node.parentNode.removeChild(node);
 		nodeRemoved(node);
@@ -2319,16 +2319,16 @@
 
 	});
 
-	var nodeInserted = function(node) { // NOTE called AFTER node inserted into document
+	let nodeInserted = function(node) { // NOTE called AFTER node inserted into document
 		if (!started) throw Error('sprockets management has not started yet');
 		if (node.nodeType !== 1) return;
 
-		var bindees = findAllBindees(node);
-		var composites = [];
+		let bindees = findAllBindees(node);
+		let composites = [];
 		forEach(bindees, function(el) {
 			some(bindingRules, function(rule) {
 				if (!matches(el, rule.selector)) return false;
-				var binding = attachBinding(rule.definition, el);
+				let binding = attachBinding(rule.definition, el);
 				if (binding && binding.rules) composites.push(el);
 				return true;
 			});
@@ -2339,7 +2339,7 @@
 		});
 
 
-		var composite = sprockets.getComposite(node);
+		let composite = sprockets.getComposite(node);
 		if (composite) applyCompositedRules(node, composite);
 
 		while (composite = composites.shift()) applyCompositedRules(composite);
@@ -2348,27 +2348,27 @@
 			
 		function applyCompositedRules(node, composite) {
 			if (!composite) composite = node;
-			var rules = getRules(composite);
+			let rules = getRules(composite);
 			if (rules.length <= 0) return;
 
-			var walker = createCompositeWalker(node, false); // don't skipRoot
-			var el;
+			let walker = createCompositeWalker(node, false); // don't skipRoot
+			let el;
 			while (el = walker.nextNode()) {
 				forEach(rules, function(rule) {
-					var selector = rule.selector; // FIXME absolutizeSelector??
+					let selector = rule.selector; // FIXME absolutizeSelector??
 					if (!matches(el, selector)) return;
-					var binding = attachBinding(rule.definition, el);
+					let binding = attachBinding(rule.definition, el);
 					rule.callback.call(binding.object, el);
 				});
 			}
 		}
 		
 		function getRules(composite) { // buffer uses unshift so LIFO
-			var rules = [];
-			var binding = getData(composite);
+			let rules = [];
+			let binding = getData(composite);
 			forEach(binding.rules, function(rule) {
 				if (!rule.callback) return;
-				var clonedRule = assign({}, rule);
+				let clonedRule = assign({}, rule);
 				clonedRule.composite = composite;
 				rules.unshift(clonedRule);
 			});
@@ -2377,22 +2377,22 @@
 		
 	};
 
-	var nodeRemoved = function(node) { // NOTE called AFTER node removed document
+	let nodeRemoved = function(node) { // NOTE called AFTER node removed document
 		if (!started) throw Error('sprockets management has not started yet');
 		if (node.nodeType !== 1) return;
 
 		// TODO leftComponentCallback. Might be hard to implement *after* node is removed
 		// FIXME the following logic maybe completely wrong
-		var nodes = findAll('*', node);
+		let nodes = findAll('*', node);
 		nodes.unshift(node);
 		forEach(nodes, Binding.leftDocumentCallback);
 	};
 
 	// FIXME this auto DOM Monitoring could have horrible performance for DOM sorting operations
 	// It would be nice to have a list of moved nodes that could potentially be ignored
-	var observe = (window.MutationObserver) ?
+	let observe = (window.MutationObserver) ?
 	function(onInserted, onRemoved) {
-		var observer = new MutationObserver(function(mutations, observer) {
+		let observer = new MutationObserver(function(mutations, observer) {
 			if (!started) return;
 			forEach(mutations, function(record) {
 				if (record.type !== 'childList') return;
@@ -2423,8 +2423,8 @@
 	};
 
 
-	var SprocketDefinition = function(prototype) {
-		var constructor = function(element) {
+	let SprocketDefinition = function(prototype) {
+		let constructor = function(element) {
 			return sprockets.cast(element, constructor);
 		};
 		constructor.prototype = prototype;
@@ -2435,8 +2435,8 @@
 	assign(sprockets, {
 
 	registerSprocket: function(selector, definition, callback) { // WARN this can promote any element into a composite
-		var rule = {};
-		var composite;
+		let rule = {};
+		let composite;
 		if (typeof selector === 'string') {
 			assign(rule, {
 				selector: selector
@@ -2448,12 +2448,12 @@
 			composite = selector.composite;
 			delete rule.composite;
 		}
-		var nodeData = getData(composite); // NOTE nodeData should always be a binding
+		let nodeData = getData(composite); // NOTE nodeData should always be a binding
 		if (!nodeData) {
 			nodeData = {};
 			setData(composite, nodeData);
 		}
-		var nodeRules = nodeData.rules;
+		let nodeRules = nodeData.rules;
 		if (!nodeRules) nodeRules = nodeData.rules = [];
 		rule.definition = definition;
 		rule.callback = callback;
@@ -2465,19 +2465,19 @@
 	},
 
 	registerComposite: function(tagName, definition) {
-		var defn = assign({}, definition);
-		var rules = defn.rules;
+		let defn = assign({}, definition);
+		let rules = defn.rules;
 		delete defn.rules;
 		if (!rules) console.warn('registerComposite() called without any sprocket rules. Try registerElement()');
-		var onattached = defn.attached;
+		let onattached = defn.attached;
 		defn.attached = function() {
-			var object = this;
+			let object = this;
 			if (rules) forEach(rules, function(rule) {
-				var selector = {
+				let selector = {
 					composite: object.element
 				};
-				var definition = {};
-				var callback;
+				let definition = {};
+				let callback;
 				if (Array.isArray(rule)) {
 					selector.selector = rule[0];
 					definition = rule[1];
@@ -2496,12 +2496,12 @@
 	},
 
 	registerComponent: function(tagName, sprocket, extras) {
-		var defn = { prototype: sprocket.prototype };
+		let defn = { prototype: sprocket.prototype };
 		if (extras) {
 			defn.handlers = extras.handlers;
 			if (extras.sprockets) forEach(extras.sprockets, function(oldRule) {
 				if (!defn.rules) defn.rules = [];
-				var rule = {
+				let rule = {
 					selector: oldRule.matches,
 					definition: oldRule.sprocket,
 					callback: oldRule.enteredComponent
@@ -2515,10 +2515,10 @@
 	},
 
 	evolve: function(base, properties) {
-		var prototype = Object.create(base.prototype);
-		var sub = new SprocketDefinition(prototype);
-		var baseProperties = base.prototype.__properties__ || {};
-		var subProperties = prototype.__properties__ = {};
+		let prototype = Object.create(base.prototype);
+		let sub = new SprocketDefinition(prototype);
+		let baseProperties = base.prototype.__properties__ || {};
+		let subProperties = prototype.__properties__ = {};
 		forOwn(baseProperties, function(desc, name) {
 			subProperties[name] = Object.create(desc);
 		});
@@ -2527,12 +2527,12 @@
 	},
 
 	defineProperties: function(sprocket, properties) {
-		var prototype = sprocket.prototype;
-		var definition = prototype.__properties__ || (prototype.__properties__ = {});
+		let prototype = sprocket.prototype;
+		let definition = prototype.__properties__ || (prototype.__properties__ = {});
 		forOwn(properties, function(desc, name) {
 			switch (typeof desc) {
 			case 'object':
-				var propDesc = definition[name] || (definition[name] = {});
+				let propDesc = definition[name] || (definition[name] = {});
 				assign(propDesc, desc);
 				Object.defineProperty(prototype, name, {
 					get: function() { throw Error('Attempt to get an ARIA property'); },
@@ -2551,42 +2551,42 @@
 	},
 
 	_matches: function(element, sprocket, rule) { // internal utility method which is passed a "cached" rule
-		var binding = Binding.getInterface(element);
+		let binding = Binding.getInterface(element);
 		if (binding) return prototypeMatchesSprocket(binding.object, sprocket);
 		if (rule && matches(element, rule.selector)) return true; // TODO should make rules scoped by rule.composite
 		return false;
 	},
 
 	matches: function(element, sprocket, inComposite) {
-		var composite;
+		let composite;
 		if (inComposite) {
 			composite = sprockets.getComposite(element);
 			if (!composite) return false;
 		}
-		var rule = getMatchingSprocketRule(element.parentNode, sprocket, inComposite);
+		let rule = getMatchingSprocketRule(element.parentNode, sprocket, inComposite);
 		return sprockets._matches(element, sprocket, rule);
 	},
 
 	closest: function(element, sprocket, inComposite) {
-		var composite;
+		let composite;
 		if (inComposite) {
 			composite = sprockets.getComposite(element);
 			if (!composite) return;
 		}
-		var rule = getMatchingSprocketRule(element.parentNode, sprocket, inComposite);
-		for (var node=element; node && node.nodeType === 1; node=node.parentNode) {
+		let rule = getMatchingSprocketRule(element.parentNode, sprocket, inComposite);
+		for (let node=element; node && node.nodeType === 1; node=node.parentNode) {
 			if (sprockets._matches(node, sprocket, rule)) return node;
 			if (node === composite) return;
 		}
 	},
 
 	findAll: function(element, sprocket) { // FIXME this search is blocked by descendant composites (scopes). Is this appropriate?
-		var nodeList = [];
-		var rule = getMatchingSprocketRule(element, sprocket);
+		let nodeList = [];
+		let rule = getMatchingSprocketRule(element, sprocket);
 		if (!rule) return nodeList;
-		var walker = createCompositeWalker(element, true); // skipRoot
+		let walker = createCompositeWalker(element, true); // skipRoot
 		
-		var node;
+		let node;
 		while (node = walker.nextNode()) {
 			if (matches(node, rule.selector)) nodeList.push(node);
 		}
@@ -2594,11 +2594,11 @@
 	},
 
 	find: function(element, sprocket) { // FIXME this search is blocked by descendant composites (scopes). Is this appropriate?
-		var rule = getMatchingSprocketRule(element, sprocket);
+		let rule = getMatchingSprocketRule(element, sprocket);
 		if (!rule) return null;
-		var walker = createCompositeWalker(element, true); // skipRoot
+		let walker = createCompositeWalker(element, true); // skipRoot
 		
-		var node;
+		let node;
 		while (node = walker.nextNode()) {
 			if (matches(node, rule.selector)) return node;
 		}
@@ -2606,29 +2606,29 @@
 	},
 
 	cast: function(element, sprocket) {
-		var object = sprockets.getInterface(element);
+		let object = sprockets.getInterface(element);
 		if (prototypeMatchesSprocket(object, sprocket)) return object;
 		throw Error('Attached sprocket is not compatible');
 	},
 
 	getInterface: function(element) {
-		var binding = Binding.getInterface(element);
+		let binding = Binding.getInterface(element);
 		if (binding) return binding.object;
-		var rule = getSprocketRule(element);
+		let rule = getSprocketRule(element);
 		if (!rule) 	throw Error('No sprocket declared'); // WARN should never happen - should be a universal fallback
-		var binding = attachBinding(rule.definition, element);
+		binding = attachBinding(rule.definition, element);
 		return binding.object;
 	},
 
 	isComposite: function(node) {
 		if (!hasData(node)) return false;
-		var nodeData = getData(node);
+		let nodeData = getData(node);
 		if (!nodeData.rules) return false;
 		return true;
 	},
 
 	getComposite: function(element) { // WARN this can return `document`. Not sure if that should count
-		for (var node=element; node; node=node.parentNode) {
+		for (let node=element; node; node=node.parentNode) {
 			if (sprockets.isComposite(node)) return node;
 		}
 	}
@@ -2636,16 +2636,16 @@
 	});
 
 	function getSprocketRule(element) {
-		var sprocketRule;
-		var composite = sprockets.getComposite(element);
+		let sprocketRule;
+		let composite = sprockets.getComposite(element);
 		sprocketRule = getRuleFromComposite(composite, element);
 		if (sprocketRule) return sprocketRule;
 		return getRuleFromComposite(document$4, element);
 	}
 
 	function getRuleFromComposite(composite, element) {
-		var sprocketRule;
-		var nodeData = getData(composite);
+		let sprocketRule;
+		let nodeData = getData(composite);
 		some(nodeData.rules, function(rule) {
 			if (!matches(element, rule.selector)) return false; // TODO should be using relative selector
 			sprocketRule = { composite: composite };
@@ -2656,16 +2656,16 @@
 	}
 
 	function getMatchingSprocketRule(element, sprocket, inComposite) {
-		var sprocketRule;
-		var composite = sprockets.getComposite(element);
+		let sprocketRule;
+		let composite = sprockets.getComposite(element);
 		sprocketRule = getMatchingRuleFromComposite(composite, sprocket);
 		if (inComposite || sprocketRule) return sprocketRule;
 		return getMatchingRuleFromComposite(document$4, sprocket);
 	}
 
 	function getMatchingRuleFromComposite(composite, sprocket) {
-		var sprocketRule;
-		var nodeData = getData(composite);
+		let sprocketRule;
+		let nodeData = getData(composite);
 		some(nodeData.rules, function(rule) {
 			if (typeof sprocket === 'string') {
 				if (rule.definition.prototype.role !== sprocket) return false;
@@ -2698,7 +2698,7 @@
 		}
 	}
 
-	var basePrototype = {};
+	let basePrototype = {};
 	sprockets.Base = new SprocketDefinition(basePrototype); // NOTE now we can extend basePrototype
 
 	return sprockets;
@@ -2709,7 +2709,7 @@
 	/* Extend BaseSprocket.prototype */
 	(function() {
 
-	var Base = sprockets.Base;
+	let Base = sprockets.Base;
 
 	assign(Base.prototype, {
 
@@ -2721,42 +2721,42 @@
 	contains: function(otherNode) { return contains(this.element, otherNode); },
 
 	attr: function(name, value) {
-		var element = this.element;
+		let element = this.element;
 		if (typeof value === 'undefined') return element.getAttribute(name);
 		if (value == null) element.removeAttribute(name);
 		else element.setAttribute(name, value);
 	},
 	hasClass: function(token) {
-		var element = this.element;
-		var text = element.getAttribute('class');
+		let element = this.element;
+		let text = element.getAttribute('class');
 		if (!text) return false;
 		return includes(words(text), token);
 	},
 	addClass: function(token) {
-		var element = this.element;
-		var text = element.getAttribute('class');
+		let element = this.element;
+		let text = element.getAttribute('class');
 		if (!text) {
 			element.setAttribute('class', token);
 			return;
 		}
 		if (includes(words(text), token)) return;
-		var n = text.length,
+		let n = text.length,
 			space = (n && text.charAt(n-1) !== ' ') ? ' ' : '';
 		text += space + token;
 		element.setAttribute('class', text);
 	},
 	removeClass: function(token) {
-		var element = this.element;
-		var text = element.getAttribute('class');
+		let element = this.element;
+		let text = element.getAttribute('class');
 		if (!text) return;
-		var prev = words(text);
-		var next = [];
+		let prev = words(text);
+		let next = [];
 		forEach(prev, function(str) { if (str !== token) next.push(str); });
 		if (prev.length === next.length) return;
 		element.setAttribute('class', next.join(' '));
 	},
 	toggleClass: function(token, force) {
-		var found = this.hasClass(token);
+		let found = this.hasClass(token);
 		if (found) {
 			if (force) return true;
 			this.removeClass(token);
@@ -2769,8 +2769,8 @@
 		}
 	},
 	css: function(name, value) {
-		var element = this.element;
-		var isKebabCase = (name.indexOf('-') >= 0);
+		let element = this.element;
+		let isKebabCase = (name.indexOf('-') >= 0);
 		if (typeof value === 'undefined') return isKebabCase ? element.style.getPropertyValue(name) : element.style[name];
 		if (value == null || value === '') {
 			if (isKebabCase) element.style.removeProperty(name);
@@ -2790,7 +2790,7 @@
 	});
 
 	// Element.prototype.hidden and visibilitychange event
-	var Element = window.Element || window.HTMLElement;
+	let Element = window.Element || window.HTMLElement;
 
 	Object.defineProperty(Element.prototype, '$', {
 		get: function() { return sprockets.getInterface(this); }
@@ -2800,21 +2800,21 @@
 
 	(function() {
 
-	var ariaProperties = { // TODO this lookup is only for default values
+	let ariaProperties = { // TODO this lookup is only for default values
 		hidden: false,
 		selected: false,
 		expanded: true
 	};
 
-	var Base = sprockets.Base;
+	let Base = sprockets.Base;
 
-	var ARIA = sprockets.evolve(Base, {
+	let ARIA = sprockets.evolve(Base, {
 
 	role: 'roletype',
 
 	aria: function(name, value) {
-		var element = this.element;
-		var defn = ariaProperties[name];
+		let element = this.element;
+		let defn = ariaProperties[name];
 		if (defn == null) throw Error('No such aria property: ' + name);
 
 		if (name === 'hidden') {
@@ -2824,10 +2824,10 @@
 			return;
 		}
 		
-		var ariaName = 'aria-' + name;
-		var type = typeof defn;
+		let ariaName = 'aria-' + name;
+		let type = typeof defn;
 		if (typeof value === 'undefined') {
-			var result = element.getAttribute(ariaName);
+			let result = element.getAttribute(ariaName);
 			switch(type) {
 			case 'string': default: return result;
 			case 'boolean': return result === 'false' ? false : result == null ? undefined : true;
@@ -2839,24 +2839,24 @@
 				element.setAttribute(ariaName, value);
 				break;
 			case 'boolean':
-				var bool = value === 'false' ? 'false' : value === false ? 'false' : 'true';
+				let bool = value === 'false' ? 'false' : value === false ? 'false' : 'true';
 				element.setAttribute(ariaName, bool);
 				break;
 		}
 	},
 
 	ariaCan: function(name, value) {
-		var desc = this.__properties__[name];
+		let desc = this.__properties__[name];
 		if (!desc) throw Error('Property not defined: ' + name);
 		if (desc.type !== 'boolean' || desc.can && !desc.can.call(this)) return false;
 		return true;
 	},
 
 	ariaToggle: function(name, value) {
-		var desc = this.__properties__[name];
+		let desc = this.__properties__[name];
 		if (!desc) throw Error('Property not defined: ' + name);
 		if (desc.type !== 'boolean' || desc.can && !desc.can.call(this)) throw Error('Property can not toggle: ' + name);
-		var oldValue = desc.get.call(this);
+		let oldValue = desc.get.call(this);
 		
 		if (typeof value === 'undefined') desc.set.call(this, !oldValue);
 		else desc.set.call(this, !!value);
@@ -2864,20 +2864,20 @@
 	},
 
 	ariaGet: function(name) {
-		var desc = this.__properties__[name];
+		let desc = this.__properties__[name];
 		if (!desc) throw Error('Property not defined: ' + name);
 		return desc.get.call(this); // TODO type and error handling
 	},
 
 	ariaSet: function(name, value) {
-		var desc = this.__properties__[name];
+		let desc = this.__properties__[name];
 		if (!desc) throw Error('Property not defined: ' + name);
 		return desc.set.call(this, value); // TODO type and error handling
 	}
 
 	});
 
-	var RoleType = sprockets.evolve(ARIA, {
+	let RoleType = sprockets.evolve(ARIA, {
 
 	hidden: {
 		type: 'boolean',
@@ -2892,7 +2892,7 @@
 	sprockets.RoleType = RoleType;
 	sprockets.register('*', RoleType);
 
-	var Element = window.Element || window.HTMLElement;
+	let Element = window.Element || window.HTMLElement;
 
 	defaults(Element.prototype, { // NOTE this assumes that the declared sprocket for every element is derived from ARIA
 
@@ -2939,7 +2939,7 @@
 
 	// TODO should this be under Meeko.sprockets??
 
-	var controllers = {
+	let controllers = {
 
 	values: {},
 
@@ -2963,7 +2963,7 @@
 	        if (!this.has(name)) throw name + ' is not a registered controller';
 	        if (value === false || value == null) value = [];
 	        else if (typeof value === 'string' || !('length' in value)) value = [ value ];
-	        var oldValue = this.values[name];
+	        let oldValue = this.values[name];
 	        if (difference(value, oldValue).length <= 0) return;
 	        this.values[name] = value;
 	        forEach(this.listeners[name], function(listener) {
@@ -2974,7 +2974,7 @@
 	listen: function(name, listener) {
 	        if (!this.has(name)) throw name + ' is not a registered controller';
 	        this.listeners[name].push(listener);
-	        var value = this.values[name];
+	        let value = this.values[name];
 	        Task.asap(function() { listener(value); });
 	}
 
@@ -2984,10 +2984,10 @@
 		HTML_IN_DOMPARSER indicates if DOMParser supports 'text/html' parsing. Historically only Firefox did.
 		Cross-browser support coming? https://developer.mozilla.org/en-US/docs/Web/API/DOMParser#Browser_compatibility
 	*/
-	var HTML_IN_DOMPARSER = (function() {
+	const HTML_IN_DOMPARSER = (function() {
 
 		try {
-			var doc = (new DOMParser).parseFromString('', 'text/html');
+			let doc = (new DOMParser).parseFromString('', 'text/html');
 			return !!doc;
 		}
 		catch(err) { return false; }
@@ -3004,7 +3004,7 @@
 	*/
 	function normalize(doc, details) { 
 
-		var baseURL = URL(details.url);
+		let baseURL = URL(details.url);
 
 		forEach(findAll('style', doc.body), function(node) {
 			if (node.hasAttribute('scoped')) return; // ignore
@@ -3013,10 +3013,10 @@
 		
 		forEach(findAll('style', doc), function(node) {
 			// TODO the following rewrites url() property values but isn't robust
-			var text = node.textContent;
-			var replacements = 0;
+			let text = node.textContent;
+			let replacements = 0;
 			text = text.replace(/\burl\(\s*(['"]?)([^\r\n]*)\1\s*\)/ig, function(match, quote, url) {
-					var absURL = baseURL.resolve(url);
+					let absURL = baseURL.resolve(url);
 					if (absURL === url) return match;
 					replacements++;
 					return "url(" + quote + absURL + quote + ")";
@@ -3030,21 +3030,21 @@
 	/*
 		resolveAll() resolves all URL attributes
 	*/
-	var urlAttributes$1 = URL.attributes;
+	let urlAttributes$1 = URL.attributes;
 
 	function resolveAll(doc, baseURL) {
 
 		return Promise.pipe(null, [
 
 		function () {
-			var selector = Object.keys(urlAttributes$1).join(', ');
+			let selector = Object.keys(urlAttributes$1).join(', ');
 			return findAll(selector, doc);
 		},
 
 		function(nodeList) {
 			return Promise.reduce(null, nodeList, function(dummy, el) {
-				var tag = getTagName(el);
-				var attrList = urlAttributes$1[tag];
+				let tag = getTagName(el);
+				let attrList = urlAttributes$1[tag];
 				forOwn(attrList, function(attrDesc, attrName) {
 					if (!el.hasAttribute(attrName)) return;
 					attrDesc.resolve(el, baseURL);
@@ -3065,7 +3065,7 @@
 		return Promise.pipe(null, [
 			
 		function() {
-			var doc = (new DOMParser).parseFromString(html, 'text/html');
+			let doc = (new DOMParser).parseFromString(html, 'text/html');
 			return normalize(doc, details);
 		}
 		
@@ -3077,13 +3077,13 @@
 		return Promise.pipe(null, [
 			
 		function() {
-			var doc = createHTMLDocument('');
-			var docElement = doc.documentElement;
+			let doc = createHTMLDocument('');
+			let docElement = doc.documentElement;
 			docElement.innerHTML = html;
-			var m = html.match(/<html(?=\s|>)(?:[^>]*)>/i); // WARN this assumes there are no comments containing '<html' and no attributes containing '>'.
-			var div = document.createElement('div');
+			let m = html.match(/<html(?=\s|>)(?:[^>]*)>/i); // WARN this assumes there are no comments containing '<html' and no attributes containing '>'.
+			let div = document.createElement('div');
 			div.innerHTML = m[0].replace(/^<html/i, '<div');
-			var htmlElement = div.firstChild;
+			let htmlElement = div.firstChild;
 			copyAttributes(docElement, htmlElement);
 			return doc;
 		},
@@ -3104,9 +3104,9 @@
 	/*
 		HTML_IN_XHR indicates if XMLHttpRequest supports HTML parsing
 	*/
-	var HTML_IN_XHR = (function() { // FIXME more testing, especially Webkit
+	const HTML_IN_XHR = (function() { // FIXME more testing, especially Webkit
 		if (!window.XMLHttpRequest) return false;
-		var xhr = new XMLHttpRequest;
+		let xhr = new XMLHttpRequest;
 		if (!('responseType' in xhr)) return false;
 		if (!('response' in xhr)) return false;
 		xhr.open('get', document.URL, true);
@@ -3128,11 +3128,11 @@
 	})();
 
 
-	var httpProxy = (function() {
+	let httpProxy = (function() {
 
-		var methods = words('get'); // TODO words('get post put delete');
-		var responseTypes = words('document'); // TODO words('document json text');
-		var defaultInfo = {
+		let methods = words('get'); // TODO words('get post put delete');
+		let responseTypes = words('document'); // TODO words('document json text');
+		let defaultInfo = {
 			method: 'get',
 			responseType: 'document'
 		};
@@ -3140,12 +3140,12 @@
 	// NOTE cache, etc is currently used only for landing page
 	// TODO test that cacheAdd/Lookup doesn't trigger new XHR when url already pending
 	// TODO an API like ServiceWorker may be more appropriate
-		var cache = [];
+		let cache = [];
 
 		function cacheAdd(request, response) {
-			var rq = defaults({}, request);
+			let rq = defaults({}, request);
 
-			var entry = {
+			let entry = {
 				invalid: false,
 				request: rq
 			};
@@ -3163,12 +3163,12 @@
 		}
 
 		function cacheLookup(request) {
-			var entry = find(cache, function (entry) {
+			let entry = find(cache, function (entry) {
 				if (!cacheMatch(request, entry)) return false;
 				return true;
 			});
 			if (!(entry && entry.response)) return;
-			var response = entry.response;
+			let response = entry.response;
 			if (Promise.isPromise(response)) return response.then(cloneResponse);
 			else return cloneResponse(response);
 		}
@@ -3181,21 +3181,21 @@
 		}
 
 		function cloneResponse(response) {
-			var resp = defaults({}, response);
+			let resp = defaults({}, response);
 			resp.document = cloneDocument(response.document); // TODO handle other response types
 			return resp;
 		}
 
 
-		var httpProxy = {
+		let httpProxy = {
 
 			HTML_IN_XHR: HTML_IN_XHR,
 
 			add: function (response) { // NOTE this is only for the landing page
-				var url = response.url;
+				let url = response.url;
 				if (!url) throw Error('Invalid url in response object');
 				if (!includes(responseTypes, response.type)) throw Error('Invalid type in response object');
-				var request = {
+				let request = {
 					url: response.url
 				};
 				defaults(request, defaultInfo);
@@ -3213,7 +3213,7 @@
 			},
 
 			load: function (url, requestInfo) {
-				var info = {
+				let info = {
 					url: url
 				};
 				if (requestInfo) defaults(info, requestInfo);
@@ -3225,8 +3225,8 @@
 
 		};
 
-		var request = function (info) {
-			var method = lc(info.method);
+		let request = function (info) {
+			let method = lc(info.method);
 			switch (method) {
 				case 'post':
 					throw Error('POST not supported'); // FIXME proper error handling
@@ -3234,7 +3234,7 @@
 					return doRequest(info);
 					break;
 				case 'get':
-					var response = cacheLookup(info);
+					let response = cacheLookup(info);
 					if (response) return Promise.resolve(response);
 					return doRequest(info)
 						.then(function (response) {
@@ -3248,12 +3248,12 @@
 			}
 		};
 
-		var doRequest = function (info) {
+		let doRequest = function (info) {
 			return new Promise(function (resolve, reject) {
-				var method = info.method;
-				var url = info.url;
-				var sendText = info.body; // FIXME not-implemented
-				var xhr = new XMLHttpRequest;
+				let method = info.method;
+				let url = info.url;
+				let sendText = info.body; // FIXME not-implemented
+				let xhr = new XMLHttpRequest;
 				xhr.onreadystatechange = onchange;
 				xhr.open(method, url, true);
 				if (HTML_IN_XHR) {
@@ -3267,7 +3267,7 @@
 
 				function onchange() { // FIXME rewrite this to use onload/onerror/onabort/ontimeout
 					if (xhr.readyState != 4) return;
-					var protocol = new URL(url).protocol;
+					let protocol = new URL(url).protocol;
 					switch (protocol) {
 						case 'http:':
 						case 'https:':
@@ -3298,14 +3298,14 @@
 				}
 
 				function onload() {
-					var result = handleResponse(xhr, info);
+					let result = handleResponse(xhr, info);
 					resolve(result);
 				}
 			});
 		};
 
 		function handleResponse(xhr, info) { // TODO handle info.responseType
-			var response = {
+			let response = {
 				url: info.url,
 				type: info.responseType,
 				status: xhr.status,
@@ -3330,14 +3330,14 @@
 	})();
 
 	// wrapper for `history` mostly to provide locking around state-updates and throttling of popstate events
-	var historyManager = (function() {
+	let historyManager = (function() {
 
-	var historyManager = {};
+	let historyManager = {};
 
-	var stateTag = 'HyperFrameset';
-	var currentState;
-	var popStateHandler;
-	var started = false;
+	const STATE_TAG = 'HyperFrameset';
+	let currentState;
+	let popStateHandler;
+	let started = false;
 
 	defaults(historyManager, {
 
@@ -3350,7 +3350,7 @@
 		if (started) throw Error('historyManager has already started');
 		started = true;
 		popStateHandler = onPopState;
-		var newState = State.create(data, title, url);
+		let newState = State.create(data, title, url);
 		if (history.replaceState) {
 			history.replaceState(newState.settings, title, url);
 		}
@@ -3361,7 +3361,7 @@
 
 	newState: function(data, title, url, useReplace, callback) {
 	return scheduler.now(function() {
-		var newState = State.create(data, title, url);
+		let newState = State.create(data, title, url);
 		if (history.replaceState) {
 			if (useReplace) history.replaceState(newState.settings, title, url);
 			else history.pushState(newState.settings, title, url);
@@ -3385,8 +3385,8 @@
 			if (e.stopImmediatePropagation) e.stopImmediatePropagation();
 			else e.stopPropagation();
 			
-			var newSettings = e.state;
-			if (!newSettings[stateTag]) {
+			let newSettings = e.state;
+			if (!newSettings[STATE_TAG]) {
 				console.warn('Ignoring invalid PopStateEvent');
 				return;
 			}
@@ -3398,19 +3398,19 @@
 		}, true);
 
 	function State(settings) {
-		if (!settings[stateTag]) throw Error('Invalid settings for new State');
+		if (!settings[STATE_TAG]) throw Error('Invalid settings for new State');
 		this.settings = settings;
 	}
 
 	State.create = function(data, title, url) {
-		var timeStamp = +(new Date);
-		var settings = {
+		let timeStamp = +(new Date);
+		let settings = {
 			title: title,
 			url: url,
 			timeStamp: timeStamp,
 			data: data
 		};
-		settings[stateTag] = true;
+		settings[STATE_TAG] = true;
 		return new State(settings);
 	};
 
@@ -3421,7 +3421,7 @@
 	},
 
 	update: function(data, callback) { // FIXME not being used. Can it be reomved?
-		var state = this;
+		let state = this;
 		return Promise.resolve(function() {
 			if (state !== currentState) throw Error('Cannot update state: not current');
 			return scheduler.now(function() {
@@ -3438,11 +3438,11 @@
 	})();
 
 
-	var scheduler = (function() { // NOTE only used in historyManager
+	let scheduler = (function() { // NOTE only used in historyManager
 
-	var queue = [];
-	var maxSize = 1;
-	var processing = false;
+	let queue = [];
+	let maxSize = 1;
+	let processing = false;
 
 	function bump() {
 		if (processing) return;
@@ -3455,13 +3455,13 @@
 			processing = false;
 			return;
 		}
-		var task = queue.shift();
-		var promise = Promise.defer(task.fn);
+		let task = queue.shift();
+		let promise = Promise.defer(task.fn);
 		promise.then(process, process);
 		promise.then(task.resolve, task.reject);
 	}
 
-	var scheduler = {
+	let scheduler = {
 		
 	now: function(fn, fail) {
 		return this.whenever(fn, fail, 0);
@@ -3493,22 +3493,22 @@
 
 	})();
 
-	var CustomNamespace = (function() {
+	let CustomNamespace = (function() {
 
 	function CustomNamespace(options) {
 		if (!(this instanceof CustomNamespace)) return new CustomNamespace(options);
 		if (!options) return; // WARN for cloning / inheritance
-		var style = options.style = lc(options.style);
-		var styleInfo = find(CustomNamespace.namespaceStyles, function(styleInfo) {
+		let style = options.style = lc(options.style);
+		let styleInfo = find(CustomNamespace.namespaceStyles, function(styleInfo) {
 			return styleInfo.style === style;
 		});
 		if (!styleInfo) throw Error('Unexpected namespace style: ' + style);
-		var name = options.name = lc(options.name);
+		let name = options.name = lc(options.name);
 		if (!name) throw Error('Unexpected name: ' + name);
 		
-		var nsDef = this;
+		let nsDef = this;
 		assign(nsDef, options);
-		var separator = styleInfo.separator;
+		let separator = styleInfo.separator;
 		nsDef.prefix = nsDef.name + separator;
 		nsDef.selectorPrefix = nsDef.name + (separator === ':' ? '\\:' : separator);
 	}
@@ -3516,15 +3516,15 @@
 	defaults(CustomNamespace.prototype, {
 
 	clone: function() {
-		var clone = new CustomNamespace();
+		let clone = new CustomNamespace();
 		assign(clone, this);
 		return clone;
 	},
 
 	lookupTagName: function(name) { return this.prefix + name; },
 	lookupSelector: function(selector) {
-		var prefix = this.selectorPrefix;
-		var tags = selector.split(/\s*,\s*|\s+/);
+		let prefix = this.selectorPrefix;
+		let tags = selector.split(/\s*,\s*|\s+/);
 		return map(tags, function(tag) { return prefix + tag; }).join(', ');
 	}
 
@@ -3555,7 +3555,7 @@
 
 	})();
 
-	var NamespaceCollection = function(doc) {
+	let NamespaceCollection = function(doc) {
 		if (!(this instanceof NamespaceCollection)) return new NamespaceCollection(doc);
 		this.items = [];
 		if (!doc) return; // WARN for cloning / inheritance
@@ -3565,15 +3565,15 @@
 	assign(NamespaceCollection.prototype, {
 
 	init: function(doc) {
-		var coll = this;
+		let coll = this;
 		forEach(map(doc.documentElement.attributes), function(attr) {
-			var fullName = lc(attr.name);
-			var styleInfo = find(CustomNamespace.namespaceStyles, function(styleInfo) {
+			let fullName = lc(attr.name);
+			let styleInfo = find(CustomNamespace.namespaceStyles, function(styleInfo) {
 				return (fullName.indexOf(styleInfo.configPrefix) === 0);
 			});
 			if (!styleInfo) return;
-			var name = fullName.substr(styleInfo.configPrefix.length);
-			var nsDef = new CustomNamespace({
+			let name = fullName.substr(styleInfo.configPrefix.length);
+			let nsDef = new CustomNamespace({
 				urn: attr.value,
 				name: name,
 				style: styleInfo.style
@@ -3583,7 +3583,7 @@
 	},
 
 	clone: function() {
-		var coll = new NamespaceCollection();
+		let coll = new NamespaceCollection();
 		forEach(this.items, function(nsDef) { 
 			coll.items.push(nsDef.clone());
 		});
@@ -3591,8 +3591,8 @@
 	},
 
 	add: function(nsDef) {
-		var coll = this;
-		var matchingNS = find(coll.items, function(def) {
+		let coll = this;
+		let matchingNS = find(coll.items, function(def) {
 			if (lc(def.urn) === lc(nsDef.urn)) {
 				if (def.prefix !== nsDef.prefix) console.warn('Attempted to add namespace with same urn as one already present: ' + def.urn);
 				return true;
@@ -3607,9 +3607,9 @@
 	},
 
 	lookupNamespace: function(urn) {
-		var coll = this;
+		let coll = this;
 		urn = lc(urn);
-		var nsDef = find(coll.items, function(def) {
+		let nsDef = find(coll.items, function(def) {
 			return (lc(def.urn) === urn);
 		});
 		return nsDef;
@@ -3617,36 +3617,36 @@
 
 
 	lookupPrefix: function(urn) {
-		var coll = this;
-		var nsDef = coll.lookupNamespace(urn);
+		let coll = this;
+		let nsDef = coll.lookupNamespace(urn);
 		return nsDef && nsDef.prefix;
 	},
 
 	lookupNamespaceURI: function(prefix) {
-		var coll = this;
+		let coll = this;
 		prefix = lc(prefix);
-		var nsDef = find(coll.items, function(def) {
+		let nsDef = find(coll.items, function(def) {
 			return (def.prefix === prefix);
 		});
 		return nsDef && nsDef.urn;
 	},
 
 	lookupTagNameNS: function(name, urn) {
-		var coll = this;
-		var nsDef = coll.lookupNamespace(urn);
+		let coll = this;
+		let nsDef = coll.lookupNamespace(urn);
 		if (!nsDef) return name; // TODO is this correct?
 		return nsDef.prefix + name; // TODO _.lc(name) ??
 	},
 
 	lookupSelector: function(selector, urn) {
-		var nsDef = this.lookupNamespace(urn);
+		let nsDef = this.lookupNamespace(urn);
 		if (!nsDef) return selector;
 		return nsDef.lookupSelector(selector);
 	}
 
 	});
 
-	var filters = new Registry({
+	let filters = new Registry({
 		writeOnce: true,
 		testKey: function(key) {
 			return /^[_a-zA-Z][_a-zA-Z0-9]*$/.test(key);
@@ -3659,10 +3659,10 @@
 	assign(filters, {
 
 	evaluate: function(name, value, params) {
-		var fn = this.get(name);
+		let fn = this.get(name);
 		// NOTE filter functions should only accept string_or_number_or_boolean
 		// FIXME Need to wrap fn() to assert / cast supplied value and accept params
-		var args = params.slice(0);
+		let args = params.slice(0);
 		args.unshift(value);
 		return fn.apply(undefined, args);
 	}
@@ -3693,8 +3693,8 @@
 	filters.register('map', function(value, dict) { // dict can be {} or []
 
 		if (Array.isArray(dict)) {
-			var patterns = filter(dict, function(item, i) { return !(i % 2); });
-			var results = filter(dict, function(item, i) { return !!(i % 2); });
+			let patterns = filter(dict, function(item, i) { return !(i % 2); });
+			let results = filter(dict, function(item, i) { return !!(i % 2); });
 			some(patterns, function(pattern, i) {
 				// FIXME what if pattern not RegExp && not string??
 				if (!(pattern instanceof RegExp)) pattern = new RegExp('^' + pattern + '$');
@@ -3712,7 +3712,7 @@
 	filters.register('match', function(value, pattern, yep, nope) {
 		// FIXME what if pattern not RegExp && not string??
 		if (!(pattern instanceof RegExp)) pattern = new RegExp('^' + pattern + '$'); // FIXME sanity TODO case-insensitive??
-		var bMatch = pattern.test(value);
+		let bMatch = pattern.test(value);
 		if (yep != null && bMatch) return yep;
 		if (nope != null && !bMatch) return nope;
 		return bMatch;
@@ -3726,7 +3726,7 @@
 		return dateFormat(value, format, utc);
 	});
 
-	var decoders = new Registry({
+	let decoders = new Registry({
 		writeOnce: true,
 		testKey: function(key) {
 			return typeof key === 'string' && /^[_a-zA-Z][_a-zA-Z0-9]*/.test(key);
@@ -3739,15 +3739,15 @@
 	assign(decoders, {
 
 	create: function(type, options, namespaces) {
-		var constructor = this.get(type);
+		let constructor = this.get(type);
 		return new constructor(options, namespaces);
 	}
 
 	});
 
 	// FIXME textAttr & htmlAttr used in HazardProcessor & CSSDecoder
-	var textAttr = '_text';
-	var htmlAttr = '_html';
+	const textAttr = '_text';
+	const htmlAttr = '_html';
 	// TODO what about tagnameAttr, namespaceAttr
 
 	const CSS_CONTEXT_VARIABLE = '_';
@@ -3762,13 +3762,12 @@
 
 	// TODO should matches() support Hazard variables
 	matches: function(element, query) { // FIXME refactor common-code in matches / evaluate
-		var queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
-		var selector = queryParts[1];
-		var attr = queryParts[2];
-		var result;
+		let queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
+		let selector = queryParts[1];
+		let attr = queryParts[2];
 		if (!matches$1(element, selector)) return;
-		var node = element;
-		var result = node;
+		let node = element;
+		let result = node;
 
 		if (attr) {
 			attr = attr.trim();
@@ -3784,7 +3783,7 @@
 			case textAttr: 
 				return node.textContent;
 			case htmlAttr:
-				var frag = doc.createDocumentFragment();
+				let frag = doc.createDocumentFragment();
 				forEach(node.childNodes, function(child) { 
 					frag.appendChild(doc.importNode(child, true)); // TODO does `child` really need to be cloned??
 				});
@@ -3799,11 +3798,11 @@
 
 	evaluate: function(query, context, variables, wantArray) {
 		if (!context) context = this.srcNode;
-		var doc = context.nodeType === 9 ? context : context.ownerDocument; // FIXME which document??
-		var queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
-		var selector = queryParts[1];
-		var attr = queryParts[2];
-		var result = find$2(selector, context, variables, wantArray);
+		let doc = context.nodeType === 9 ? context : context.ownerDocument; // FIXME which document??
+		let queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
+		let selector = queryParts[1];
+		let attr = queryParts[2];
+		let result = find$2(selector, context, variables, wantArray);
 
 		if (attr) {
 			attr = attr.trim();
@@ -3824,7 +3823,7 @@
 			case textAttr: 
 				return node.textContent;
 			case htmlAttr:
-				var frag = doc.createDocumentFragment();
+				let frag = doc.createDocumentFragment();
 				forEach(node.childNodes, function(child) { 
 					frag.appendChild(doc.importNode(child, true)); // TODO does `child` really need to be cloned??
 				});
@@ -3846,14 +3845,14 @@
 	function find$2(selectorGroup, context, variables, wantArray) { // FIXME currently only implements `context` expansion
 		selectorGroup = selectorGroup.trim();
 		if (selectorGroup === '') return wantArray ? [ context ] : context;
-		var nullResult = wantArray ? [] : null;
-		var selectors = selectorGroup.split(/,(?![^\(]*\)|[^\[]*\])/);
+		let nullResult = wantArray ? [] : null;
+		let selectors = selectorGroup.split(/,(?![^\(]*\)|[^\[]*\])/);
 		selectors = map(selectors, function(s) { return s.trim(); });
 
-		var invalidVarUse = false;
-		var contextVar;
+		let invalidVarUse = false;
+		let contextVar;
 		forEach(selectors, function(s, i) {
-			var m = s.match(/\\?\$[_a-zA-Z][_a-zA-Z0-9]*\b/g);
+			let m = s.match(/\\?\$[_a-zA-Z][_a-zA-Z0-9]*\b/g);
 			if (!m) {
 				if (i > 0 && contextVar) {
 					invalidVarUse = true;
@@ -3863,8 +3862,8 @@
 			}
 			forEach(m, function(varRef, j) {
 				if (varRef.charAt(0) === '\\') return; // Ignore "\$"
-				var varName = varRef.substr(1);
-				var varPos = s.indexOf(varRef);
+				let varName = varRef.substr(1);
+				let varPos = s.indexOf(varRef);
 				if (j > 0 || varPos > 0) {
 					invalidVarUse = true;
 					console.warn('Invalid use of ' + varRef + ' in ' + selectorGroup);
@@ -3903,7 +3902,7 @@
 			}
 		}
 
-		var isRoot = false;
+		let isRoot = false;
 		if (context.nodeType === 9 || context.nodeType === 11) isRoot = true;
 
 		selectors = filter(selectors, function(s) {
@@ -3920,13 +3919,13 @@
 
 		selectors = map(selectors, function(s) {
 				if (isRoot) return s;
-				var prefix = ':scope';
+				let prefix = ':scope';
 				return (contextVar) ? 
 					s.replace('$' + contextVar, prefix) : 
 					prefix + ' ' + s;
 			});
 		
-		var finalSelector = selectors.join(', ');
+		let finalSelector = selectors.join(', ');
 
 		if (wantArray) {
 			return findAll(finalSelector, context, !isRoot, !isRoot);
@@ -3936,9 +3935,9 @@
 		}
 	}
 
-	var document$5 = window.document;
+	let document$5 = window.document;
 
-	var Microdata = (function() {
+	let Microdata = (function() {
 
 	function intersects(a1, a2) { // TODO add to Meeko.stuff
 		return some(a1, function(i1) {
@@ -3949,14 +3948,14 @@
 	}
 
 	function walkTree(root, skipRoot, callback) { // callback(el) must return NodeFilter code
-		var walker = document$5.createNodeIterator(
+		let walker = document$5.createNodeIterator(
 				root,
 				1,
 				acceptNode,
 				null // IE9 throws if this irrelavent argument isn't passed
 			);
 		
-		var el;
+		let el;
 		while (el = walker.nextNode());
 
 		function acceptNode(el) {
@@ -3967,30 +3966,30 @@
 
 	// TODO copied from DOMSprockets. Could be a generic "class"
 
-	var nodeIdProperty = '__microdata__';
-	var nodeCount = 0; // used to generated node IDs
-	var nodeStorage = {}; // hash of storage for nodes, keyed off `nodeIdProperty`
+	let nodeIdProperty = '__microdata__';
+	let nodeCount = 0; // used to generated node IDs
+	let nodeStorage = {}; // hash of storage for nodes, keyed off `nodeIdProperty`
 
-	var uniqueId = function(node) {
-		var nodeId = node[nodeIdProperty];
+	let uniqueId = function(node) {
+		let nodeId = node[nodeIdProperty];
 		if (nodeId) return nodeId;
 		nodeId = nodeCount++; // TODO stringify??
 		node[nodeIdProperty] = new String(nodeId); // NOTE so that node cloning in old IE doesn't copy the node ID property
 		return nodeId;
 	};
 
-	var setData = function(node, data) { // FIXME assert node is element
-		var nodeId = uniqueId(node);
+	let setData = function(node, data) { // FIXME assert node is element
+		let nodeId = uniqueId(node);
 		nodeStorage[nodeId] = data;
 	};
 
-	var hasData = function(node) {
-		var nodeId = node[nodeIdProperty];
+	let hasData = function(node) {
+		let nodeId = node[nodeIdProperty];
 		return !nodeId ? false : nodeId in nodeStorage;
 	};
 
-	var getData = function(node) { // TODO should this throw if no data?
-		var nodeId = node[nodeIdProperty];
+	let getData = function(node) { // TODO should this throw if no data?
+		let nodeId = node[nodeIdProperty];
 		if (!nodeId) return;
 		return nodeStorage[nodeId];
 	};
@@ -3999,16 +3998,16 @@
 	function getItems(rootNode, type) {
 		if (!hasData(rootNode)) parse(rootNode);
 
-		var scope = getData(rootNode);
-		var typeList = 
+		let scope = getData(rootNode);
+		let typeList =
 			(typeof type === 'string') ? words(type.trim()) :
 			type && type.length ? type :
 			[];
 				
-		var resultList = [];
+		let resultList = [];
 
 		forEach(scope.properties.names, function(propName) {
-			var propList = scope.properties.namedItem(propName);
+			let propList = scope.properties.namedItem(propName);
 			forEach(propList, function(prop) {
 				if (prop.isScope) [].push.apply(resultList, getItems(prop.element, typeList));
 			});
@@ -4028,20 +4027,20 @@
 
 	function getProperties(el) {
 		if (!hasData(el)) return;
-		var desc = getData(el);
+		let desc = getData(el);
 		if (!desc.isScope) return;
 		return desc.properties;
 	}
 
 	function parse(rootNode) {
 		if (!rootNode) rootNode = document$5;
-		var desc = getScopeDesc(rootNode);
+		let desc = getScopeDesc(rootNode);
 	}
 
 	function getScopeDesc(scopeEl) {
 		if (hasData(scopeEl)) return getData(scopeEl);
 		
-		var scopeDesc = {
+		let scopeDesc = {
 			element: scopeEl,
 			isScope: true,
 			type: scopeEl.nodeType === 1 || words(scopeEl.getAttribute('itemtype')),
@@ -4050,11 +4049,11 @@
 		};
 
 		walkTree(scopeEl, true, function(el) {
-			var isScope = el.hasAttribute('itemscope');
-			var propName = el.getAttribute('itemprop');
+			let isScope = el.hasAttribute('itemscope');
+			let propName = el.getAttribute('itemprop');
 			if (!(isScope || propName)) return NodeFilter.FILTER_SKIP;
 			
-			var item = isScope ? getScopeDesc(el) : getPropDesc(el);
+			let item = isScope ? getScopeDesc(el) : getPropDesc(el);
 			if (propName) scopeDesc.properties.addNamedItem(propName, el);
 			else scopeDesc.childScopes.push(el);
 
@@ -4067,7 +4066,7 @@
 		
 	function getValue(el) {
 		if (hasData(el)) return getData(el).value;
-		var desc = getPropDesc(el);
+		let desc = getPropDesc(el);
 		setData(el, desc);
 		return desc.value;
 	}
@@ -4075,9 +4074,9 @@
 	function getPropDesc(el) {
 		if (hasData(el)) return getData(el);
 
-		var name = el.getAttribute('itemprop');
+		let name = el.getAttribute('itemprop');
 		
-		var prop = {
+		let prop = {
 			name: name,
 			value: evaluate(el)
 		};
@@ -4087,22 +4086,22 @@
 	}
 
 	function evaluate(el) {
-		var tagName = el.tagName.toLowerCase();
-		var attrName = valueAttr[tagName];
+		let tagName = el.tagName.toLowerCase();
+		let attrName = valueAttr[tagName];
 		if (attrName) return el[attrName] || el.getAttribute(attrName);
 
 		return el;
 	}
 
 	function createHTMLPropertiesCollection() {
-		var list = [];
+		let list = [];
 		list.names = [];
 		list.nodeLists = {};
 		assign(list, HTMLPropertiesCollection.prototype);
 		return list;
 	}
 
-	var HTMLPropertiesCollection = function() {};
+	let HTMLPropertiesCollection = function() {};
 	assign(HTMLPropertiesCollection.prototype, {
 
 	namedItem: function(name) {
@@ -4121,9 +4120,9 @@
 	});
 
 
-	var valueAttr = {};
+	let valueAttr = {};
 	forEach(words("meta@content link@href a@href area@href img@src video@src audio@src source@src track@src iframe@src embed@src object@data time@datetime data@value meter@value"), function(text) {
-		var m = text.split("@"), tagName = m[0], attrName = m[1];
+		let m = text.split("@"), tagName = m[0], attrName = m[1];
 		valueAttr[tagName] = attrName;
 	});
 
@@ -4151,14 +4150,14 @@
 	evaluate: function(query, context, variables, wantArray) {
 		if (!context) context = this.rootNode;
 
-		var query = query.trim();
-		var startAtRoot = false;
-		var baseSchema;
-		var pathParts;
+		query = query.trim();
+		let startAtRoot = false;
+		let baseSchema;
+		let pathParts;
 
 		if (query === '.') return (wantArray) ? [ context ] : context;
 
-		var m = query.match(/^(?:(\^)?\[([^\]]*)\]\.)/);
+		let m = query.match(/^(?:(\^)?\[([^\]]*)\]\.)/);
 		if (m && m.length) {
 			query = query.substr(m[0].length);
 			startAtRoot = !!m[1];
@@ -4166,21 +4165,21 @@
 		}
 		pathParts = words(query.trim());
 		
-		var nodes;
+		let nodes;
 		if (baseSchema) {
 			if (startAtRoot) context = this.view;
 			nodes = Microdata.getItems(context, baseSchema);	
 		}
 		else nodes = [ context ];
 
-		var resultList = nodes;
+		let resultList = nodes;
 		forEach(pathParts, function(relPath, i) {
-			var parents = resultList;
+			let parents = resultList;
 			resultList = [];
 			forEach(parents, function(el) {
-				var props = Microdata.getProperties(el);
+				let props = Microdata.getProperties(el);
 				if (!props) return;
-				var nodeList = props.namedItem(relPath);
+				let nodeList = props.namedItem(relPath);
 				if (!nodeList) return;
 				[].push.apply(resultList, nodeList);
 			});
@@ -4188,7 +4187,7 @@
 
 		// now convert elements to values
 		resultList = map(resultList, function(el) {
-			var props = Microdata.getProperties(el);
+			let props = Microdata.getProperties(el);
 			if (props) return el;
 			return Microdata.getValue(el);
 		});
@@ -4215,24 +4214,24 @@
 	evaluate: function(query, context, variables, wantArray) {
 		if (!context) context = this.object;
 
-		var query = query.trim();
-		var pathParts;
+		query = query.trim();
+		let pathParts;
 
 		if (query === '.') return (wantArray) ? [ context ] : context;
 
-		var m = query.match(/^\^/);
+		let m = query.match(/^\^/);
 		if (m && m.length) {
 			query = query.substr(m[0].length);
 			context = this.object;
 		}
 		pathParts = query.split('.');
 		
-		var resultList = [ context ];
+		let resultList = [ context ];
 		forEach(pathParts, function(relPath, i) {
-			var parents = resultList;
+			let parents = resultList;
 			resultList = [];
 			forEach(parents, function(item) {
-				var child = item[relPath];
+				let child = item[relPath];
 				if (child != null) {
 					if (Array.isArray(child)) [].push.apply(resultList, child);
 					else resultList.push(child);
@@ -4242,7 +4241,7 @@
 
 		if (wantArray) return resultList;
 
-		var value = resultList[0];
+		let value = resultList[0];
 		return value;
 	}
 
@@ -4260,7 +4259,7 @@
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
 
-	var processors = new Registry({
+	let processors = new Registry({
 		writeOnce: true,
 		testKey: function(key) {
 			return typeof key === 'string' && /^[_a-zA-Z][_a-zA-Z0-9]*/.test(key);
@@ -4273,7 +4272,7 @@
 	assign(processors, {
 
 	create: function(type, options, namespaces) {
-		var constructor = this.get(type);
+		let constructor = this.get(type);
 		return new constructor(options, namespaces);
 	}
 
@@ -4294,15 +4293,15 @@
 	},
 
 	transform: function(provider, details) { // TODO how to use details?
-		var srcNode = provider.srcNode;
-		var srcDoc = srcNode.nodeType === 9 ? srcNode : srcNode.ownerDocument;
-		var main;
+		let srcNode = provider.srcNode;
+		let srcDoc = srcNode.nodeType === 9 ? srcNode : srcNode.ownerDocument;
+		let main;
 		if (!main) main = find$1('main, [role=main]', srcNode);
 		if (!main && srcNode === srcDoc) main = srcDoc.body;
 		if (!main) main = srcNode;
 
-		var frag = srcDoc.createDocumentFragment();
-		var node;
+		let frag = srcDoc.createDocumentFragment();
+		let node;
 		while (node = main.firstChild) frag.appendChild(node); // NOTE no adoption
 		return frag;
 	}
@@ -4322,7 +4321,7 @@
 	defaults(ScriptProcessor.prototype, {
 
 	loadTemplate: function(template) {
-		var script;
+		let script;
 		forEach(map(template.childNodes), function(node) {
 			switch (node.nodeType) {
 			case 1: // Element
@@ -4362,7 +4361,7 @@
 	},
 
 	transform: function(provider, details) {
-		var srcNode = provider.srcNode;
+		let srcNode = provider.srcNode;
 		if (!this.processor || !this.processor.transform) {
 			console.warn('"script" transform template did not produce valid transform object');
 			return;
@@ -4378,15 +4377,15 @@
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
 
-	var document$6 = window.document;
+	let document$6 = window.document;
 
 	// NOTE textAttr & htmlAttr used in HazardProcessor & CSSDecoder
-	var textAttr$1 = '_text';
-	var htmlAttr$1 = '_html';
+	const textAttr$1 = '_text';
+	const htmlAttr$1 = '_html';
 
-	var PIPE_OPERATOR = '//>';
+	const PIPE_OPERATOR = '//>';
 
-	var HYPERFRAMESET_URN = 'hyperframeset'; // FIXME DRY with libHyperFrameset.js
+	const HYPERFRAMESET_URN = 'hyperframeset'; // FIXME DRY with libHyperFrameset.js
 
 	/* WARN 
 		on IE11 and Edge, certain elements (or attrs) *not* attached to a document 
@@ -4395,24 +4394,24 @@
 			- <element style="...">
 			- <li value="NaN">
 	*/
-	var FRAGMENTS_ARE_INERT = !(window.HTMLUnknownElement && 
+	const FRAGMENTS_ARE_INERT = !(window.HTMLUnknownElement &&
 		'runtimeStyle' in window.HTMLUnknownElement.prototype);
 	// NOTE actually IE10 is okay, but no reasonable feature detection has been determined
 
-	var HAZARD_TRANSFORM_URN = 'HazardTransform';
-	var hazDefaultNS = new CustomNamespace({
+	const HAZARD_TRANSFORM_URN = 'HazardTransform';
+	const hazDefaultNS = new CustomNamespace({
 		urn: HAZARD_TRANSFORM_URN,
 		name: 'haz',
 		style: 'xml'
 	});
-	var HAZARD_EXPRESSION_URN = 'HazardExpression';
-	var exprDefaultNS = new CustomNamespace({
+	const HAZARD_EXPRESSION_URN = 'HazardExpression';
+	const exprDefaultNS = new CustomNamespace({
 		urn: HAZARD_EXPRESSION_URN,
 		name: 'expr',
 		style: 'xml'
 	});
-	var HAZARD_MEXPRESSION_URN = 'HazardMExpression';
-	var mexprDefaultNS = new CustomNamespace({
+	const HAZARD_MEXPRESSION_URN = 'HazardMExpression';
+	const mexprDefaultNS = new CustomNamespace({
 		urn: HAZARD_MEXPRESSION_URN,
 		name: 'mexpr',
 		style: 'xml'
@@ -4423,7 +4422,7 @@
 	 containing certain elements / attrs, see
 	     https://connect.microsoft.com/IE/feedback/details/1776195/ie11-edge-performance-regression-with-dom-fragments
 	*/
-	var PERFORMANCE_UNFRIENDLY_CONDITIONS = [
+	let PERFORMANCE_UNFRIENDLY_CONDITIONS = [
 		{
 			tag: '*', // must be present for checkElementPerformance()
 			attr: 'style',
@@ -4441,10 +4440,10 @@
 	];
 
 	function checkElementPerformance(el, namespaces) {
-		var exprPrefix = namespaces.lookupPrefix(HAZARD_EXPRESSION_URN);
-		var mexprPrefix = namespaces.lookupPrefix(HAZARD_MEXPRESSION_URN);
+		let exprPrefix = namespaces.lookupPrefix(HAZARD_EXPRESSION_URN);
+		let mexprPrefix = namespaces.lookupPrefix(HAZARD_MEXPRESSION_URN);
 
-		var outerHTML;
+		let outerHTML;
 		forEach(PERFORMANCE_UNFRIENDLY_CONDITIONS, function(cond) {
 			switch (cond.tag) {
 			case undefined: case null:
@@ -4456,7 +4455,7 @@
 			case '*': case '':
 				if (every(
 					['', exprPrefix, mexprPrefix], function(prefix) {
-						var attr = prefix + cond.attr;
+						let attr = prefix + cond.attr;
 						return !el.hasAttribute(attr);
 					})
 				) return;
@@ -4479,15 +4478,15 @@
 	 - the order of items in hazLangDefinition is the order of promoting 
 	    attrs to elements.
 	*/
-	var hazLangDefinition = 
-		'<otherwise <when@test <each@select <one@select +var@name,select <if@test <unless@test ' +
+	let hazLangDefinition =
+		'<otherwise <when@test <each@select <one@select +let@name,select <if@test <unless@test ' +
 		'>choose <template@name,match >eval@select >mtext@select >text@select ' +
 		'call@name apply param@name,select clone deepclone element@name attr@name';
 
-	var hazLang = map(words(hazLangDefinition), function(def) {
+	let hazLang = map(words(hazLangDefinition), function(def) {
 		def = def.split('@');
-		var tag = def[0];
-		var attrToElement = tag.charAt(0);
+		let tag = def[0];
+		let attrToElement = tag.charAt(0);
 		switch (attrToElement) {
 		default: 
 			attrToElement = false; 
@@ -4496,7 +4495,7 @@
 			break;
 		}
 		if (attrToElement) tag = tag.substr(1);
-		var attrs = def[1];
+		let attrs = def[1];
 		attrs = (attrs && attrs !== '') ? attrs.split(',') : [];
 		return {
 			tag: tag,
@@ -4505,22 +4504,22 @@
 		}
 	});
 
-	var hazLangLookup = {};
+	let hazLangLookup = {};
 
 	forEach(hazLang, function(directive) {
-		var tag = directive.tag; 
+		let tag = directive.tag;
 		hazLangLookup[tag] = directive;
 	});
 
 	function walkTree(root, skipRoot, callback) { // always "accept" element nodes
-		var walker = document$6.createNodeIterator(
+		let walker = document$6.createNodeIterator(
 				root,
 				1,
 				acceptNode,
 				null // IE9 throws if this irrelavent argument isn't passed
 			);
 		
-		var el;
+		let el;
 		while (el = walker.nextNode()) callback(el);
 
 		function acceptNode(el) {
@@ -4530,17 +4529,17 @@
 	}
 
 	function childNodesToFragment(el) {
-		var doc = el.ownerDocument;
-		var frag = doc.createDocumentFragment();
+		let doc = el.ownerDocument;
+		let frag = doc.createDocumentFragment();
 		forEach(map(el.childNodes), function(child) { frag.appendChild(child); });
 		return frag;
 	}
 
 	function htmlToFragment(html, doc) {
 		if (!doc) doc = document$6;
-		var div = doc.createElement('div');
+		let div = doc.createElement('div');
 		div.innerHTML = html;
-		var result = childNodesToFragment(div);
+		let result = childNodesToFragment(div);
 		return result;
 	}
 
@@ -4558,43 +4557,43 @@
 	defaults(HazardProcessor.prototype, {
 		
 	loadTemplate: function(template) {
-		var processor = this;
+		let processor = this;
 		processor.root = template; // FIXME assert template is Fragment
 		processor.templates = [];
 
-		var namespaces = processor.namespaces;
-		var hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
-		var exprPrefix = namespaces.lookupPrefix(HAZARD_EXPRESSION_URN);
-		var mexprPrefix = namespaces.lookupPrefix(HAZARD_MEXPRESSION_URN);
+		let namespaces = processor.namespaces;
+		let hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
+		let exprPrefix = namespaces.lookupPrefix(HAZARD_EXPRESSION_URN);
+		let mexprPrefix = namespaces.lookupPrefix(HAZARD_MEXPRESSION_URN);
 
-		var exprHtmlAttr = exprPrefix + htmlAttr$1; // NOTE this is mapped to haz:eval
-		var hazEvalTag = hazPrefix + 'eval';
-		var mexprHtmlAttr = mexprPrefix + htmlAttr$1; // NOTE this is invalid
+		let exprHtmlAttr = exprPrefix + htmlAttr$1; // NOTE this is mapped to haz:eval
+		let hazEvalTag = hazPrefix + 'eval';
+		let mexprHtmlAttr = mexprPrefix + htmlAttr$1; // NOTE this is invalid
 
-		var mexprTextAttr = mexprPrefix + textAttr$1; // NOTE this is mapped to haz:mtext
-		var hazMTextTag = hazPrefix + 'mtext';
-		var exprTextAttr = exprPrefix + textAttr$1; // NOTE this is mapped to haz:text
-		var hazTextTag = hazPrefix + 'text';
+		let mexprTextAttr = mexprPrefix + textAttr$1; // NOTE this is mapped to haz:mtext
+		let hazMTextTag = hazPrefix + 'mtext';
+		let exprTextAttr = exprPrefix + textAttr$1; // NOTE this is mapped to haz:text
+		let hazTextTag = hazPrefix + 'text';
 
 		// FIXME extract exprToHazPriority from hazLang
-		var exprToHazPriority = [ exprHtmlAttr, mexprTextAttr, exprTextAttr ];
-		var exprToHazMap = {};
+		let exprToHazPriority = [ exprHtmlAttr, mexprTextAttr, exprTextAttr ];
+		let exprToHazMap = {};
 		exprToHazMap[exprHtmlAttr] = hazEvalTag;
 		exprToHazMap[mexprTextAttr] = hazMTextTag;
 		exprToHazMap[exprTextAttr] = hazTextTag;
 
-		var doc = template.ownerDocument;
+		let doc = template.ownerDocument;
 
 		// rewrite the template if necessary
 		walkTree(template, true, function(el) {
-			var tag = getTagName(el);
+			let tag = getTagName(el);
 			if (tag.indexOf(hazPrefix) === 0) return;
 
 			// pre-process @expr:_html -> @haz:eval, etc
 			forEach(exprToHazPriority, function(attr) {
 				if (!el.hasAttribute(attr)) return;
-				var tag = exprToHazMap[attr];
-				var val = el.getAttribute(attr);
+				let tag = exprToHazMap[attr];
+				let val = el.getAttribute(attr);
 				el.removeAttribute(attr);
 				el.setAttribute(tag, val);
 			});
@@ -4607,30 +4606,30 @@
 			// promote applicable hazard attrs to elements
 			forEach(hazLang, function(def) {
 				if (!def.attrToElement) return;
-				var nsTag = hazPrefix + def.tag;
+				let nsTag = hazPrefix + def.tag;
 				if (!el.hasAttribute(nsTag)) return;
 
 				// create <haz:element> ...
-				var directiveEl = doc.createElement(nsTag);
+				let directiveEl = doc.createElement(nsTag);
 				// with default attr set from @haz:attr on original element
-				var defaultAttr = def.attrs[0];
-				var value = el.getAttribute(nsTag);
+				let defaultAttr = def.attrs[0];
+				let value = el.getAttribute(nsTag);
 				el.removeAttribute(nsTag);
 				if (defaultAttr) directiveEl.setAttribute(defaultAttr, value);
 
 				// copy non-default hazard attrs
 				forEach(def.attrs, function(attr, i) {
 					if (i === 0) return; // the defaultAttr
-					var nsAttr = hazPrefix + attr;
+					let nsAttr = hazPrefix + attr;
 					if (!el.hasAttribute(nsAttr)) return;
-					var value = el.getAttribute(nsAttr);
+					let value = el.getAttribute(nsAttr);
 					el.removeAttribute(nsAttr);
 					directiveEl.setAttribute(attr, value);
 				});
 				// insert the hazard element goes below or above the current element
 				switch (def.attrToElement) {
 				case '>':
-					var frag = childNodesToFragment(el);
+					let frag = childNodesToFragment(el);
 					directiveEl.appendChild(frag);
 					el.appendChild(directiveEl);
 					break;
@@ -4648,7 +4647,7 @@
 		});
 		
 		walkTree(template, true, function(el) {
-			var tag = getTagName(el);
+			let tag = getTagName(el);
 			if (tag === hazPrefix + 'template') markTemplate(el);
 			if (tag === hazPrefix + 'choose') implyOtherwise(el);
 		});
@@ -4663,9 +4662,9 @@
 		if (console.logLevel !== 'debug') return;
 
 		// if debugging then warn about PERFORMANCE_UNFRIENDLY_CONDITIONS (IE11 / Edge)
-		var hfNS = processor.namespaces.lookupNamespace(HYPERFRAMESET_URN);
+		let hfNS = processor.namespaces.lookupNamespace(HYPERFRAMESET_URN);
 		walkTree(template, true, function(el) {
-			var tag = getTagName(el);
+			let tag = getTagName(el);
 			if (tag.indexOf(hazPrefix) === 0) return;
 			if (tag.indexOf(hfNS.prefix) === 0) return; // HyperFrameset element
 			checkElementPerformance(el, namespaces);
@@ -4673,9 +4672,9 @@
 
 
 		function implyOtherwise(el) { // NOTE this slurps *any* non-<haz:when>, including <haz:otherwise>
-			var otherwise = el.ownerDocument.createElement(hazPrefix + 'otherwise');
+			let otherwise = el.ownerDocument.createElement(hazPrefix + 'otherwise');
 			forEach(map(el.childNodes), function(node) {
-				var tag = getTagName(node);
+				let tag = getTagName(node);
 				if (tag === hazPrefix + 'when') return;
 				otherwise.appendChild(node);
 			});
@@ -4687,14 +4686,14 @@
 		}
 
 		function implyEntryTemplate(el) { // NOTE this slurps *any* non-<haz:template>
-			var firstExplicitTemplate;
-			var contentNodes = filter(el.childNodes, function(node) {
-				var tag = getTagName(node);
+			let firstExplicitTemplate;
+			let contentNodes = filter(el.childNodes, function(node) {
+				let tag = getTagName(node);
 				if (tag === hazPrefix + 'template') {
 					if (!firstExplicitTemplate) firstExplicitTemplate = node;
 					return false;
 				}
-				if (tag === hazPrefix + 'var') return false;
+				if (tag === hazPrefix + 'let') return false;
 				if (tag === hazPrefix + 'param') return false;
 				if (node.nodeType === 3 && !(/\S/).test(node.nodeValue)) return false;
 				if (node.nodeType !== 1) return false;
@@ -4705,7 +4704,7 @@
 				if (firstExplicitTemplate) return;
 				console.warn('This Hazard Template cannot generate any content.');
 			}
-			var entryTemplate = el.ownerDocument.createElement(hazPrefix + 'template');
+			let entryTemplate = el.ownerDocument.createElement(hazPrefix + 'template');
 			forEach(contentNodes, function(node) {
 				entryTemplate.appendChild(node);
 			}); 
@@ -4722,7 +4721,7 @@
 	},
 
 	getNamedTemplate: function(name) {
-		var processor = this;
+		let processor = this;
 		name = lc(name);
 		return find(processor.templates, function(template) {
 			return lc(template.getAttribute('name')) === name;
@@ -4730,20 +4729,20 @@
 	},
 
 	getMatchingTemplate: function(element) {
-		var processor = this;
+		let processor = this;
 		return find(processor.templates, function(template) {
 			if (!template.hasAttribute('match')) return false;
-			var expression = template.getAttribute('match');
+			let expression = template.getAttribute('match');
 			return processor.provider.matches(element, expression);
 		});	
 	},
 
 	transform: FRAGMENTS_ARE_INERT ?
 	function(provider, details) { // TODO how to use details
-		var processor = this;
-		var root = processor.root;
-		var doc = root.ownerDocument;
-		var frag = doc.createDocumentFragment();
+		let processor = this;
+		let root = processor.root;
+		let doc = root.ownerDocument;
+		let frag = doc.createDocumentFragment();
 		return processor._transform(provider, details, frag)
 		.then(function() {
 			return frag;
@@ -4752,10 +4751,10 @@
 
 	// NOTE IE11, Edge needs a different transform() because fragments are not inert
 	function(provider, details) {
-		var processor = this;
-		var root = processor.root;
-		var doc = createHTMLDocument('', root.ownerDocument);
-		var frag = doc.body; // WARN don't know why `doc.body` is inert but fragments aren't
+		let processor = this;
+		let root = processor.root;
+		let doc = createHTMLDocument('', root.ownerDocument);
+		let frag = doc.body; // WARN don't know why `doc.body` is inert but fragments aren't
 		return processor._transform(provider, details, frag)
 		.then(function() {
 			frag = childNodesToFragment(frag);
@@ -4764,7 +4763,7 @@
 	},
 
 	_transform: function(provider, details, frag) {
-		var processor = this;
+		let processor = this;
 		processor.provider = provider;
 
 		processor.globalParams = assign({}, details);
@@ -4776,7 +4775,7 @@
 
 		processor.variables = {
 			has: function(key) {
-				var result = 
+				let result =
 					key in processor.localVars ||
 					key in processor.localParams ||
 					key in processor.globalVars ||
@@ -4785,7 +4784,7 @@
 				return result;
 			},
 			get: function(key) {
-				var result = 
+				let result =
 					key in processor.localVars && processor.localVars[key] ||
 					key in processor.localParams && processor.localParams[key] ||
 					key in processor.globalVars && processor.globalVars[key] ||
@@ -4794,7 +4793,7 @@
 				return result;
 			},
 			set: function(key, value, inParams, isGlobal) {
-				var mapName = isGlobal ?
+				let mapName = isGlobal ?
 					( inParams ? 'globalParams' : 'globalVars' ) :
 					( inParams ? 'localParams' : 'localVars' );
 				// NOTE params are write-once
@@ -4818,13 +4817,13 @@
 
 		return processor.transformChildNodes(processor.root, null, frag)
 		.then(function() {
-			var template = processor.getEntryTemplate();
+			let template = processor.getEntryTemplate();
 			return processor.transformTemplate(template, null, null, frag);
 		});
 	},
 
 	transformTemplate: function(template, context, params, frag) {
-		var processor = this;
+		let processor = this;
 		processor.variables.push(params);
 
 		return processor.transformChildNodes(template, context, frag)
@@ -4835,7 +4834,7 @@
 	},
 
 	transformChildNodes: function(srcNode, context, frag) {
-		var processor = this;
+		let processor = this;
 
 		return Promise.reduce(null, srcNode.childNodes, function(dummy, current) {
 			return processor.transformNode(current, context, frag);
@@ -4843,51 +4842,53 @@
 	},
 
 	transformNode: function(srcNode, context, frag) {
-		var processor = this;
+		let processor = this;
 
 		switch (srcNode.nodeType) {
 		default: 
-			var node = srcNode.cloneNode(true);
+			let node = srcNode.cloneNode(true);
 			frag.appendChild(node);
 			return;
 		case 3: // NOTE text-nodes are special-cased for perf testing
-			var node = srcNode.cloneNode(true);
-			frag.appendChild(node);
+			let textNode = srcNode.cloneNode(true);
+			frag.appendChild(textNode);
 			return;
 		case 1:
-			var details = srcNode.hazardDetails;
+			let details = srcNode.hazardDetails;
 			if (details.definition) return processor.transformHazardTree(srcNode, context, frag);
 			else return processor.transformTree(srcNode, context, frag);
 		}
 	},
 
 	transformHazardTree: function(el, context, frag) {
-		var processor = this;
-		var doc = el.ownerDocument;
+		let processor = this;
+		let doc = el.ownerDocument;
 
-		var details = el.hazardDetails;
-		var def = details.definition;
+		let details = el.hazardDetails;
+		let def = details.definition;
 
-		var invertTest = false; // for haz:if haz:unless
+		let invertTest = false; // for haz:if haz:unless
 
-		switch (def.tag) {
+		let name, selector, value, type, template, node, expr, mexpr;
+
+		switch (def.tag) { // TODO refactor these cases into individual methods, e.g transformHazardLetTree()
 		default: // for unknown (or unhandled) haz: elements just process the children
 			return processor.transformChildNodes(el, context, frag); 
 			
 		case 'template':
 			return frag;
 
-		case 'var':
-			var name = el.getAttribute('name');
-			var selector = el.getAttribute('select');
-			var value = context;
+		case 'let':
+			name = el.getAttribute('name');
+			selector = el.getAttribute('select');
+			value = context;
 			if (selector) {
 				try {
 					value = processor.provider.evaluate(selector, context, processor.variables, false);
 				}
 				catch (err) {
 					Task.postError(err);
-					console.warn('Error evaluating <haz:var name="' + name + '" select="' + selector + '">. Assumed empty.');
+					console.warn('Error evaluating <haz:let name="' + name + '" select="' + selector + '">. Assumed empty.');
 					value = undefined;
 				}
 			}
@@ -4896,9 +4897,9 @@
 			return frag;
 
 		case 'param':
-			var name = el.getAttribute('name');
-			var selector = el.getAttribute('select');
-			var value = context;
+			name = el.getAttribute('name');
+			selector = el.getAttribute('select');
+			value = context;
 			if (selector) {
 				try {
 					value = processor.provider.evaluate(selector, context, processor.variables, false);
@@ -4916,8 +4917,8 @@
 
 		case 'call':
 			// FIXME attributes should already be in hazardDetails
-			var name = el.getAttribute('name');
-			var template = processor.getNamedTemplate(name);
+			name = el.getAttribute('name');
+			template = processor.getNamedTemplate(name);
 			if (!template) {
 				console.warn('Hazard could not find template name=' + name);
 				return frag;
@@ -4926,24 +4927,24 @@
 			return processor.transformTemplate(template, context, null, frag); 
 
 		case 'apply': // WARN only applies to DOM-based provider
-			var template = processor.getMatchingTemplate(context);
-			var promise = Promise.resolve(el);
+			template = processor.getMatchingTemplate(context);
+			let promise = Promise.resolve(el);
 			if (template) {
 				return processor.transformTemplate(template, context, null, frag);
 			}
-			var node = context.cloneNode(false);
+			node = context.cloneNode(false);
 			frag.appendChild(node);
 			return Promise.reduce(null, context.childNodes, function(dummy, child) {
 				return processor.transformHazardTree(el, child, node);
 			});
 
 		case 'clone': // WARN only applies to DOM-based providers
-			var node = context.cloneNode(false);
+			node = context.cloneNode(false);
 			frag.appendChild(node);
 			return processor.transformChildNodes(el, context, node);
 
 		case 'deepclone': // WARN only applies to DOM-based providers
-			var node = context.cloneNode(true);
+			node = context.cloneNode(true);
 			frag.appendChild(node);
 			// TODO WARN if el has child-nodes
 			return frag;
@@ -4951,24 +4952,24 @@
 		case 'element':
 			// FIXME attributes should already be in hazardDetails
 			// FIXME log a warning if this directive has children
-			var mexpr = el.getAttribute('name');
-			var name = evalMExpression(mexpr, processor.provider, context, processor.variables);
-			var type = typeof value;
+			mexpr = el.getAttribute('name');
+			name = evalMExpression(mexpr, processor.provider, context, processor.variables);
+			type = typeof value;
 			if (type !== 'string') return frag;
 
-			var node = doc.createElement(name);
+			node = doc.createElement(name);
 			frag.appendChild(node);
 			return processor.transformChildNodes(el, context, node);
 
 		case 'attr':
 			// FIXME attributes should already be in hazardDetails
 			// FIXME log a warning if this directive has children
-			var mexpr = el.getAttribute('name');
-			var name = evalMExpression(mexpr, processor.provider, context, processor.variables);
-			var type = typeof value;
+			mexpr = el.getAttribute('name');
+			name = evalMExpression(mexpr, processor.provider, context, processor.variables);
+			type = typeof value;
 			if (type !== 'string') return frag;
 
-			var node = doc.createDocumentFragment();
+			node = doc.createDocumentFragment();
 			return processor.transformChildNodes(el, context, node)
 			.then(function() {
 				value = node.textContent;
@@ -4979,9 +4980,9 @@
 		case 'eval':
 			// FIXME attributes should already be in hazardDetails
 			// FIXME log a warning if this directive has children
-			var selector = el.getAttribute('select');
-			var value = evalExpression(selector, processor.provider, context, processor.variables, 'node');
-			var type = typeof value;
+			selector = el.getAttribute('select');
+			value = evalExpression(selector, processor.provider, context, processor.variables, 'node');
+			type = typeof value;
 			if (type === 'undefined' || type === 'boolean' || value == null) return frag;
 			if (!value.nodeType) { // TODO test performance
 				value = htmlToFragment(value, doc);
@@ -4992,8 +4993,8 @@
 		case 'mtext':
 			// FIXME attributes should already be in hazardDetails
 			// FIXME log a warning if this directive has children
-			var mexpr = el.getAttribute('select');
-			var value = evalMExpression(mexpr, processor.provider, context, processor.variables);
+			mexpr = el.getAttribute('select');
+			value = evalMExpression(mexpr, processor.provider, context, processor.variables);
 			// FIXME `value` should always already be "text"
 			if (type === 'undefined' || type === 'boolean' || value == null) return frag;
 			if (!value.nodeType) {
@@ -5005,10 +5006,10 @@
 		case 'text':
 			// FIXME attributes should already be in hazardDetails
 			// FIXME log a warning if this directive has children
-			var expr = el.getAttribute('select');
-			var value = evalExpression(expr, processor.provider, context, processor.variables, 'text');
+			expr = el.getAttribute('select');
+			value = evalExpression(expr, processor.provider, context, processor.variables, 'text');
 			// FIXME `value` should always already be "text"
-			var type = typeof value;
+			type = typeof value;
 			if (type === 'undefined' || type === 'boolean' || value == null) return frag;
 			if (!value.nodeType) {
 				value = doc.createTextNode(value);
@@ -5020,8 +5021,8 @@
 			invertTest = true;
 		case 'if':
 			// FIXME attributes should already be in hazardDetails
-			var testVal = el.getAttribute('test');
-			var pass = false;
+			let testVal = el.getAttribute('test');
+			let pass = false;
 			try {
 				pass = evalExpression(testVal, processor.provider, context, processor.variables, 'boolean');
 			}
@@ -5037,19 +5038,19 @@
 		case 'choose':
 			// FIXME attributes should already be in hazardDetails
 	 		// NOTE if no successful `when` then chooses *first* `otherwise` 		
-			var otherwise;
-			var when;
-			var found = some(el.childNodes, function(child) { // TODO .children??
+			let otherwise;
+			let when;
+			let found = some(el.childNodes, function(child) { // TODO .children??
 				if (child.nodeType !== 1) return false;
-				var childDef = child.hazardDetails.definition;
+				let childDef = child.hazardDetails.definition;
 				if (!childDef) return false;
 				if (childDef.tag === 'otherwise') {
 					if (!otherwise) otherwise = child;
 					return false;
 				}
 				if (childDef.tag !== 'when') return false;
-				var testVal = child.getAttribute('test');
-				var pass = evalExpression(testVal, processor.provider, context, processor.variables, 'boolean');
+				let testVal = child.getAttribute('test');
+				let pass = evalExpression(testVal, processor.provider, context, processor.variables, 'boolean');
 				if (!pass) return false;
 				when = child;
 				return true;
@@ -5060,8 +5061,8 @@
 
 		case 'one': // FIXME refactor common parts with `case 'each':`
 			// FIXME attributes should already be in hazardDetails
-			var selector = el.getAttribute('select');
-			var subContext;
+			selector = el.getAttribute('select');
+			let subContext;
 			try {
 				subContext = processor.provider.evaluate(selector, context, processor.variables, false);
 			}
@@ -5077,8 +5078,8 @@
 
 		case 'each':
 			// FIXME attributes should already be in hazardDetails
-			var selector = el.getAttribute('select');
-			var subContexts;
+			selector = el.getAttribute('select');
+			let subContexts;
 			try {
 				subContexts = processor.provider.evaluate(selector, context, processor.variables, true);
 			}
@@ -5097,12 +5098,12 @@
 	},
 
 	transformTree: function(srcNode, context, frag) { // srcNode is Element
-		var processor = this;
+		let processor = this;
 		
-		var nodeType = srcNode.nodeType;
+		let nodeType = srcNode.nodeType;
 		if (nodeType !== 1) throw Error('transformTree() expects Element');
-		var node = processor.transformSingleElement(srcNode, context);
-		var nodeAsFrag = frag.appendChild(node); // WARN use returned value not `node` ...
+		let node = processor.transformSingleElement(srcNode, context);
+		let nodeAsFrag = frag.appendChild(node); // WARN use returned value not `node` ...
 		// ... this allows frag to be a custom object, which in turn 
 		// ... allows a different type of output construction
 
@@ -5110,13 +5111,13 @@
 	},
 
 	transformSingleElement: function(srcNode, context) {
-		var processor = this;
-		var details = srcNode.hazardDetails;
+		let processor = this;
+		let details = srcNode.hazardDetails;
 
-		var el = srcNode.cloneNode(false);
+		let el = srcNode.cloneNode(false);
 
 		forEach(details.exprAttributes, function(desc) {
-			var value;
+			let value;
 			try {
 				value = (desc.namespaceURI === HAZARD_MEXPRESSION_URN) ?
 					processMExpression(desc.mexpression, processor.provider, context, processor.variables) :
@@ -5136,14 +5137,14 @@
 	});
 
 	function getHazardDetails(el, namespaces) {
-		var details = {};
-		var tag = getTagName(el);
-		var hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
-		var isHazElement = tag.indexOf(hazPrefix) === 0;
+		let details = {};
+		let tag = getTagName(el);
+		let hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
+		let isHazElement = tag.indexOf(hazPrefix) === 0;
 
 		if (isHazElement) { // FIXME preprocess attrs of <haz:*>
 			tag = tag.substr(hazPrefix.length);
-			var def = hazLangLookup[tag];
+			let def = hazLangLookup[tag];
 			details.definition = def || { tag: '' };
 		}
 
@@ -5152,20 +5153,20 @@
 	}
 
 	function getExprAttributes(el, namespaces) {
-		var attrs = [];
+		let attrs = [];
 		
-		var exprNS = namespaces.lookupNamespace(HAZARD_EXPRESSION_URN);
-		var mexprNS = namespaces.lookupNamespace(HAZARD_MEXPRESSION_URN);
+		let exprNS = namespaces.lookupNamespace(HAZARD_EXPRESSION_URN);
+		let mexprNS = namespaces.lookupNamespace(HAZARD_MEXPRESSION_URN);
 		forEach(map(el.attributes), function(attr) {
-			var ns = find([ exprNS, mexprNS ], function(ns) {
+			let ns = find([ exprNS, mexprNS ], function(ns) {
 				return (attr.name.indexOf(ns.prefix) === 0);
 			});
 			if (!ns) return;
-			var prefix = ns.prefix;
-			var namespaceURI = ns.urn;
-			var attrName = attr.name.substr(prefix.length);
+			let prefix = ns.prefix;
+			let namespaceURI = ns.urn;
+			let attrName = attr.name.substr(prefix.length);
 			el.removeAttribute(attr.name);
-			var desc = {
+			let desc = {
 				namespaceURI: namespaceURI,
 				prefix: prefix,
 				attrName: attrName,
@@ -5188,7 +5189,7 @@
 
 
 	function setAttribute(el, attrName, value) {
-		var type = typeof value;
+		let type = typeof value;
 		if (type === 'undefined' || type === 'boolean' || value == null) {
 			if (!value) el.removeAttribute(attrName);
 			else el.setAttribute(attrName, '');
@@ -5199,20 +5200,20 @@
 	}
 
 	function evalMExpression(mexprText, provider, context, variables) {
-		var mexpr = interpretMExpression(mexprText);
-		var result = processMExpression(mexpr, provider, context, variables);
+		let mexpr = interpretMExpression(mexprText);
+		let result = processMExpression(mexpr, provider, context, variables);
 		return result;
 	}
 
 	function evalExpression(exprText, provider, context, variables, type) {
-		var expr = interpretExpression(exprText);
-		var result = processExpression(expr, provider, context, variables, type);
+		let expr = interpretExpression(exprText);
+		let result = processExpression(expr, provider, context, variables, type);
 		return result;
 	}
 		
 	function interpretMExpression(mexprText) {
-		var expressions = [];
-		var mexpr = mexprText.replace(/\{\{((?:[^}]|\}(?=\}\})|\}(?!\}))*)\}\}/g, function(all, expr) {
+		let expressions = [];
+		let mexpr = mexprText.replace(/\{\{((?:[^}]|\}(?=\}\})|\}(?!\}))*)\}\}/g, function(all, expr) {
 			expressions.push(expr);
 			return '{{}}';
 		});
@@ -5225,22 +5226,22 @@
 	}
 
 	function interpretExpression(exprText) { // FIXME robustness
-		var expression = {};
+		let expression = {};
 		expression.text = exprText;
-		var exprParts = exprText.split(PIPE_OPERATOR);
+		let exprParts = exprText.split(PIPE_OPERATOR);
 		expression.selector = exprParts.shift();
 		expression.filters = [];
 
 		forEach(exprParts, function(filterSpec) {
 			filterSpec = filterSpec.trim();
-			var text = filterSpec;
-			var m = text.match(/^([_a-zA-Z][_a-zA-Z0-9]*)\s*(:?)/);
+			let text = filterSpec;
+			let m = text.match(/^([_a-zA-Z][_a-zA-Z0-9]*)\s*(:?)/);
 			if (!m) {
 				console.warn('Syntax Error in filter call: ' + filterSpec);
 				return false;
 			}
-			var filterName = m[1];
-			var hasParams = m[2];
+			let filterName = m[1];
+			let hasParams = m[2];
 			text = text.substr(m[0].length);
 			if (!hasParams && /\S+/.test(text)) {
 				console.warn('Syntax Error in filter call: ' + filterSpec);
@@ -5248,7 +5249,7 @@
 			}
 
 			try {
-				var filterParams = (Function('return [' + text + '];'))();
+				let filterParams = (Function('return [' + text + '];'))();
 			}
 			catch (err) {
 				console.warn('Syntax Error in filter call: ' + filterSpec);
@@ -5268,17 +5269,17 @@
 
 
 	function processMExpression(mexpr, provider, context, variables) {
-		var i = 0;
+		let i = 0;
 		return mexpr.template.replace(/\{\{\}\}/g, function(all) {
 			return processExpression(mexpr.expressions[i++], provider, context, variables, 'text');
 		});
 	}
 
 	function processExpression(expr, provider, context, variables, type) { // FIXME robustness
-		var doc = (context && context.nodeType) ? // TODO which document
+		let doc = (context && context.nodeType) ? // TODO which document
 			(context.nodeType === 9 ? context : context.ownerDocument) : 
 			document$6; 
-		var value = provider.evaluate(expr.selector, context, variables);
+		let value = provider.evaluate(expr.selector, context, variables);
 
 		every(expr.filters, function(filter) {
 			if (value == null) value = '';
@@ -5298,7 +5299,7 @@
 			}
 		});
 
-		var result = cast(value, type);
+		let result = cast(value, type);
 		return result;
 
 		function cast(value, type) {
@@ -5307,12 +5308,12 @@
 				if (value && value.nodeType) value = value.textContent;
 				break;
 			case 'node':
-				var frag = doc.createDocumentFragment();
+				let frag = doc.createDocumentFragment();
 				if (value && value.nodeType) frag.appendChild(doc.importNode(value, true)); // NOTE no adoption
 				else {
-					var div = doc.createElement('div');
+					let div = doc.createElement('div');
 					div.innerHTML = value;
-					var node;
+					let node;
 					while (node = div.firstChild) frag.appendChild(node); // NOTE no adoption
 				}
 				value = frag;
@@ -5343,7 +5344,7 @@
 
 	processors.register('hazard', HazardProcessor);
 
-	var configData = new Registry({
+	let configData = new Registry({
 		writeOnce: true,
 		testKey: function(key) {
 			return typeof key === 'string';
@@ -5359,17 +5360,17 @@
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
 
-	var document$7 = window.document;
+	let document$7 = window.document;
 
-	var eventConfig = 'form@submit,reset,input,change,invalid input,textarea@input,change,invalid,focus,blur select,fieldset@change,invalid,focus,blur button@click';
+	const eventConfig = 'form@submit,reset,input,change,invalid input,textarea@input,change,invalid,focus,blur select,fieldset@change,invalid,focus,blur button@click';
 
-	var eventTable = (function(config) {
+	let eventTable = (function(config) {
 
-	var table = {};
+	let table = {};
 	forEach(config.split(/\s+/), function(combo) {
-		var m = combo.split('@');
-		var tags = m[0].split(',');
-		var events = m[1].split(',');
+		let m = combo.split('@');
+		let tags = m[0].split(',');
+		let events = m[1].split(',');
 		forEach(tags, function(tag) {
 			table[tag] = map(events);
 		});
@@ -5380,36 +5381,36 @@
 	})(eventConfig);
 
 
-	var elements = {};
-	var interfaces = {};
+	let elements = {};
+	let interfaces = {};
 
 	function registerFormElements() {
 		forOwn(elements, function(ClassName, tag) {
-			var Interface = interfaces[ClassName];
+			let Interface = interfaces[ClassName];
 			sprockets.registerElement(tag, Interface);
 		});
 	}
 
 	forOwn(eventTable, function(events, tag) {
 
-	var ClassName = 'Configurable' + ucFirst(tag);
+	let ClassName = 'Configurable' + ucFirst(tag);
 
-	var Interface = sprockets.evolve(sprockets.RoleType, {});
+	let Interface = sprockets.evolve(sprockets.RoleType, {});
 	assign(Interface, {
 
 	attached: function(handlers) {
-		var object = this;
-		var element = object.element;
+		let object = this;
+		let element = object.element;
 		if (!element.hasAttribute('config')) return;
-		var configID = words(element.getAttribute('config'))[0];	
-		var options = configData.get(configID);
+		let configID = words(element.getAttribute('config'))[0];
+		let options = configData.get(configID);
 		if (!options) return;
 		forEach(events, function(type) {
-			var ontype = 'on' + type;
-			var callback = options[ontype];
+			let ontype = 'on' + type;
+			let callback = options[ontype];
 			if (!callback) return;
 
-			var fn = function() { callback.apply(object, arguments); };
+			let fn = function() { callback.apply(object, arguments); };
 			object[ontype] = fn;
 			handlers.push({
 				type: type,
@@ -5426,26 +5427,26 @@
 	});
 
 	// NOTE handlers are registered for "body@submit,reset,input,change" in HFrameset
-	var ConfigurableBody = sprockets.evolve(sprockets.RoleType, {});
+	let ConfigurableBody = sprockets.evolve(sprockets.RoleType, {});
 	assign(ConfigurableBody, {
 
 	attached: function(handlers) {
-		var object = this;
-		var element = object.element;
+		let object = this;
+		let element = object.element;
 		if (!element.hasAttribute('config')) return;
-		var configID = words(element.getAttribute('config'))[0];	
-		var options = configData.get(configID);
+		let configID = words(element.getAttribute('config'))[0];
+		let options = configData.get(configID);
 		if (!options) return;
 
-		var events = words('submit reset change input');
-		var needClickWatcher = false;
+		let events = words('submit reset change input');
+		let needClickWatcher = false;
 
 		forEach(events, function(type) {
-			var ontype = 'on' + type;
-			var callback = options[ontype];
+			let ontype = 'on' + type;
+			let callback = options[ontype];
 			if (!callback) return;
 
-			var fn = function(e) { 
+			let fn = function(e) {
 				if (closest(e.target, 'form')) return;
 				callback.apply(object, arguments); 
 			};
@@ -5464,10 +5465,10 @@
 		if (needClickWatcher) {
 			document$7.addEventListener('click', function(e) { 
 				if (closest(e.target, 'form')) return;
-				var type = e.target.type;
+				let type = e.target.type;
 				if (!(type === 'submit' || type === 'reset')) return;
 				Task.asap(function() {
-					var pseudoEvent = document$7.createEvent('CustomEvent');
+					let pseudoEvent = document$7.createEvent('CustomEvent');
 					// NOTE pseudoEvent.detail = e.target
 					pseudoEvent.initCustomEvent(type, true, true, e.target);
 					pseudoEvent.preventDefault();
@@ -5482,7 +5483,7 @@
 	elements['body'] = 'ConfigurableBody';
 	interfaces['ConfigurableBody'] = ConfigurableBody;
 
-	var formElements = {
+	let formElements = {
 
 		register: registerFormElements
 
@@ -5516,18 +5517,18 @@
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
 
-	var document$8 = window.document;
+	let document$8 = window.document;
 
-	var namespace; // will be set by external call to registerFramesetElements()
+	let namespace; // will be set by external call to registerFramesetElements()
 
 	/*
 	 * HyperFrameset sprockets
 	 */
 
 	// All HyperFrameset sprockets will inherit from HBase
-	var HBase = (function() {
+	let HBase = (function() {
 
-	var HBase = sprockets.evolve(sprockets.RoleType, {
+	let HBase = sprockets.evolve(sprockets.RoleType, {
 
 	});
 
@@ -5544,12 +5545,12 @@
 	},
 
 	connectOptions: function() {
-		var object = this;
+		let object = this;
 		object.options = {};
-		var element = object.element;
+		let element = object.element;
 		if (!element.hasAttribute('config')) return;
-		var configID = words(element.getAttribute('config'))[0];	
-		var options = configData.get(configID);
+		let configID = words(element.getAttribute('config'))[0];
+		let options = configData.get(configID);
 		object.options = options;
 	}
 	});
@@ -5558,9 +5559,9 @@
 	})();
 
 
-	var Layer = (function() {
+	let Layer = (function() {
 
-	var Layer = sprockets.evolve(HBase, {
+	let Layer = sprockets.evolve(HBase, {
 
 	role: 'layer',
 
@@ -5568,7 +5569,7 @@
 
 	});
 
-	var zIndex = 1;
+	let zIndex = 1;
 
 	assign(Layer, {
 
@@ -5595,9 +5596,9 @@
 	return Layer;
 	})();
 
-	var Popup = (function() {
+	let Popup = (function() {
 
-	var Popup = sprockets.evolve(HBase, {
+	let Popup = sprockets.evolve(HBase, {
 
 	role: 'popup',
 
@@ -5620,9 +5621,9 @@
 	},
 
 	connectController: function() {
-		var panel = this;
-		var name = panel.attr('name'); 
-		var value = panel.attr('value'); 
+		let panel = this;
+		let name = panel.attr('name');
+		let value = panel.attr('value');
 		if (!name && !value) return;
 		panel.ariaToggle('hidden', true);
 		if (!name) return; // being controlled by an ancestor
@@ -5636,9 +5637,9 @@
 	return Popup;
 	})();
 
-	var Panel = (function() {
+	let Panel = (function() {
 
-	var Panel = sprockets.evolve(HBase, {
+	let Panel = sprockets.evolve(HBase, {
 
 	role: 'panel',
 
@@ -5667,20 +5668,20 @@
 	},
 
 	adjustBox: function() {
-		var overflow = this.attr('overflow');
+		let overflow = this.attr('overflow');
 		if (overflow) this.css('overflow', overflow); // FIXME sanity check
-		var height = this.attr('height');
+		let height = this.attr('height');
 		if (height) this.css('height', height); // FIXME units
-		var width = this.attr('width');
+		let width = this.attr('width');
 		if (width) this.css('width', width); // FIXME units
-		var minWidth = this.attr('minwidth');
+		let minWidth = this.attr('minwidth');
 		if (minWidth) this.css('min-width', minWidth); // FIXME units
 	}, 
 
 	connectController: function() {
-		var panel = this;
-		var name = panel.attr('name'); 
-		var value = panel.attr('value'); 
+		let panel = this;
+		let name = panel.attr('name');
+		let value = panel.attr('value');
 		if (!name && !value) return;
 		panel.ariaToggle('hidden', true);
 		if (!name) return; // being controlled by an ancestor
@@ -5698,9 +5699,9 @@
 	return Panel;
 	})();
 
-	var Layout = (function() { // a Layout is a list of Panel (or other Layout) and perhaps separators for hlayout, vlayout
+	let Layout = (function() { // a Layout is a list of Panel (or other Layout) and perhaps separators for hlayout, vlayout
 
-	var Layout = sprockets.evolve(HBase, {
+	let Layout = sprockets.evolve(HBase, {
 
 	role: 'group',
 
@@ -5735,24 +5736,24 @@
 	},
 
 	adjustBox: function() {
-		var element = this.element;
-		var parent = element.parentNode;
+		let element = this.element;
+		let parent = element.parentNode;
 
 		// FIXME dimension setting should occur before becoming visible
 		if (!matches(parent, Layer.isLayer)) return;
 		// TODO vh, vw not tested on various platforms
-		var height = this.attr('height'); // TODO css unit parsing / validation
+		let height = this.attr('height'); // TODO css unit parsing / validation
 		if (!height) height = '100vh';
 		else height = height.replace('%', 'vh');
 		this.css('height', height); // FIXME units
-		var width = this.attr('width'); // TODO css unit parsing / validation
+		let width = this.attr('width'); // TODO css unit parsing / validation
 		if (!width) width = '100vw';
 		else width = width.replace('%', 'vw');
 		if (width) this.css('width', width); // FIXME units
 	},
 
 	normalizeChildren: function() {
-		var element = this.element;
+		let element = this.element;
 		forEach(map(element.childNodes), normalizeChild, element);
 	},
 
@@ -5763,7 +5764,7 @@
 	});
 
 	function normalizeChild(node) {
-		var element = this;
+		let element = this;
 		switch (node.nodeType) {
 		case 1: // hide non-layout elements
 			if (matches(node, function(el) { return Panel.isPanel(el) || Layout.isLayout(el); })) return;
@@ -5774,7 +5775,7 @@
 				element.removeChild(node);
 				return;
 			}
-			var wbr = element.ownerDocument.createElement('wbr');
+			let wbr = element.ownerDocument.createElement('wbr');
 			wbr.hidden = true;
 			element.replaceChild(wbr, node); // NOTE no adoption
 			wbr.appendChild(node); // NOTE no adoption
@@ -5788,9 +5789,9 @@
 	})();
 
 
-	var VLayout = (function() {
+	let VLayout = (function() {
 
-	var VLayout = sprockets.evolve(Layout, {
+	let VLayout = sprockets.evolve(Layout, {
 	});
 
 	assign(VLayout, {
@@ -5798,7 +5799,7 @@
 	attached: function(handlers) {
 		Layout.attached.call(this, handlers);
 
-		var hAlign = this.attr('align'); // FIXME assert left/center/right/justify - also start/end (stretch?)
+		let hAlign = this.attr('align'); // FIXME assert left/center/right/justify - also start/end (stretch?)
 		if (hAlign) this.css('text-align', hAlign); // NOTE defaults defined in <style> above
 	},
 
@@ -5815,9 +5816,9 @@
 	return VLayout;
 	})();
 
-	var HLayout = (function() {
+	let HLayout = (function() {
 
-	var HLayout = sprockets.evolve(Layout, {
+	let HLayout = sprockets.evolve(Layout, {
 	});
 
 	assign(HLayout, {
@@ -5829,7 +5830,7 @@
 	enteredDocument: function() {
 		Layout.enteredDocument.call(this);
 
-		var vAlign = this.attr('align'); // FIXME assert top/middle/bottom/baseline - also start/end (stretch?)
+		let vAlign = this.attr('align'); // FIXME assert top/middle/bottom/baseline - also start/end (stretch?)
 		forEach(this.ariaGet('owns'), function(panel) {
 			if (vAlign) panel.$.css('vertical-align', vAlign);
 		});
@@ -5845,15 +5846,15 @@
 	return HLayout;
 	})();
 
-	var Deck = (function() {
+	let Deck = (function() {
 
-	var Deck = sprockets.evolve(Layout, {
+	let Deck = sprockets.evolve(Layout, {
 
 	activedescendant: {
 		set: function(item) { // if !item then hide all children
 			
-			var element = this.element;
-			var panels = this.ariaGet('owns');
+			let element = this.element;
+			let panels = this.ariaGet('owns');
 			if (item && !includes(panels, item)) throw Error('set activedescendant failed: item is not child of deck');
 			forEach(panels, function(child) {
 				if (child === item) child.ariaToggle('hidden', false);
@@ -5887,16 +5888,16 @@
 	},
 
 	connectController: function() {
-		var deck = this;
-		var name = deck.attr('name'); 
+		let deck = this;
+		let name = deck.attr('name');
 		if (!name) {
 			deck.ariaSet('activedescendant', deck.ariaGet('owns')[0]);
 			return;
 		}
 		controllers.listen(name, function(values) {
-			var panels = deck.ariaGet('owns');
-			var activePanel = find(panels, function(child) { 
-				var value = child.getAttribute('value');
+			let panels = deck.ariaGet('owns');
+			let activePanel = find(panels, function(child) {
+				let value = child.getAttribute('value');
 				if (!includes(values, value)) return false;
 				return true;
 			});
@@ -5910,9 +5911,9 @@
 	return Deck;
 	})();
 
-	var ResponsiveDeck = (function() {
+	let ResponsiveDeck = (function() {
 
-	var ResponsiveDeck = sprockets.evolve(Deck, {
+	let ResponsiveDeck = sprockets.evolve(Deck, {
 		
 	});
 
@@ -5933,10 +5934,10 @@
 	},
 
 	refresh: function() { // TODO should this be static method?
-		var width = parseFloat(window.getComputedStyle(this.element, null).width);
-		var panels = this.ariaGet('owns');
-		var activePanel = find(panels, function(panel) {
-			var minWidth = window.getComputedStyle(panel, null).minWidth;
+		let width = parseFloat(window.getComputedStyle(this.element, null).width);
+		let panels = this.ariaGet('owns');
+		let activePanel = find(panels, function(panel) {
+			let minWidth = window.getComputedStyle(panel, null).minWidth;
 			if (minWidth == null || minWidth === '' || minWidth === '0px') return true;
 			minWidth = parseFloat(minWidth); // FIXME minWidth should be "NNNpx" but need to test
 			if (minWidth > width) return false;
@@ -5967,7 +5968,7 @@
 	sprockets.registerElement(namespace.lookupSelector('deck'), Deck);
 	sprockets.registerElement(namespace.lookupSelector('rdeck'), ResponsiveDeck);
 
-	var cssText = [
+	let cssText = [
 	'*[hidden] { display: none !important; }', // TODO maybe not !important
 	namespace.lookupSelector('layer, popup, hlayout, vlayout, deck, rdeck, panel, body') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
 	namespace.lookupSelector('layer') + ' { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; }',
@@ -5987,13 +5988,13 @@
 	namespace.lookupSelector('rdeck') + ' > * { width: 0; height: 0; }',
 	].join('\n');
 
-	var style = document$8.createElement('style');
+	let style = document$8.createElement('style');
 	style.textContent = cssText;
 	document$8.head.insertBefore(style, document$8.head.firstChild);
 
 	} // END registerLayoutElements()
 
-	var layoutElements = {
+	let layoutElements = {
 
 	register: registerLayoutElements
 
@@ -6018,11 +6019,11 @@
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
 
-	var document$9 = window.document;
+	let document$9 = window.document;
 
-	var namespace$1; // will be set by external call to registerFrameElements()
+	let namespace$1; // will be set by external call to registerFrameElements()
 
-	var frameDefinitions = new Registry({
+	let frameDefinitions = new Registry({
 		writeOnce: true,
 		testKey: function(key) {
 			return typeof key === 'string';
@@ -6032,16 +6033,16 @@
 		}
 	});
 
-	var HFrame = (function() {
+	let HFrame = (function() {
 
-	var HFrame = sprockets.evolve(Panel, {
+	let HFrame = sprockets.evolve(Panel, {
 
 	role: 'frame',
 
 	isFrame: true,
 
 	preload: function(request) {
-		var frame = this;
+		let frame = this;
 		return Promise.pipe(request, [
 			
 		function(request) { return frame.definition.render(request, 'loading'); },
@@ -6054,7 +6055,7 @@
 	},
 
 	load: function(response) { // FIXME need a teardown method that releases child-frames	
-		var frame = this;
+		let frame = this;
 		if (response) frame.src = response.url;
 		// else a no-src frame
 		return Promise.pipe(response, [
@@ -6073,10 +6074,10 @@
 	},
 
 	insert: function(bodyElement, replace) { // FIXME need a teardown method that releases child-frames	
-		var frame = this;
-		var element = frame.element;
+		let frame = this;
+		let element = frame.element;
 		
-		var options = frame.options;
+		let options = frame.options;
 
 		// FIXME .bodyElement will probably become .bodies[] for transition animations.
 		if (frame.bodyElement) {
@@ -6088,7 +6089,7 @@
 		}
 
 		if (replace) {
-			var frag = adoptContents(bodyElement, element.ownerDocument);
+			let frag = adoptContents(bodyElement, element.ownerDocument);
 			sprockets.insertNode('replace', element, frag);
 			return;
 		}
@@ -6103,9 +6104,9 @@
 	},
 
 	refresh: function() {
-		var frame = this;
-		var element = this.element;
-		var src = frame.attr('src');
+		let frame = this;
+		let element = this.element;
+		let src = frame.attr('src');
 
 		return Promise.resolve().then(function() {
 
@@ -6117,12 +6118,12 @@
 				return; // FIXME frame.load(null, { condition: 'uninitialized' })
 			}
 
-			var fullURL = URL(src);
-			var nohash = fullURL.nohash;
-			var hash = fullURL.hash;
+			let fullURL = URL(src);
+			let nohash = fullURL.nohash;
+			let hash = fullURL.hash;
 
-			var request = { method: 'get', url: nohash, responseType: 'document'};
-			var response;
+			let request = { method: 'get', url: nohash, responseType: 'document'};
+			let response;
 
 			return Promise.pipe(null, [ // FIXME how to handle `hash` if present??
 
@@ -6148,8 +6149,8 @@
 	attached: function(handlers) {
 		Panel.attached.call(this, handlers);
 
-		var frame = this;
-		var def = frame.attr('def');
+		let frame = this;
+		let def = frame.attr('def');
 		frame.definition = frameDefinitions.get(def); // FIXME assert frameDefinitions.has(def)
 		defaults(frame, {
 			bodyElement: null,
@@ -6177,10 +6178,10 @@
 	},
 
 	observeAttributes: function() {
-		var attrList = [].splice.call(arguments, 0);
-		var frame = this;
-		var element = frame.element;
-		var observer = observeAttributes(element, function(attrName) {
+		let attrList = [].splice.call(arguments, 0);
+		let frame = this;
+		let element = frame.element;
+		let observer = observeAttributes(element, function(attrName) {
 			HFrame.attributeChanged.call(frame, attrName);
 		}, attrList);
 		frame.attributeObserver = observer;
@@ -6192,9 +6193,9 @@
 
 	});
 
-	var observeAttributes = (window.MutationObserver) ?
+	let observeAttributes = (window.MutationObserver) ?
 	function(element, callback, attrList) {
-		var observer = new MutationObserver(function(mutations, observer) {
+		let observer = new MutationObserver(function(mutations, observer) {
 			forEach(mutations, function(record) {
 				if (record.type !== 'attributes') return;
 				callback.call(record.target, record.attributeName);
@@ -6231,18 +6232,18 @@
 
 	sprockets.registerElement(namespace$1.lookupSelector('frame'), HFrame);
 
-	var cssText = [
+	let cssText = [
 	namespace$1.lookupSelector('frame') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
 	namespace$1.lookupSelector('frame') + ' { display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }' // FIXME text-align: start
 	].join('\n');
 
-	var style = document$9.createElement('style');
+	let style = document$9.createElement('style');
 	style.textContent = cssText;
 	document$9.head.insertBefore(style, document$9.head.firstChild);
 
 	} // END registerFrameElements()
 
-	var frameElements = {
+	let frameElements = {
 
 	register: registerFrameElements
 
@@ -6256,17 +6257,17 @@
 
 	/* BEGIN HFrameset code */
 
-	var HYPERFRAMESET_URN$1 = 'hyperframeset';
-	var hfDefaultNamespace = new CustomNamespace({
+	const HYPERFRAMESET_URN$1 = 'hyperframeset';
+	const hfDefaultNamespace = new CustomNamespace({
 		name: 'hf',
 		style: 'vendor',
 		urn: HYPERFRAMESET_URN$1
 	});
 
 
-	var hfHeadTags = words('title meta link style script');
+	const hfHeadTags = words('title meta link style script');
 
-	var HFrameDefinition = (function() {
+	let HFrameDefinition = (function() {
 
 	function HFrameDefinition(el, framesetDef) {
 		if (!el) return; // in case of inheritance
@@ -6277,20 +6278,20 @@
 	defaults(HFrameDefinition.prototype, {
 
 	init: function(el) {
-	    var frameDef = this;
-		var framesetDef = frameDef.framesetDefinition;
+	    let frameDef = this;
+		let framesetDef = frameDef.framesetDefinition;
 		defaults(frameDef, {
 			element: el,
 			mainSelector: el.getAttribute('main') // TODO consider using a hash in `@src`
 	    });
-		var bodies = frameDef.bodies = [];
+		frameDef.bodies = [];
 		forEach(map(el.childNodes), function(node) {
-			var tag = getTagName(node);
+			let tag = getTagName(node);
 			if (!tag) return;
 			if (includes(hfHeadTags, tag)) return; // ignore typical <head> elements
 			if (tag === framesetDef.namespaces.lookupTagNameNS('body', HYPERFRAMESET_URN$1)) {
 				el.removeChild(node);
-				bodies.push(new HBodyDefinition(node, framesetDef));
+				frameDef.bodies.push(new HBodyDefinition(node, framesetDef));
 				return;
 			}
 			console.warn('Unexpected element in HFrame: ' + tag);
@@ -6301,15 +6302,15 @@
 	},
 
 	render: function(resource, condition, details) {
-		var frameDef = this;
-		var framesetDef = frameDef.framesetDefinition;
+		let frameDef = this;
+		let framesetDef = frameDef.framesetDefinition;
 		if (!details) details = {};
 		defaults(details, { // TODO more details??
 			scope: framesetDef.scope,
 			url: resource && resource.url,
 			mainSelector: frameDef.mainSelector,
 		});
-		var bodyDef = find(frameDef.bodies, function(body) { return body.condition === condition;});
+		let bodyDef = find(frameDef.bodies, function(body) { return body.condition === condition;});
 		if (!bodyDef) return; // FIXME what to do here??
 		return bodyDef.render(resource, details);
 	}
@@ -6321,7 +6322,7 @@
 	})();
 
 
-	var HBodyDefinition = (function() {
+	let HBodyDefinition = (function() {
 		
 	function HBodyDefinition(el, framesetDef) {
 		if (!el) return; // in case of inheritance
@@ -6329,9 +6330,9 @@
 		this.init(el);
 	}
 
-	var conditions = words('uninitialized loading loaded error');
+	let conditions = words('uninitialized loading loaded error');
 
-	var conditionAliases = {
+	let conditionAliases = {
 		'blank': 'uninitialized',
 		'waiting': 'loading',
 		'interactive': 'loaded',
@@ -6354,10 +6355,10 @@
 	defaults(HBodyDefinition.prototype, {
 
 	init: function(el) {
-		var bodyDef = this;
-		var framesetDef = bodyDef.framesetDefinition;
-		var condition = el.getAttribute('condition');
-		var finalCondition;
+		let bodyDef = this;
+		let framesetDef = bodyDef.framesetDefinition;
+		let condition = el.getAttribute('condition');
+		let finalCondition;
 		if (condition) {
 			finalCondition = normalizeCondition(condition);
 			if (!finalCondition) {
@@ -6384,24 +6385,24 @@
 	},
 
 	render: function(resource, details) {
-		var bodyDef = this;
-		var framesetDef = bodyDef.framesetDefinition;
+		let bodyDef = this;
+		let framesetDef = bodyDef.framesetDefinition;
 		if (bodyDef.transforms.length <= 0) {
 			return bodyDef.element.cloneNode(true);
 		}
 		if (!resource) return null;
-		var doc = resource.document; // FIXME what if resource is a Request?
+		let doc = resource.document; // FIXME what if resource is a Request?
 		if (!doc) return null;
-		var frag0 = doc;
+		let frag0 = doc;
 		if (details.mainSelector) frag0 = find$1(details.mainSelector, doc);
 
 		return Promise.reduce(frag0, bodyDef.transforms, function(fragment, transform) {
 			return transform.process(fragment, details);
 		})
 		.then(function(fragment) {
-			var el = bodyDef.element.cloneNode(false);
+			let el = bodyDef.element.cloneNode(false);
 			// crop to <body> if it exists
-			var htmlBody = find$1('body', fragment);
+			let htmlBody = find$1('body', fragment);
 			if (htmlBody) fragment = adoptContents(htmlBody, el.ownerDocument);
 			// remove all stylesheets
 			forEach(findAll('link[rel~=stylesheet], style', fragment), function(node) {
@@ -6418,7 +6419,7 @@
 	})();
 
 
-	var HTransformDefinition = (function() {
+	let HTransformDefinition = (function() {
 		
 	function HTransformDefinition(el, framesetDef) {
 		if (!el) return; // in case of inheritance
@@ -6429,32 +6430,32 @@
 	defaults(HTransformDefinition.prototype, {
 
 	init: function(el) {
-		var transform = this;
-		var framesetDef = transform.framesetDefinition;
+		let transform = this;
+		let framesetDef = transform.framesetDefinition;
 		defaults(transform, {
 			element: el,
 			type: el.getAttribute('type') || 'main',
 			format: el.getAttribute('format')
 	    });
 		if (transform.type === 'main') transform.format = '';
-		var doc = framesetDef.document; // or el.ownerDocument
-		var frag = doc.createDocumentFragment();
-		var node;
+		let doc = framesetDef.document; // or el.ownerDocument
+		let frag = doc.createDocumentFragment();
+		let node;
 		while (node = el.firstChild) frag.appendChild(node); // NOTE no adoption
 
-		var options;
+		let options;
 		if (el.hasAttribute('config')) {
-			var configID = words(el.getAttribute('config'))[0];
+			let configID = words(el.getAttribute('config'))[0];
 			options = configData.get(configID);
 		}
-		var processor = transform.processor = processors.create(transform.type, options, framesetDef.namespaces);
+		let processor = transform.processor = processors.create(transform.type, options, framesetDef.namespaces);
 		processor.loadTemplate(frag);
 	},
 
 	process: function(srcNode, details) {
-		var transform = this;
-		var framesetDef = transform.framesetDefinition;
-		var decoder;
+		let transform = this;
+		let framesetDef = transform.framesetDefinition;
+		let decoder;
 		if (transform.format) {
 			decoder = decoders.create(transform.format, {}, framesetDef.namespaces);
 			decoder.init(srcNode);
@@ -6462,8 +6463,8 @@
 		else decoder = {
 			srcNode: srcNode
 		};
-		var processor = transform.processor;
-		var output = processor.transform(decoder, details);
+		let processor = transform.processor;
+		let output = processor.transform(decoder, details);
 		return output;
 	}
 
@@ -6473,7 +6474,7 @@
 	})();
 
 
-	var HFramesetDefinition = (function() {
+	let HFramesetDefinition = (function() {
 
 	function HFramesetDefinition(doc, settings) {
 		if (!doc) return; // in case of inheritance
@@ -6484,34 +6485,34 @@
 	defaults(HFramesetDefinition.prototype, {
 
 	init: function(doc, settings) {
-		var framesetDef = this;
+		let framesetDef = this;
 		defaults(framesetDef, {
 			url: settings.framesetURL,
 			scope: settings.scope
 		});
 
-		var namespaces = framesetDef.namespaces = CustomNamespace.getNamespaces(doc);
+		let namespaces = framesetDef.namespaces = CustomNamespace.getNamespaces(doc);
 		if (!namespaces.lookupNamespace(HYPERFRAMESET_URN$1)) {
 			namespaces.add(hfDefaultNamespace);
 		}
 
 		// NOTE first rebase scope: urls
-		var scopeURL = URL(settings.scope);
+		let scopeURL = URL(settings.scope);
 		rebase(doc, scopeURL);
-		var frameElts = findAll(
+		let frameElts = findAll(
 			framesetDef.namespaces.lookupSelector('frame', HYPERFRAMESET_URN$1), 
 			doc.body);
 		forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
 			// NOTE first rebase @src with scope: urls
-			var src = el.getAttribute('src');
+			let src = el.getAttribute('src');
 			if (src) {
-				var newSrc = rebaseURL(src, scopeURL);
+				let newSrc = rebaseURL(src, scopeURL);
 				if (newSrc != src) el.setAttribute('src', newSrc);
 			}
 		});
 
 		// warn about not using @id
-		var idElements = findAll('*[id]:not(script)', doc.body);
+		let idElements = findAll('*[id]:not(script)', doc.body);
 		if (idElements.length) {
 			console.warn('@id is strongly discouraged in frameset-documents (except on <script>).\n' +
 				'Found ' + idElements.length + ', ' + 
@@ -6520,16 +6521,16 @@
 		}
 
 		// Add @id and @sourceurl to inline <script type="text/javascript">
-		var scripts = findAll('script', doc);
+		let scripts = findAll('script', doc);
 		forEach(scripts, function(script, i) {
 			// ignore non-javascript scripts
 			if (script.type && !/^text\/javascript/.test(script.type)) return;
 			// ignore external scripts
 			if (script.hasAttribute('src')) return;
-			var id = script.id;
+			let id = script.id;
 			// TODO generating ID always has a chance of duplicating IDs
 			if (!id) id = script.id = 'script[' + i + ']'; // FIXME doc that i is zero-indexed
-			var sourceURL;
+			let sourceURL;
 			if (script.hasAttribute('sourceurl')) sourceURL = script.getAttribute('sourceurl');
 			else {
 				sourceURL = framesetDef.url + '__' + id; // FIXME this should be configurable
@@ -6539,7 +6540,7 @@
 		});
 
 		// Move all <script for> in <head> to <body>
-		var firstChild = doc.body.firstChild;
+		let firstChild = doc.body.firstChild;
 		forEach(findAll('script[for]', doc.head), function(script) {
 			doc.body.insertBefore(script, firstChild);
 			script.setAttribute('for', '');
@@ -6556,24 +6557,24 @@
 			console.info('Moved <script> in frameset <body> to <head>');
 		});
 
-		var allowedScope = 'panel, frame';
-		var allowedScopeSelector = framesetDef.namespaces.lookupSelector(allowedScope, HYPERFRAMESET_URN$1);
+		let allowedScope = 'panel, frame';
+		let allowedScopeSelector = framesetDef.namespaces.lookupSelector(allowedScope, HYPERFRAMESET_URN$1);
 		normalizeScopedStyles(doc, allowedScopeSelector);
 
-		var body = doc.body;
+		let body = doc.body;
 		body.parentNode.removeChild(body);
 		framesetDef.document = doc;
 		framesetDef.element = body;
 	},
 
 	preprocess: function() {
-		var framesetDef = this;
-		var body = framesetDef.element;
+		let framesetDef = this;
+		let body = framesetDef.element;
 		defaults(framesetDef, {
 			frames: {} // all hyperframe definitions. Indexed by @defid (which may be auto-generated)
 		});
 
-		var scripts = findAll('script', body);
+		let scripts = findAll('script', body);
 		forEach(scripts, function(script, i) {
 			// Ignore non-javascript scripts
 			if (script.type && !/^text\/javascript/.test(script.type)) return;
@@ -6586,7 +6587,7 @@
 				return;
 			}
 
-			var sourceURL = script.getAttribute('sourceurl');
+			let sourceURL = script.getAttribute('sourceurl');
 
 			// TODO probably don't need this as handled by init()
 			if (!script.hasAttribute('for')) {
@@ -6604,16 +6605,16 @@
 				return;
 			}
 
-			var scriptFor = script;
+			let scriptFor = script;
 			while (scriptFor = scriptFor.previousSibling) {
 				if (scriptFor.nodeType !== 1) continue;
-				var tag = getTagName(scriptFor);
+				let tag = getTagName(scriptFor);
 				if (tag !== 'script' && tag !== 'style') break;
 			}
 			if (!scriptFor) scriptFor = script.parentNode;
 			
 			// FIXME @config shouldn't be hard-wired here
-			var configID = scriptFor.hasAttribute('config') ? 
+			let configID = scriptFor.hasAttribute('config') ?
 				scriptFor.getAttribute('config') :
 				'';
 			// TODO we can add more than one @config to an element but only first is used
@@ -6622,11 +6623,11 @@
 				sourceURL;
 			scriptFor.setAttribute('config', configID);
 
-			var fnText = 'return (' + script.text + '\n);';
+			let fnText = 'return (' + script.text + '\n);';
 
 			try {
-				var fn = Function(fnText);
-				var object = fn();
+				let fn = Function(fnText);
+				let object = fn();
 				configData.set(sourceURL, object);
 			}
 			catch(err) { 
@@ -6638,19 +6639,19 @@
 			script.parentNode.removeChild(script); // physical <script> no longer needed
 		});
 
-		var frameElts = findAll(
+		let frameElts = findAll(
 			framesetDef.namespaces.lookupSelector('frame', HYPERFRAMESET_URN$1), 
 			body);
-		var frameDefElts = [];
-		var frameRefElts = [];
+		let frameDefElts = [];
+		let frameRefElts = [];
 		forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
 
 			// NOTE even if the frame is only a declaration (@def && @def !== @defid) it still has its content removed
-			var placeholder = el.cloneNode(false);
+			let placeholder = el.cloneNode(false);
 			el.parentNode.replaceChild(placeholder, el); // NOTE no adoption
 
-			var defId = el.getAttribute('defid');
-			var def = el.getAttribute('def');
+			let defId = el.getAttribute('defid');
+			let def = el.getAttribute('def');
 			if (def && def !== defId) {
 				frameRefElts.push(el);
 				return;
@@ -6666,25 +6667,25 @@
 			frameDefElts.push(el);
 		});
 		forEach(frameDefElts, function(el) {
-			var defId = el.getAttribute('defid');
+			let defId = el.getAttribute('defid');
 			framesetDef.frames[defId] = new HFrameDefinition(el, framesetDef);
 		});
 		forEach(frameRefElts, function(el) {
-			var def = el.getAttribute('def');
-			var ref = framesetDef.frames[def];
+			let def = el.getAttribute('def');
+			let ref = framesetDef.frames[def];
 			if (!ref) {
 				console.warn('Frame declaration references non-existant frame definition: ' + def);
 				return;
 			}
-			var refEl = ref.element;
+			let refEl = ref.element;
 			if (!refEl.hasAttribute('scopeid')) return;
-			var id = el.getAttribute('id');
+			let id = el.getAttribute('id');
 			if (id) {
 				console.warn('Frame declaration references a frame definition with scoped-styles but these cannot be applied because the frame declaration has its own @id: ' + id);
 				return;
 			}
 			id = refEl.getAttribute('id');
-			var scopeId = refEl.getAttribute('scopeid');
+			let scopeId = refEl.getAttribute('scopeid');
 			if (id !== scopeId) {
 				console.warn('Frame declaration references a frame definition with scoped-styles but these cannot be applied because the frame definition has its own @id: ' + id);
 				return;
@@ -6695,7 +6696,7 @@
 	},
 
 	render: function() {
-		var framesetDef = this;
+		let framesetDef = this;
 		return framesetDef.element.cloneNode(true);
 	}
 
@@ -6707,15 +6708,15 @@
 	 is rewritten with `path` being relative to the current scope.
 	 */
 
-	var urlAttributes = URL.attributes;
+	let urlAttributes = URL.attributes;
 
 	function rebase(doc, scopeURL) {
 		forOwn(urlAttributes, function(attrList, tag) {
 			forEach(findAll(tag, doc), function(el) {
 				forOwn(attrList, function(attrDesc, attrName) {
-					var relURL = el.getAttribute(attrName);
+					let relURL = el.getAttribute(attrName);
 					if (relURL == null) return;
-					var url = rebaseURL(relURL, scopeURL);
+					let url = rebaseURL(relURL, scopeURL);
 					if (url != relURL) el[attrName] = url;
 				});
 			});
@@ -6723,37 +6724,37 @@
 	}
 
 	function rebaseURL(url, baseURL) {
-		var relURL = url.replace(/^scope:/i, '');
+		let relURL = url.replace(/^scope:/i, '');
 		if (relURL == url) return url;
 		return baseURL.resolve(relURL);
 	}
 
 	function normalizeScopedStyles(doc, allowedScopeSelector) {
-		var scopedStyles = findAll('style[scoped]', doc.body);
-		var dummyDoc = createHTMLDocument('', doc);
+		let scopedStyles = findAll('style[scoped]', doc.body);
+		let dummyDoc = createHTMLDocument('', doc);
 		forEach(scopedStyles, function(el, index) {
-			var scope = el.parentNode;
+			let scope = el.parentNode;
 			if (!matches(scope, allowedScopeSelector)) {
 				console.warn('Removing <style scoped>. Must be child of ' + allowedScopeSelector);
 				scope.removeChild(el);
 				return;
 			}
 			
-			var scopeId = '__scope_' + index + '__';
+			let scopeId = '__scope_' + index + '__';
 			scope.setAttribute('scopeid', scopeId);
 			if (scope.hasAttribute('id')) scopeId = scope.getAttribute('id');
 			else scope.setAttribute('id', scopeId);
 
 			el.removeAttribute('scoped');
-			var sheet = el.sheet || (function() {
+			let sheet = el.sheet || (function() {
 				// Firefox doesn't seem to instatiate el.sheet in XHR documents
-				var dummyEl = dummyDoc.createElement('style');
+				let dummyEl = dummyDoc.createElement('style');
 				dummyEl.textContent = el.textContent;
 				insertNode('beforeend', dummyDoc.head, dummyEl);
 				return dummyEl.sheet;
 			})();
 			forRules(sheet, processRule, scope);
-			var cssText = map(sheet.cssRules, function(rule) { 
+			let cssText = map(sheet.cssRules, function(rule) {
 					return rule.cssText; 
 				}).join('\n');
 			el.textContent = cssText;
@@ -6763,15 +6764,15 @@
 	}
 
 	function processRule(rule, id, parentRule) {
-		var scope = this;
+		let scope = this;
 		switch (rule.type) {
 		case 1: // CSSRule.STYLE_RULE
 			// prefix each selector in selector-chain with scopePrefix
 			// selector-chain is split on COMMA (,) that is not inside BRACKETS. Technically: not followed by a RHB ')' unless first followed by LHB '(' 
-			var scopeId = scope.getAttribute('scopeid');
-			var scopePrefix = '#' + scopeId + ' ';
-			var selectorText = scopePrefix + rule.selectorText.replace(/,(?![^(]*\))/g, ', ' + scopePrefix); 
-			var cssText = rule.cssText.replace(rule.selectorText, '');
+			let scopeId = scope.getAttribute('scopeid');
+			let scopePrefix = '#' + scopeId + ' ';
+			let selectorText = scopePrefix + rule.selectorText.replace(/,(?![^(]*\))/g, ', ' + scopePrefix);
+			let cssText = rule.cssText.replace(rule.selectorText, '');
 			cssText = selectorText + ' ' + cssText;
 			parentRule.deleteRule(id);
 			parentRule.insertRule(cssText, id);
@@ -6793,8 +6794,8 @@
 	}
 
 	function forRules(parentRule, callback, context) {
-		var ruleList = parentRule.cssRules;
-		for (var i=ruleList.length-1; i>=0; i--) callback.call(context, ruleList[i], i, parentRule);
+		let ruleList = parentRule.cssRules;
+		for (let i=ruleList.length-1; i>=0; i--) callback.call(context, ruleList[i], i, parentRule);
 	}
 		
 
@@ -6828,9 +6829,9 @@
 	const FRAMESET_REL = 'frameset'; // NOTE http://lists.w3.org/Archives/Public/www-html/1996Dec/0143.html
 	const SELF_REL = 'self';
 
-	var document$a = window.document;
+	let document$a = window.document;
 
-	var framer = {};
+	let framer = {};
 
 	defaults(framer, {
 
@@ -6845,7 +6846,7 @@
 	},
 
 	config: function(options) {
-		var framer = this;
+		let framer = this;
 		if (!options) return;
 		assign(framer.options, options);
 	}
@@ -6853,7 +6854,7 @@
 	});
 
 
-	var framesetReady = Promise.applyTo();
+	let framesetReady = Promise.applyTo();
 
 	defaults(framer, {
 
@@ -6862,7 +6863,7 @@
 	started: false,
 
 	start: function(startOptions) {
-		var framer = this;
+		let framer = this;
 		
 		if (framer.started) throw Error('Already started');
 		if (!startOptions || !startOptions.contentDocument) throw Error('No contentDocument passed to start()');
@@ -6884,7 +6885,7 @@
 		},
 
 		function() { // lookup or detect frameset.URL
-			var framerConfig;
+			let framerConfig;
 			framerConfig = framer.lookup(document$a.URL);
 			if (framerConfig) return framerConfig;
 			return startOptions.contentDocument
@@ -6896,12 +6897,12 @@
 		function(framerConfig) { // initiate fetch of frameset.URL
 			if (!framerConfig) throw Error('No frameset could be determined for this page');
 			framer.scope = framerConfig.scope; // FIXME shouldn't set this until loadFramesetDefinition() returns success
-			var framesetURL = URL(framerConfig.framesetURL);
+			let framesetURL = URL(framerConfig.framesetURL);
 			if (framesetURL.hash) console.info('Ignoring hash component of frameset URL: ' + framesetURL.hash);
 			framer.framesetURL = framerConfig.framesetURL = framesetURL.nohash;
 			return httpProxy.load(framer.framesetURL, { responseType: 'document' })
 			.then(function(response) {
-				var framesetDoc = response.document;
+				let framesetDoc = response.document;
 				return new HFramesetDefinition(framesetDoc, framerConfig);
 			});
 		},
@@ -6928,19 +6929,19 @@
 		function() {
 			window.addEventListener('click', function(e) {
 				if (e.defaultPrevented) return;
-				var acceptDefault = framer.onClick(e);
+				let acceptDefault = framer.onClick(e);
 				if (acceptDefault === false) e.preventDefault();
 			}, false); // onClick generates requestnavigation event
 			window.addEventListener('submit', function(e) {
 				if (e.defaultPrevented) return;
-				var acceptDefault = framer.onSubmit(e);
+				let acceptDefault = framer.onSubmit(e);
 				if (acceptDefault === false) e.preventDefault();
 			}, false);
 			
 			registerFrames(framer.definition);
 			interceptFrameElements();
 			retargetFramesetElements();
-			var namespace = framer.definition.namespaces.lookupNamespace(HYPERFRAMESET_URN$2);
+			let namespace = framer.definition.namespaces.lookupNamespace(HYPERFRAMESET_URN$2);
 			layoutElements.register(namespace);
 			frameElements.register(namespace);
 			registerFramesetElement();
@@ -6953,7 +6954,7 @@
 			return framesetReady
 			.then(function() {
 
-				var changeset = framer.currentChangeset;
+				let changeset = framer.currentChangeset;
 				// FIXME what if no changeset is returned
 				return historyManager.start(changeset, '', document$a.URL,
 					function(state) { }, // FIXME need some sort of rendering status
@@ -6985,27 +6986,27 @@
 
 	});
 
-	var prepareFrameset = function(dstDoc, definition) {
+	let prepareFrameset = function(dstDoc, definition) {
 
 		if (getFramesetMarker(dstDoc)) throw Error('The HFrameset has already been applied');
 
-		var srcDoc = cloneDocument(definition.document);
+		let srcDoc = cloneDocument(definition.document);
 
-		var selfMarker;
+		let selfMarker;
 		
 		return Promise.pipe(null, [
 
 		function() { // remove all <link rel=stylesheet /> just in case
 			// FIXME maybe remove all <link>
-			var dstHead = dstDoc.head;
+			let dstHead = dstDoc.head;
 			forEach(findAll('link[rel|=stylesheet]', dstHead), function(node) {
 				dstHead.removeChild(node);
 			});
 		},
 
 		function() { // empty the body
-			var dstBody = dstDoc.body;
-			var node;
+			let dstBody = dstDoc.body;
+			let node;
 			while (node = dstBody.firstChild) dstBody.removeChild(node);
 		},
 
@@ -7019,7 +7020,7 @@
 		},
 
 		function() {
-			var framesetMarker = dstDoc.createElement('link');
+			let framesetMarker = dstDoc.createElement('link');
 			framesetMarker.rel = FRAMESET_REL;
 			framesetMarker.href = definition.src;
 			dstDoc.head.insertBefore(framesetMarker, selfMarker); // NOTE no adoption
@@ -7040,19 +7041,19 @@
 
 	};
 
-	var prerenderFrameset = function(dstDoc, definition) { // FIXME where does this go
-		var srcBody = definition.element;
-		var dstBody = document$a.body;
+	let prerenderFrameset = function(dstDoc, definition) { // FIXME where does this go
+		let srcBody = definition.element;
+		let dstBody = document$a.body;
 		mergeElement(dstBody, srcBody);
 	};
 
 	// TODO separateHead and mergeHead are only called with isFrameset === true
 	function separateHead(dstDoc, isFrameset) {
-		var dstHead = dstDoc.head;
-		var framesetMarker = getFramesetMarker(dstDoc);
+		let dstHead = dstDoc.head;
+		let framesetMarker = getFramesetMarker(dstDoc);
 		if (!framesetMarker) throw Error('No ' + FRAMESET_REL + ' marker found. ');
 
-		var selfMarker = getSelfMarker(dstDoc);
+		let selfMarker = getSelfMarker(dstDoc);
 		// remove frameset / page elements except for <script type=text/javascript>
 		if (isFrameset) forEach(siblings('after', framesetMarker, 'before', selfMarker), remove);
 		else forEach(siblings('after', selfMarker), remove);
@@ -7064,11 +7065,11 @@
 	}
 
 	function mergeHead(dstDoc, srcHead, isFrameset) {
-		var baseURL = URL(dstDoc.URL);
-		var dstHead = dstDoc.head;
-		var framesetMarker = getFramesetMarker();
+		let baseURL = URL(dstDoc.URL);
+		let dstHead = dstDoc.head;
+		let framesetMarker = getFramesetMarker();
 		if (!framesetMarker) throw Error('No ' + FRAMESET_REL + ' marker found. ');
-		var selfMarker = getSelfMarker();
+		let selfMarker = getSelfMarker();
 
 		separateHead(dstDoc, isFrameset);
 
@@ -7107,13 +7108,13 @@
 
 	function getFramesetMarker(doc) {
 		if (!doc) doc = document$a;
-		var marker = find$1('link[rel~=' + FRAMESET_REL + ']', doc.head);
+		let marker = find$1('link[rel~=' + FRAMESET_REL + ']', doc.head);
 		return marker;
 	}
 
 	function getSelfMarker(doc) {
 		if (!doc) doc = document$a;
-		var marker = find$1('link[rel~=' + SELF_REL + ']', doc.head); 
+		let marker = find$1('link[rel~=' + SELF_REL + ']', doc.head);
 		return marker;
 	}
 
@@ -7121,9 +7122,9 @@
 	defaults(framer, {
 
 	framesetEntered: function(frameset) {
-		var framer = this;
+		let framer = this;
 		framer.frameset = frameset;
-		var url = document$a.URL;
+		let url = document$a.URL;
 		framer.currentChangeset = frameset.lookup(url, {
 			referrer: document$a.referrer
 		});
@@ -7131,14 +7132,14 @@
 	},
 
 	framesetLeft: function(frameset) { // WARN this should never happen
-		var framer = this;
+		let framer = this;
 		delete framer.frameset;
 	},
 
 	frameEntered: function(frame) {
-		var namespaces = framer.definition.namespaces;
-		var parentFrame;
-		var parentElement = closest(frame.element.parentNode, HFrame.isFrame); // TODO frame.element.parentNode.ariaClosest('frame')
+		let namespaces = framer.definition.namespaces;
+		let parentFrame;
+		let parentElement = closest(frame.element.parentNode, HFrame.isFrame); // TODO frame.element.parentNode.ariaClosest('frame')
 		if (parentElement) parentFrame = parentElement.$;
 		else {
 			parentElement = document$a.body; // TODO  frame.element.parentNode.ariaClosest('frameset'); 
@@ -7153,36 +7154,36 @@
 	},
 
 	frameLeft: function(frame) {
-		var parentFrame = frame.parentFrame;
+		let parentFrame = frame.parentFrame;
 		delete frame.parentFrame;
 		parentFrame.frameLeft(frame);
 	},
 
 	onClick: function(e) { // return false means success
-		var framer = this;
+		let framer = this;
 
 		if (e.button != 0) return; // FIXME what is the value for button in IE's W3C events model??
 		if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return; // FIXME do these always trigger modified click behavior??
 
 		// Find closest <a href> to e.target
-		var linkElement = closest(e.target, 'a, [link]');
+		let linkElement = closest(e.target, 'a, [link]');
 		if (!linkElement) return;
-		var hyperlink;
+		let hyperlink;
 		if (getTagName(linkElement) === 'a') hyperlink = linkElement;
 		else {
 			hyperlink = find$1('a, link', linkElement);
 			if (!hyperlink) hyperlink = closest('a', linkElement);
 			if (!hyperlink) return;
 		}
-		var href = hyperlink.getAttribute('href');
+		let href = hyperlink.getAttribute('href');
 		if (!href) return; // not really a hyperlink
 
-		var baseURL = URL(document$a.URL);
-		var url = baseURL.resolve(href); // TODO probably don't need to resolve on browsers that support pushstate
+		let baseURL = URL(document$a.URL);
+		let url = baseURL.resolve(href); // TODO probably don't need to resolve on browsers that support pushstate
 
 		// NOTE The following creates a pseudo-event and dispatches to frames in a bubbling order.
 		// FIXME May as well use a virtual event system, e.g. DOMSprockets
-		var details = {
+		let details = {
 			url: url,
 			element: hyperlink
 		}; // TODO more details?? event??
@@ -7192,22 +7193,22 @@
 	},
 
 	onSubmit: function(e) { // return false means success
-		var framer = this;
+		let framer = this;
 
 		// test submit
-		var form = e.target;
+		let form = e.target;
 		if (form.target) return; // no iframe
-		var baseURL = URL(document$a.URL);
-		var action = baseURL.resolve(form.action); // TODO probably don't need to resolve on browsers that support pushstate
+		let baseURL = URL(document$a.URL);
+		let action = baseURL.resolve(form.action); // TODO probably don't need to resolve on browsers that support pushstate
 		
-		var details = {
+		let details = {
 			element: form
 		};
-		var method = lc(form.method);
+		let method = lc(form.method);
 		switch(method) {
 		case 'get':
-			var oURL = URL(action);
-			var query = encode(form);
+			let oURL = URL(action);
+			let query = encode(form);
 			details.url = oURL.nosearch + (oURL.search || '?') + query + oURL.hash;
 			break;
 		default: return; // TODO handle POST
@@ -7217,7 +7218,7 @@
 		return false;
 		
 		function encode(form) {
-			var data = [];
+			let data = [];
 			forEach(form.elements, function(el) {
 				if (!el.name) return;
 				data.push(el.name + '=' + encodeURIComponent(el.value));
@@ -7228,9 +7229,9 @@
 
 	triggerRequestNavigation: function(url, details) {
 		Promise.defer(function() {
-			var event = document$a.createEvent('CustomEvent');
+			let event = document$a.createEvent('CustomEvent');
 			event.initCustomEvent('requestnavigation', true, true, details.url);
-			var acceptDefault = details.element.dispatchEvent(event);
+			let acceptDefault = details.element.dispatchEvent(event);
 			if (acceptDefault !== false) {
 				location.assign(details.url);
 			}
@@ -7238,15 +7239,15 @@
 	},
 
 	onRequestNavigation: function(e, frame) { // `return false` means success (so preventDefault)
-		var framer = this;
+		let framer = this;
 		if (!frame) throw Error('Invalid frame / frameset in onRequestNavigation');
 		// NOTE only pushState enabled browsers use this
 		// We want panning to be the default behavior for clicks on hyperlinks - <a href>
 		// Before panning to the next page, have to work out if that is appropriate
 		// `return` means ignore the click
 
-		var url = e.detail;
-		var details = {
+		let url = e.detail;
+		let details = {
 			url: url,
 			element: e.target
 		};
@@ -7257,19 +7258,19 @@
 		}
 		
 		// test hyperlinks
-		var baseURL = URL(document$a.URL);
-		var oURL = URL(url);
+		let baseURL = URL(document$a.URL);
+		let oURL = URL(url);
 		if (oURL.origin != baseURL.origin) return; // no external urls
 
 		// TODO perhaps should test same-site and same-page links
-		var isPageLink = (oURL.nohash === baseURL.nohash); // TODO what about page-links that match the current hash?
+		let isPageLink = (oURL.nohash === baseURL.nohash); // TODO what about page-links that match the current hash?
 		if (isPageLink) {
 			framer.onPageLink(url, details);
 			return false;
 		}
 
-		var frameset = frame;
-		var framesetScope = framer.lookup(url);
+		let frameset = frame;
+		let framesetScope = framer.lookup(url);
 		if (!framesetScope || !framer.compareFramesetScope(framesetScope)) { // allow normal browser navigation
 			return;
 		}
@@ -7278,7 +7279,7 @@
 		return;
 
 		function requestNavigation(frame, url, details) { // `return true` means success
-			var changeset = frame.lookup(url, details);
+			let changeset = frame.lookup(url, details);
 			if (changeset === '' || changeset === true) return true;
 			if (changeset == null || changeset === false) return false;
 			framer.load(url, changeset, frame.isFrameset);
@@ -7292,26 +7293,26 @@
 	},
 
 	navigate: function(url, changeset) { // FIXME doesn't support replaceState
-		var framer = this;	
+		let framer = this;
 		return framer.load(url, changeset, true);
 	},
 
 	load: function(url, changeset, changeState) { // FIXME doesn't support replaceState
-		var framer = this;	
-		var frameset = framer.frameset;
-		var mustNotify = changeState || changeState === 0;
-		var target = changeset.target;
-		var frames = [];
+		let framer = this;
+		let frameset = framer.frameset;
+		let mustNotify = changeState || changeState === 0;
+		let target = changeset.target;
+		let frames = [];
 		recurseFrames(frameset, function(frame) {
 			if (frame.targetname !== target) return;
 			frames.push(frame);
 			return true;
 		});
 		
-		var fullURL = URL(url);
-		var hash = fullURL.hash;
-		var nohash = fullURL.nohash;
-		var request = { method: 'get', url: nohash, responseType: 'document' }; // TODO one day may support different response-type
+		let fullURL = URL(url);
+		let hash = fullURL.hash;
+		let nohash = fullURL.nohash;
+		let request = { method: 'get', url: nohash, responseType: 'document' }; // TODO one day may support different response-type
 
 		return Promise.pipe(null, [
 
@@ -7350,16 +7351,16 @@
 
 		function recurseFrames(parentFrame, fn) {
 			forEach(parentFrame.frames, function(frame) {
-				var found = fn(frame);
+				let found = fn(frame);
 				if (!found) recurseFrames(frame, fn);
 			});			
 		}
 	},
 
 	onPopState: function(changeset) {
-		var framer = this;
-		var frameset = framer.frameset;
-		var url = changeset.url;
+		let framer = this;
+		let frameset = framer.frameset;
+		let url = changeset.url;
 		if (url !== document$a.URL) {
 			console.warn('Popped state URL does not match address-bar URL.');
 			// FIXME needs an optional error recovery, perhaps reloading document.URL
@@ -7372,9 +7373,9 @@
 	defaults(framer, {
 
 	lookup: function(docURL) {
-		var framer = this;
+		let framer = this;
 		if (!framer.options.lookup) return;
-		var result = framer.options.lookup(docURL);
+		let result = framer.options.lookup(docURL);
 		// FIXME if (result === '' || result === true) 
 		if (result == null || result === false) return false;
 
@@ -7385,9 +7386,9 @@
 	},
 
 	detect: function(srcDoc) {
-		var framer = this;
+		let framer = this;
 		if (!framer.options.detect) return;
-		var result = framer.options.detect(srcDoc);
+		let result = framer.options.detect(srcDoc);
 		// FIXME if (result === '' || result === true) 
 		if (result == null || result === false) return false;
 
@@ -7398,7 +7399,7 @@
 	},
 
 	compareFramesetScope: function(settings) {
-		var framer = this;
+		let framer = this;
 		if (framer.framesetURL !== settings.framesetURL) return false;
 		if (framer.scope !== settings.scope) return false;
 		return true;
@@ -7409,10 +7410,10 @@
 	});
 
 	function implyFramesetScope(framesetSrc, docSrc) {
-		var docURL = URL(docSrc);
-		var docSiteURL = URL(docURL.origin);
-		var framesetSrc = docSiteURL.resolve(framesetSrc);
-		var scope = implyScope(framesetSrc, docSrc);
+		let docURL = URL(docSrc);
+		let docSiteURL = URL(docURL.origin);
+		framesetSrc = docSiteURL.resolve(framesetSrc);
+		let scope = implyScope(framesetSrc, docSrc);
 		return {
 			scope: scope,
 			framesetURL: framesetSrc
@@ -7420,16 +7421,16 @@
 	}
 
 	function implyScope(framesetSrc, docSrc) {
-		var docURL = URL(docSrc);
-		var framesetURL = URL(framesetSrc);
-		var scope = docURL.base;
-		var framesetBase = framesetURL.base;
+		let docURL = URL(docSrc);
+		let framesetURL = URL(framesetSrc);
+		let scope = docURL.base;
+		let framesetBase = framesetURL.base;
 		if (scope.indexOf(framesetBase) >= 0) scope = framesetBase;
 		return scope;
 	}
 
 	function inferChangeset(url, partial) {
-		var inferred = {
+		let inferred = {
 			url: url
 		};
 		
@@ -7454,15 +7455,15 @@
 	}
 
 
-	var notify = function(msg) { // FIXME this isn't being used called everywhere it should
-		var module;
+	let notify = function(msg) { // FIXME this isn't being used called everywhere it should
+		let module;
 		switch (msg.module) {
 		case 'frameset': module = framer.frameset.options; break;
 		default: return Promise.resolve();
 		}
-		var handler = module[msg.type];
+		let handler = module[msg.type];
 		if (!handler) return Promise.resolve();
-		var listener;
+		let listener;
 
 		if (handler[msg.stage]) listener = handler[msg.stage];
 		else switch(msg.module) {
@@ -7484,7 +7485,7 @@
 		}
 
 		if (typeof listener == 'function') {
-			var promise = Promise.defer(function() { listener(msg); }); // TODO isFunction(listener)
+			let promise = Promise.defer(function() { listener(msg); }); // TODO isFunction(listener)
 			promise['catch'](function(err) { throw Error(err); });
 			return promise;
 		}
@@ -7507,7 +7508,7 @@
 	},
 
 	frameLeft: function(frame) {
-		var index = this.frames.indexOf(frame);
+		let index = this.frames.indexOf(frame);
 		this.frames.splice(index);
 	}
 
@@ -7539,9 +7540,9 @@
 	} // end patch
 
 
-	var HFrameset = (function() {
+	let HFrameset = (function() {
 
-	var HFrameset = sprockets.evolve(HBase, {
+	let HFrameset = sprockets.evolve(HBase, {
 
 	role: 'frameset',
 	isFrameset: true,
@@ -7551,17 +7552,17 @@
 	},
 
 	frameLeft: function(frame) {
-		var index = this.frames.indexOf(frame);
+		let index = this.frames.indexOf(frame);
 		this.frames.splice(index);
 	},
 
 	render: function() {
 
-		var frameset = this;
-		var definition = frameset.definition;
-		var dstBody = this.element;
+		let frameset = this;
+		let definition = frameset.definition;
+		let dstBody = this.element;
 
-		var srcBody = definition.render();
+		let srcBody = definition.render();
 		
 		return Promise.pipe(null, [
 
@@ -7582,7 +7583,7 @@
 	attached: function(handlers) {
 		HBase.attached.call(this, handlers);
 
-		var frameset = this;
+		let frameset = this;
 		frameset.definition = framer.definition; // TODO remove `framer` dependency
 		defaults(frameset, {
 			frames: []
@@ -7592,13 +7593,13 @@
 	}, 
 
 	enteredDocument: function() {
-		var frameset = this;
+		let frameset = this;
 		framer.framesetEntered(frameset); // TODO remove `framer` dependency
 		frameset.render();
 	},
 
 	leftDocument: function() { // FIXME should never be called??
-		var frameset = this;
+		let frameset = this;
 		framer.framesetLeft(frameset); // TODO remove `framer` dependency
 	}
 
@@ -7613,10 +7614,10 @@
 	assign(HBase.prototype, {
 
 	lookup: function(url, details) {
-		var link = this;
-		var options = link.options;
+		let link = this;
+		let options = link.options;
 		if (!options || !options.lookup) return false;
-		var partial = options.lookup(url, details);
+		let partial = options.lookup(url, details);
 		if (partial === '' || partial === true) return true;
 		if (partial == null || partial === false) return false;
 		return framer.inferChangeset(url, partial);
@@ -7628,15 +7629,15 @@
 
 	HBase.attached = function(handlers) {
 		HBase._attached.call(this, handlers);
-		var object = this;
-		var options = object.options;
+		let object = this;
+		let options = object.options;
 		if (!options.lookup) return;
 
 		handlers.push({
 			type: 'requestnavigation',
 			action: function(e) {
 				if (e.defaultPrevented) return;
-				var acceptDefault = framer.onRequestNavigation(e, this);
+				let acceptDefault = framer.onRequestNavigation(e, this);
 				if (acceptDefault === false) e.preventDefault();
 			}
 		});
@@ -7647,11 +7648,11 @@
 	function registerFramesetElement() {
 
 		sprockets.registerElement('body', HFrameset);
-		var cssText = [
+		let cssText = [
 		'html, body { margin: 0; padding: 0; }',
 		'html { width: 100%; height: 100%; }'
 		];
-		var style = document$a.createElement('style');
+		let style = document$a.createElement('style');
 		style.textContent = cssText;
 		document$a.head.insertBefore(style, document$a.head.firstChild);
 
@@ -7659,7 +7660,7 @@
 
 	(function() {
 
-	    var stuff = assign({}, _);
+	    let stuff = assign({}, _);
 	    stuff.dateFormat = dateFormat;
 
 	    if (!this.Meeko) this.Meeko = {};

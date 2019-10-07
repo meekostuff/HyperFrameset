@@ -18,11 +18,11 @@ import Registry from './Registry.mjs';
 import sprockets from './Sprocket.mjs';
 import { Panel } from './layoutElements.mjs';
 
-var document = window.document;
+let document = window.document;
 
-var namespace; // will be set by external call to registerFrameElements()
+let namespace; // will be set by external call to registerFrameElements()
 
-var frameDefinitions = new Registry({
+let frameDefinitions = new Registry({
 	writeOnce: true,
 	testKey: function(key) {
 		return typeof key === 'string';
@@ -32,16 +32,16 @@ var frameDefinitions = new Registry({
 	}
 });
 
-var HFrame = (function() {
+let HFrame = (function() {
 
-var HFrame = sprockets.evolve(Panel, {
+let HFrame = sprockets.evolve(Panel, {
 
 role: 'frame',
 
 isFrame: true,
 
 preload: function(request) {
-	var frame = this;
+	let frame = this;
 	return Promise.pipe(request, [
 		
 	function(request) { return frame.definition.render(request, 'loading'); },
@@ -54,7 +54,7 @@ preload: function(request) {
 },
 
 load: function(response) { // FIXME need a teardown method that releases child-frames	
-	var frame = this;
+	let frame = this;
 	if (response) frame.src = response.url;
 	// else a no-src frame
 	return Promise.pipe(response, [
@@ -73,10 +73,10 @@ load: function(response) { // FIXME need a teardown method that releases child-f
 },
 
 insert: function(bodyElement, replace) { // FIXME need a teardown method that releases child-frames	
-	var frame = this;
-	var element = frame.element;
+	let frame = this;
+	let element = frame.element;
 	
-	var options = frame.options;
+	let options = frame.options;
 
 	// FIXME .bodyElement will probably become .bodies[] for transition animations.
 	if (frame.bodyElement) {
@@ -88,7 +88,7 @@ insert: function(bodyElement, replace) { // FIXME need a teardown method that re
 	}
 
 	if (replace) {
-		var frag = DOM.adoptContents(bodyElement, element.ownerDocument);
+		let frag = DOM.adoptContents(bodyElement, element.ownerDocument);
 		sprockets.insertNode('replace', element, frag);
 		return;
 	}
@@ -103,9 +103,9 @@ insert: function(bodyElement, replace) { // FIXME need a teardown method that re
 },
 
 refresh: function() {
-	var frame = this;
-	var element = this.element;
-	var src = frame.attr('src');
+	let frame = this;
+	let element = this.element;
+	let src = frame.attr('src');
 
 	return Promise.resolve().then(function() {
 
@@ -117,12 +117,12 @@ refresh: function() {
 			return; // FIXME frame.load(null, { condition: 'uninitialized' })
 		}
 
-		var fullURL = URL(src);
-		var nohash = fullURL.nohash;
-		var hash = fullURL.hash;
+		let fullURL = URL(src);
+		let nohash = fullURL.nohash;
+		let hash = fullURL.hash;
 
-		var request = { method: 'get', url: nohash, responseType: 'document'};
-		var response;
+		let request = { method: 'get', url: nohash, responseType: 'document'};
+		let response;
 
 		return Promise.pipe(null, [ // FIXME how to handle `hash` if present??
 
@@ -148,8 +148,8 @@ _.assign(HFrame, {
 attached: function(handlers) {
 	Panel.attached.call(this, handlers);
 
-	var frame = this;
-	var def = frame.attr('def');
+	let frame = this;
+	let def = frame.attr('def');
 	frame.definition = frameDefinitions.get(def); // FIXME assert frameDefinitions.has(def)
 	_.defaults(frame, {
 		bodyElement: null,
@@ -177,10 +177,10 @@ attributeChanged: function(attrName) {
 },
 
 observeAttributes: function() {
-	var attrList = [].splice.call(arguments, 0);
-	var frame = this;
-	var element = frame.element;
-	var observer = observeAttributes(element, function(attrName) {
+	let attrList = [].splice.call(arguments, 0);
+	let frame = this;
+	let element = frame.element;
+	let observer = observeAttributes(element, function(attrName) {
 		HFrame.attributeChanged.call(frame, attrName);
 	}, attrList);
 	frame.attributeObserver = observer;
@@ -192,9 +192,9 @@ isFrame: function(element) {
 
 });
 
-var observeAttributes = (window.MutationObserver) ?
+let observeAttributes = (window.MutationObserver) ?
 function(element, callback, attrList) {
-	var observer = new MutationObserver(function(mutations, observer) {
+	let observer = new MutationObserver(function(mutations, observer) {
 		_.forEach(mutations, function(record) {
 			if (record.type !== 'attributes') return;
 			callback.call(record.target, record.attributeName);
@@ -231,18 +231,18 @@ namespace = ns; // TODO assert ns instanceof CustomNamespace
 
 sprockets.registerElement(namespace.lookupSelector('frame'), HFrame);
 
-var cssText = [
+let cssText = [
 namespace.lookupSelector('frame') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
 namespace.lookupSelector('frame') + ' { display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }' // FIXME text-align: start
 ].join('\n');
 
-var style = document.createElement('style');
+let style = document.createElement('style');
 style.textContent = cssText;
 document.head.insertBefore(style, document.head.firstChild);
 
 } // END registerFrameElements()
 
-var frameElements = {
+let frameElements = {
 
 register: registerFrameElements
 

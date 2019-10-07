@@ -10,18 +10,18 @@ import configData from './configData.mjs';
 import sprockets from './Sprocket.mjs';
 import controllers from './controllers.mjs';
 
-var document = window.document;
+let document = window.document;
 
-var namespace; // will be set by external call to registerFramesetElements()
+let namespace; // will be set by external call to registerFramesetElements()
 
 /*
  * HyperFrameset sprockets
  */
 
 // All HyperFrameset sprockets will inherit from HBase
-var HBase = (function() {
+let HBase = (function() {
 
-var HBase = sprockets.evolve(sprockets.RoleType, {
+let HBase = sprockets.evolve(sprockets.RoleType, {
 
 });
 
@@ -38,12 +38,12 @@ leftDocument: function() { // WARN void method: don't remove
 },
 
 connectOptions: function() {
-	var object = this;
+	let object = this;
 	object.options = {};
-	var element = object.element;
+	let element = object.element;
 	if (!element.hasAttribute('config')) return;
-	var configID = _.words(element.getAttribute('config'))[0];	
-	var options = configData.get(configID);
+	let configID = _.words(element.getAttribute('config'))[0];
+	let options = configData.get(configID);
 	object.options = options;
 }
 });
@@ -52,9 +52,9 @@ return HBase;
 })();
 
 
-var Layer = (function() {
+let Layer = (function() {
 
-var Layer = sprockets.evolve(HBase, {
+let Layer = sprockets.evolve(HBase, {
 
 role: 'layer',
 
@@ -62,7 +62,7 @@ isLayer: true
 
 });
 
-var zIndex = 1;
+let zIndex = 1;
 
 _.assign(Layer, {
 
@@ -89,9 +89,9 @@ isLayer: function(element) {
 return Layer;
 })();
 
-var Popup = (function() {
+let Popup = (function() {
 
-var Popup = sprockets.evolve(HBase, {
+let Popup = sprockets.evolve(HBase, {
 
 role: 'popup',
 
@@ -114,9 +114,9 @@ leftDocument: function() {
 },
 
 connectController: function() {
-	var panel = this;
-	var name = panel.attr('name'); 
-	var value = panel.attr('value'); 
+	let panel = this;
+	let name = panel.attr('name');
+	let value = panel.attr('value');
 	if (!name && !value) return;
 	panel.ariaToggle('hidden', true);
 	if (!name) return; // being controlled by an ancestor
@@ -130,9 +130,9 @@ connectController: function() {
 return Popup;
 })();
 
-var Panel = (function() {
+let Panel = (function() {
 
-var Panel = sprockets.evolve(HBase, {
+let Panel = sprockets.evolve(HBase, {
 
 role: 'panel',
 
@@ -161,20 +161,20 @@ leftDocument: function() {
 },
 
 adjustBox: function() {
-	var overflow = this.attr('overflow');
+	let overflow = this.attr('overflow');
 	if (overflow) this.css('overflow', overflow); // FIXME sanity check
-	var height = this.attr('height');
+	let height = this.attr('height');
 	if (height) this.css('height', height); // FIXME units
-	var width = this.attr('width');
+	let width = this.attr('width');
 	if (width) this.css('width', width); // FIXME units
-	var minWidth = this.attr('minwidth');
+	let minWidth = this.attr('minwidth');
 	if (minWidth) this.css('min-width', minWidth); // FIXME units
 }, 
 
 connectController: function() {
-	var panel = this;
-	var name = panel.attr('name'); 
-	var value = panel.attr('value'); 
+	let panel = this;
+	let name = panel.attr('name');
+	let value = panel.attr('value');
 	if (!name && !value) return;
 	panel.ariaToggle('hidden', true);
 	if (!name) return; // being controlled by an ancestor
@@ -192,9 +192,9 @@ isPanel: function(element) {
 return Panel;
 })();
 
-var Layout = (function() { // a Layout is a list of Panel (or other Layout) and perhaps separators for hlayout, vlayout
+let Layout = (function() { // a Layout is a list of Panel (or other Layout) and perhaps separators for hlayout, vlayout
 
-var Layout = sprockets.evolve(HBase, {
+let Layout = sprockets.evolve(HBase, {
 
 role: 'group',
 
@@ -229,24 +229,24 @@ leftDocument: function() {
 },
 
 adjustBox: function() {
-	var element = this.element;
-	var parent = element.parentNode;
+	let element = this.element;
+	let parent = element.parentNode;
 
 	// FIXME dimension setting should occur before becoming visible
 	if (!DOM.matches(parent, Layer.isLayer)) return;
 	// TODO vh, vw not tested on various platforms
-	var height = this.attr('height'); // TODO css unit parsing / validation
+	let height = this.attr('height'); // TODO css unit parsing / validation
 	if (!height) height = '100vh';
 	else height = height.replace('%', 'vh');
 	this.css('height', height); // FIXME units
-	var width = this.attr('width'); // TODO css unit parsing / validation
+	let width = this.attr('width'); // TODO css unit parsing / validation
 	if (!width) width = '100vw';
 	else width = width.replace('%', 'vw');
 	if (width) this.css('width', width); // FIXME units
 },
 
 normalizeChildren: function() {
-	var element = this.element;
+	let element = this.element;
 	_.forEach(_.map(element.childNodes), normalizeChild, element);
 },
 
@@ -257,7 +257,7 @@ isLayout: function(element) {
 });
 
 function normalizeChild(node) {
-	var element = this;
+	let element = this;
 	switch (node.nodeType) {
 	case 1: // hide non-layout elements
 		if (DOM.matches(node, function(el) { return Panel.isPanel(el) || Layout.isLayout(el); })) return;
@@ -268,7 +268,7 @@ function normalizeChild(node) {
 			element.removeChild(node);
 			return;
 		}
-		var wbr = element.ownerDocument.createElement('wbr');
+		let wbr = element.ownerDocument.createElement('wbr');
 		wbr.hidden = true;
 		element.replaceChild(wbr, node); // NOTE no adoption
 		wbr.appendChild(node); // NOTE no adoption
@@ -282,9 +282,9 @@ return Layout;
 })();
 
 
-var VLayout = (function() {
+let VLayout = (function() {
 
-var VLayout = sprockets.evolve(Layout, {
+let VLayout = sprockets.evolve(Layout, {
 });
 
 _.assign(VLayout, {
@@ -292,7 +292,7 @@ _.assign(VLayout, {
 attached: function(handlers) {
 	Layout.attached.call(this, handlers);
 
-	var hAlign = this.attr('align'); // FIXME assert left/center/right/justify - also start/end (stretch?)
+	let hAlign = this.attr('align'); // FIXME assert left/center/right/justify - also start/end (stretch?)
 	if (hAlign) this.css('text-align', hAlign); // NOTE defaults defined in <style> above
 },
 
@@ -309,9 +309,9 @@ leftDocument: function() {
 return VLayout;
 })();
 
-var HLayout = (function() {
+let HLayout = (function() {
 
-var HLayout = sprockets.evolve(Layout, {
+let HLayout = sprockets.evolve(Layout, {
 });
 
 _.assign(HLayout, {
@@ -323,7 +323,7 @@ attached: function(handlers) {
 enteredDocument: function() {
 	Layout.enteredDocument.call(this);
 
-	var vAlign = this.attr('align'); // FIXME assert top/middle/bottom/baseline - also start/end (stretch?)
+	let vAlign = this.attr('align'); // FIXME assert top/middle/bottom/baseline - also start/end (stretch?)
 	_.forEach(this.ariaGet('owns'), function(panel) {
 		if (vAlign) panel.$.css('vertical-align', vAlign);
 	});
@@ -339,15 +339,15 @@ leftDocument: function() {
 return HLayout;
 })();
 
-var Deck = (function() {
+let Deck = (function() {
 
-var Deck = sprockets.evolve(Layout, {
+let Deck = sprockets.evolve(Layout, {
 
 activedescendant: {
 	set: function(item) { // if !item then hide all children
 		
-		var element = this.element;
-		var panels = this.ariaGet('owns');
+		let element = this.element;
+		let panels = this.ariaGet('owns');
 		if (item && !_.includes(panels, item)) throw Error('set activedescendant failed: item is not child of deck');
 		_.forEach(panels, function(child) {
 			if (child === item) child.ariaToggle('hidden', false);
@@ -381,16 +381,16 @@ leftDocument: function() {
 },
 
 connectController: function() {
-	var deck = this;
-	var name = deck.attr('name'); 
+	let deck = this;
+	let name = deck.attr('name');
 	if (!name) {
 		deck.ariaSet('activedescendant', deck.ariaGet('owns')[0]);
 		return;
 	}
 	controllers.listen(name, function(values) {
-		var panels = deck.ariaGet('owns');
-		var activePanel = _.find(panels, function(child) { 
-			var value = child.getAttribute('value');
+		let panels = deck.ariaGet('owns');
+		let activePanel = _.find(panels, function(child) {
+			let value = child.getAttribute('value');
 			if (!_.includes(values, value)) return false;
 			return true;
 		});
@@ -404,9 +404,9 @@ connectController: function() {
 return Deck;
 })();
 
-var ResponsiveDeck = (function() {
+let ResponsiveDeck = (function() {
 
-var ResponsiveDeck = sprockets.evolve(Deck, {
+let ResponsiveDeck = sprockets.evolve(Deck, {
 	
 });
 
@@ -427,10 +427,10 @@ leftDocument: function() {
 },
 
 refresh: function() { // TODO should this be static method?
-	var width = parseFloat(window.getComputedStyle(this.element, null).width);
-	var panels = this.ariaGet('owns');
-	var activePanel = _.find(panels, function(panel) {
-		var minWidth = window.getComputedStyle(panel, null).minWidth;
+	let width = parseFloat(window.getComputedStyle(this.element, null).width);
+	let panels = this.ariaGet('owns');
+	let activePanel = _.find(panels, function(panel) {
+		let minWidth = window.getComputedStyle(panel, null).minWidth;
 		if (minWidth == null || minWidth === '' || minWidth === '0px') return true;
 		minWidth = parseFloat(minWidth); // FIXME minWidth should be "NNNpx" but need to test
 		if (minWidth > width) return false;
@@ -461,7 +461,7 @@ sprockets.registerElement(namespace.lookupSelector('hlayout'), HLayout);
 sprockets.registerElement(namespace.lookupSelector('deck'), Deck);
 sprockets.registerElement(namespace.lookupSelector('rdeck'), ResponsiveDeck);
 
-var cssText = [
+let cssText = [
 '*[hidden] { display: none !important; }', // TODO maybe not !important
 namespace.lookupSelector('layer, popup, hlayout, vlayout, deck, rdeck, panel, body') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
 namespace.lookupSelector('layer') + ' { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; }',
@@ -481,13 +481,13 @@ namespace.lookupSelector('deck') + ' > * { width: 100%; height: 100%; }',
 namespace.lookupSelector('rdeck') + ' > * { width: 0; height: 0; }',
 ].join('\n');
 
-var style = document.createElement('style');
+let style = document.createElement('style');
 style.textContent = cssText;
 document.head.insertBefore(style, document.head.firstChild);
 
 } // END registerLayoutElements()
 
-var layoutElements = {
+let layoutElements = {
 
 register: registerLayoutElements
 

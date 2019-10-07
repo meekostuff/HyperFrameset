@@ -17,17 +17,17 @@ import processors from './processors.mjs';
 
 /* BEGIN HFrameset code */
 
-var HYPERFRAMESET_URN = 'hyperframeset';
-var hfDefaultNamespace = new CustomNamespace({
+const HYPERFRAMESET_URN = 'hyperframeset';
+const hfDefaultNamespace = new CustomNamespace({
 	name: 'hf',
 	style: 'vendor',
 	urn: HYPERFRAMESET_URN
 });
 
 
-var hfHeadTags = _.words('title meta link style script');
+const hfHeadTags = _.words('title meta link style script');
 
-var HFrameDefinition = (function() {
+let HFrameDefinition = (function() {
 
 function HFrameDefinition(el, framesetDef) {
 	if (!el) return; // in case of inheritance
@@ -38,20 +38,20 @@ function HFrameDefinition(el, framesetDef) {
 _.defaults(HFrameDefinition.prototype, {
 
 init: function(el) {
-    var frameDef = this;
-	var framesetDef = frameDef.framesetDefinition;
+    let frameDef = this;
+	let framesetDef = frameDef.framesetDefinition;
 	_.defaults(frameDef, {
 		element: el,
 		mainSelector: el.getAttribute('main') // TODO consider using a hash in `@src`
     });
-	var bodies = frameDef.bodies = [];
+	frameDef.bodies = [];
 	_.forEach(_.map(el.childNodes), function(node) {
-		var tag = DOM.getTagName(node);
+		let tag = DOM.getTagName(node);
 		if (!tag) return;
 		if (_.includes(hfHeadTags, tag)) return; // ignore typical <head> elements
 		if (tag === framesetDef.namespaces.lookupTagNameNS('body', HYPERFRAMESET_URN)) {
 			el.removeChild(node);
-			bodies.push(new HBodyDefinition(node, framesetDef));
+			frameDef.bodies.push(new HBodyDefinition(node, framesetDef));
 			return;
 		}
 		console.warn('Unexpected element in HFrame: ' + tag);
@@ -62,15 +62,15 @@ init: function(el) {
 },
 
 render: function(resource, condition, details) {
-	var frameDef = this;
-	var framesetDef = frameDef.framesetDefinition;
+	let frameDef = this;
+	let framesetDef = frameDef.framesetDefinition;
 	if (!details) details = {};
 	_.defaults(details, { // TODO more details??
 		scope: framesetDef.scope,
 		url: resource && resource.url,
 		mainSelector: frameDef.mainSelector,
 	});
-	var bodyDef = _.find(frameDef.bodies, function(body) { return body.condition === condition;});
+	let bodyDef = _.find(frameDef.bodies, function(body) { return body.condition === condition;});
 	if (!bodyDef) return; // FIXME what to do here??
 	return bodyDef.render(resource, details);
 }
@@ -82,7 +82,7 @@ return HFrameDefinition;
 })();
 
 
-var HBodyDefinition = (function() {
+let HBodyDefinition = (function() {
 	
 function HBodyDefinition(el, framesetDef) {
 	if (!el) return; // in case of inheritance
@@ -90,9 +90,9 @@ function HBodyDefinition(el, framesetDef) {
 	this.init(el);
 }
 
-var conditions = _.words('uninitialized loading loaded error');
+let conditions = _.words('uninitialized loading loaded error');
 
-var conditionAliases = {
+let conditionAliases = {
 	'blank': 'uninitialized',
 	'waiting': 'loading',
 	'interactive': 'loaded',
@@ -115,10 +115,10 @@ conditionAliases: conditionAliases
 _.defaults(HBodyDefinition.prototype, {
 
 init: function(el) {
-	var bodyDef = this;
-	var framesetDef = bodyDef.framesetDefinition;
-	var condition = el.getAttribute('condition');
-	var finalCondition;
+	let bodyDef = this;
+	let framesetDef = bodyDef.framesetDefinition;
+	let condition = el.getAttribute('condition');
+	let finalCondition;
 	if (condition) {
 		finalCondition = normalizeCondition(condition);
 		if (!finalCondition) {
@@ -145,24 +145,24 @@ init: function(el) {
 },
 
 render: function(resource, details) {
-	var bodyDef = this;
-	var framesetDef = bodyDef.framesetDefinition;
+	let bodyDef = this;
+	let framesetDef = bodyDef.framesetDefinition;
 	if (bodyDef.transforms.length <= 0) {
 		return bodyDef.element.cloneNode(true);
 	}
 	if (!resource) return null;
-	var doc = resource.document; // FIXME what if resource is a Request?
+	let doc = resource.document; // FIXME what if resource is a Request?
 	if (!doc) return null;
-	var frag0 = doc;
+	let frag0 = doc;
 	if (details.mainSelector) frag0 = DOM.find(details.mainSelector, doc);
 
 	return Promise.reduce(frag0, bodyDef.transforms, function(fragment, transform) {
 		return transform.process(fragment, details);
 	})
 	.then(function(fragment) {
-		var el = bodyDef.element.cloneNode(false);
+		let el = bodyDef.element.cloneNode(false);
 		// crop to <body> if it exists
-		var htmlBody = DOM.find('body', fragment);
+		let htmlBody = DOM.find('body', fragment);
 		if (htmlBody) fragment = DOM.adoptContents(htmlBody, el.ownerDocument);
 		// remove all stylesheets
 		_.forEach(DOM.findAll('link[rel~=stylesheet], style', fragment), function(node) {
@@ -179,7 +179,7 @@ return HBodyDefinition;
 })();
 
 
-var HTransformDefinition = (function() {
+let HTransformDefinition = (function() {
 	
 function HTransformDefinition(el, framesetDef) {
 	if (!el) return; // in case of inheritance
@@ -190,32 +190,32 @@ function HTransformDefinition(el, framesetDef) {
 _.defaults(HTransformDefinition.prototype, {
 
 init: function(el) {
-	var transform = this;
-	var framesetDef = transform.framesetDefinition;
+	let transform = this;
+	let framesetDef = transform.framesetDefinition;
 	_.defaults(transform, {
 		element: el,
 		type: el.getAttribute('type') || 'main',
 		format: el.getAttribute('format')
     });
 	if (transform.type === 'main') transform.format = '';
-	var doc = framesetDef.document; // or el.ownerDocument
-	var frag = doc.createDocumentFragment();
-	var node;
+	let doc = framesetDef.document; // or el.ownerDocument
+	let frag = doc.createDocumentFragment();
+	let node;
 	while (node = el.firstChild) frag.appendChild(node); // NOTE no adoption
 
-	var options;
+	let options;
 	if (el.hasAttribute('config')) {
-		var configID = _.words(el.getAttribute('config'))[0];
+		let configID = _.words(el.getAttribute('config'))[0];
 		options = configData.get(configID);
 	}
-	var processor = transform.processor = processors.create(transform.type, options, framesetDef.namespaces);
+	let processor = transform.processor = processors.create(transform.type, options, framesetDef.namespaces);
 	processor.loadTemplate(frag);
 },
 
 process: function(srcNode, details) {
-	var transform = this;
-	var framesetDef = transform.framesetDefinition;
-	var decoder;
+	let transform = this;
+	let framesetDef = transform.framesetDefinition;
+	let decoder;
 	if (transform.format) {
 		decoder = decoders.create(transform.format, {}, framesetDef.namespaces);
 		decoder.init(srcNode);
@@ -223,8 +223,8 @@ process: function(srcNode, details) {
 	else decoder = {
 		srcNode: srcNode
 	}
-	var processor = transform.processor;
-	var output = processor.transform(decoder, details);
+	let processor = transform.processor;
+	let output = processor.transform(decoder, details);
 	return output;
 }
 
@@ -234,7 +234,7 @@ return HTransformDefinition;
 })();
 
 
-var HFramesetDefinition = (function() {
+let HFramesetDefinition = (function() {
 
 function HFramesetDefinition(doc, settings) {
 	if (!doc) return; // in case of inheritance
@@ -245,34 +245,34 @@ function HFramesetDefinition(doc, settings) {
 _.defaults(HFramesetDefinition.prototype, {
 
 init: function(doc, settings) {
-	var framesetDef = this;
+	let framesetDef = this;
 	_.defaults(framesetDef, {
 		url: settings.framesetURL,
 		scope: settings.scope
 	});
 
-	var namespaces = framesetDef.namespaces = CustomNamespace.getNamespaces(doc);
+	let namespaces = framesetDef.namespaces = CustomNamespace.getNamespaces(doc);
 	if (!namespaces.lookupNamespace(HYPERFRAMESET_URN)) {
 		namespaces.add(hfDefaultNamespace);
 	}
 
 	// NOTE first rebase scope: urls
-	var scopeURL = URL(settings.scope);
+	let scopeURL = URL(settings.scope);
 	rebase(doc, scopeURL);
-	var frameElts = DOM.findAll(
+	let frameElts = DOM.findAll(
 		framesetDef.namespaces.lookupSelector('frame', HYPERFRAMESET_URN), 
 		doc.body);
 	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
 		// NOTE first rebase @src with scope: urls
-		var src = el.getAttribute('src');
+		let src = el.getAttribute('src');
 		if (src) {
-			var newSrc = rebaseURL(src, scopeURL);
+			let newSrc = rebaseURL(src, scopeURL);
 			if (newSrc != src) el.setAttribute('src', newSrc);
 		}
 	});
 
 	// warn about not using @id
-	var idElements = DOM.findAll('*[id]:not(script)', doc.body);
+	let idElements = DOM.findAll('*[id]:not(script)', doc.body);
 	if (idElements.length) {
 		console.warn('@id is strongly discouraged in frameset-documents (except on <script>).\n' +
 			'Found ' + idElements.length + ', ' + 
@@ -281,16 +281,16 @@ init: function(doc, settings) {
 	}
 
 	// Add @id and @sourceurl to inline <script type="text/javascript">
-	var scripts = DOM.findAll('script', doc);
+	let scripts = DOM.findAll('script', doc);
 	_.forEach(scripts, function(script, i) {
 		// ignore non-javascript scripts
 		if (script.type && !/^text\/javascript/.test(script.type)) return;
 		// ignore external scripts
 		if (script.hasAttribute('src')) return;
-		var id = script.id;
+		let id = script.id;
 		// TODO generating ID always has a chance of duplicating IDs
 		if (!id) id = script.id = 'script[' + i + ']'; // FIXME doc that i is zero-indexed
-		var sourceURL;
+		let sourceURL;
 		if (script.hasAttribute('sourceurl')) sourceURL = script.getAttribute('sourceurl');
 		else {
 			sourceURL = framesetDef.url + '__' + id; // FIXME this should be configurable
@@ -300,7 +300,7 @@ init: function(doc, settings) {
 	});
 
 	// Move all <script for> in <head> to <body>
-	var firstChild = doc.body.firstChild;
+	let firstChild = doc.body.firstChild;
 	_.forEach(DOM.findAll('script[for]', doc.head), function(script) {
 		doc.body.insertBefore(script, firstChild);
 		script.setAttribute('for', '');
@@ -317,24 +317,24 @@ init: function(doc, settings) {
 		console.info('Moved <script> in frameset <body> to <head>');
 	});
 
-	var allowedScope = 'panel, frame';
-	var allowedScopeSelector = framesetDef.namespaces.lookupSelector(allowedScope, HYPERFRAMESET_URN);
+	let allowedScope = 'panel, frame';
+	let allowedScopeSelector = framesetDef.namespaces.lookupSelector(allowedScope, HYPERFRAMESET_URN);
 	normalizeScopedStyles(doc, allowedScopeSelector);
 
-	var body = doc.body;
+	let body = doc.body;
 	body.parentNode.removeChild(body);
 	framesetDef.document = doc;
 	framesetDef.element = body;
 },
 
 preprocess: function() {
-	var framesetDef = this;
-	var body = framesetDef.element;
+	let framesetDef = this;
+	let body = framesetDef.element;
 	_.defaults(framesetDef, {
 		frames: {} // all hyperframe definitions. Indexed by @defid (which may be auto-generated)
 	});
 
-	var scripts = DOM.findAll('script', body);
+	let scripts = DOM.findAll('script', body);
 	_.forEach(scripts, function(script, i) {
 		// Ignore non-javascript scripts
 		if (script.type && !/^text\/javascript/.test(script.type)) return;
@@ -347,7 +347,7 @@ preprocess: function() {
 			return;
 		}
 
-		var sourceURL = script.getAttribute('sourceurl');
+		let sourceURL = script.getAttribute('sourceurl');
 
 		// TODO probably don't need this as handled by init()
 		if (!script.hasAttribute('for')) {
@@ -365,16 +365,16 @@ preprocess: function() {
 			return;
 		}
 
-		var scriptFor = script;
+		let scriptFor = script;
 		while (scriptFor = scriptFor.previousSibling) {
 			if (scriptFor.nodeType !== 1) continue;
-			var tag = DOM.getTagName(scriptFor);
+			let tag = DOM.getTagName(scriptFor);
 			if (tag !== 'script' && tag !== 'style') break;
 		}
 		if (!scriptFor) scriptFor = script.parentNode;
 		
 		// FIXME @config shouldn't be hard-wired here
-		var configID = scriptFor.hasAttribute('config') ? 
+		let configID = scriptFor.hasAttribute('config') ?
 			scriptFor.getAttribute('config') :
 			'';
 		// TODO we can add more than one @config to an element but only first is used
@@ -383,11 +383,11 @@ preprocess: function() {
 			sourceURL;
 		scriptFor.setAttribute('config', configID);
 
-		var fnText = 'return (' + script.text + '\n);';
+		let fnText = 'return (' + script.text + '\n);';
 
 		try {
-			var fn = Function(fnText);
-			var object = fn();
+			let fn = Function(fnText);
+			let object = fn();
 			configData.set(sourceURL, object);
 		}
 		catch(err) { 
@@ -399,19 +399,19 @@ preprocess: function() {
 		script.parentNode.removeChild(script); // physical <script> no longer needed
 	});
 
-	var frameElts = DOM.findAll(
+	let frameElts = DOM.findAll(
 		framesetDef.namespaces.lookupSelector('frame', HYPERFRAMESET_URN), 
 		body);
-	var frameDefElts = [];
-	var frameRefElts = [];
+	let frameDefElts = [];
+	let frameRefElts = [];
 	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
 
 		// NOTE even if the frame is only a declaration (@def && @def !== @defid) it still has its content removed
-		var placeholder = el.cloneNode(false);
+		let placeholder = el.cloneNode(false);
 		el.parentNode.replaceChild(placeholder, el); // NOTE no adoption
 
-		var defId = el.getAttribute('defid');
-		var def = el.getAttribute('def');
+		let defId = el.getAttribute('defid');
+		let def = el.getAttribute('def');
 		if (def && def !== defId) {
 			frameRefElts.push(el);
 			return;
@@ -427,25 +427,25 @@ preprocess: function() {
 		frameDefElts.push(el);
 	});
 	_.forEach(frameDefElts, function(el) {
-		var defId = el.getAttribute('defid');
+		let defId = el.getAttribute('defid');
 		framesetDef.frames[defId] = new HFrameDefinition(el, framesetDef);
 	});
 	_.forEach(frameRefElts, function(el) {
-		var def = el.getAttribute('def');
-		var ref = framesetDef.frames[def];
+		let def = el.getAttribute('def');
+		let ref = framesetDef.frames[def];
 		if (!ref) {
 			console.warn('Frame declaration references non-existant frame definition: ' + def);
 			return;
 		}
-		var refEl = ref.element;
+		let refEl = ref.element;
 		if (!refEl.hasAttribute('scopeid')) return;
-		var id = el.getAttribute('id');
+		let id = el.getAttribute('id');
 		if (id) {
 			console.warn('Frame declaration references a frame definition with scoped-styles but these cannot be applied because the frame declaration has its own @id: ' + id);
 			return;
 		}
 		id = refEl.getAttribute('id');
-		var scopeId = refEl.getAttribute('scopeid');
+		let scopeId = refEl.getAttribute('scopeid');
 		if (id !== scopeId) {
 			console.warn('Frame declaration references a frame definition with scoped-styles but these cannot be applied because the frame definition has its own @id: ' + id);
 			return;
@@ -456,7 +456,7 @@ preprocess: function() {
 },
 
 render: function() {
-	var framesetDef = this;
+	let framesetDef = this;
 	return framesetDef.element.cloneNode(true);
 }
 
@@ -468,15 +468,15 @@ render: function() {
  is rewritten with `path` being relative to the current scope.
  */
 
-var urlAttributes = URL.attributes;
+let urlAttributes = URL.attributes;
 
 function rebase(doc, scopeURL) {
 	_.forOwn(urlAttributes, function(attrList, tag) {
 		_.forEach(DOM.findAll(tag, doc), function(el) {
 			_.forOwn(attrList, function(attrDesc, attrName) {
-				var relURL = el.getAttribute(attrName);
+				let relURL = el.getAttribute(attrName);
 				if (relURL == null) return;
-				var url = rebaseURL(relURL, scopeURL);
+				let url = rebaseURL(relURL, scopeURL);
 				if (url != relURL) el[attrName] = url;
 			});
 		});
@@ -484,37 +484,37 @@ function rebase(doc, scopeURL) {
 }
 
 function rebaseURL(url, baseURL) {
-	var relURL = url.replace(/^scope:/i, '');
+	let relURL = url.replace(/^scope:/i, '');
 	if (relURL == url) return url;
 	return baseURL.resolve(relURL);
 }
 
 function normalizeScopedStyles(doc, allowedScopeSelector) {
-	var scopedStyles = DOM.findAll('style[scoped]', doc.body);
-	var dummyDoc = DOM.createHTMLDocument('', doc);
+	let scopedStyles = DOM.findAll('style[scoped]', doc.body);
+	let dummyDoc = DOM.createHTMLDocument('', doc);
 	_.forEach(scopedStyles, function(el, index) {
-		var scope = el.parentNode;
+		let scope = el.parentNode;
 		if (!DOM.matches(scope, allowedScopeSelector)) {
 			console.warn('Removing <style scoped>. Must be child of ' + allowedScopeSelector);
 			scope.removeChild(el);
 			return;
 		}
 		
-		var scopeId = '__scope_' + index + '__';
+		let scopeId = '__scope_' + index + '__';
 		scope.setAttribute('scopeid', scopeId);
 		if (scope.hasAttribute('id')) scopeId = scope.getAttribute('id');
 		else scope.setAttribute('id', scopeId);
 
 		el.removeAttribute('scoped');
-		var sheet = el.sheet || (function() {
+		let sheet = el.sheet || (function() {
 			// Firefox doesn't seem to instatiate el.sheet in XHR documents
-			var dummyEl = dummyDoc.createElement('style');
+			let dummyEl = dummyDoc.createElement('style');
 			dummyEl.textContent = el.textContent;
 			DOM.insertNode('beforeend', dummyDoc.head, dummyEl);
 			return dummyEl.sheet;
 		})();
 		forRules(sheet, processRule, scope);
-		var cssText = _.map(sheet.cssRules, function(rule) { 
+		let cssText = _.map(sheet.cssRules, function(rule) {
 				return rule.cssText; 
 			}).join('\n');
 		el.textContent = cssText;
@@ -524,15 +524,15 @@ function normalizeScopedStyles(doc, allowedScopeSelector) {
 }
 
 function processRule(rule, id, parentRule) {
-	var scope = this;
+	let scope = this;
 	switch (rule.type) {
 	case 1: // CSSRule.STYLE_RULE
 		// prefix each selector in selector-chain with scopePrefix
 		// selector-chain is split on COMMA (,) that is not inside BRACKETS. Technically: not followed by a RHB ')' unless first followed by LHB '(' 
-		var scopeId = scope.getAttribute('scopeid');
-		var scopePrefix = '#' + scopeId + ' ';
-		var selectorText = scopePrefix + rule.selectorText.replace(/,(?![^(]*\))/g, ', ' + scopePrefix); 
-		var cssText = rule.cssText.replace(rule.selectorText, '');
+		let scopeId = scope.getAttribute('scopeid');
+		let scopePrefix = '#' + scopeId + ' ';
+		let selectorText = scopePrefix + rule.selectorText.replace(/,(?![^(]*\))/g, ', ' + scopePrefix);
+		let cssText = rule.cssText.replace(rule.selectorText, '');
 		cssText = selectorText + ' ' + cssText;
 		parentRule.deleteRule(id);
 		parentRule.insertRule(cssText, id);
@@ -554,8 +554,8 @@ function processRule(rule, id, parentRule) {
 }
 
 function forRules(parentRule, callback, context) {
-	var ruleList = parentRule.cssRules;
-	for (var i=ruleList.length-1; i>=0; i--) callback.call(context, ruleList[i], i, parentRule);
+	let ruleList = parentRule.cssRules;
+	for (let i=ruleList.length-1; i>=0; i--) callback.call(context, ruleList[i], i, parentRule);
 }
 	
 

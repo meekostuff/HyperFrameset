@@ -1,7 +1,7 @@
 import * as _ from './stuff.mjs';
 import Registry from './Registry.mjs';
 
-var filters = new Registry({
+let filters = new Registry({
 	writeOnce: true,
 	testKey: function(key) {
 		return /^[_a-zA-Z][_a-zA-Z0-9]*$/.test(key);
@@ -14,10 +14,10 @@ var filters = new Registry({
 _.assign(filters, {
 
 evaluate: function(name, value, params) {
-	var fn = this.get(name);
+	let fn = this.get(name);
 	// NOTE filter functions should only accept string_or_number_or_boolean
 	// FIXME Need to wrap fn() to assert / cast supplied value and accept params
-	var args = params.slice(0);
+	let args = params.slice(0);
 	args.unshift(value);
 	return fn.apply(undefined, args);
 }
