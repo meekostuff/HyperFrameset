@@ -18,6 +18,7 @@ var defaults = { // NOTE defaults also define the type of the associated config 
 	"html5_block_elements": 'article aside figcaption figure footer header hgroup main nav section',
 	"html5_inline_elements": 'abbr mark output time audio video picture',
 	"main_script": '{bootscriptdir}HyperFrameset.js',
+	"main_script": '{bootscriptdir}src/HyperFrameset.mjs', // for development
 	"config_script": '{bootscriptdir}config.js'
 }
 
@@ -457,6 +458,7 @@ function prepareScript(url, onload, onerror) { // create script (and insert if s
 	var script = document.createElement('script');
 	script.onerror = onError;
 	script.onload = onLoad;
+	if (/\.mjs$/i.test(url)) script.type = 'module'; // FIXME find a better way to detect js module URLs.
 	script.src = url;
 	if (supportsSync) {
 		script.async = false;
