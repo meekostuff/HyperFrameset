@@ -345,38 +345,7 @@
 			now: function() { return (new Date).getTime(); }
 		};
 
-	let schedule = (function() {
-		// See http://creativejs.com/resources/requestanimationframe/
-		let fn = window.requestAnimationFrame;
-		if (fn) return fn;
-
-		some(words('moz ms o webkit'), function(vendor) {
-			let name = vendor + 'RequestAnimationFrame';
-			if (!window[name]) return false;
-			fn = window[name];
-			return true;
-		});
-		if (fn) return fn;
-
-		let lastTime = 0;
-		let callback;
-		fn = function(cb, element) {
-			if (callback) throw 'schedule() only allows one callback at a time';
-			callback = cb;
-			let currTime = performance.now();
-			let timeToCall = Math.max(0, frameInterval - (currTime - lastTime));
-			let id = window.setTimeout(function() {
-				lastTime = performance.now();
-				let cb = callback;
-				callback = undefined;
-				cb(lastTime, element); 
-			}, timeToCall);
-			return id;
-		};
-		
-		return fn;
-	})();
-
+	let schedule = window.requestAnimationFrame;
 
 	let asapQueue = [];
 	let deferQueue = [];
