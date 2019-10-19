@@ -679,8 +679,7 @@ let nodeRemoved = function(node) { // NOTE called AFTER node removed document
 
 // FIXME this auto DOM Monitoring could have horrible performance for DOM sorting operations
 // It would be nice to have a list of moved nodes that could potentially be ignored
-let observe = (window.MutationObserver) ?
-function(onInserted, onRemoved) {
+let observe = function(onInserted, onRemoved) {
 	let observer = new MutationObserver(function(mutations, observer) {
 		if (!started) return;
 		_.forEach(mutations, function(record) {
@@ -692,25 +691,7 @@ function(onInserted, onRemoved) {
 	observer.observe(document.body, { childList: true, subtree: true });
 	
 	// FIXME when to call observer.disconnect() ??
-} :
-function(onInserted, onRemoved) { // otherwise assume MutationEvents. TODO is this assumption safe?
-	document.body.addEventListener('DOMNodeInserted', function(e) {
-		e.stopPropagation();
-		if (!started) return;
- 		// NOTE IE sends event for every descendant of the inserted node
-		if (e.target.parentNode !== e.relatedNode) return;
-		Task.asap(function() { onInserted(e.target); });
-	}, true);
-	document.body.addEventListener('DOMNodeRemoved', function(e) {
-		e.stopPropagation();
-		if (!started) return;
- 		// NOTE IE sends event for every descendant of the inserted node
-		if (e.target.parentNode !== e.relatedNode) return;
-		Task.asap(function() { onRemoved(e.target); });
-		// FIXME
-	}, true);
-};
-
+}
 
 let SprocketDefinition = function(prototype) {
 	let constructor = function(element) {

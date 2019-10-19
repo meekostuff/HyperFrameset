@@ -24,7 +24,6 @@ have full functionality when HyperFrameset doesn't run.
 
 HyperFrameset can run on browsers which support `history.pushState` and `MutationObserver`.
 These are available on most browsers in significant use today.
-Since `MutationObserver` is NOT supported on IE10, HyperFrameset uses `MutationEvents` on that platform. 
 
 ### License
 

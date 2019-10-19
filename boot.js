@@ -57,13 +57,12 @@ var Meeko = window.Meeko || (window.Meeko = {});
 		- inert staging documents (created by XMLHttpRequest, DOMParser, etc)
 			We don't want <img> and <script> in staging documents to download 
 			or run when they may be removed or changed before entering the view
-		- MutationObservers or 'DOMAttrModified' events
-			+ Webkit never supported 'DOMAttrModified'
+		- MutationObservers
 		- sessionStorage for saving state during reload
 		- document.readyState for determining whether all landing page content
 			is available.
 
-	These features rule out browsers older than IE10, Safari6. 
+	These features rule out browsers older than IE11, Safari6.
 	This allows us to assume the presence of features such as:
 		- Node.addEventListener
 		- <script>.onload
@@ -126,7 +125,7 @@ var SUPPORTS_REQUEST_ANIMATION_FRAME = (function() {
 		var name = prefix + 'RequestAnimationFrame';
 		if (window[name]) return true;
 	};
-	
+
 	return false;
 })();
 
@@ -163,25 +162,6 @@ var STAGING_DOCUMENT_IS_INERT = (function() {
 	return true; // Presumably IE10,11 or Edge
 })();
 */
-
-/*
-	SUPPORTS_MUTATION_OBSERVERS indicates that DOM mutation can be adequately observed.
-	This is a requirement of DOMSprockets and element visibilitychange events.
-	If this is false then the `no_frameset` option applies.
-*/
-
-var SUPPORTS_MUTATION_OBSERVERS = (function() {
-
-	if (window.MutationObserver) return true;
-
-	if (!window.addEventListener) return false;
-	var supported = false;
-	var div = document.createElement('div');
-	div.addEventListener('DOMAttrModified', function(e) { supported = true; }, false);
-	div.setAttribute('hidden', '');
-	return supported;
-	
-})();
 
 /*
  ### JS utilities
@@ -684,7 +664,7 @@ test: function() { // return `false` for strict, otherwise warning message
 },
 
 getDocument: function() { // WARN this assumes HyperFrameset is ready
-	return new Meeko.Promise(function(resolve, reject) {
+	return new Promise(function(resolve, reject) {
 		domReady(function() {
 			var elts = $$('plaintext');
 			var plaintext = elts[elts.length - 1]; // NOTE There should only be one, but take the last just to be sure
@@ -786,7 +766,7 @@ if (isSet('no_style')) {
 var no_frameset = isSet('no_frameset');
 if (no_frameset) return; // TODO console.info()
 if (!(history.pushState && SUPPORTS_XMLHTTPREQUEST && 'readyState' in document && 
-	SUPPORTS_REQUEST_ANIMATION_FRAME && SUPPORTS_MUTATION_OBSERVERS)) {
+	SUPPORTS_REQUEST_ANIMATION_FRAME && window.MutationObserver)) {
 	console.debug('HyperFrameset depends on native XMLHttpRequest, history.pushState, and MutationObserver');
 	return;
 }
@@ -832,7 +812,7 @@ function start() {
 		contentDocument: Capture.getDocument()
 	});
 	else startFu = Meeko.framer.start({
-		contentDocument: new Meeko.Promise(function(resolve, reject) { // FIXME this is bound to have cross-browser failures
+		contentDocument: new Promise(function(resolve, reject) { // FIXME this is bound to have cross-browser failures
 			var dstDoc = document.cloneNode(true);
 			var dstHead = dstDoc.head;
 			empty(dstHead);

@@ -192,8 +192,7 @@ isFrame: function(element) {
 
 });
 
-let observeAttributes = (window.MutationObserver) ?
-function(element, callback, attrList) {
+function observeAttributes(element, callback, attrList) {
 	let observer = new MutationObserver(function(mutations, observer) {
 		_.forEach(mutations, function(record) {
 			if (record.type !== 'attributes') return;
@@ -203,24 +202,7 @@ function(element, callback, attrList) {
 	observer.observe(element, { attributes: true, attributeFilter: attrList, subtree: false });
 	
 	return observer;
-} :
-function(element, callback, attrList) { // otherwise assume MutationEvents (IE10). 
-	function handleEvent(e) {
-		if (e.target !== e.currentTarget) return;
-		e.stopPropagation();
-		if (attrList && attrList.length > 0 && attrList.indexOf(e.attrName) < 0) return;
-		Task.asap(function() { callback.call(e.target, e.attrName); });
-	}
-
-	element.addEventListener('DOMAttrModified', handleEvent, true);
-	return { 
-		disconnect: function() {
-			element.removeEventListener('DOMAttrModified', handleEvent, true);	
-		}
-	};
-
-};
-
+}
 
 return HFrame;	
 })();

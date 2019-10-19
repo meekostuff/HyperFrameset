@@ -1383,14 +1383,6 @@
 		}, true);
 	}
 
-	const SUPPORTS_ATTRMODIFIED = (function() {
-		let supported = false;
-		let div = document$2.createElement('div');
-		div.addEventListener('DOMAttrModified', function(e) { supported = true; }, false);
-		div.setAttribute('hidden', '');
-		return supported;
-	})();
-
 	// DOM node visibilitychange implementation and monitoring
 	if (!('hidden' in document$2.documentElement)) { // implement 'hidden' for older browsers
 
@@ -1418,25 +1410,12 @@
 		});
 	}
 
-	if (window.MutationObserver) {
-
-		let observer = new MutationObserver(function(mutations, observer) {
-			forEach(mutations, function(entry) {
-				triggerVisibilityChangeEvent(entry.target);
-			});
+	let observer = new MutationObserver(function(mutations, observer) {
+		forEach(mutations, function(entry) {
+			triggerVisibilityChangeEvent(entry.target);
 		});
-		observer.observe(document$2, { attributes: true, attributeFilter: ['hidden'], subtree: true });
-
-	}
-	else if (SUPPORTS_ATTRMODIFIED) {
-
-		document$2.addEventListener('DOMAttrModified', function(e) {
-			if (e.attrName !== 'hidden') return;
-			triggerVisibilityChangeEvent(e.target);
-		}, true);
-
-	}
-	else console.warn('element.visibilitychange event will not be supported');
+	});
+	observer.observe(document$2, { attributes: true, attributeFilter: ['hidden'], subtree: true });
 
 	// FIXME this should use observers, not events
 	function triggerVisibilityChangeEvent(target) {
@@ -1700,7 +1679,6 @@
 		dispatchEvent: dispatchEvent,
 		manageEvent: manageEvent,
 		adoptContents: adoptContents,
-		SUPPORTS_ATTRMODIFIED: SUPPORTS_ATTRMODIFIED,
 		isVisible: isVisible,
 		whenVisible: whenVisible,
 		insertNode: insertNode,
@@ -2390,8 +2368,7 @@
 
 	// FIXME this auto DOM Monitoring could have horrible performance for DOM sorting operations
 	// It would be nice to have a list of moved nodes that could potentially be ignored
-	let observe = (window.MutationObserver) ?
-	function(onInserted, onRemoved) {
+	let observe = function(onInserted, onRemoved) {
 		let observer = new MutationObserver(function(mutations, observer) {
 			if (!started) return;
 			forEach(mutations, function(record) {
@@ -2403,25 +2380,7 @@
 		observer.observe(document$4.body, { childList: true, subtree: true });
 		
 		// FIXME when to call observer.disconnect() ??
-	} :
-	function(onInserted, onRemoved) { // otherwise assume MutationEvents. TODO is this assumption safe?
-		document$4.body.addEventListener('DOMNodeInserted', function(e) {
-			e.stopPropagation();
-			if (!started) return;
-	 		// NOTE IE sends event for every descendant of the inserted node
-			if (e.target.parentNode !== e.relatedNode) return;
-			Task.asap(function() { onInserted(e.target); });
-		}, true);
-		document$4.body.addEventListener('DOMNodeRemoved', function(e) {
-			e.stopPropagation();
-			if (!started) return;
-	 		// NOTE IE sends event for every descendant of the inserted node
-			if (e.target.parentNode !== e.relatedNode) return;
-			Task.asap(function() { onRemoved(e.target); });
-			// FIXME
-		}, true);
 	};
-
 
 	let SprocketDefinition = function(prototype) {
 		let constructor = function(element) {
@@ -6193,8 +6152,7 @@
 
 	});
 
-	let observeAttributes = (window.MutationObserver) ?
-	function(element, callback, attrList) {
+	function observeAttributes(element, callback, attrList) {
 		let observer = new MutationObserver(function(mutations, observer) {
 			forEach(mutations, function(record) {
 				if (record.type !== 'attributes') return;
@@ -6204,24 +6162,7 @@
 		observer.observe(element, { attributes: true, attributeFilter: attrList, subtree: false });
 		
 		return observer;
-	} :
-	function(element, callback, attrList) { // otherwise assume MutationEvents (IE10). 
-		function handleEvent(e) {
-			if (e.target !== e.currentTarget) return;
-			e.stopPropagation();
-			if (attrList && attrList.length > 0 && attrList.indexOf(e.attrName) < 0) return;
-			Task.asap(function() { callback.call(e.target, e.attrName); });
-		}
-
-		element.addEventListener('DOMAttrModified', handleEvent, true);
-		return { 
-			disconnect: function() {
-				element.removeEventListener('DOMAttrModified', handleEvent, true);	
-			}
-		};
-
-	};
-
+	}
 
 	return HFrame;	
 	})();

@@ -265,14 +265,6 @@ function manageEvent(type) {
 	}, true);
 }
 
-const SUPPORTS_ATTRMODIFIED = (function() {
-	let supported = false;
-	let div = document.createElement('div');
-	div.addEventListener('DOMAttrModified', function(e) { supported = true; }, false);
-	div.setAttribute('hidden', '');
-	return supported;
-})();
-
 // DOM node visibilitychange implementation and monitoring
 if (!('hidden' in document.documentElement)) { // implement 'hidden' for older browsers
 
@@ -300,25 +292,12 @@ if (!('hidden' in document.documentElement)) { // implement 'hidden' for older b
 	});
 }
 
-if (window.MutationObserver) {
-
-	let observer = new MutationObserver(function(mutations, observer) {
-		_.forEach(mutations, function(entry) {
-			triggerVisibilityChangeEvent(entry.target);
-		});
+let observer = new MutationObserver(function(mutations, observer) {
+	_.forEach(mutations, function(entry) {
+		triggerVisibilityChangeEvent(entry.target);
 	});
-	observer.observe(document, { attributes: true, attributeFilter: ['hidden'], subtree: true });
-
-}
-else if (SUPPORTS_ATTRMODIFIED) {
-
-	document.addEventListener('DOMAttrModified', function(e) {
-		if (e.attrName !== 'hidden') return;
-		triggerVisibilityChangeEvent(e.target);
-	}, true);
-
-}
-else console.warn('element.visibilitychange event will not be supported');
+});
+observer.observe(document, { attributes: true, attributeFilter: ['hidden'], subtree: true });
 
 // FIXME this should use observers, not events
 function triggerVisibilityChangeEvent(target) {
@@ -571,7 +550,6 @@ export {
 	findId, find, findAll, closest, siblings,
 	dispatchEvent, manageEvent,
 	adoptContents,
-	SUPPORTS_ATTRMODIFIED,
 	isVisible, whenVisible,
 	insertNode,
 	checkStyleSheets,
