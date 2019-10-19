@@ -114,22 +114,6 @@ var SUPPORTS_XMLHTTPREQUEST = (function() {
 })();
 
 /*
-	SUPPORTS_REQUEST_ANIMATION_FRAME is a good proxy for many other features
-*/
-var SUPPORTS_REQUEST_ANIMATION_FRAME = (function() {
-
-	if (window.requestAnimationFrame) return true;
-
-	var prefix, vendors = 'moz ms o webkit'.split(/\s+/);
-	while (prefix = vendors.shift()) {
-		var name = prefix + 'RequestAnimationFrame';
-		if (window[name]) return true;
-	};
-
-	return false;
-})();
-
-/*
 	STAGING_DOCUMENT_IS_INERT indicates that resource URLs - like img@src -
 	WILL NOT start downloading when the document they are in is parsed.
 	If this is false then the `no_frameset` option applies.
@@ -765,8 +749,8 @@ if (isSet('no_style')) {
 
 var no_frameset = isSet('no_frameset');
 if (no_frameset) return; // TODO console.info()
-if (!(history.pushState && SUPPORTS_XMLHTTPREQUEST && 'readyState' in document && 
-	SUPPORTS_REQUEST_ANIMATION_FRAME && window.MutationObserver)) {
+if (!(history.pushState && SUPPORTS_XMLHTTPREQUEST && 'readyState' in document &&
+	window.requestAnimationFrame && window.MutationObserver)) {
 	console.debug('HyperFrameset depends on native XMLHttpRequest, history.pushState, and MutationObserver');
 	return;
 }
