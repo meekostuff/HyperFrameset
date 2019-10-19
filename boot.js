@@ -73,47 +73,6 @@ var Meeko = window.Meeko || (window.Meeko = {});
 */
 
 /*
-	SUPPORTS_XMLHTTPREQUEST detects native XMLHttpRequest and `file:` handling
-*/
-
-var SUPPORTS_XMLHTTPREQUEST = (function() {
-	if (!window.XMLHttpRequest) return false;
-	switch (location.protocol) {
-	default: return false;
-	case 'http:': case 'https:': return true;
-	case 'file:':
-		try {
-			var xhr = new XMLHttpRequest;
-			var dummyURL = document.URL + (location.search ? '&' : '?') + vendorPrefix + (new Date).getTime();
-
-			var fail = false;
-			xhr.onerror = function() { fail = true; }
-
-			// NOTE IE / Edge throws on .open()
-			xhr.open('get', dummyURL, true);
-			if (fail) return false;
-
-			// NOTE Chrome errors during .send() **but doesn't throw**
-			// Hack around this somehow.
-			// FIXME this will fail if Chrome changes its behavior
-			xhr.send();
-			if (fail) return false;
-			if (xhr.readyState === 4) return false;
-			if (xhr.status !== 0) return false;
-
-			xhr.abort(); // NOTE don't actually need the result
-			return true;
-		}
-		catch (error) {
-			return false;
-		}
-	}
-
-	// should never reach here
-	return false;
-})();
-
-/*
 	STAGING_DOCUMENT_IS_INERT indicates that resource URLs - like img@src -
 	WILL NOT start downloading when the document they are in is parsed.
 	If this is false then the `no_frameset` option applies.
@@ -749,7 +708,7 @@ if (isSet('no_style')) {
 
 var no_frameset = isSet('no_frameset');
 if (no_frameset) return; // TODO console.info()
-if (!(history.pushState && SUPPORTS_XMLHTTPREQUEST && 'readyState' in document &&
+if (!(history.pushState && window.XMLHttpRequest && 'readyState' in document &&
 	window.requestAnimationFrame && window.MutationObserver)) {
 	console.debug('HyperFrameset depends on native XMLHttpRequest, history.pushState, and MutationObserver');
 	return;
