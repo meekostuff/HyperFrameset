@@ -266,32 +266,6 @@ function manageEvent(type) {
 }
 
 // DOM node visibilitychange implementation and monitoring
-if (!('hidden' in document.documentElement)) { // implement 'hidden' for older browsers
-
-	let head = document.head;
-	// NOTE on <=IE8 this needs a styleSheet work-around
-	let style = document.createElement('style');
-
-	let cssText = '*[hidden] { display: none; }\n';
-	style.textContent = cssText;
-
-	head.insertBefore(style, head.firstChild);
-
-	Object.defineProperty(Element.prototype, 'hidden', {
-		get: function() { return this.hasAttribute('hidden'); },
-		set: function(value) {
-			if (!!value) this.setAttribute('hidden', '');
-			else this.removeAttribute('hidden');
-
-			// IE9 has a reflow bug. The following forces a reflow. FIXME can we stop suporting IE9
-			let elementDisplayStyle = this.style.display;
-			let computedDisplayStyle = window.getComputedStyle(this, null);
-			this.style.display = computedDisplayStyle;
-			this.style.display = elementDisplayStyle;
-		}
-	});
-}
-
 let observer = new MutationObserver(function(mutations, observer) {
 	_.forEach(mutations, function(entry) {
 		triggerVisibilityChangeEvent(entry.target);

@@ -1059,7 +1059,6 @@ trigger: function(type, params) {
 
 });
 
-// Element.prototype.hidden and visibilitychange event
 let Element = window.Element || window.HTMLElement;
 
 Object.defineProperty(Element.prototype, '$', {
