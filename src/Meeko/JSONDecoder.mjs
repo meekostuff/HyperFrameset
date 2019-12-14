@@ -1,8 +1,7 @@
 
 import * as _ from './stuff.mjs';
 
-// FIXME not really a JSON decoder since expects JSON input and 
-// doesn't use JSON paths
+// FIXME not really a JSON decoder since expects JSON input and doesn't use JSON paths
 
 function JSONDecoder(options, namespaces) {}
 

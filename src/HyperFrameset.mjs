@@ -6,7 +6,7 @@ import Promise from './Meeko/Promise.mjs';
 import URL from './Meeko/URL.mjs';
 import * as DOM from './Meeko/DOM.mjs';
 import scriptQueue from './Meeko/scriptQueue.mjs';
-import sprockets from './Meeko/Sprocket.mjs';
+import sprockets from './Meeko/sprockets.mjs';
 import controllers from './Meeko/controllers.mjs';
 import htmlParser from './Meeko/htmlParser.mjs';
 import httpProxy from './Meeko/httpProxy.mjs';

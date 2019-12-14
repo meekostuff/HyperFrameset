@@ -15,7 +15,7 @@ import URL from './URL.mjs';
 import * as DOM from './DOM.mjs';
 import httpProxy from './httpProxy.mjs';
 import Registry from './Registry.mjs';
-import sprockets from './Sprocket.mjs';
+import sprockets from './sprockets.mjs';
 import { Panel } from './layoutElements.mjs';
 
 let document = window.document;

@@ -16,7 +16,7 @@ import * as DOM from './DOM.mjs';
 import scriptQueue from './scriptQueue.mjs';
 import httpProxy from './httpProxy.mjs';
 import historyManager from './historyManager.mjs';
-import sprockets from './Sprocket.mjs';
+import sprockets from './sprockets.mjs';
 import formElements, { ConfigurableBody } from './formElements.mjs';
 import layoutElements, { HBase } from './layoutElements.mjs';
 import frameElements, { frameDefinitions, HFrame } from './frameElements.mjs';

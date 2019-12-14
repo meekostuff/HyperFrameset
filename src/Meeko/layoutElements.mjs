@@ -7,7 +7,7 @@
 import * as _ from './stuff.mjs';
 import * as DOM from './DOM.mjs';
 import configData from './configData.mjs';
-import sprockets from './Sprocket.mjs';
+import sprockets from './sprockets.mjs';
 import controllers from './controllers.mjs';
 
 let document = window.document;

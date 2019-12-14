@@ -12,7 +12,7 @@ import * as _ from './stuff.mjs';
 import Task from './Task.mjs';
 import * as DOM from './DOM.mjs';
 import configData from './configData.mjs';
-import sprockets from './Sprocket.mjs';
+import sprockets from './sprockets.mjs';
 
 let document = window.document;
 
