@@ -1,6 +1,6 @@
 /*!
  Sprocket
- (c) Sean Hogan, 2008,2012,2013,2014,2016
+ (c) Sean Hogan, 2008,2012,2013,2014,2016,2019
  Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 */
 
@@ -52,16 +52,13 @@ function findAllBoundElements(root, bExcludeRoot) {
 let started = false;
 let manualDOM = false;
 
-let registerElement = function(tagName, defn) { // FIXME test tagName
-	if (started) throw Error('sprockets management already started');
-	if (defn.rules) console.warn('registerElement() does not support rules. Try registerComposite()');
-	let bindingDefn = new BindingDefinition(defn);
-	let selector = tagName + ', [is=' + tagName + ']'; // TODO why should @is be supported??
-	let rule = new BindingRule(selector, bindingDefn);
-	bindingRules.push(rule);
-	return rule;
-}
-
+/**
+ * Attach sprockets to elements within the document and conditionally watch element insertions and removal.
+ * No more registrations are permitted.
+ *
+ * @param options {object} Options.
+ *     If `options.manual === true` then the caller will manually call nodeInserted / nodeRemoved as appropriate.
+ */
 let start = function(options) {
 	if (started) throw Error('sprockets management has already started');
 	started = true;
@@ -70,6 +67,192 @@ let start = function(options) {
 	if (!manualDOM) observe(nodeInserted, nodeRemoved);
 }
 
+/**
+ * Private method to create a sprocket-definition with no base definition.
+ *
+ * @param prototype
+ * @returns {constructor} The sprocket-definition.
+ */
+let create = function(prototype) {
+	let constructor = function(element) {
+		return cast(element, constructor);
+	};
+	constructor.prototype = prototype;
+	return constructor;
+}
+
+/**
+ * Create a sprocket-definition which extends a base-definition.
+ *
+ * @param baseDefn The base-definition.
+ * @param properties The new properties for the extended sprocket-definition.
+ * @returns {constructor} The sprocket-definition.
+ */
+let evolve = function(baseDefn, properties) {
+	let prototype = Object.create(baseDefn.prototype);
+	let sub = create(prototype);
+	let baseProperties = baseDefn.prototype.__properties__ || {};
+	let subProperties = prototype.__properties__ = {};
+	_.forOwn(baseProperties, function(desc, name) {
+		subProperties[name] = Object.create(desc);
+	});
+	if (properties) defineProperties(sub, properties);
+	return sub;
+}
+
+let defineProperties = function(sprocket, properties) {
+	let prototype = sprocket.prototype;
+	let definition = prototype.__properties__ || (prototype.__properties__ = {});
+	_.forOwn(properties, function(desc, name) {
+		switch (typeof desc) {
+			case 'object':
+				let propDesc = definition[name] || (definition[name] = {});
+				_.assign(propDesc, desc);
+				Object.defineProperty(prototype, name, {
+					get: function() { throw Error('Attempt to get an ARIA property'); },
+					set: function() { throw Error('Attempt to set an ARIA property'); }
+				});
+				break;
+			default:
+				prototype[name] = desc;
+				break;
+		}
+	});
+}
+
+/**
+ * Register a sprocket definition for elements which have the specified tag-name.
+ *   TODO: Should this be a private method?
+ *
+ * @param tagName
+ * @param definition
+ * @returns {BindingRule}
+ */
+let registerElement = function(tagName, definition) { // FIXME test tagName
+	if (started) throw Error('sprockets management already started');
+	if (definition.rules) console.warn('registerElement() does not support rules. Try registerComposite()');
+	let bindingDefn = new BindingDefinition(definition);
+	let selector = tagName + ', [is=' + tagName + ']'; // TODO why should @is be supported??
+	let rule = new BindingRule(selector, bindingDefn);
+	bindingRules.push(rule);
+	return rule;
+}
+
+/**
+ * Register a sprocket definition. Internally method only.
+ *   WARN this can promote any element into a composite
+ *
+ * @param selectorDescriptor {string|object} A string is a CSS selector. An object is {selector, composite: rootElement}
+ * @param definition
+ * @param callback Function that is called when the sprocket
+ */
+let registerSprocket = function(selectorDescriptor, definition, callback) {
+	let selector, composite;
+	if (typeof selectorDescriptor === 'string') {
+		selector = selectorDescriptor;
+		composite = document;
+	}
+	else {
+		selector = selectorDescriptor.selector;
+		composite = selectorDescriptor.composite;
+	}
+	let nodeData = DOM.getData(composite); // NOTE nodeData should always be a binding
+	if (!nodeData) {
+		nodeData = {};
+		DOM.setData(composite, nodeData);
+	}
+	let nodeRules = nodeData.rules;
+	if (!nodeRules) nodeRules = nodeData.rules = [];
+	let rule = new BindingRule(selector, definition);
+	rule.callback = callback;
+	nodeRules.unshift(rule); // WARN last registered means highest priority. Is this appropriate??
+}
+
+/**
+ * Mostly an alias for registerElement.
+ *
+ * @param options
+ * @param definition
+ */
+let register = function(options, definition) {
+	return registerSprocket(options, definition);
+}
+
+/**
+ * Register a sprocket-definition for elements which match the specified tag-name.
+ *   The definition may contain a list of rules of sprocket-definition registrations for descendant elements.
+ *
+ * @param tagName
+ * @param compositeDefn
+ * @returns {BindingRule}
+ */
+let registerComposite = function(tagName, compositeDefn) {
+	let defn = _.assign({}, compositeDefn);
+	let rules = defn.rules;
+	delete defn.rules;
+	if (!rules) console.warn('registerComposite() called without any sprocket rules. Try registerElement()');
+	let onattached = defn.attached;
+	defn.attached = function() {
+		let object = this;
+		if (rules) _.forEach(rules, function(rule) {
+			let selector = {
+				composite: object.element
+			}
+			let definition = {};
+			let callback;
+			if (Array.isArray(rule)) {
+				selector.selector = rule[0];
+				definition = rule[1];
+				callback = rule[2];
+			}
+			else {
+				selector.selector = rule.selector;
+				definition = rule.definition;
+				callback = rule.callback;
+			}
+			registerSprocket(selector, definition, callback);
+		});
+		if (onattached) return onattached.call(this);
+	};
+	return registerElement(tagName, defn);
+}
+
+/**
+ * Almost the same as registerComposite. Provided for backwards compatibility.
+ *
+ * @param tagName
+ * @param definition
+ * @param extras
+ * @returns {BindingRule}
+ * @deprecated
+ */
+let registerComponent = function(tagName, definition, extras) {
+	let compositeDefn = { prototype: definition.prototype };
+	if (extras) {
+		compositeDefn.handlers = extras.handlers;
+		if (extras.sprockets) _.forEach(extras.sprockets, function(oldRule) {
+			if (!compositeDefn.rules) compositeDefn.rules = [];
+			let rule = {
+				selector: oldRule.matches,
+				definition: oldRule.sprocket,
+				callback: oldRule.enteredComponent
+			}
+			compositeDefn.rules.push(rule);
+		});
+		if (extras.callback) _.defaults(compositeDefn, extras.callback);
+	}
+	if (compositeDefn.rules) return registerComposite(tagName, compositeDefn);
+	else return registerElement(tagName, compositeDefn);
+}
+
+/**
+ * Insert a node into the document at a specified location and attach / enable registered sprockets.
+ *
+ * @param conf {string} where to insert the node relative to `refNode`.
+ * @param refNode {Node}
+ * @param node {Node} the node to be inserted.
+ * @returns {Node} The node (now inserted).
+ */
 let insertNode = function(conf, refNode, node) {
 	if (!started) throw Error('sprockets management has not started yet');
 	if (!manualDOM) throw Error('Must not use sprockets.insertNode: auto DOM monitoring');
@@ -103,6 +286,12 @@ let insertNode = function(conf, refNode, node) {
 	return node;
 }
 
+/**
+ * Remove a specified node from the document and disable / remove registered sprockets.
+ *
+ * @param node {Node} the node to be removed.
+ * @returns {Node} the node (now removed).
+ */
 let removeNode = function(node) {
 	if (!started) throw Error('sprockets management has not started yet');
 	if (!manualDOM) throw Error('Must not use sprockets.insertNode: auto DOM monitoring');
@@ -112,7 +301,6 @@ let removeNode = function(node) {
 	nodeRemoved(node);
 	return node;
 }
-
 
 let nodeInserted = function(node) { // NOTE called AFTER node inserted into document
 	if (!started) throw Error('sprockets management has not started yet');
@@ -197,130 +385,6 @@ let observe = function(onInserted, onRemoved) {
 	observer.observe(document.body, { childList: true, subtree: true });
 	
 	// FIXME when to call observer.disconnect() ??
-}
-
-let registerSprocket = function(selector, definition, callback) { // WARN this can promote any element into a composite
-	let rule = {};
-	let composite;
-	if (typeof selector === 'string') {
-		_.assign(rule, {
-			selector: selector
-		});
-		composite = document;
-	}
-	else {
-		_.assign(rule, selector);
-		composite = selector.composite;
-		delete rule.composite;
-	}
-	let nodeData = DOM.getData(composite); // NOTE nodeData should always be a binding
-	if (!nodeData) {
-		nodeData = {};
-		DOM.setData(composite, nodeData);
-	}
-	let nodeRules = nodeData.rules;
-	if (!nodeRules) nodeRules = nodeData.rules = [];
-	rule.definition = definition;
-	rule.callback = callback;
-	nodeRules.unshift(rule); // WARN last registered means highest priority. Is this appropriate??
-}
-
-let register = function(options, sprocket) {
-	return registerSprocket(options, sprocket);
-}
-
-let registerComposite = function(tagName, definition) {
-	let defn = _.assign({}, definition);
-	let rules = defn.rules;
-	delete defn.rules;
-	if (!rules) console.warn('registerComposite() called without any sprocket rules. Try registerElement()');
-	let onattached = defn.attached;
-	defn.attached = function() {
-		let object = this;
-		if (rules) _.forEach(rules, function(rule) {
-			let selector = {
-				composite: object.element
-			}
-			let definition = {};
-			let callback;
-			if (Array.isArray(rule)) {
-				selector.selector = rule[0];
-				definition = rule[1];
-				callback = rule[2];
-			}
-			else {
-				selector.selector = rule.selector;
-				definition = rule.definition;
-				callback = rule.callback;
-			}
-			registerSprocket(selector, definition, callback);
-		});
-		if (onattached) return onattached.call(this);
-	};
-	return registerElement(tagName, defn);
-}
-
-let registerComponent = function(tagName, sprocket, extras) {
-	let defn = { prototype: sprocket.prototype };
-	if (extras) {
-		defn.handlers = extras.handlers;
-		if (extras.sprockets) _.forEach(extras.sprockets, function(oldRule) {
-			if (!defn.rules) defn.rules = [];
-			let rule = {
-				selector: oldRule.matches,
-				definition: oldRule.sprocket,
-				callback: oldRule.enteredComponent
-			}
-			defn.rules.push(rule);
-		});
-		if (extras.callbacks) _.defaults(defn, extras.callbacks);
-	}
-	if (defn.rules) return registerComposite(tagName, defn);
-	else return registerElement(tagName, defn);
-}
-
-let create = function(prototype) {
-	let constructor = function(element) {
-		return cast(element, constructor);
-	};
-	constructor.prototype = prototype;
-	return constructor;
-}
-
-let evolve = function(base, properties) {
-	let prototype = Object.create(base.prototype);
-	let sub = create(prototype);
-	let baseProperties = base.prototype.__properties__ || {};
-	let subProperties = prototype.__properties__ = {};
-	_.forOwn(baseProperties, function(desc, name) {
-		subProperties[name] = Object.create(desc);
-	});
-	if (properties) defineProperties(sub, properties);
-	return sub;
-}
-
-let defineProperties = function(sprocket, properties) {
-	let prototype = sprocket.prototype;
-	let definition = prototype.__properties__ || (prototype.__properties__ = {});
-	_.forOwn(properties, function(desc, name) {
-		switch (typeof desc) {
-		case 'object':
-			let propDesc = definition[name] || (definition[name] = {});
-			_.assign(propDesc, desc);
-			Object.defineProperty(prototype, name, {
-				get: function() { throw Error('Attempt to get an ARIA property'); },
-				set: function() { throw Error('Attempt to set an ARIA property'); }
-			});
-			break;
-		default:
-			prototype[name] = desc;
-			break;
-		}
-	});
-}
-
-let getPropertyDescriptor = function(sprocket, prop) {
-	return sprocket.prototype.__properties__[prop];
 }
 
 let innerMatches = function(element, sprocket, rule) { // internal utility method which is passed a "cached" rule
@@ -477,7 +541,6 @@ let sprockets = {
 	registerComponent,
 	registerComposite,
 	register,
-	create,
 	evolve,
 	cast,
 	find,
