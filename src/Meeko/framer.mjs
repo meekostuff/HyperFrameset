@@ -10,7 +10,7 @@
  */
 
 import * as _ from './stuff.mjs';
-import Promise from './Promise.mjs';
+import Thenfu from './Thenfu.mjs';
 import URL from './URL.mjs';
 import * as DOM from './DOM.mjs';
 import scriptQueue from './scriptQueue.mjs';
@@ -53,7 +53,7 @@ config: function(options) {
 });
 
 
-let framesetReady = Promise.applyTo();
+let framesetReady = Thenfu.applyTo();
 
 _.defaults(framer, {
 
@@ -68,7 +68,7 @@ start: function(startOptions) {
 	if (!startOptions || !startOptions.contentDocument) throw Error('No contentDocument passed to start()');
 
 	framer.started = true;
-	startOptions.contentDocument
+	Thenfu.resolve(startOptions.contentDocument)
 	.then(function(doc) { // FIXME potential race condition between document finished loading and frameset rendering
 		return httpProxy.add({
 			url: document.URL,
@@ -77,10 +77,10 @@ start: function(startOptions) {
 		});
 	});
 	
-	return Promise.pipe(null, [
+	return Thenfu.pipe(null, [
 		
 	function() { // sanity check
-		return Promise.wait(function() { return !!document.body; });
+		return Thenfu.wait(function() { return !!document.body; });
 	},
 
 	function() { // lookup or detect frameset.URL
@@ -107,7 +107,7 @@ start: function(startOptions) {
 	},
 
 	function(definition) {
-		return Promise.pipe(definition, [
+		return Thenfu.pipe(definition, [
 		
 		function() {
 			framer.definition = definition;
@@ -175,7 +175,7 @@ start: function(startOptions) {
 
 	// TODO it would be nice if <body> wasn't populated until stylesheets were loaded
 	function() {
-		return Promise.wait(function() { return DOM.checkStyleSheets(); })
+		return Thenfu.wait(function() { return DOM.checkStyleSheets(); })
 	}	
 	
 	]);
@@ -193,7 +193,7 @@ let prepareFrameset = function(dstDoc, definition) {
 
 	let selfMarker;
 	
-	return Promise.pipe(null, [
+	return Thenfu.pipe(null, [
 
 	function() { // remove all <link rel=stylesheet /> just in case
 		// FIXME maybe remove all <link>
@@ -427,7 +427,7 @@ onSubmit: function(e) { // return false means success
 },
 
 triggerRequestNavigation: function(url, details) {
-	Promise.defer(function() {
+	Thenfu.defer(function() {
 		let event = document.createEvent('CustomEvent');
 		event.initCustomEvent('requestnavigation', true, true, details.url);
 		let acceptDefault = details.element.dispatchEvent(event);
@@ -515,7 +515,7 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 	let request = { method: 'get', url: nohash, responseType: 'document' }; // TODO one day may support different response-type
 	let response;
 
-	return Promise.pipe(null, [
+	return Thenfu.pipe(null, [
 
 	function() {
 		if (mustNotify) return notify({ // FIXME need a timeout on notify
@@ -661,10 +661,10 @@ let notify = function(msg) { // FIXME this isn't being used called everywhere it
 	let module;
 	switch (msg.module) {
 	case 'frameset': module = framer.frameset.options; break;
-	default: return Promise.resolve();
+	default: return Thenfu.resolve();
 	}
 	let handler = module[msg.type];
-	if (!handler) return Promise.resolve();
+	if (!handler) return Thenfu.resolve();
 	let listener;
 
 	if (handler[msg.stage]) listener = handler[msg.stage];
@@ -687,11 +687,11 @@ let notify = function(msg) { // FIXME this isn't being used called everywhere it
 	}
 
 	if (typeof listener == 'function') {
-		let promise = Promise.defer(function() { listener(msg); }); // TODO isFunction(listener)
+		let promise = Thenfu.defer(function() { listener(msg); }); // TODO isFunction(listener)
 		promise['catch'](function(err) { throw Error(err); });
 		return promise;
 	}
-	else return Promise.resolve();
+	else return Thenfu.resolve();
 }
 
 function registerFrames(framesetDef) {
@@ -766,7 +766,7 @@ render: function() {
 
 	let srcBody = definition.render();
 	
-	return Promise.pipe(null, [
+	return Thenfu.pipe(null, [
 
 	function() {
 		_.forEach(_.map(srcBody.childNodes), function(node) {

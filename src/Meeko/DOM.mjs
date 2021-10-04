@@ -15,7 +15,7 @@ Object.create - IE9+
 */
 
 import * as _ from './stuff.mjs';
-import Promise from './Promise.mjs';
+import Thenfu from './Thenfu.mjs';
 
 const vendorPrefix = 'meeko'; // FIXME DRY with other instances of `vendorPrefix`
 
@@ -286,7 +286,7 @@ function isVisible(element) {
 
 
 function whenVisible(element) { // FIXME this quite possibly causes leaks if closestHidden is removed from document before removeEventListener
-	return new Promise(function(resolve, reject) {
+	return new Thenfu(function(resolve, reject) {
 		let closestHidden = closest(element, '[hidden]');
 		if (!closestHidden) {
 			resolve();

@@ -508,8 +508,8 @@
 	 WARN: This was based on early DOM Futures specification. This has been evolved towards ES6 Promises.
 	 */
 
-	let Promise = function(init) { // `init` is called as init(resolve, reject)
-		if (!(this instanceof Promise)) return new Promise(init);
+	let Thenfu = function(init) { // `init` is called as init(resolve, reject)
+		if (!(this instanceof Thenfu)) return new Thenfu(init);
 		
 		let promise = this;
 		promise._initialize();
@@ -539,11 +539,11 @@
 		}
 	};
 
-	defaults(Promise, {
+	defaults(Thenfu, {
 
 	applyTo: function(object) {
 		let resolver = {};
-		let promise = new Promise(function(resolve, reject) {
+		let promise = new Thenfu(function(resolve, reject) {
 			resolver.resolve = resolve;
 			resolver.reject = reject;
 		});
@@ -552,17 +552,13 @@
 		return promise;
 	},
 
-	isPromise: function(value) {
-		return value instanceof Promise;
-	},
-
 	isThenable: function(value) {
 		return value != null && typeof value.then === 'function';
 	}
 
 	});
 
-	defaults(Promise.prototype, {
+	defaults(Thenfu.prototype, {
 
 	_initialize: function() {
 		let promise = this;
@@ -604,12 +600,12 @@
 	_resolve: function(value, sync) { // NOTE equivalent to 'resolve algorithm'. External calls MUST NOT use sync
 		let promise = this;
 		if (!promise.isPending) return;
-		if (Promise.isPromise(value) && !value.isPending) {
+		if (value instanceof Thenfu && !value.isPending) {
 			if (value.isFulfilled) promise._fulfil(value.value, sync);
 			else /* if (value.isRejected) */ promise._reject(value.reason, sync);
 			return;
 		}
-		/* else */ if (Promise.isThenable(value)) {
+		/* else */ if (Thenfu.isThenable(value)) {
 			try {
 				value.then(
 					function(result) { promise._resolve(result, true); },
@@ -680,7 +676,7 @@
 
 	then: function(fulfilCallback, rejectCallback) {
 		let promise = this;
-		return new Promise(function(resolve, reject) {
+		return new Thenfu(function(resolve, reject) {
 			let fulfilWrapper = fulfilCallback ?
 				wrapResolve(fulfilCallback, resolve, reject) :
 				function(value) { resolve(value); };
@@ -723,18 +719,18 @@
 	}
 
 
-	defaults(Promise, {
+	defaults(Thenfu, {
 
 	resolve: function(value) {
-		if (Promise.isPromise(value)) return value;
-		let promise = Object.create(Promise.prototype);
+		if (value instanceof Thenfu) return value;
+		let promise = Object.create(Thenfu.prototype);
 		promise._initialize();
 		promise._resolve(value);
 		return promise;
 	},
 
 	reject: function(error) { // FIXME should never be used
-	return new Promise(function(resolve, reject) {
+	return new Thenfu(function(resolve, reject) {
 		reject(error);
 	});
 	}
@@ -755,7 +751,7 @@
 
 	function wait(fn) {
 		let test = { fn: fn };
-		let promise = Promise.applyTo(test);
+		let promise = Thenfu.applyTo(test);
 		asapTest(test);
 		return promise;
 	}
@@ -788,40 +784,40 @@
 	})();
 
 	function asap$1(value) { // FIXME asap(fn) should execute immediately
-		if (Promise.isPromise(value)) {
+		if (value instanceof Thenfu) {
 			if (value.isPending) return value; // already deferred
 			if (Task.getTime(true) <= 0) return value.then(); // will defer
 			return value; // not-deferred
 		}
-		if (Promise.isThenable(value)) return Promise.resolve(value); // will defer
+		if (Thenfu.isThenable(value)) return Thenfu.resolve(value); // will defer
 		if (typeof value === 'function') {
-			if (Task.getTime(true) <= 0) return Promise.resolve().then(value);
-			return new Promise(function(resolve) { resolve(value); }); // WARN relies on Meeko.Promise behavior
+			if (Task.getTime(true) <= 0) return Thenfu.resolve().then(value);
+			return new Thenfu(function(resolve) { resolve(value); }); // WARN relies on Meeko.Thenfu behavior
 		}
 		// NOTE otherwise we have a non-thenable, non-function something
-		if (Task.getTime(true) <= 0) return Promise.resolve(value).then(); // will defer
-		return Promise.resolve(value); // not-deferred
+		if (Task.getTime(true) <= 0) return Thenfu.resolve(value).then(); // will defer
+		return Thenfu.resolve(value); // not-deferred
 	}
 
 	function defer$1(value) {
-		if (Promise.isPromise(value)) {
+		if (value instanceof Thenfu) {
 			if (value.isPending) return value; // already deferred
 			return value.then();
 		}
-		if (Promise.isThenable(value)) return Promise.resolve(value);
-		if (typeof value === 'function') return Promise.resolve().then(value);
-		return Promise.resolve(value).then();
+		if (Thenfu.isThenable(value)) return Thenfu.resolve(value);
+		if (typeof value === 'function') return Thenfu.resolve().then(value);
+		return Thenfu.resolve(value).then();
 	}
 
 	function delay$1(timeout) { // FIXME delay(timeout, value_or_fn_or_promise)
-		return new Promise(function(resolve, reject) {
+		return new Thenfu(function(resolve, reject) {
 			if (timeout <= 0 || timeout == null) Task.defer(resolve);
 			else Task.delay(resolve, timeout);
 		});
 	}
 
 	function pipe(startValue, fnList) { // TODO make more efficient with sync introspection
-		let promise = Promise.resolve(startValue);
+		let promise = Thenfu.resolve(startValue);
 		for (let n=fnList.length, i=0; i<n; i++) {
 			let fn = fnList[i];
 			promise = promise.then(fn);
@@ -830,7 +826,7 @@
 	}
 
 	function reduce(accumulator, a, fn, context) {
-	return new Promise(function(resolve, reject) {
+	return new Thenfu(function(resolve, reject) {
 		let length = a.length;
 		let i = 0;
 
@@ -844,8 +840,8 @@
 			let timeoutCount = 1;
 
 			while (i < length) {
-				if (Promise.isThenable(acc)) {
-					if (!Promise.isPromise(acc) || !acc.isFulfilled) {
+				if (Thenfu.isThenable(acc)) {
+					if (!(acc instanceof Thenfu) || !acc.isFulfilled) {
 						acc.then(process, reject);
 						if (j <= 0 || !prevTime || i >= length) return;
 						let currTime = Task.getTime(true);
@@ -924,7 +920,7 @@
 
 	});
 
-	defaults(Promise, {
+	defaults(Thenfu, {
 		asap: asap$1, defer: defer$1, delay: delay$1, wait: wait, pipe: pipe, reduce: reduce
 	});
 
@@ -987,7 +983,8 @@
 		url.nohash = url.nosearch + url.search;
 		url.href = url.nohash + url.hash;
 		url.toString = function() { return url.href; };
-	}
+	};
+
 	URL.prototype.resolve = function resolve(relHref) {
 		relHref = relHref.trim();
 		if (!this.supportsResolve) return relHref;
@@ -1373,7 +1370,7 @@
 
 
 	function whenVisible(element) { // FIXME this quite possibly causes leaks if closestHidden is removed from document before removeEventListener
-		return new Promise(function(resolve, reject) {
+		return new Thenfu(function(resolve, reject) {
 			let closestHidden = closest(element, '[hidden]');
 			if (!closestHidden) {
 				resolve();
@@ -1670,7 +1667,7 @@
 	let scriptQueue = {
 
 	push: function(node) {
-	return new Promise(function(resolve, reject) {
+	return new Thenfu(function(resolve, reject) {
 		if (emptying) throw Error('Attempt to append script to scriptQueue while emptying');
 		
 		// TODO assert node is in document
@@ -1704,7 +1701,7 @@
 		script.type = 'text/javascript';
 		
 		// enabledFu resolves after script is inserted
-		let enabledFu = Promise.applyTo();
+		let enabledFu = Thenfu.applyTo();
 		
 		let prev = queue[queue.length - 1], prevScript = prev && prev.script;
 
@@ -1713,11 +1710,11 @@
 			if (prevScript.hasAttribute('async') || script.src && supportsSync && !script.hasAttribute('async')) triggerFu = prev.enabled;
 			else triggerFu = prev.complete; 
 		}
-		else triggerFu = Promise.resolve();
+		else triggerFu = Thenfu.resolve();
 		
 		triggerFu.then(enable, enable);
 
-		let completeFu = Promise.applyTo();
+		let completeFu = Thenfu.applyTo();
 		completeFu.then(resolve, reject);
 
 		let current = { script: script, complete: completeFu, enabled: enabledFu };
@@ -1768,7 +1765,7 @@
 	},
 
 	empty: function() {
-	return new Promise(function(resolve, reject) {
+	return new Thenfu(function(resolve, reject) {
 		
 		emptying = true;
 		if (queue.length <= 0) {
@@ -1807,6 +1804,9 @@
 	 (c) Sean Hogan, 2008,2012,2013,2014,2016
 	 Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	*/
+
+
+	let document$4 = window.document;
 
 	class Binding {
 		constructor(definition) {
@@ -1985,6 +1985,126 @@
 		}
 	}
 
+
+	/*
+		FIXME: What are we going to do with this dead-code?
+		TODO: better reporting of invalid content
+	*/
+	let convertXBLHandler = function(config) {
+		let handler = {};
+		handler.type = config.event;
+		if (null == config.event) console.warn('Invalid handler: event property undeclared');
+
+		function lookupValue(attrName, lookup) {
+			let attrValue = config[attrName];
+			let result;
+			if (attrValue) {
+				result = lookup[attrValue];
+				if (null == result) console.info('Ignoring invalid property ' + attrName + ': ' + attrValue);
+			}
+			return result;
+		}
+
+		handler.eventPhase = lookupValue('phase', {
+			'capture': 1, // Event.CAPTURING_PHASE,
+			'target': 2, // Event.AT_TARGET,
+			'bubble': 3, // Event.BUBBLING_PHASE,
+			'default-action': 0x78626C44 
+		}) || 0;
+
+		handler.preventDefault = lookupValue('default-action', {
+			'cancel' : true,
+			'perform' : false
+		}) || false;
+
+		handler.stopPropagation = lookupValue('propagate', {
+			'stop': true,
+			'continue': false
+		}) || false;
+		
+		function attrText_to_numArray(attr) {				
+			let attrText = config[attr];
+			if (!attrText) return null;
+			let result = [];
+			let strings = attrText.split(/\s+/);
+			for (let n=strings.length, i=0; i<n; i++) {
+				let text = strings[i];
+				let num = Number(text);
+				if (NaN != num && Math.floor(num) == num) result.push(num);
+			}
+			return result;
+		}
+
+		// Event Filters: mouse / keyboard / text / mutation / modifiers
+		
+		// mouse
+		handler.button = attrText_to_numArray('button');
+		handler.clickCount = attrText_to_numArray('click-count');
+		
+		// keyboard
+		handler.key = config.key;
+		handler.keyLocation = [];
+		let keyLocationText = config['key-location'];
+		let keyLocationStrings =  (keyLocationText) ? keyLocationText.split(/\s+/) : [];
+		for (let n=keyLocationStrings.length, i=0; i<n; i++) {
+			let text = keyLocationStrings[i];
+			switch (text) {
+				case 'standard': handler.keyLocation.push(KeyboardEvent.DOM_KEY_LOCATION_STANDARD); break;
+				case 'left': handler.keyLocation.push(KeyboardEvent.DOM_KEY_LOCATION_LEFT); break;
+				case 'right': handler.keyLocation.push(KeyboardEvent.DOM_KEY_LOCATION_RIGHT); break;
+				case 'numpad': handler.keyLocation.push(KeyboardEvent.DOM_KEY_LOCATION_NUMPAD); break;
+			}
+		}
+
+		// text
+		handler.text = config.text;
+		
+		// non-standard
+		handler.filter = new RegExp(config.filter, '');
+		
+		// mutation
+		// FIXME not supported anymore
+		handler.attrName = config['attr-name'];
+		handler.attrChange = [];
+		let attrChangeText = config['attr-change'];
+		let attrChangeStrings =  (attrChangeText) ? attrChangeText.split(/\s+/) : [];
+		for (let n=attrChangeStrings.length, i=0; i<n; i++) {
+			let text = attrChangeStrings[i];
+			switch (text) {
+				case 'modification': handler.attrChange.push(MutationEvent.MODIFICATION); break;
+				case 'addition': handler.attrChange.push(MutationEvent.ADDITION); break;
+				case 'removal': handler.attrChange.push(MutationEvent.REMOVAL); break;
+			}
+		}
+		handler.prevValue = config['prev-value'];
+		handler.newValue = config['new-value'];
+		
+		// modifiers
+		// TODO should handler.modifiers be {} or []?
+		if (null != config['modifiers']) {
+			handler.modifiers = [];
+			let modifiersText = config['modifiers'];
+			let modifiersStrings = (modifiersText) ? modifiersText.split(/\s+/) : [];
+			for (let n=modifiersStrings, i=0; i<n; i++) {
+				let text = modifiersStrings[i];
+				let m;
+				m = /^([+-]?)([a-z]+)(\??)$/.exec(text);
+				if (m) {
+					let key = m[2];
+					let condition = 1; // MUST
+					if (m[3]) condition = 0; // OPTIONAL
+					else if (m[1] == '+') condition = 1; // MUST
+					else if (m[1] == '-') condition = -1; // MUST NOT
+					handler.modifiers.push({ key: key, condition: condition });
+				}
+			}
+		}
+		else handler.modifiers = null;
+		handler.action = config.action;
+		
+		return handler;
+	};
+
 	let EventModules = {};
 	EventModules.AllEvents = {};
 	registerModule('FocusEvents', 'focus blur focusin focusout');
@@ -2003,8 +2123,11 @@
 	}
 
 	let matchesEvent = function(handler, event, ignorePhase) {
+		// type
+		let allEvents = EventModules.AllEvents;
 		let mouseEvents = EventModules.MouseEvents;
 		let keyboardEvents = EventModules.KeyboardEvents;
+		let uiEvents = EventModules.UIEvents;
 
 		if (event.type != handler.type) return false;
 
@@ -2037,6 +2160,7 @@
 
 		if (evType in keyboardEvents) {
 			if (handler.key) {
+				let success = false;
 				let keyId = event.keyIdentifier;
 				if (/^U\+00....$/.test(keyId)) { // TODO Needed for Safari-2. It would be great if this test could be done elsewhere
 					keyId = keyId.replace(/^U\+00/, 'U+');
@@ -2049,6 +2173,12 @@
 				if (!modifiersMatchEvent(handler.modifiers || [ 'none' ], event)) return false;
 			}
 		}
+
+		// UI events
+		if (evType in uiEvents) { } // TODO
+		
+		// user-defined events
+		if (!(evType in allEvents)) { } // TODO should these be optionally allowed / prevented??
 
 		return true;
 	};
@@ -2066,6 +2196,7 @@
 		};
 
 		let evMods_any = event.ctrlKey || event.shiftKey || event.altKey || event.metaKey;
+		let evMods_none = !evMods_any;
 
 		let any = false;
 
@@ -2147,11 +2278,11 @@
 
 	/*!
 	 Sprocket
-	 (c) Sean Hogan, 2008,2012,2013,2014,2016
+	 (c) Sean Hogan, 2008,2012,2013,2014,2016,2019
 	 Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	*/
 
-	let document$4 = window.document;
+	let document$5 = window.document;
 
 	/* FIXME
 		- auto DOM monitoring for node insertion / removal should be a start() option
@@ -2180,29 +2311,212 @@
 	let started = false;
 	let manualDOM = false;
 
-	let registerElement = function(tagName, defn) { // FIXME test tagName
+	/**
+	 * Attach sprockets to elements within the document and conditionally watch element insertions and removal.
+	 * No more registrations are permitted.
+	 *
+	 * @param options {object} Options.
+	 *     If `options.manual === true` then the caller will manually call nodeInserted / nodeRemoved as appropriate.
+	 */
+	let start = function(options) {
+		if (started) throw Error('sprockets management has already started');
+		started = true;
+		if (options && options.manual) manualDOM = true;
+		nodeInserted(document$5.body);
+		if (!manualDOM) observe(nodeInserted, nodeRemoved);
+	};
+
+	/**
+	 * Private method to create a sprocket-definition with no base definition.
+	 *
+	 * @param prototype
+	 * @returns {constructor} The sprocket-definition.
+	 */
+	let create = function(prototype) {
+		let constructor = function(element) {
+			return cast(element, constructor);
+		};
+		constructor.prototype = prototype;
+		return constructor;
+	};
+
+	/**
+	 * Create a sprocket-definition which extends a base-definition.
+	 *
+	 * @param baseDefn The base-definition.
+	 * @param properties The new properties for the extended sprocket-definition.
+	 * @returns {constructor} The sprocket-definition.
+	 */
+	let evolve = function(baseDefn, properties) {
+		let prototype = Object.create(baseDefn.prototype);
+		let sub = create(prototype);
+		let baseProperties = baseDefn.prototype.__properties__ || {};
+		let subProperties = prototype.__properties__ = {};
+		forOwn(baseProperties, function(desc, name) {
+			subProperties[name] = Object.create(desc);
+		});
+		if (properties) defineProperties(sub, properties);
+		return sub;
+	};
+
+	let defineProperties = function(sprocket, properties) {
+		let prototype = sprocket.prototype;
+		let definition = prototype.__properties__ || (prototype.__properties__ = {});
+		forOwn(properties, function(desc, name) {
+			switch (typeof desc) {
+				case 'object':
+					let propDesc = definition[name] || (definition[name] = {});
+					assign(propDesc, desc);
+					Object.defineProperty(prototype, name, {
+						get: function() { throw Error('Attempt to get an ARIA property'); },
+						set: function() { throw Error('Attempt to set an ARIA property'); }
+					});
+					break;
+				default:
+					prototype[name] = desc;
+					break;
+			}
+		});
+	};
+
+	/**
+	 * Register a sprocket definition for elements which have the specified tag-name.
+	 *   TODO: Should this be a private method?
+	 *
+	 * @param tagName
+	 * @param definition
+	 * @returns {BindingRule}
+	 */
+	let registerElement = function(tagName, definition) { // FIXME test tagName
 		if (started) throw Error('sprockets management already started');
-		if (defn.rules) console.warn('registerElement() does not support rules. Try registerComposite()');
-		let bindingDefn = new BindingDefinition(defn);
+		if (definition.rules) console.warn('registerElement() does not support rules. Try registerComposite()');
+		let bindingDefn = new BindingDefinition(definition);
 		let selector = tagName + ', [is=' + tagName + ']'; // TODO why should @is be supported??
 		let rule = new BindingRule(selector, bindingDefn);
 		bindingRules.push(rule);
 		return rule;
 	};
 
-	let start = function(options) {
-		if (started) throw Error('sprockets management has already started');
-		started = true;
-		if (options && options.manual) manualDOM = true;
-		nodeInserted(document$4.body);
-		if (!manualDOM) observe(nodeInserted, nodeRemoved);
+	/**
+	 * Register a sprocket definition. Internally method only.
+	 *   WARN this can promote any element into a composite
+	 *
+	 * @param selectorDescriptor {string|object} A string is a CSS selector. An object is {selector, composite: rootElement}
+	 * @param definition
+	 * @param callback Function that is called when the sprocket
+	 */
+	let registerSprocket = function(selectorDescriptor, definition, callback) {
+		let selector, composite;
+		if (typeof selectorDescriptor === 'string') {
+			selector = selectorDescriptor;
+			composite = document$5;
+		}
+		else {
+			selector = selectorDescriptor.selector;
+			composite = selectorDescriptor.composite;
+		}
+		let nodeData = getData(composite); // NOTE nodeData should always be a binding
+		if (!nodeData) {
+			nodeData = {};
+			setData(composite, nodeData);
+		}
+		let nodeRules = nodeData.rules;
+		if (!nodeRules) nodeRules = nodeData.rules = [];
+		let rule = new BindingRule(selector, definition);
+		rule.callback = callback;
+		nodeRules.unshift(rule); // WARN last registered means highest priority. Is this appropriate??
 	};
 
+	/**
+	 * Mostly an alias for registerElement.
+	 *
+	 * @param options
+	 * @param definition
+	 */
+	let register = function(options, definition) {
+		return registerSprocket(options, definition);
+	};
+
+	/**
+	 * Register a sprocket-definition for elements which match the specified tag-name.
+	 *   The definition may contain a list of rules of sprocket-definition registrations for descendant elements.
+	 *
+	 * @param tagName
+	 * @param compositeDefn
+	 * @returns {BindingRule}
+	 */
+	let registerComposite = function(tagName, compositeDefn) {
+		let defn = assign({}, compositeDefn);
+		let rules = defn.rules;
+		delete defn.rules;
+		if (!rules) console.warn('registerComposite() called without any sprocket rules. Try registerElement()');
+		let onattached = defn.attached;
+		defn.attached = function() {
+			let object = this;
+			if (rules) forEach(rules, function(rule) {
+				let selector = {
+					composite: object.element
+				};
+				let definition = {};
+				let callback;
+				if (Array.isArray(rule)) {
+					selector.selector = rule[0];
+					definition = rule[1];
+					callback = rule[2];
+				}
+				else {
+					selector.selector = rule.selector;
+					definition = rule.definition;
+					callback = rule.callback;
+				}
+				registerSprocket(selector, definition, callback);
+			});
+			if (onattached) return onattached.call(this);
+		};
+		return registerElement(tagName, defn);
+	};
+
+	/**
+	 * Almost the same as registerComposite. Provided for backwards compatibility.
+	 *
+	 * @param tagName
+	 * @param definition
+	 * @param extras
+	 * @returns {BindingRule}
+	 * @deprecated
+	 */
+	let registerComponent = function(tagName, definition, extras) {
+		let compositeDefn = { prototype: definition.prototype };
+		if (extras) {
+			compositeDefn.handlers = extras.handlers;
+			if (extras.sprockets) forEach(extras.sprockets, function(oldRule) {
+				if (!compositeDefn.rules) compositeDefn.rules = [];
+				let rule = {
+					selector: oldRule.matches,
+					definition: oldRule.sprocket,
+					callback: oldRule.enteredComponent
+				};
+				compositeDefn.rules.push(rule);
+			});
+			if (extras.callback) defaults(compositeDefn, extras.callback);
+		}
+		if (compositeDefn.rules) return registerComposite(tagName, compositeDefn);
+		else return registerElement(tagName, compositeDefn);
+	};
+
+	/**
+	 * Insert a node into the document at a specified location and attach / enable registered sprockets.
+	 *
+	 * @param conf {string} where to insert the node relative to `refNode`.
+	 * @param refNode {Node}
+	 * @param node {Node} the node to be inserted.
+	 * @returns {Node} The node (now inserted).
+	 */
 	let insertNode$1 = function(conf, refNode, node) {
 		if (!started) throw Error('sprockets management has not started yet');
 		if (!manualDOM) throw Error('Must not use sprockets.insertNode: auto DOM monitoring');
 		let doc = refNode.ownerDocument;
-		if (doc !== document$4 || !contains(document$4, refNode)) throw Error('sprockets.insertNode must insert into `document`');
+		if (doc !== document$5 || !contains(document$5, refNode)) throw Error('sprockets.insertNode must insert into `document`');
 		if (doc.adoptNode) node = doc.adoptNode(node); // Safari 5 was throwing because imported nodes had been added to a document node
 
 		let nodes = [ node ];
@@ -2231,16 +2545,21 @@
 		return node;
 	};
 
+	/**
+	 * Remove a specified node from the document and disable / remove registered sprockets.
+	 *
+	 * @param node {Node} the node to be removed.
+	 * @returns {Node} the node (now removed).
+	 */
 	let removeNode = function(node) {
 		if (!started) throw Error('sprockets management has not started yet');
 		if (!manualDOM) throw Error('Must not use sprockets.insertNode: auto DOM monitoring');
 		let doc = node.ownerDocument;
-		if (doc !== document$4 || !contains(document$4, node)) throw Error('sprockets.removeNode must remove from `document`');
+		if (doc !== document$5 || !contains(document$5, node)) throw Error('sprockets.removeNode must remove from `document`');
 		node.parentNode.removeChild(node);
 		nodeRemoved(node);
 		return node;
 	};
-
 
 	let nodeInserted = function(node) { // NOTE called AFTER node inserted into document
 		if (!started) throw Error('sprockets management has not started yet');
@@ -2322,129 +2641,9 @@
 				forEach(record.removedNodes, onRemoved, sprockets);
 			});
 		});
-		observer.observe(document$4.body, { childList: true, subtree: true });
+		observer.observe(document$5.body, { childList: true, subtree: true });
 		
 		// FIXME when to call observer.disconnect() ??
-	};
-
-	let registerSprocket = function(selector, definition, callback) { // WARN this can promote any element into a composite
-		let rule = {};
-		let composite;
-		if (typeof selector === 'string') {
-			assign(rule, {
-				selector: selector
-			});
-			composite = document$4;
-		}
-		else {
-			assign(rule, selector);
-			composite = selector.composite;
-			delete rule.composite;
-		}
-		let nodeData = getData(composite); // NOTE nodeData should always be a binding
-		if (!nodeData) {
-			nodeData = {};
-			setData(composite, nodeData);
-		}
-		let nodeRules = nodeData.rules;
-		if (!nodeRules) nodeRules = nodeData.rules = [];
-		rule.definition = definition;
-		rule.callback = callback;
-		nodeRules.unshift(rule); // WARN last registered means highest priority. Is this appropriate??
-	};
-
-	let register = function(options, sprocket) {
-		return registerSprocket(options, sprocket);
-	};
-
-	let registerComposite = function(tagName, definition) {
-		let defn = assign({}, definition);
-		let rules = defn.rules;
-		delete defn.rules;
-		if (!rules) console.warn('registerComposite() called without any sprocket rules. Try registerElement()');
-		let onattached = defn.attached;
-		defn.attached = function() {
-			let object = this;
-			if (rules) forEach(rules, function(rule) {
-				let selector = {
-					composite: object.element
-				};
-				let definition = {};
-				let callback;
-				if (Array.isArray(rule)) {
-					selector.selector = rule[0];
-					definition = rule[1];
-					callback = rule[2];
-				}
-				else {
-					selector.selector = rule.selector;
-					definition = rule.definition;
-					callback = rule.callback;
-				}
-				registerSprocket(selector, definition, callback);
-			});
-			if (onattached) return onattached.call(this);
-		};
-		return registerElement(tagName, defn);
-	};
-
-	let registerComponent = function(tagName, sprocket, extras) {
-		let defn = { prototype: sprocket.prototype };
-		if (extras) {
-			defn.handlers = extras.handlers;
-			if (extras.sprockets) forEach(extras.sprockets, function(oldRule) {
-				if (!defn.rules) defn.rules = [];
-				let rule = {
-					selector: oldRule.matches,
-					definition: oldRule.sprocket,
-					callback: oldRule.enteredComponent
-				};
-				defn.rules.push(rule);
-			});
-			if (extras.callbacks) defaults(defn, extras.callbacks);
-		}
-		if (defn.rules) return registerComposite(tagName, defn);
-		else return registerElement(tagName, defn);
-	};
-
-	let create = function(prototype) {
-		let constructor = function(element) {
-			return cast(element, constructor);
-		};
-		constructor.prototype = prototype;
-		return constructor;
-	};
-
-	let evolve = function(base, properties) {
-		let prototype = Object.create(base.prototype);
-		let sub = create(prototype);
-		let baseProperties = base.prototype.__properties__ || {};
-		let subProperties = prototype.__properties__ = {};
-		forOwn(baseProperties, function(desc, name) {
-			subProperties[name] = Object.create(desc);
-		});
-		if (properties) defineProperties(sub, properties);
-		return sub;
-	};
-
-	let defineProperties = function(sprocket, properties) {
-		let prototype = sprocket.prototype;
-		let definition = prototype.__properties__ || (prototype.__properties__ = {});
-		forOwn(properties, function(desc, name) {
-			switch (typeof desc) {
-			case 'object':
-				let propDesc = definition[name] || (definition[name] = {});
-				assign(propDesc, desc);
-				Object.defineProperty(prototype, name, {
-					get: function() { throw Error('Attempt to get an ARIA property'); },
-					set: function() { throw Error('Attempt to set an ARIA property'); }
-				});
-				break;
-			default:
-				prototype[name] = desc;
-				break;
-			}
-		});
 	};
 
 	let innerMatches = function(element, sprocket, rule) { // internal utility method which is passed a "cached" rule
@@ -2535,7 +2734,7 @@
 		let composite = getComposite(element);
 		sprocketRule = getRuleFromComposite(composite, element);
 		if (sprocketRule) return sprocketRule;
-		return getRuleFromComposite(document$4, element);
+		return getRuleFromComposite(document$5, element);
 	}
 
 	function getRuleFromComposite(composite, element) {
@@ -2555,7 +2754,7 @@
 		let composite = getComposite(element);
 		sprocketRule = getMatchingRuleFromComposite(composite, sprocket);
 		if (inComposite || sprocketRule) return sprocketRule;
-		return getMatchingRuleFromComposite(document$4, sprocket);
+		return getMatchingRuleFromComposite(document$5, sprocket);
 	}
 
 	function getMatchingRuleFromComposite(composite, sprocket) {
@@ -2581,7 +2780,7 @@
 	}
 
 	function createCompositeWalker(root, skipRoot) {
-		return document$4.createNodeIterator(
+		return document$5.createNodeIterator(
 				root,
 				1,
 				acceptNode,
@@ -2601,7 +2800,6 @@
 		registerComponent,
 		registerComposite,
 		register,
-		create,
 		evolve,
 		cast,
 		find: find$2,
@@ -2927,7 +3125,7 @@
 			if (replacements) node.textContent = text;
 		});
 
-		return resolveAll(doc, baseURL);
+		return resolveAll(doc, baseURL, false);
 	}
 
 	/*
@@ -2937,7 +3135,7 @@
 
 	function resolveAll(doc, baseURL) {
 
-		return Promise.pipe(null, [
+		return Thenfu.pipe(null, [
 
 		function () {
 			let selector = Object.keys(urlAttributes$1).join(', ');
@@ -2945,7 +3143,7 @@
 		},
 
 		function(nodeList) {
-			return Promise.reduce(null, nodeList, function(dummy, el) {
+			return Thenfu.reduce(null, nodeList, function(dummy, el) {
 				let tag = getTagName(el);
 				let attrList = urlAttributes$1[tag];
 				forOwn(attrList, function(attrDesc, attrName) {
@@ -2965,7 +3163,7 @@
 
 	function nativeParser(html, details) {
 
-		return Promise.pipe(null, [
+		return Thenfu.pipe(null, [
 			
 		function() {
 			let doc = (new DOMParser).parseFromString(html, 'text/html');
@@ -3024,13 +3222,14 @@
 
 		function cacheAdd(request, response) {
 			let rq = defaults({}, request);
+			let resp;
 
 			let entry = {
 				invalid: false,
 				request: rq
 			};
 
-			if (Promise.isPromise(response)) entry.response = response.then(
+			if (Thenfu.isThenable(response)) entry.response = response.then(
 				cloneResponse,
 				function (status) {
 					entry.invalid = true;
@@ -3049,7 +3248,7 @@
 			});
 			if (!(entry && entry.response)) return;
 			let response = entry.response;
-			if (Promise.isPromise(response)) return response.then(cloneResponse);
+			if (Thenfu.isThenable(response)) return response.then(cloneResponse);
 			else return cloneResponse(response);
 		}
 
@@ -3079,7 +3278,7 @@
 					url: response.url
 				};
 				defaults(request, defaultInfo);
-				return Promise.pipe(undefined, [
+				return Thenfu.pipe(undefined, [
 
 					function () {
 						return htmlParser.normalize(response.document, request);
@@ -3106,6 +3305,7 @@
 		};
 
 		let request = function (info) {
+			let sendText = null;
 			let method = lc(info.method);
 			switch (method) {
 				case 'post':
@@ -3115,7 +3315,7 @@
 					break;
 				case 'get':
 					let response = cacheLookup(info);
-					if (response) return Promise.resolve(response);
+					if (response) return Thenfu.resolve(response);
 					return doRequest(info)
 						.then(function (response) {
 							cacheAdd(info, response);
@@ -3129,7 +3329,7 @@
 		};
 
 		let doRequest = function (info) {
-			return new Promise(function (resolve, reject) {
+			return new Thenfu(function (resolve, reject) {
 				let method = info.method;
 				let url = info.url;
 				let sendText = info.body; // FIXME not-implemented
@@ -3174,7 +3374,7 @@
 							break;
 					}
 
-					Promise.defer(onload); // Use delay to stop the readystatechange event interrupting other event handlers (on IE).
+					Thenfu.defer(onload); // Use delay to stop the readystatechange event interrupting other event handlers (on IE).
 				}
 
 				function onload() {
@@ -3302,7 +3502,7 @@
 
 	update: function(data, callback) { // FIXME not being used. Can it be reomved?
 		let state = this;
-		return Promise.resolve(function() {
+		return Thenfu.resolve(function() {
 			if (state !== currentState) throw Error('Cannot update state: not current');
 			return scheduler.now(function() {
 				if (history.replaceState) history.replaceState(state.settings, title, url);
@@ -3336,7 +3536,7 @@
 			return;
 		}
 		let task = queue.shift();
-		let promise = Promise.defer(task.fn);
+		let promise = Thenfu.defer(task.fn);
 		promise.then(process, process);
 		promise.then(task.resolve, task.reject);
 	}
@@ -3353,11 +3553,11 @@
 	},
 
 	whenever: function(fn, fail, max) {
-	return new Promise(function(resolve, reject) {
+	return new Thenfu(function(resolve, reject) {
 
 		if (max == null) max = maxSize;
 		if (queue.length > max || (queue.length === max && processing)) {
-			if (fail) Promise.defer(fail).then(resolve, reject);
+			if (fail) Thenfu.defer(fail).then(resolve, reject);
 			else reject(function() { throw Error('No `fail` callback passed to whenever()'); });
 			return;
 		}
@@ -3815,7 +4015,14 @@
 		}
 	}
 
-	let document$5 = window.document;
+	function markElement(context) {
+		if (context.hasAttribute(nodeIdProperty)) return context.getAttribute(nodeIdProperty);
+		let uid = uniqueId(context);
+		context.setAttribute(nodeIdProperty, uid);
+		return uid;
+	}
+
+	let document$6 = window.document;
 
 	let Microdata = (function() {
 
@@ -3828,7 +4035,7 @@
 	}
 
 	function walkTree(root, skipRoot, callback) { // callback(el) must return NodeFilter code
-		let walker = document$5.createNodeIterator(
+		let walker = document$6.createNodeIterator(
 				root,
 				1,
 				acceptNode,
@@ -3913,7 +4120,7 @@
 	}
 
 	function parse(rootNode) {
-		if (!rootNode) rootNode = document$5;
+		if (!rootNode) rootNode = document$6;
 		let desc = getScopeDesc(rootNode);
 	}
 
@@ -4256,7 +4463,7 @@
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
 
-	let document$6 = window.document;
+	let document$7 = window.document;
 
 	// NOTE textAttr & htmlAttr used in HazardProcessor & CSSDecoder
 	const textAttr$1 = '_text';
@@ -4391,7 +4598,7 @@
 	});
 
 	function walkTree(root, skipRoot, callback) { // always "accept" element nodes
-		let walker = document$6.createNodeIterator(
+		let walker = document$7.createNodeIterator(
 				root,
 				1,
 				acceptNode,
@@ -4415,7 +4622,7 @@
 	}
 
 	function htmlToFragment(html, doc) {
-		if (!doc) doc = document$6;
+		if (!doc) doc = document$7;
 		let div = doc.createElement('div');
 		div.innerHTML = html;
 		let result = childNodesToFragment(div);
@@ -4715,7 +4922,7 @@
 	transformChildNodes: function(srcNode, context, frag) {
 		let processor = this;
 
-		return Promise.reduce(null, srcNode.childNodes, function(dummy, current) {
+		return Thenfu.reduce(null, srcNode.childNodes, function(dummy, current) {
 			return processor.transformNode(current, context, frag);
 		});
 	},
@@ -4807,13 +5014,13 @@
 
 		case 'apply': // WARN only applies to DOM-based provider
 			template = processor.getMatchingTemplate(context);
-			let promise = Promise.resolve(el);
+			let promise = Thenfu.resolve(el);
 			if (template) {
 				return processor.transformTemplate(template, context, null, frag);
 			}
 			node = context.cloneNode(false);
 			frag.appendChild(node);
-			return Promise.reduce(null, context.childNodes, function(dummy, child) {
+			return Thenfu.reduce(null, context.childNodes, function(dummy, child) {
 				return processor.transformHazardTree(el, child, node);
 			});
 
@@ -4968,7 +5175,7 @@
 				return frag;
 			}
 
-			return Promise.reduce(null, subContexts, function(dummy, subContext) {
+			return Thenfu.reduce(null, subContexts, function(dummy, subContext) {
 				return processor.transformChildNodes(el, subContext, frag);
 			});
 
@@ -5157,7 +5364,7 @@
 	function processExpression(expr, provider, context, variables, type) { // FIXME robustness
 		let doc = (context && context.nodeType) ? // TODO which document
 			(context.nodeType === 9 ? context : context.ownerDocument) : 
-			document$6; 
+			document$7; 
 		let value = provider.evaluate(expr.selector, context, variables);
 
 		every(expr.filters, function(filter) {
@@ -5239,7 +5446,7 @@
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
 
-	let document$7 = window.document;
+	let document$8 = window.document;
 
 	const eventConfig = 'form@submit,reset,input,change,invalid input,textarea@input,change,invalid,focus,blur select,fieldset@change,invalid,focus,blur button@click';
 
@@ -5342,12 +5549,12 @@
 		});
 
 		if (needClickWatcher) {
-			document$7.addEventListener('click', function(e) { 
+			document$8.addEventListener('click', function(e) { 
 				if (closest(e.target, 'form')) return;
 				let type = e.target.type;
 				if (!(type === 'submit' || type === 'reset')) return;
 				Task.asap(function() {
-					let pseudoEvent = document$7.createEvent('CustomEvent');
+					let pseudoEvent = document$8.createEvent('CustomEvent');
 					// NOTE pseudoEvent.detail = e.target
 					pseudoEvent.initCustomEvent(type, true, true, e.target);
 					pseudoEvent.preventDefault();
@@ -5396,7 +5603,7 @@
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
 
-	let document$8 = window.document;
+	let document$9 = window.document;
 
 	let namespace; // will be set by external call to registerFramesetElements()
 
@@ -5857,19 +6064,15 @@
 	namespace.lookupSelector('body') + ' { display: block; width: auto; height: auto; margin: 0; }',
 	namespace.lookupSelector('popup') + ' { display: block; position: relative; width: 0; height: 0; }',
 	namespace.lookupSelector('popup') + ' > * { position: absolute; top: 0; left: 0; }', // TODO or change 'body' styling above
-	namespace.lookupSelector('vlayout') + ' { height: 100%; }',
-	namespace.lookupSelector('hlayout') + ' { width: 100%; overflow-y: hidden; }',
-	namespace.lookupSelector('vlayout') + ' > * { display: block; float: left; width: 100%; height: auto; text-align: left; }',
-	namespace.lookupSelector('vlayout') + ' > *::after { clear: both; }',
-	namespace.lookupSelector('hlayout') + ' > * { display: block; float: left; width: auto; height: 100%; vertical-align: top; overflow-y: auto; }',
-	namespace.lookupSelector('hlayout') + '::after { clear: both; }',
+	namespace.lookupSelector('vlayout') + ' { display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; }',
+	namespace.lookupSelector('hlayout') + ' { display: flex; flex-direction: row; justify-content: flex-end; align-items: stretch; }',
 	namespace.lookupSelector('deck') + ' > * { width: 100%; height: 100%; }',
 	namespace.lookupSelector('rdeck') + ' > * { width: 0; height: 0; }',
 	].join('\n');
 
-	let style = document$8.createElement('style');
+	let style = document$9.createElement('style');
 	style.textContent = cssText;
-	document$8.head.insertBefore(style, document$8.head.firstChild);
+	document$9.head.insertBefore(style, document$9.head.firstChild);
 
 	} // END registerLayoutElements()
 
@@ -5898,7 +6101,7 @@
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
 
-	let document$9 = window.document;
+	let document$a = window.document;
 
 	let namespace$1; // will be set by external call to registerFrameElements()
 
@@ -5922,7 +6125,7 @@
 
 	preload: function(request) {
 		let frame = this;
-		return Promise.pipe(request, [
+		return Thenfu.pipe(request, [
 			
 		function(request) { return frame.definition.render(request, 'loading'); },
 		function(result) {
@@ -5937,7 +6140,7 @@
 		let frame = this;
 		if (response) frame.src = response.url;
 		// else a no-src frame
-		return Promise.pipe(response, [
+		return Thenfu.pipe(response, [
 		
 		function(response) { 
 			return frame.definition.render(response, 'loaded', {
@@ -5987,7 +6190,7 @@
 		let element = this.element;
 		let src = frame.attr('src');
 
-		return Promise.resolve().then(function() {
+		return Thenfu.resolve().then(function() {
 
 			if (src == null) { // a non-src frame
 				return frame.load(null, { condition: 'loaded' });
@@ -6004,7 +6207,7 @@
 			let request = { method: 'get', url: nohash, responseType: 'document'};
 			let response;
 
-			return Promise.pipe(null, [ // FIXME how to handle `hash` if present??
+			return Thenfu.pipe(null, [ // FIXME how to handle `hash` if present??
 
 				function() { return frame.preload(request); },
 				function() { return httpProxy.load(nohash, request); },
@@ -6098,9 +6301,9 @@
 	namespace$1.lookupSelector('frame') + ' { display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }' // FIXME text-align: start
 	].join('\n');
 
-	let style = document$9.createElement('style');
+	let style = document$a.createElement('style');
 	style.textContent = cssText;
-	document$9.head.insertBefore(style, document$9.head.firstChild);
+	document$a.head.insertBefore(style, document$a.head.firstChild);
 
 	} // END registerFrameElements()
 
@@ -6257,7 +6460,7 @@
 		let frag0 = doc;
 		if (details.mainSelector) frag0 = find$1(details.mainSelector, doc);
 
-		return Promise.reduce(frag0, bodyDef.transforms, function(fragment, transform) {
+		return Thenfu.reduce(frag0, bodyDef.transforms, function(fragment, transform) {
 			return transform.process(fragment, details);
 		})
 		.then(function(fragment) {
@@ -6690,7 +6893,7 @@
 	const FRAMESET_REL = 'frameset'; // NOTE http://lists.w3.org/Archives/Public/www-html/1996Dec/0143.html
 	const SELF_REL = 'self';
 
-	let document$a = window.document;
+	let document$b = window.document;
 
 	let framer = {};
 
@@ -6715,7 +6918,7 @@
 	});
 
 
-	let framesetReady = Promise.applyTo();
+	let framesetReady = Thenfu.applyTo();
 
 	defaults(framer, {
 
@@ -6730,24 +6933,24 @@
 		if (!startOptions || !startOptions.contentDocument) throw Error('No contentDocument passed to start()');
 
 		framer.started = true;
-		startOptions.contentDocument
+		Thenfu.resolve(startOptions.contentDocument)
 		.then(function(doc) { // FIXME potential race condition between document finished loading and frameset rendering
 			return httpProxy.add({
-				url: document$a.URL,
+				url: document$b.URL,
 				type: 'document',
 				document: doc
 			});
 		});
 		
-		return Promise.pipe(null, [
+		return Thenfu.pipe(null, [
 			
 		function() { // sanity check
-			return Promise.wait(function() { return !!document$a.body; });
+			return Thenfu.wait(function() { return !!document$b.body; });
 		},
 
 		function() { // lookup or detect frameset.URL
 			let framerConfig;
-			framerConfig = framer.lookup(document$a.URL);
+			framerConfig = framer.lookup(document$b.URL);
 			if (framerConfig) return framerConfig;
 			return startOptions.contentDocument
 				.then(function(doc) {
@@ -6769,11 +6972,11 @@
 		},
 
 		function(definition) {
-			return Promise.pipe(definition, [
+			return Thenfu.pipe(definition, [
 			
 			function() {
 				framer.definition = definition;
-				return prepareFrameset(document$a, definition)
+				return prepareFrameset(document$b, definition)
 			},
 
 			function() { 
@@ -6781,7 +6984,7 @@
 			},
 
 			function() {
-				return prerenderFrameset(document$a, definition)
+				return prerenderFrameset(document$b, definition)
 			}
 
 			]);
@@ -6817,7 +7020,7 @@
 
 				let changeset = framer.currentChangeset;
 				// FIXME what if no changeset is returned
-				return historyManager.start(changeset, '', document$a.URL,
+				return historyManager.start(changeset, '', document$b.URL,
 					function(state) { }, // FIXME need some sort of rendering status
 					function(state) { return framer.onPopState(state.getData()); }
 					);
@@ -6830,14 +7033,14 @@
 				module: 'frameset',
 				type: 'enteredState',
 				stage: 'after',
-				url: document$a.URL
+				url: document$b.URL
 			});
 
 		},
 
 		// TODO it would be nice if <body> wasn't populated until stylesheets were loaded
 		function() {
-			return Promise.wait(function() { return checkStyleSheets(); })
+			return Thenfu.wait(function() { return checkStyleSheets(); })
 		}	
 		
 		]);
@@ -6855,7 +7058,7 @@
 
 		let selfMarker;
 		
-		return Promise.pipe(null, [
+		return Thenfu.pipe(null, [
 
 		function() { // remove all <link rel=stylesheet /> just in case
 			// FIXME maybe remove all <link>
@@ -6904,7 +7107,7 @@
 
 	let prerenderFrameset = function(dstDoc, definition) { // FIXME where does this go
 		let srcBody = definition.element;
-		let dstBody = document$a.body;
+		let dstBody = document$b.body;
 		mergeElement(dstBody, srcBody);
 	};
 
@@ -6968,13 +7171,13 @@
 	}
 
 	function getFramesetMarker(doc) {
-		if (!doc) doc = document$a;
+		if (!doc) doc = document$b;
 		let marker = find$1('link[rel~=' + FRAMESET_REL + ']', doc.head);
 		return marker;
 	}
 
 	function getSelfMarker(doc) {
-		if (!doc) doc = document$a;
+		if (!doc) doc = document$b;
 		let marker = find$1('link[rel~=' + SELF_REL + ']', doc.head);
 		return marker;
 	}
@@ -6985,9 +7188,9 @@
 	framesetEntered: function(frameset) {
 		let framer = this;
 		framer.frameset = frameset;
-		let url = document$a.URL;
+		let url = document$b.URL;
 		framer.currentChangeset = frameset.lookup(url, {
-			referrer: document$a.referrer
+			referrer: document$b.referrer
 		});
 		framesetReady.resolve();
 	},
@@ -7003,7 +7206,7 @@
 		let parentElement = closest(frame.element.parentNode, HFrame.isFrame); // TODO frame.element.parentNode.ariaClosest('frame')
 		if (parentElement) parentFrame = parentElement.$;
 		else {
-			parentElement = document$a.body; // TODO  frame.element.parentNode.ariaClosest('frameset'); 
+			parentElement = document$b.body; // TODO  frame.element.parentNode.ariaClosest('frameset'); 
 			parentFrame = parentElement.$;
 		}
 		parentFrame.frameEntered(frame);
@@ -7039,7 +7242,7 @@
 		let href = hyperlink.getAttribute('href');
 		if (!href) return; // not really a hyperlink
 
-		let baseURL = URL(document$a.URL);
+		let baseURL = URL(document$b.URL);
 		let url = baseURL.resolve(href); // TODO probably don't need to resolve on browsers that support pushstate
 
 		// NOTE The following creates a pseudo-event and dispatches to frames in a bubbling order.
@@ -7059,7 +7262,7 @@
 		// test submit
 		let form = e.target;
 		if (form.target) return; // no iframe
-		let baseURL = URL(document$a.URL);
+		let baseURL = URL(document$b.URL);
 		let action = baseURL.resolve(form.action); // TODO probably don't need to resolve on browsers that support pushstate
 		
 		let details = {
@@ -7089,8 +7292,8 @@
 	},
 
 	triggerRequestNavigation: function(url, details) {
-		Promise.defer(function() {
-			let event = document$a.createEvent('CustomEvent');
+		Thenfu.defer(function() {
+			let event = document$b.createEvent('CustomEvent');
 			event.initCustomEvent('requestnavigation', true, true, details.url);
 			let acceptDefault = details.element.dispatchEvent(event);
 			if (acceptDefault !== false) {
@@ -7119,7 +7322,7 @@
 		}
 		
 		// test hyperlinks
-		let baseURL = URL(document$a.URL);
+		let baseURL = URL(document$b.URL);
 		let oURL = URL(url);
 		if (oURL.origin != baseURL.origin) return; // no external urls
 
@@ -7150,6 +7353,7 @@
 	},
 
 	onPageLink: function(url, details) {
+		let framer = this;
 		console.warn('Ignoring on-same-page links for now.'); // FIXME
 	},
 
@@ -7174,15 +7378,16 @@
 		let hash = fullURL.hash;
 		let nohash = fullURL.nohash;
 		let request = { method: 'get', url: nohash, responseType: 'document' }; // TODO one day may support different response-type
+		let response;
 
-		return Promise.pipe(null, [
+		return Thenfu.pipe(null, [
 
 		function() {
 			if (mustNotify) return notify({ // FIXME need a timeout on notify
 				module: 'frameset',
 				type: 'leftState',
 				stage: 'before',
-				url: document$a.URL
+				url: document$b.URL
 				// TODO details, resource, url, frames??
 				});
 		},
@@ -7193,7 +7398,7 @@
 		},
 		function() { // NOTE .load() is just to sync pushState
 			return httpProxy.load(nohash, request)
-			.then(function(resp) { });
+			.then(function(resp) { response = resp; });
 		},
 		function() { // FIXME how to handle `hash` if present??
 			if (changeState) return historyManager.pushState(changeset, '', url, function(state) {});
@@ -7221,8 +7426,9 @@
 	onPopState: function(changeset) {
 		let framer = this;
 		let frameset = framer.frameset;
+		let frames = [];
 		let url = changeset.url;
-		if (url !== document$a.URL) {
+		if (url !== document$b.URL) {
 			console.warn('Popped state URL does not match address-bar URL.');
 			// FIXME needs an optional error recovery, perhaps reloading document.URL
 		}
@@ -7254,7 +7460,7 @@
 		if (result == null || result === false) return false;
 
 		// FIXME error if `result` is a relative URL
-		if (typeof result === 'string') result = implyFramesetScope(result, document$a.URL);
+		if (typeof result === 'string') result = implyFramesetScope(result, document$b.URL);
 		if (typeof result !== 'object' || !result.scope || !result.framesetURL) throw Error('Unexpected result from frameset detect');
 		return result;
 	},
@@ -7320,10 +7526,10 @@
 		let module;
 		switch (msg.module) {
 		case 'frameset': module = framer.frameset.options; break;
-		default: return Promise.resolve();
+		default: return Thenfu.resolve();
 		}
 		let handler = module[msg.type];
-		if (!handler) return Promise.resolve();
+		if (!handler) return Thenfu.resolve();
 		let listener;
 
 		if (handler[msg.stage]) listener = handler[msg.stage];
@@ -7346,11 +7552,11 @@
 		}
 
 		if (typeof listener == 'function') {
-			let promise = Promise.defer(function() { listener(msg); }); // TODO isFunction(listener)
+			let promise = Thenfu.defer(function() { listener(msg); }); // TODO isFunction(listener)
 			promise['catch'](function(err) { throw Error(err); });
 			return promise;
 		}
-		else return Promise.resolve();
+		else return Thenfu.resolve();
 	};
 
 	function registerFrames(framesetDef) {
@@ -7425,7 +7631,7 @@
 
 		let srcBody = definition.render();
 		
-		return Promise.pipe(null, [
+		return Thenfu.pipe(null, [
 
 		function() {
 			forEach(map(srcBody.childNodes), function(node) {
@@ -7513,9 +7719,9 @@
 		'html, body { margin: 0; padding: 0; }',
 		'html { width: 100%; height: 100%; }'
 		];
-		let style = document$a.createElement('style');
+		let style = document$b.createElement('style');
 		style.textContent = cssText;
-		document$a.head.insertBefore(style, document$a.head.firstChild);
+		document$b.head.insertBefore(style, document$b.head.firstChild);
 
 	}
 
@@ -7526,7 +7732,7 @@
 
 	    if (!this.Meeko) this.Meeko = {};
 	    assign(this.Meeko, {
-	        stuff, Registry, Task, Promise: Promise, URL, DOM, scriptQueue,
+	        stuff, Registry, Task, Thenfu, URL, DOM, scriptQueue,
 	        sprockets,
 	        htmlParser, httpProxy, historyManager,
 	        CustomNamespace,

@@ -5,7 +5,7 @@
  */
 
 import * as _ from './stuff.mjs';
-import Promise from './Promise.mjs';
+import Thenfu from './Thenfu.mjs';
 import * as DOM from './DOM.mjs';
 
 let document = window.document;
@@ -37,7 +37,7 @@ let testScript = document.createElement('script'),
 let scriptQueue = {
 
 push: function(node) {
-return new Promise(function(resolve, reject) {
+return new Thenfu(function(resolve, reject) {
 	if (emptying) throw Error('Attempt to append script to scriptQueue while emptying');
 	
 	// TODO assert node is in document
@@ -71,7 +71,7 @@ return new Promise(function(resolve, reject) {
 	script.type = 'text/javascript';
 	
 	// enabledFu resolves after script is inserted
-	let enabledFu = Promise.applyTo();
+	let enabledFu = Thenfu.applyTo();
 	
 	let prev = queue[queue.length - 1], prevScript = prev && prev.script;
 
@@ -80,11 +80,11 @@ return new Promise(function(resolve, reject) {
 		if (prevScript.hasAttribute('async') || script.src && supportsSync && !script.hasAttribute('async')) triggerFu = prev.enabled;
 		else triggerFu = prev.complete; 
 	}
-	else triggerFu = Promise.resolve();
+	else triggerFu = Thenfu.resolve();
 	
 	triggerFu.then(enable, enable);
 
-	let completeFu = Promise.applyTo();
+	let completeFu = Thenfu.applyTo();
 	completeFu.then(resolve, reject);
 
 	let current = { script: script, complete: completeFu, enabled: enabledFu };
@@ -135,7 +135,7 @@ return new Promise(function(resolve, reject) {
 },
 
 empty: function() {
-return new Promise(function(resolve, reject) {
+return new Thenfu(function(resolve, reject) {
 	
 	emptying = true;
 	if (queue.length <= 0) {

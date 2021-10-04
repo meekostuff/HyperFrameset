@@ -6,7 +6,7 @@
 
 import * as _ from './stuff.mjs';
 import Task from './Task.mjs';
-import Promise from './Promise.mjs';
+import Thenfu from './Thenfu.mjs';
 import URL from './URL.mjs';
 import * as DOM from './DOM.mjs';
 import configData from './configData.mjs';
@@ -156,7 +156,7 @@ render: function(resource, details) {
 	let frag0 = doc;
 	if (details.mainSelector) frag0 = DOM.find(details.mainSelector, doc);
 
-	return Promise.reduce(frag0, bodyDef.transforms, function(fragment, transform) {
+	return Thenfu.reduce(frag0, bodyDef.transforms, function(fragment, transform) {
 		return transform.process(fragment, details);
 	})
 	.then(function(fragment) {

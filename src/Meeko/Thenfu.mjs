@@ -6,8 +6,8 @@
 import * as _ from './stuff.mjs';
 import Task from './Task.mjs';
 
-let Promise = function(init) { // `init` is called as init(resolve, reject)
-	if (!(this instanceof Promise)) return new Promise(init);
+let Thenfu = function(init) { // `init` is called as init(resolve, reject)
+	if (!(this instanceof Thenfu)) return new Thenfu(init);
 	
 	let promise = this;
 	promise._initialize();
@@ -37,11 +37,11 @@ let Promise = function(init) { // `init` is called as init(resolve, reject)
 	}
 }
 
-_.defaults(Promise, {
+_.defaults(Thenfu, {
 
 applyTo: function(object) {
 	let resolver = {}
-	let promise = new Promise(function(resolve, reject) {
+	let promise = new Thenfu(function(resolve, reject) {
 		resolver.resolve = resolve;
 		resolver.reject = reject;
 	});
@@ -50,17 +50,13 @@ applyTo: function(object) {
 	return promise;
 },
 
-isPromise: function(value) {
-	return value instanceof Promise;
-},
-
 isThenable: function(value) {
 	return value != null && typeof value.then === 'function';
 }
 
 });
 
-_.defaults(Promise.prototype, {
+_.defaults(Thenfu.prototype, {
 
 _initialize: function() {
 	let promise = this;
@@ -102,12 +98,12 @@ _fulfil: function(result, sync) { // NOTE equivalent to 'fulfil algorithm'. Exte
 _resolve: function(value, sync) { // NOTE equivalent to 'resolve algorithm'. External calls MUST NOT use sync
 	let promise = this;
 	if (!promise.isPending) return;
-	if (Promise.isPromise(value) && !value.isPending) {
+	if (value instanceof Thenfu && !value.isPending) {
 		if (value.isFulfilled) promise._fulfil(value.value, sync);
 		else /* if (value.isRejected) */ promise._reject(value.reason, sync);
 		return;
 	}
-	/* else */ if (Promise.isThenable(value)) {
+	/* else */ if (Thenfu.isThenable(value)) {
 		try {
 			value.then(
 				function(result) { promise._resolve(result, true); },
@@ -178,7 +174,7 @@ _process: function() { // NOTE process a promises callbacks
 
 then: function(fulfilCallback, rejectCallback) {
 	let promise = this;
-	return new Promise(function(resolve, reject) {
+	return new Thenfu(function(resolve, reject) {
 		let fulfilWrapper = fulfilCallback ?
 			wrapResolve(fulfilCallback, resolve, reject) :
 			function(value) { resolve(value); }
@@ -221,18 +217,18 @@ function wrapResolve(callback, resolve, reject) {
 }
 
 
-_.defaults(Promise, {
+_.defaults(Thenfu, {
 
 resolve: function(value) {
-	if (Promise.isPromise(value)) return value;
-	let promise = Object.create(Promise.prototype);
+	if (value instanceof Thenfu) return value;
+	let promise = Object.create(Thenfu.prototype);
 	promise._initialize();
 	promise._resolve(value);
 	return promise;
 },
 
 reject: function(error) { // FIXME should never be used
-return new Promise(function(resolve, reject) {
+return new Thenfu(function(resolve, reject) {
 	reject(error);
 });
 }
@@ -253,7 +249,7 @@ let tests = [];
 
 function wait(fn) {
 	let test = { fn: fn };
-	let promise = Promise.applyTo(test);
+	let promise = Thenfu.applyTo(test);
 	asapTest(test);
 	return promise;
 }
@@ -286,40 +282,40 @@ return wait;
 })();
 
 function asap(value) { // FIXME asap(fn) should execute immediately
-	if (Promise.isPromise(value)) {
+	if (value instanceof Thenfu) {
 		if (value.isPending) return value; // already deferred
 		if (Task.getTime(true) <= 0) return value.then(); // will defer
 		return value; // not-deferred
 	}
-	if (Promise.isThenable(value)) return Promise.resolve(value); // will defer
+	if (Thenfu.isThenable(value)) return Thenfu.resolve(value); // will defer
 	if (typeof value === 'function') {
-		if (Task.getTime(true) <= 0) return Promise.resolve().then(value);
-		return new Promise(function(resolve) { resolve(value); }); // WARN relies on Meeko.Promise behavior
+		if (Task.getTime(true) <= 0) return Thenfu.resolve().then(value);
+		return new Thenfu(function(resolve) { resolve(value); }); // WARN relies on Meeko.Thenfu behavior
 	}
 	// NOTE otherwise we have a non-thenable, non-function something
-	if (Task.getTime(true) <= 0) return Promise.resolve(value).then(); // will defer
-	return Promise.resolve(value); // not-deferred
+	if (Task.getTime(true) <= 0) return Thenfu.resolve(value).then(); // will defer
+	return Thenfu.resolve(value); // not-deferred
 }
 
 function defer(value) {
-	if (Promise.isPromise(value)) {
+	if (value instanceof Thenfu) {
 		if (value.isPending) return value; // already deferred
 		return value.then();
 	}
-	if (Promise.isThenable(value)) return Promise.resolve(value);
-	if (typeof value === 'function') return Promise.resolve().then(value);
-	return Promise.resolve(value).then();
+	if (Thenfu.isThenable(value)) return Thenfu.resolve(value);
+	if (typeof value === 'function') return Thenfu.resolve().then(value);
+	return Thenfu.resolve(value).then();
 }
 
 function delay(timeout) { // FIXME delay(timeout, value_or_fn_or_promise)
-	return new Promise(function(resolve, reject) {
+	return new Thenfu(function(resolve, reject) {
 		if (timeout <= 0 || timeout == null) Task.defer(resolve);
 		else Task.delay(resolve, timeout);
 	});
 }
 
 function pipe(startValue, fnList) { // TODO make more efficient with sync introspection
-	let promise = Promise.resolve(startValue);
+	let promise = Thenfu.resolve(startValue);
 	for (let n=fnList.length, i=0; i<n; i++) {
 		let fn = fnList[i];
 		promise = promise.then(fn);
@@ -328,7 +324,7 @@ function pipe(startValue, fnList) { // TODO make more efficient with sync intros
 }
 
 function reduce(accumulator, a, fn, context) {
-return new Promise(function(resolve, reject) {
+return new Thenfu(function(resolve, reject) {
 	let length = a.length;
 	let i = 0;
 
@@ -342,8 +338,8 @@ return new Promise(function(resolve, reject) {
 		let timeoutCount = 1;
 
 		while (i < length) {
-			if (Promise.isThenable(acc)) {
-				if (!Promise.isPromise(acc) || !acc.isFulfilled) {
+			if (Thenfu.isThenable(acc)) {
+				if (!(acc instanceof Thenfu) || !acc.isFulfilled) {
 					acc.then(process, reject);
 					if (j <= 0 || !prevTime || i >= length) return;
 					let currTime = Task.getTime(true);
@@ -422,11 +418,11 @@ getTimeoutCount: function(remainingTime) {
 
 });
 
-_.defaults(Promise, {
+_.defaults(Thenfu, {
 	asap: asap, defer: defer, delay: delay, wait: wait, pipe: pipe, reduce: reduce
 });
 
-export default Promise;
+export default Thenfu;
 
 
 

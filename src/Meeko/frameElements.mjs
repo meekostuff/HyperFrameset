@@ -10,7 +10,7 @@
 
 import * as _ from './stuff.mjs';
 import Task from './Task.mjs';
-import Promise from './Promise.mjs';
+import Thenfu from './Thenfu.mjs';
 import URL from './URL.mjs';
 import * as DOM from './DOM.mjs';
 import httpProxy from './httpProxy.mjs';
@@ -42,7 +42,7 @@ isFrame: true,
 
 preload: function(request) {
 	let frame = this;
-	return Promise.pipe(request, [
+	return Thenfu.pipe(request, [
 		
 	function(request) { return frame.definition.render(request, 'loading'); },
 	function(result) {
@@ -57,7 +57,7 @@ load: function(response) { // FIXME need a teardown method that releases child-f
 	let frame = this;
 	if (response) frame.src = response.url;
 	// else a no-src frame
-	return Promise.pipe(response, [
+	return Thenfu.pipe(response, [
 	
 	function(response) { 
 		return frame.definition.render(response, 'loaded', {
@@ -107,7 +107,7 @@ refresh: function() {
 	let element = this.element;
 	let src = frame.attr('src');
 
-	return Promise.resolve().then(function() {
+	return Thenfu.resolve().then(function() {
 
 		if (src == null) { // a non-src frame
 			return frame.load(null, { condition: 'loaded' });
@@ -124,7 +124,7 @@ refresh: function() {
 		let request = { method: 'get', url: nohash, responseType: 'document'};
 		let response;
 
-		return Promise.pipe(null, [ // FIXME how to handle `hash` if present??
+		return Thenfu.pipe(null, [ // FIXME how to handle `hash` if present??
 
 			function() { return frame.preload(request); },
 			function() { return httpProxy.load(nohash, request); },

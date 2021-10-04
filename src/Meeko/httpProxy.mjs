@@ -1,8 +1,7 @@
-
 import * as _ from './stuff.mjs';
 import URL from './URL.mjs';
 import * as DOM from './DOM.mjs';
-import Promise from './Promise.mjs';
+import Thenfu from './Thenfu.mjs';
 import htmlParser from './htmlParser.mjs';
 
 /*
@@ -55,7 +54,7 @@ let httpProxy = (function() {
 			request: rq
 		};
 
-		if (Promise.isPromise(response)) entry.response = response.then(
+		if (Thenfu.isThenable(response)) entry.response = response.then(
 			cloneResponse,
 			function (status) {
 				entry.invalid = true;
@@ -74,7 +73,7 @@ let httpProxy = (function() {
 		});
 		if (!(entry && entry.response)) return;
 		let response = entry.response;
-		if (Promise.isPromise(response)) return response.then(cloneResponse);
+		if (Thenfu.isThenable(response)) return response.then(cloneResponse);
 		else return cloneResponse(response);
 	}
 
@@ -104,7 +103,7 @@ let httpProxy = (function() {
 				url: response.url
 			}
 			_.defaults(request, defaultInfo);
-			return Promise.pipe(undefined, [
+			return Thenfu.pipe(undefined, [
 
 				function () {
 					return htmlParser.normalize(response.document, request);
@@ -141,7 +140,7 @@ let httpProxy = (function() {
 				break;
 			case 'get':
 				let response = cacheLookup(info);
-				if (response) return Promise.resolve(response);
+				if (response) return Thenfu.resolve(response);
 				return doRequest(info)
 					.then(function (response) {
 						cacheAdd(info, response);
@@ -155,7 +154,7 @@ let httpProxy = (function() {
 	}
 
 	let doRequest = function (info) {
-		return new Promise(function (resolve, reject) {
+		return new Thenfu(function (resolve, reject) {
 			let method = info.method;
 			let url = info.url;
 			let sendText = info.body; // FIXME not-implemented
@@ -200,7 +199,7 @@ let httpProxy = (function() {
 						break;
 				}
 
-				Promise.defer(onload); // Use delay to stop the readystatechange event interrupting other event handlers (on IE).
+				Thenfu.defer(onload); // Use delay to stop the readystatechange event interrupting other event handlers (on IE).
 			}
 
 			function onload() {

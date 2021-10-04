@@ -2,7 +2,7 @@
 import * as _ from './stuff.mjs';
 import URL from './URL.mjs';
 import * as DOM from './DOM.mjs';
-import Promise from './Promise.mjs';
+import Thenfu from './Thenfu.mjs';
 
 /*
 	normalize() is called between html-parsing (internal) and document normalising (external function).
@@ -42,7 +42,7 @@ let urlAttributes = URL.attributes;
 
 function resolveAll(doc, baseURL) {
 
-	return Promise.pipe(null, [
+	return Thenfu.pipe(null, [
 
 	function () {
 		let selector = Object.keys(urlAttributes).join(', ');
@@ -50,7 +50,7 @@ function resolveAll(doc, baseURL) {
 	},
 
 	function(nodeList) {
-		return Promise.reduce(null, nodeList, function(dummy, el) {
+		return Thenfu.reduce(null, nodeList, function(dummy, el) {
 			let tag = DOM.getTagName(el);
 			let attrList = urlAttributes[tag];
 			_.forOwn(attrList, function(attrDesc, attrName) {
@@ -70,7 +70,7 @@ function resolveAll(doc, baseURL) {
 
 function nativeParser(html, details) {
 
-	return Promise.pipe(null, [
+	return Thenfu.pipe(null, [
 		
 	function() {
 		let doc = (new DOMParser).parseFromString(html, 'text/html');

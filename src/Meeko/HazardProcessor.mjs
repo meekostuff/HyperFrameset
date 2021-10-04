@@ -16,7 +16,7 @@
 import * as _ from './stuff.mjs';
 import * as DOM from './DOM.mjs';
 import Task from './Task.mjs';
-import Promise from './Promise.mjs';
+import Thenfu from './Thenfu.mjs';
 import filters from './filters.mjs';
 import CustomNamespace from './CustomNamespace.mjs';
 
@@ -479,7 +479,7 @@ transformTemplate: function(template, context, params, frag) {
 transformChildNodes: function(srcNode, context, frag) {
 	let processor = this;
 
-	return Promise.reduce(null, srcNode.childNodes, function(dummy, current) {
+	return Thenfu.reduce(null, srcNode.childNodes, function(dummy, current) {
 		return processor.transformNode(current, context, frag);
 	});
 },
@@ -571,13 +571,13 @@ transformHazardTree: function(el, context, frag) {
 
 	case 'apply': // WARN only applies to DOM-based provider
 		template = processor.getMatchingTemplate(context);
-		let promise = Promise.resolve(el);
+		let promise = Thenfu.resolve(el);
 		if (template) {
 			return processor.transformTemplate(template, context, null, frag);
 		}
 		node = context.cloneNode(false);
 		frag.appendChild(node);
-		return Promise.reduce(null, context.childNodes, function(dummy, child) {
+		return Thenfu.reduce(null, context.childNodes, function(dummy, child) {
 			return processor.transformHazardTree(el, child, node);
 		});
 
@@ -732,7 +732,7 @@ transformHazardTree: function(el, context, frag) {
 			return frag;
 		}
 
-		return Promise.reduce(null, subContexts, function(dummy, subContext) {
+		return Thenfu.reduce(null, subContexts, function(dummy, subContext) {
 			return processor.transformChildNodes(el, subContext, frag);
 		});
 

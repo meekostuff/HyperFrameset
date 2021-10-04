@@ -1,5 +1,5 @@
 import * as _ from './stuff.mjs';
-import Promise from './Promise.mjs';
+import Thenfu from './Thenfu.mjs';
 
 // wrapper for `history` mostly to provide locking around state-updates and throttling of popstate events
 let historyManager = (function() {
@@ -94,7 +94,7 @@ getData: function() {
 
 update: function(data, callback) { // FIXME not being used. Can it be reomved?
 	let state = this;
-	return Promise.resolve(function() {
+	return Thenfu.resolve(function() {
 		if (state !== currentState) throw Error('Cannot update state: not current');
 		return scheduler.now(function() {
 			if (history.replaceState) history.replaceState(state.settings, title, url);
@@ -128,7 +128,7 @@ function process() {
 		return;
 	}
 	let task = queue.shift();
-	let promise = Promise.defer(task.fn);
+	let promise = Thenfu.defer(task.fn);
 	promise.then(process, process);
 	promise.then(task.resolve, task.reject);
 }
@@ -145,11 +145,11 @@ reset: function(fn) {
 },
 
 whenever: function(fn, fail, max) {
-return new Promise(function(resolve, reject) {
+return new Thenfu(function(resolve, reject) {
 
 	if (max == null) max = maxSize;
 	if (queue.length > max || (queue.length === max && processing)) {
-		if (fail) Promise.defer(fail).then(resolve, reject);
+		if (fail) Thenfu.defer(fail).then(resolve, reject);
 		else reject(function() { throw Error('No `fail` callback passed to whenever()'); });
 		return;
 	}
