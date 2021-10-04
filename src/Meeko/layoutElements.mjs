@@ -471,12 +471,8 @@ namespace.lookupSelector('panel') + ' { display: block; width: auto; height: aut
 namespace.lookupSelector('body') + ' { display: block; width: auto; height: auto; margin: 0; }',
 namespace.lookupSelector('popup') + ' { display: block; position: relative; width: 0; height: 0; }',
 namespace.lookupSelector('popup') + ' > * { position: absolute; top: 0; left: 0; }', // TODO or change 'body' styling above
-namespace.lookupSelector('vlayout') + ' { height: 100%; }',
-namespace.lookupSelector('hlayout') + ' { width: 100%; overflow-y: hidden; }',
-namespace.lookupSelector('vlayout') + ' > * { display: block; float: left; width: 100%; height: auto; text-align: left; }',
-namespace.lookupSelector('vlayout') + ' > *::after { clear: both; }',
-namespace.lookupSelector('hlayout') + ' > * { display: block; float: left; width: auto; height: 100%; vertical-align: top; overflow-y: auto; }',
-namespace.lookupSelector('hlayout') + '::after { clear: both; }',
+namespace.lookupSelector('vlayout') + ' { display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; }',
+namespace.lookupSelector('hlayout') + ' { display: flex; flex-direction: row; justify-content: flex-end; align-items: stretch; }',
 namespace.lookupSelector('deck') + ' > * { width: 100%; height: 100%; }',
 namespace.lookupSelector('rdeck') + ' > * { width: 0; height: 0; }',
 ].join('\n');
