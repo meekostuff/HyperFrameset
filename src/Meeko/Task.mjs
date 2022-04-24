@@ -8,8 +8,6 @@
 
 import * as _ from './stuff.mjs';
 
-const vendorPrefix = 'meeko'; // FIXME DRY with other instances of `vendorPrefix`
-
 // FIXME record Task statistics
 
 const frameRate = 60; // FIXME make this a boot-option??
@@ -27,7 +25,6 @@ let schedule = window.requestAnimationFrame;
 
 let asapQueue = [];
 let deferQueue = [];
-let errorQueue = [];
 let scheduled = false;
 let processing = false;
 
@@ -55,7 +52,7 @@ function delay(fn, timeout) {
 
 	setTimeout(function() {
 		try { fn(); }
-		catch (error) { postError(error); }
+		catch (error) { reportError(error); }
 		processTasks();
 	}, timeout);
 }
@@ -113,7 +110,7 @@ function processTasks() {
 		fn = asapQueue.shift();
 		if (typeof fn !== 'function') continue;
 		try { fn(); }
-		catch (error) { postError(error); }
+		catch (error) { reportError(error); }
 		currTime = getTime();
 		if (currTime >= frameExecutionTimeout) break;
 	}
@@ -129,47 +126,7 @@ function processTasks() {
 		idle = false;
 	}
 	else idle = true;
-	
-	throwErrors();
-	
 }
-
-function postError(error) {
-	errorQueue.push(error);
-}
-
-let throwErrors = (function() {
-
-let evType = vendorPrefix + '-error';
-function throwErrors() {
-	let handlers = createThrowers(errorQueue);
-	_.forEach(handlers, function(handler) {
-		window.addEventListener(evType, handler, false);
-	});
-	let e = document.createEvent('Event');
-	e.initEvent(evType, true, true);
-	window.dispatchEvent(e);
-	_.forEach(handlers, function(handler) {
-		window.removeEventListener(evType, handler, false);
-	});
-	errorQueue = [];
-}
-
-function createThrowers(list) {
-	return _.map(list, function(error) {
-		return function() {
-			if (console.logLevel === 'debug') {
-				if (error && error.stack) console.debug(error.stack);
-				else console.debug('Untraceable error: ' + error); // FIXME why are these occuring??
-			}
-			throw error;
-		};
-	});
-}
-
-return throwErrors;
-
-})();
 
 export default {
 	asap,
@@ -177,6 +134,5 @@ export default {
 	delay,
 	getTime,
 	getStats,
-	resetStats,
-	postError
+	resetStats
 };

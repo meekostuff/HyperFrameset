@@ -1,5 +1,6 @@
 /*
- ### Promise
+ ### Thenfu
+ This is an enhanced Promise implementation but it defers to allow animation.
  WARN: This was based on early DOM Futures specification. This has been evolved towards ES6 Promises.
  */
 
@@ -126,7 +127,7 @@ _reject: function(error, sync) { // NOTE equivalent to 'reject algorithm'. Exter
 	promise.isRejected = true;
 	promise.reason = error;
 	if (!promise._willCatch) {
-		Task.postError(error);
+		reportError(error);
 	}
 	else promise._requestProcessing(sync);
 },

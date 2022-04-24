@@ -6,7 +6,6 @@
 
 import * as _ from './stuff.mjs';
 import * as DOM from './DOM.mjs';
-import Task from './Task.mjs';
 
 function ScriptProcessor(options) {
 	this.processor = options;
@@ -46,7 +45,7 @@ loadTemplate: function(template) {
 		return;
 	}
 	try { this.processor = (Function('return (' + script.text + ')'))(); }
-	catch(err) { Task.postError(err); }
+	catch(err) { reportError(err); }
 	
 	if (!this.processor || !this.processor.transform) {
 		console.warn('"script" transform template did not produce valid transform object');

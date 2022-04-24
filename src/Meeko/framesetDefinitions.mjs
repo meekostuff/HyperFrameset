@@ -5,7 +5,6 @@
  */
 
 import * as _ from './stuff.mjs';
-import Task from './Task.mjs';
 import Thenfu from './Thenfu.mjs';
 import URL from './URL.mjs';
 import * as DOM from './DOM.mjs';
@@ -393,7 +392,7 @@ preprocess: function() {
 		catch(err) { 
 			console.warn('Error evaluating inline script in frameset:\n' +
 				framesetDef.url + '#' + script.id);
-			Task.postError(err);
+			reportError(err);
 		}
 
 		script.parentNode.removeChild(script); // physical <script> no longer needed

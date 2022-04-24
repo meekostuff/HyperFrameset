@@ -9,7 +9,6 @@
 */
 
 import * as _ from './stuff.mjs';
-import Task from './Task.mjs';
 import Thenfu from './Thenfu.mjs';
 import URL from './URL.mjs';
 import * as DOM from './DOM.mjs';
@@ -82,7 +81,7 @@ insert: function(bodyElement, replace) { // FIXME need a teardown method that re
 	if (frame.bodyElement) {
 		if (options && options.bodyLeft) {
 			try { options.bodyLeft(frame, frame.bodyElement); } 
-			catch (err) { Task.postError(err); }
+			catch (err) { reportError(err); }
 		}
 		sprockets.removeNode(frame.bodyElement);
 	}
@@ -98,7 +97,7 @@ insert: function(bodyElement, replace) { // FIXME need a teardown method that re
 
 	if (options && options.bodyEntered) {
 		try { options.bodyEntered(frame, frame.bodyElement); } 
-		catch (err) { Task.postError(err); }
+		catch (err) { reportError(err); }
 	}
 },
 

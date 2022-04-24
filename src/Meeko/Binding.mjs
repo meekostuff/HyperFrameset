@@ -19,7 +19,6 @@ Object.create - IE9+
 */
 
 import * as _ from './stuff.mjs';
-import Task from './Task.mjs';
 import * as DOM from './DOM.mjs';
 import BindingDefinition from './BindingDefinition.mjs';
 
@@ -118,7 +117,7 @@ _.assign(Binding.prototype, {
 				return handleEvent.call(object, event, handler);
 			}
 			catch (error) {
-				Task.postError(error);
+				reportError(error);
 				throw error;
 			}
 		}

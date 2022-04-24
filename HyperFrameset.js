@@ -330,8 +330,6 @@
 		TODO Only intended for use by Promise. Should this be externally available?
 	 */
 
-	const vendorPrefix = 'meeko'; // FIXME DRY with other instances of `vendorPrefix`
-
 	// FIXME record Task statistics
 
 	const frameRate = 60; // FIXME make this a boot-option??
@@ -349,7 +347,6 @@
 
 	let asapQueue = [];
 	let deferQueue = [];
-	let errorQueue = [];
 	let scheduled = false;
 	let processing = false;
 
@@ -377,7 +374,7 @@
 
 		setTimeout(function() {
 			try { fn(); }
-			catch (error) { postError(error); }
+			catch (error) { reportError(error); }
 			processTasks();
 		}, timeout);
 	}
@@ -435,7 +432,7 @@
 			fn = asapQueue.shift();
 			if (typeof fn !== 'function') continue;
 			try { fn(); }
-			catch (error) { postError(error); }
+			catch (error) { reportError(error); }
 			currTime = getTime();
 			if (currTime >= frameExecutionTimeout) break;
 		}
@@ -451,47 +448,7 @@
 			idle = false;
 		}
 		else idle = true;
-		
-		throwErrors();
-		
 	}
-
-	function postError(error) {
-		errorQueue.push(error);
-	}
-
-	let throwErrors = (function() {
-
-	let evType = vendorPrefix + '-error';
-	function throwErrors() {
-		let handlers = createThrowers(errorQueue);
-		forEach(handlers, function(handler) {
-			window.addEventListener(evType, handler, false);
-		});
-		let e = document.createEvent('Event');
-		e.initEvent(evType, true, true);
-		window.dispatchEvent(e);
-		forEach(handlers, function(handler) {
-			window.removeEventListener(evType, handler, false);
-		});
-		errorQueue = [];
-	}
-
-	function createThrowers(list) {
-		return map(list, function(error) {
-			return function() {
-				if (console.logLevel === 'debug') {
-					if (error && error.stack) console.debug(error.stack);
-					else console.debug('Untraceable error: ' + error); // FIXME why are these occuring??
-				}
-				throw error;
-			};
-		});
-	}
-
-	return throwErrors;
-
-	})();
 
 	var Task = {
 		asap,
@@ -499,12 +456,12 @@
 		delay,
 		getTime,
 		getStats,
-		resetStats,
-		postError
+		resetStats
 	};
 
 	/*
-	 ### Promise
+	 ### Thenfu
+	 This is an enhanced Promise implementation but it defers to allow animation.
 	 WARN: This was based on early DOM Futures specification. This has been evolved towards ES6 Promises.
 	 */
 
@@ -628,7 +585,7 @@
 		promise.isRejected = true;
 		promise.reason = error;
 		if (!promise._willCatch) {
-			Task.postError(error);
+			reportError(error);
 		}
 		else promise._requestProcessing(sync);
 	},
@@ -1101,7 +1058,7 @@
 	 Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	*/
 
-	const vendorPrefix$1 = 'meeko'; // FIXME DRY with other instances of `vendorPrefix`
+	const vendorPrefix = 'meeko'; // FIXME DRY with other instances of `vendorPrefix`
 
 	let document$2 = window.document;
 
@@ -1115,7 +1072,7 @@
 	// TODO A node-manager API would be useful elsewhere
 
 	const nodeIdSuffix = Math.round(Math.random() * 1000000);
-	const nodeIdProperty = '__' + vendorPrefix$1 + nodeIdSuffix;
+	const nodeIdProperty = '__' + vendorPrefix + nodeIdSuffix;
 	let nodeCount = 0; // used to generated node IDs
 	let nodeTable = []; // list of tagged nodes
 	let nodeStorage = {}; // hash of storage for nodes, keyed off `nodeIdProperty`
@@ -1900,7 +1857,7 @@
 					return handleEvent.call(object, event, handler);
 				}
 				catch (error) {
-					Task.postError(error);
+					reportError(error);
 					throw error;
 				}
 			};
@@ -4438,7 +4395,7 @@
 			return;
 		}
 		try { this.processor = (Function('return (' + script.text + ')'))(); }
-		catch(err) { Task.postError(err); }
+		catch(err) { reportError(err); }
 		
 		if (!this.processor || !this.processor.transform) {
 			console.warn('"script" transform template did not produce valid transform object');
@@ -4973,7 +4930,7 @@
 					value = processor.provider.evaluate(selector, context, processor.variables, false);
 				}
 				catch (err) {
-					Task.postError(err);
+					reportError(err);
 					console.warn('Error evaluating <haz:let name="' + name + '" select="' + selector + '">. Assumed empty.');
 					value = undefined;
 				}
@@ -4991,7 +4948,7 @@
 					value = processor.provider.evaluate(selector, context, processor.variables, false);
 				}
 				catch (err) {
-					Task.postError(err);
+					reportError(err);
 					console.warn('Error evaluating <haz:param name="' + name + '" select="' + selector + '">. Assumed empty.');
 					value = undefined;
 				}
@@ -5113,7 +5070,7 @@
 				pass = evalExpression(testVal, processor.provider, context, processor.variables, 'boolean');
 			}
 			catch (err) {
-				Task.postError(err);
+				reportError(err);
 				console.warn('Error evaluating <haz:if test="' + testVal + '">. Assumed false.');
 				pass = false;
 			}
@@ -5153,7 +5110,7 @@
 				subContext = processor.provider.evaluate(selector, context, processor.variables, false);
 			}
 			catch (err) {
-				Task.postError(err);
+				reportError(err);
 				console.warn('Error evaluating <haz:one select="' + selector + '">. Assumed empty.');
 				return frag;
 			}
@@ -5170,7 +5127,7 @@
 				subContexts = processor.provider.evaluate(selector, context, processor.variables, true);
 			}
 			catch (err) {
-				Task.postError(err);
+				reportError(err);
 				console.warn('Error evaluating <haz:each select="' + selector + '">. Assumed empty.');
 				return frag;
 			}
@@ -5210,7 +5167,7 @@
 					processExpression(desc.expression, processor.provider, context, processor.variables, desc.type);
 			}
 			catch (err) {
-				Task.postError(err);
+				reportError(err);
 				console.warn('Error evaluating @' + desc.attrName + '="' + desc.expression + '". Assumed false.');
 				value = false;
 			}
@@ -5378,7 +5335,7 @@
 				return true;
 			}
 			catch (err) {
-				Task.postError(err);
+				reportError(err);
 				console.warn('Failure processing filter call: "' + filter.text + '" with input: "' + value + '"');
 				value = '';
 				return false;
@@ -6165,7 +6122,7 @@
 		if (frame.bodyElement) {
 			if (options && options.bodyLeft) {
 				try { options.bodyLeft(frame, frame.bodyElement); } 
-				catch (err) { Task.postError(err); }
+				catch (err) { reportError(err); }
 			}
 			sprockets.removeNode(frame.bodyElement);
 		}
@@ -6181,7 +6138,7 @@
 
 		if (options && options.bodyEntered) {
 			try { options.bodyEntered(frame, frame.bodyElement); } 
-			catch (err) { Task.postError(err); }
+			catch (err) { reportError(err); }
 		}
 	},
 
@@ -6697,7 +6654,7 @@
 			catch(err) { 
 				console.warn('Error evaluating inline script in frameset:\n' +
 					framesetDef.url + '#' + script.id);
-				Task.postError(err);
+				reportError(err);
 			}
 
 			script.parentNode.removeChild(script); // physical <script> no longer needed
