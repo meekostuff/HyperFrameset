@@ -173,9 +173,10 @@ let registerSprocket = function(selectorDescriptor, definition, callback) {
  *
  * @param options
  * @param definition
+ * @param callback
  */
-let register = function(options, definition) {
-	return registerSprocket(options, definition);
+let register = function(options, definition, callback) {
+	return registerSprocket(options, definition, callback);
 }
 
 /**
@@ -780,7 +781,7 @@ ariaFind: function(role) {
 },
 
 ariaFindAll: function(role) {
-	return this.$.ariaFindALL(role);
+	return this.$.ariaFindAll(role);
 },
 
 ariaMatches: function(role) {
