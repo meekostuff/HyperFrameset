@@ -10,16 +10,16 @@
 
 Meeko.sprockets.UI = (function() {
 
-var _ = Meeko.stuff, DOM = Meeko.DOM;
-var sprockets = Meeko.sprockets, Base = sprockets.Base, RoleType = sprockets.RoleType;
+let _ = Meeko.stuff, DOM = Meeko.DOM;
+let sprockets = Meeko.sprockets, Base = sprockets.Base, RoleType = sprockets.RoleType;
 
-var Group = sprockets.evolve(RoleType, {
+let Group = sprockets.evolve(RoleType, {
 
 role: 'group'
 
 });
 
-var TreeItem = sprockets.evolve(RoleType, {
+let TreeItem = sprockets.evolve(RoleType, {
 
 role: 'treeitem',
 
@@ -35,7 +35,7 @@ expanded: {
 	can: function() { return !!this.element.ariaFind('group'); },
 	get: function() { return !!this.aria('expanded'); },
 	set: function(value) {
-		var group = this.element.ariaFind('group');
+		let group = this.element.ariaFind('group');
 		group.ariaToggle('hidden', !value);
 		this.aria('expanded', !!value);
 	}	
@@ -43,21 +43,21 @@ expanded: {
 
 });
 
-var Tree = sprockets.evolve(RoleType, {
+let Tree = sprockets.evolve(RoleType, {
 
 role: 'tree',
 
 activedescendant: {
 	type: 'node',
 	get: function() {
-		var items = this.element.ariaFindAll('treeitem');
-		for (var n=items.length, i=0; i<n; i++) {
-			var node = items[i];
+		let items = this.element.ariaFindAll('treeitem');
+		for (let n=items.length, i=0; i<n; i++) {
+			let node = items[i];
 			if (node.ariaGet('selected')) return node;
 		}
 	},
 	set: function(node) {
-		var oldNode = this.ariaGet('activedescendant');
+		let oldNode = this.ariaGet('activedescendant');
 		if (oldNode) oldNode.ariaToggle('selected', false);
 		node.ariaToggle('selected', true); // FIXME check node is treeitem
 		this.signalChange();
@@ -72,14 +72,14 @@ signalChange: function() {
 
 });
 
-var ScrollBox = sprockets.evolve(RoleType, {
+let ScrollBox = sprockets.evolve(RoleType, {
 
 role: 'frame',
 
 activedescendant: {
 	
 	set: function(item) {
-		var element = this.element;
+		let element = this.element;
 		if (element === item || !element.contains(item)) throw Error('set activedescendant failed: item is not descendant of ScrollBox');
 		element.scrollTop = item.offsetTop - element.offsetTop;
 	}
@@ -89,9 +89,9 @@ activedescendant: {
 });
 
 
-var Panel = RoleType;
+let Panel = RoleType;
 
-var SwitchBox = sprockets.evolve(RoleType, {
+let SwitchBox = sprockets.evolve(RoleType, {
 
 role: 'group',
 
@@ -102,8 +102,8 @@ owns: {
 activedescendant: {
 	set: function(item) {
 		
-		var element = this.element;
-		var panels = this.ariaGet('owns');
+		let element = this.element;
+		let panels = this.ariaGet('owns');
 		if (!_.includes(panels, item)) throw Error('set activedescendant failed: item is not child of SwitchBox');
 		_.forEach(panels, function(child) {
 			if (child === item) child.ariaToggle('hidden', false);
@@ -120,32 +120,32 @@ initialize: function() {
 });
 
 
-var Table = sprockets.evolve(RoleType, { // FIXME uses className. This shouldn't be hard-wired
+let Table = sprockets.evolve(RoleType, { // FIXME uses className. This shouldn't be hard-wired
 	
 getTable: function() {
-	var element = this.element;
+	let element = this.element;
 	if (element.tagName.toLowerCase() === 'table') return element;
 	return DOM.find('table', element);
 },
 
 getColumns: function() {
 	
-	var table = this.getTable();
+	let table = this.getTable();
 	return table.tHead.rows[0].cells;
 			
 },
 sort: function(column, type, reverse) {
 	
 
-	var table = this.getTable();
-	var tBodies = table.tBodies;
-	for (var j=0, m=tBodies.length; j<m; j++) {
-		var tBody = tBodies[j];
-		var rows = tBody.rows;
-		var values = [];
-		for (var i=0, n=rows.length; i<n; i++) {
-			var row = rows[i]; var cell = row.cells[column];
-			var val = new String(cell.firstChild.nodeValue);
+	let table = this.getTable();
+	let tBodies = table.tBodies;
+	for (let j=0, m=tBodies.length; j<m; j++) {
+		let tBody = tBodies[j];
+		let rows = tBody.rows;
+		let values = [];
+		for (let i=0, n=rows.length; i<n; i++) {
+			let row = rows[i]; let cell = row.cells[column];
+			let val = new String(cell.firstChild.nodeValue);
 			val.row = row;
 			values.push(val);
 		}
@@ -161,9 +161,9 @@ sort: function(column, type, reverse) {
 				break;
 		}
 		if (reverse) values = values.reverse();
-		for (var n=values.length, i=0; i<n; i++) {
-			var val = values[i];
-			var row = val.row;
+		for (let n=values.length, i=0; i<n; i++) {
+			let val = values[i];
+			let row = val.row;
 			tBody.removeChild(row);
 			if (i == n-1) tBody.appendChild(row);
 			else tBody.insertBefore(row, tBody.rows[i]);
@@ -173,15 +173,15 @@ sort: function(column, type, reverse) {
 },
 toggleColumnSortState: function(column) { // TODO shouldn't have hard-wired classes
 
-	var type = 'string';
-	var cols = this.getColumns();
-	var colEl = cols[column];
-	var col = new Base(colEl);
+	let type = 'string';
+	let cols = this.getColumns();
+	let colEl = cols[column];
+	let col = new Base(colEl);
 	if (col.hasClass('number')) type = 'number';
 	if (col.hasClass('string')) type = 'string';
-	var sortable = col.hasClass('sortable');
-	var sorted = col.hasClass('sorted');
-	var reversed = col.hasClass('reversed');
+	let sortable = col.hasClass('sortable');
+	let sorted = col.hasClass('sorted');
+	let reversed = col.hasClass('reversed');
 	if (!sortable) return;
 	if (!sorted) {
 		this.sort(column, type, false);
@@ -193,7 +193,7 @@ toggleColumnSortState: function(column) { // TODO shouldn't have hard-wired clas
 		if (reversed) col.removeClass('reversed');
 		else col.addClass('reversed');
 	}
-	for (var n=cols.length, i=0; i<n; i++) {
+	for (let n=cols.length, i=0; i<n; i++) {
 		if (column != i) {
 			colEl = cols[i];
 			col = new Base(colEl);
@@ -206,14 +206,14 @@ toggleColumnSortState: function(column) { // TODO shouldn't have hard-wired clas
 
 });
 
-var WF2FormElement = sprockets.evolve(RoleType, {
+let WF2FormElement = sprockets.evolve(RoleType, {
 encode: function() {
 
-var a = [];
+let a = [];
 _.forEach(this.elements, function(el) {
 	if (el.name) a.push(el.name + '=' + encodeURIComponent(el.value));
 });
-var txt = a.join('&');
+let txt = a.join('&');
 return txt;
 			
 }
