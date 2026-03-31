@@ -1,0 +1,23 @@
+{
+  "name": "hyperframeset",
+  "version": "1.0.0",
+  "description": "HyperFrameset =============",
+  "main": "HyperFrameset.js",
+  "directories": {
+    "doc": "doc",
+    "test": "demo"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "build": "webpack"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "vitest": "^4.1.2",
+    "webpack": "^5.105.4",
+    "webpack-cli": "^7.0.2"
+  }
+}
