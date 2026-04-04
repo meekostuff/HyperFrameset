@@ -23,10 +23,10 @@ let namespace; // will be set by external call to registerFrameElements()
 
 let frameDefinitions = new Registry({
 	writeOnce: true,
-	testKey: function(key) {
+	keyValidator: function(key) {
 		return typeof key === 'string';
 	},
-	testValue: function(o) {
+	valueValidator: function(o) {
 		return o != null && typeof o === 'object';
 	}
 });

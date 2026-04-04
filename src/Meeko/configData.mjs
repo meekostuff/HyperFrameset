@@ -2,10 +2,10 @@ import Registry from './Registry.mjs';
 
 let configData = new Registry({
 	writeOnce: true,
-	testKey: function(key) {
+	keyValidator: function(key) {
 		return typeof key === 'string';
 	},
-	testValue: function(o) {
+	valueValidator: function(o) {
 		return o != null && typeof o === 'object';
 	}
 });

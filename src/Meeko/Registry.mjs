@@ -1,50 +1,73 @@
-import * as _ from './stuff.mjs';
+/**
+ * @typedef {Object} RegistryOptions
+ * @property {boolean} [writeOnce] - If true, keys cannot be overwritten, deleted, or cleared.
+ * @property {(key: string) => boolean} [keyValidator] - Returns true if the key is valid.
+ * @property {(value: *) => boolean} [valueValidator] - Returns true if the value is valid.
+ */
 
-let Registry = function(options) {
-	if (!options || typeof options !== 'object') options = {};
-	this.options = options;
-	this.items = {};
+/**
+ * A validated key-value store extending Map.
+ * Supports write-once semantics and key/value validation.
+ * @extends {Map<string, *>}
+ */
+class Registry extends Map {
+
+#writeOnce;
+#keyValidator;
+#valueValidator;
+
+/**
+ * @param {RegistryOptions} [options]
+ */
+constructor({ writeOnce, keyValidator, valueValidator } = {}) {
+	super();
+	this.#writeOnce = writeOnce;
+	this.#keyValidator = keyValidator;
+	this.#valueValidator = valueValidator;
 }
 
-_.assign(Registry.prototype, {
-
-clear: function() {
-	if (this.options.writeOnce) throw Error('Attempted to clear write-once storage');
-	this.items = Object.create(null);
-},
-
-has: function(key) {
-	return key in this.items;
-},
-
-get: function(key) {
-	return this.items[key];
-},
-
-set: function(key, value) {
-	if (this.options.writeOnce && this.has(key)) {
-		throw Error('Attempted to rewrite key ' + key + ' in write-once storage');
+/**
+ * @param {string} key
+ * @param {*} value
+ * @returns {this}
+ * @throws {Error} If key exists in write-once mode, or key/value fails validation.
+ */
+set(key, value) {
+	if (this.#writeOnce && this.has(key)) {
+		throw Error(`Attempted to rewrite key ${key} in write-once storage`);
 	}
-	if (this.options.keyTest) {
-		let ok = this.options.keyTest(key);
-		if (!ok) throw Error('Invalid key ' + key + ' for storage');
+	if (this.#keyValidator && !this.#keyValidator(key)) {
+		throw Error(`Invalid key ${key} for storage`);
 	}
-	if (this.options.valueTest) {
-		let ok = this.options.valueTest(value);
-		if (!ok) throw Error('Invalid value ' + value + ' for storage');
+	if (this.#valueValidator && !this.#valueValidator(value)) {
+		throw Error(`Invalid value ${value} for storage`);
 	}
-	this.items[key] = value;
-},
-
-'delete': function(key) {
-	if (this.options.writeOnce && this.has(key)) {
-		throw Error('Attempted to delete key ' + key + ' in write-once storage');
-	}
-	delete this.items[key];
+	return super.set(key, value);
 }
 
-});
+/**
+ * @throws {Error} If in write-once mode.
+ */
+clear() {
+	if (this.#writeOnce) throw Error(`Attempted to clear write-once storage`);
+	return super.clear();
+}
 
-Registry.prototype.register = Registry.prototype.set;
+/**
+ * @param {string} key
+ * @returns {boolean}
+ * @throws {Error} If key exists in write-once mode.
+ */
+delete(key) {
+	if (this.#writeOnce && this.has(key)) {
+		throw Error(`Attempted to delete key ${key} in write-once storage`);
+	}
+	return super.delete(key);
+}
+
+/** Alias for {@link Registry#set}. */
+register(key, value) { return this.set(key, value); }
+
+}
 
 export default Registry;

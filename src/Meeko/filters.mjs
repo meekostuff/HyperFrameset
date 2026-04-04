@@ -3,10 +3,10 @@ import Registry from './Registry.mjs';
 
 let filters = new Registry({
 	writeOnce: true,
-	testKey: function(key) {
+	keyValidator: function(key) {
 		return /^[_a-zA-Z][_a-zA-Z0-9]*$/.test(key);
 	},
-	testValue: function(fn) {
+	valueValidator: function(fn) {
 		return typeof fn === 'function';
 	}
 });

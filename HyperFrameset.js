@@ -195,7 +195,7 @@
 		return _find(a, fn, context, true);
 	}
 
-	function find(a, fn, context) {
+	function find$3(a, fn, context) {
 		return _find(a, fn, context, false);
 	}
 
@@ -255,80 +255,106 @@
 
 	var _ = /*#__PURE__*/Object.freeze({
 		__proto__: null,
-		uc: uc,
-		lc: lc,
-		ucFirst: ucFirst,
+		assign: assign,
 		camelCase: camelCase,
-		kebabCase: kebabCase,
-		words: words,
-		includes: includes,
-		forEach: forEach,
-		some: some,
-		every: every,
-		map: map,
-		filter: filter,
-		find: find,
-		findIndex: findIndex,
-		without: without,
+		defaults: defaults,
 		difference: difference,
+		every: every,
+		filter: filter,
+		find: find$3,
+		findIndex: findIndex,
+		forEach: forEach,
 		forIn: forIn,
 		forOwn: forOwn,
+		includes: includes,
 		isEmpty: isEmpty,
-		defaults: defaults,
-		assign: assign
+		kebabCase: kebabCase,
+		lc: lc,
+		map: map,
+		some: some,
+		uc: uc,
+		ucFirst: ucFirst,
+		without: without,
+		words: words
 	});
 
-	let Registry = function(options) {
-		if (!options || typeof options !== 'object') options = {};
-		this.options = options;
-		this.items = {};
-	};
+	/**
+	 * @typedef {Object} RegistryOptions
+	 * @property {boolean} [writeOnce] - If true, keys cannot be overwritten, deleted, or cleared.
+	 * @property {(key: string) => boolean} [keyValidator] - Returns true if the key is valid.
+	 * @property {(value: *) => boolean} [valueValidator] - Returns true if the value is valid.
+	 */
 
-	assign(Registry.prototype, {
+	/**
+	 * A validated key-value store extending Map.
+	 * Supports write-once semantics and key/value validation.
+	 * @extends {Map<string, *>}
+	 */
+	class Registry extends Map {
 
-	clear: function() {
-		if (this.options.writeOnce) throw Error('Attempted to clear write-once storage');
-		this.items = Object.create(null);
-	},
+	#writeOnce;
+	#keyValidator;
+	#valueValidator;
 
-	has: function(key) {
-		return key in this.items;
-	},
-
-	get: function(key) {
-		return this.items[key];
-	},
-
-	set: function(key, value) {
-		if (this.options.writeOnce && this.has(key)) {
-			throw Error('Attempted to rewrite key ' + key + ' in write-once storage');
-		}
-		if (this.options.keyTest) {
-			let ok = this.options.keyTest(key);
-			if (!ok) throw Error('Invalid key ' + key + ' for storage');
-		}
-		if (this.options.valueTest) {
-			let ok = this.options.valueTest(value);
-			if (!ok) throw Error('Invalid value ' + value + ' for storage');
-		}
-		this.items[key] = value;
-	},
-
-	'delete': function(key) {
-		if (this.options.writeOnce && this.has(key)) {
-			throw Error('Attempted to delete key ' + key + ' in write-once storage');
-		}
-		delete this.items[key];
+	/**
+	 * @param {RegistryOptions} [options]
+	 */
+	constructor({ writeOnce, keyValidator, valueValidator } = {}) {
+		super();
+		this.#writeOnce = writeOnce;
+		this.#keyValidator = keyValidator;
+		this.#valueValidator = valueValidator;
 	}
 
-	});
+	/**
+	 * @param {string} key
+	 * @param {*} value
+	 * @returns {this}
+	 * @throws {Error} If key exists in write-once mode, or key/value fails validation.
+	 */
+	set(key, value) {
+		if (this.#writeOnce && this.has(key)) {
+			throw Error(`Attempted to rewrite key ${key} in write-once storage`);
+		}
+		if (this.#keyValidator && !this.#keyValidator(key)) {
+			throw Error(`Invalid key ${key} for storage`);
+		}
+		if (this.#valueValidator && !this.#valueValidator(value)) {
+			throw Error(`Invalid value ${value} for storage`);
+		}
+		return super.set(key, value);
+	}
 
-	Registry.prototype.register = Registry.prototype.set;
+	/**
+	 * @throws {Error} If in write-once mode.
+	 */
+	clear() {
+		if (this.#writeOnce) throw Error(`Attempted to clear write-once storage`);
+		return super.clear();
+	}
+
+	/**
+	 * @param {string} key
+	 * @returns {boolean}
+	 * @throws {Error} If key exists in write-once mode.
+	 */
+	delete(key) {
+		if (this.#writeOnce && this.has(key)) {
+			throw Error(`Attempted to delete key ${key} in write-once storage`);
+		}
+		return super.delete(key);
+	}
+
+	/** Alias for {@link Registry#set}. */
+	register(key, value) { return this.set(key, value); }
+
+	}
 
 	/*
 	 ### Task queuing and isolation
 		TODO Only intended for use by Promise. Should this be externally available?
 	 */
+
 
 	// FIXME record Task statistics
 
@@ -350,7 +376,7 @@
 	let scheduled = false;
 	let processing = false;
 
-	function asap(fn) {
+	function asap$1(fn) {
 		asapQueue.push(fn);
 		if (processing) return;
 		if (scheduled) return;
@@ -358,17 +384,17 @@
 		scheduled = true;
 	}
 
-	function defer(fn) {
+	function defer$1(fn) {
 		if (processing) {
 			deferQueue.push(fn);
 			return;
 		}
-		asap(fn);
+		asap$1(fn);
 	}
 
-	function delay(fn, timeout) {
+	function delay$1(fn, timeout) {
 		if (timeout <= 0 || timeout == null) {
-			defer(fn);
+			defer$1(fn);
 			return;
 		}
 
@@ -451,9 +477,9 @@
 	}
 
 	var Task = {
-		asap,
-		defer,
-		delay,
+		asap: asap$1,
+		defer: defer$1,
+		delay: delay$1,
 		getTime,
 		getStats,
 		resetStats
@@ -464,6 +490,7 @@
 	 This is an enhanced Promise implementation but it defers to allow animation.
 	 WARN: This was based on early DOM Futures specification. This has been evolved towards ES6 Promises.
 	 */
+
 
 	let Thenfu = function(init) { // `init` is called as init(resolve, reject)
 		if (!(this instanceof Thenfu)) return new Thenfu(init);
@@ -714,7 +741,7 @@
 	}
 
 	function asapTest(test) {
-		asap$1(test.fn)
+		asap(test.fn)
 		.then(function(done) {
 			if (done) test.resolve();
 			else deferTest(test);
@@ -740,7 +767,7 @@
 
 	})();
 
-	function asap$1(value) { // FIXME asap(fn) should execute immediately
+	function asap(value) { // FIXME asap(fn) should execute immediately
 		if (value instanceof Thenfu) {
 			if (value.isPending) return value; // already deferred
 			if (Task.getTime(true) <= 0) return value.then(); // will defer
@@ -756,7 +783,7 @@
 		return Thenfu.resolve(value); // not-deferred
 	}
 
-	function defer$1(value) {
+	function defer(value) {
 		if (value instanceof Thenfu) {
 			if (value.isPending) return value; // already deferred
 			return value.then();
@@ -766,7 +793,7 @@
 		return Thenfu.resolve(value).then();
 	}
 
-	function delay$1(timeout) { // FIXME delay(timeout, value_or_fn_or_promise)
+	function delay(timeout) { // FIXME delay(timeout, value_or_fn_or_promise)
 		return new Thenfu(function(resolve, reject) {
 			if (timeout <= 0 || timeout == null) Task.defer(resolve);
 			else Task.delay(resolve, timeout);
@@ -878,10 +905,10 @@
 	});
 
 	defaults(Thenfu, {
-		asap: asap$1, defer: defer$1, delay: delay$1, wait: wait, pipe: pipe, reduce: reduce
+		asap: asap, defer: defer, delay: delay, wait: wait, pipe: pipe, reduce: reduce
 	});
 
-	let document$1 = window.document;
+	let document$b = window.document;
 
 	/*
 	 ### URL utility functions
@@ -966,10 +993,10 @@
 		return absHref;
 	};
 
-	let urlAttributes = URL.attributes = (function() {
+	let urlAttributes$1 = URL.attributes = (function() {
 		
 	function AttributeDescriptor(tagName, attrName, loads, compound) {
-		let testEl = document$1.createElement(tagName);
+		let testEl = document$b.createElement(tagName);
 		let supported = attrName in testEl;
 		let lcAttr = lc(attrName); // NOTE for longDesc, etc
 		defaults(this, { // attrDesc
@@ -1058,9 +1085,10 @@
 	 Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	*/
 
+
 	const vendorPrefix = 'meeko'; // FIXME DRY with other instances of `vendorPrefix`
 
-	let document$2 = window.document;
+	let document$a = window.document;
 
 	/*
 	 ### DOM utility functions
@@ -1120,12 +1148,12 @@
 
 	let matchesSelector;
 
-	if (document$2.documentElement.matches) matchesSelector = function(element, selector) {
+	if (document$a.documentElement.matches) matchesSelector = function(element, selector) {
 		return (element && element.nodeType === 1) ? element.matches(selector) : false; 
 	};
 	else some(words('moz webkit ms o'), function(prefix) {
 		let method = prefix + 'MatchesSelector';
-		if (document$2.documentElement[method]) {
+		if (document$a.documentElement[method]) {
 			matchesSelector = function(element, selector) { return (element && element.nodeType === 1) ? element[method](selector) : false; };
 			return true;
 		}
@@ -1133,7 +1161,7 @@
 	});
 
 
-	let matches = matchesSelector ?
+	let matches$2 = matchesSelector ?
 	function(element, selector, scope) {
 		if (!(element && element.nodeType === 1)) return false;
 		if (typeof selector === 'function') return selector(element, scope);
@@ -1143,7 +1171,7 @@
 	} :
 	function() { throw Error('matches not supported'); }; // NOTE fallback
 
-	let closest = matchesSelector ?
+	let closest$1 = matchesSelector ?
 	function(element, selector, scope) {
 		if (typeof selector === 'function') {
 			for (let el=element; el && el!==scope; el=el.parentNode) {
@@ -1207,15 +1235,15 @@
 
 	function findId(id, doc) {
 		if (!id) return;
-		if (!doc) doc = document$2;
+		if (!doc) doc = document$a;
 		if (!doc.getElementById) throw Error('Context for findId() must be a Document node');
 		return doc.getElementById(id);
 		// WARN would need a work around for broken getElementById in IE <= 7
 	}
 
-	let findAll = document$2.querySelectorAll ?
+	let findAll$1 = document$a.querySelectorAll ?
 	function(selector, node, scope, inclusive) {
-		if (!node) node = document$2;
+		if (!node) node = document$a;
 		if (!node.querySelectorAll) return [];
 		if (scope && !scope.nodeType) scope = node; // `true` but not the scope element
 		return scopeify(function(absSelector) {
@@ -1226,9 +1254,9 @@
 	} :
 	function() { throw Error('findAll() not supported'); };
 
-	let find$1 = document$2.querySelector ?
+	let find$2 = document$a.querySelector ?
 	function(selector, node, scope, inclusive) {
-		if (!node) node = document$2;
+		if (!node) node = document$a;
 		if (!node.querySelector) return null;
 		if (scope && !scope.nodeType) scope = node; // `true` but not the scope element
 		return scopeify(function(absSelector) {
@@ -1270,13 +1298,13 @@
 	}
 
 	let contains = // WARN `contains()` means contains-or-isSameNode
-	document$2.documentElement.contains && function(node, otherNode) {
+	document$a.documentElement.contains && function(node, otherNode) {
 		if (node === otherNode) return true;
 		if (node.contains) return node.contains(otherNode);
 		if (node.documentElement) return node.documentElement.contains(otherNode); // FIXME won't be valid on pseudo-docs
 		return false;
 	} ||
-	document$2.documentElement.compareDocumentPosition && function(node, otherNode) { return (node === otherNode) || !!(node.compareDocumentPosition(otherNode) & 16); } ||
+	document$a.documentElement.compareDocumentPosition && function(node, otherNode) { return (node === otherNode) || !!(node.compareDocumentPosition(otherNode) & 16); } ||
 	function(node, otherNode) { throw Error('contains not supported'); };
 
 	function dispatchEvent(target, type, params) { // NOTE every JS initiated event is a custom-event
@@ -1288,7 +1316,7 @@
 		let cancelable = params && 'cancelable' in params ? !!params.cancelable : true;
 		if (typeof type !== 'string') throw Error('trigger() called with invalid event type');
 		let detail = params && params.detail;
-		let event = document$2.createEvent('CustomEvent');
+		let event = document$a.createEvent('CustomEvent');
 		event.initCustomEvent(type, bubbles, cancelable, detail);
 		if (params) defaults(event, params);
 		return target.dispatchEvent(event);
@@ -1312,7 +1340,7 @@
 			triggerVisibilityChangeEvent(entry.target);
 		});
 	});
-	observer.observe(document$2, { attributes: true, attributeFilter: ['hidden'], subtree: true });
+	observer.observe(document$a, { attributes: true, attributeFilter: ['hidden'], subtree: true });
 
 	// FIXME this should use observers, not events
 	function triggerVisibilityChangeEvent(target) {
@@ -1321,14 +1349,14 @@
 	}
 
 	function isVisible(element) {
-		let closestHidden = closest(element, '[hidden]');
+		let closestHidden = closest$1(element, '[hidden]');
 		return (!closestHidden);
 	}
 
 
 	function whenVisible(element) { // FIXME this quite possibly causes leaks if closestHidden is removed from document before removeEventListener
 		return new Thenfu(function(resolve, reject) {
-			let closestHidden = closest(element, '[hidden]');
+			let closestHidden = closest$1(element, '[hidden]');
 			if (!closestHidden) {
 				resolve();
 				return;
@@ -1343,7 +1371,7 @@
 	}
 
 
-	function insertNode(conf, refNode, node) { // like imsertAdjacentHTML but with a node and auto-adoption
+	function insertNode$1(conf, refNode, node) { // like imsertAdjacentHTML but with a node and auto-adoption
 		let doc = refNode.ownerDocument;
 		if (doc.adoptNode) node = doc.adoptNode(node); // Safari 5 was throwing because imported nodes had been added to a document node
 		switch(conf) {
@@ -1374,7 +1402,7 @@
 	}
 
 	function adoptContents(parentNode, doc) {
-		if (!doc) doc = document$2;
+		if (!doc) doc = document$a;
 		let frag = doc.createDocumentFragment();
 		let node;
 		while (node = parentNode.firstChild) frag.appendChild(doc.adoptNode(node));
@@ -1393,7 +1421,7 @@
 	function checkStyleSheets() {
 		// check that every <link rel="stylesheet" type="text/css" /> 
 		// has loaded
-		return every(findAll('link'), function(node) {
+		return every(findAll$1('link'), function(node) {
 			if (!node.rel || !/^stylesheet$/i.test(node.rel)) return true;
 			if (node.type && !/^text\/css$/i.test(node.type)) return true;
 			if (node.disabled) return true;
@@ -1443,14 +1471,14 @@
 	}
 
 	const CREATE_DOCUMENT_COPIES_URL = (function() {
-		let doc = document$2.implementation.createHTMLDocument('');
-		return doc.URL === document$2.URL;
+		let doc = document$a.implementation.createHTMLDocument('');
+		return doc.URL === document$a.URL;
 	})();
 
 	const CLONE_DOCUMENT_COPIES_URL = (function() {
 		try {
-			let doc = document$2.cloneNode(false);
-			if (doc.URL === document$2.URL) return true;
+			let doc = document$a.cloneNode(false);
+			if (doc.URL === document$a.URL) return true;
 		}
 		catch (err) { }
 		return false;
@@ -1460,7 +1488,7 @@
 	const CREATE_DOCUMENT_WITH_CLONE = !CREATE_DOCUMENT_COPIES_URL && CLONE_DOCUMENT_COPIES_URL;
 
 	function createDocument(srcDoc) { // modern browsers. IE >= 9
-		if (!srcDoc) srcDoc = document$2;
+		if (!srcDoc) srcDoc = document$a;
 		// TODO find doctype element??
 		let doc;
 		if (CREATE_DOCUMENT_WITH_CLONE) { 
@@ -1474,7 +1502,7 @@
 	}
 
 	function createHTMLDocument(title, srcDoc) { // modern browsers. IE >= 9
-		if (!srcDoc) srcDoc = document$2;
+		if (!srcDoc) srcDoc = document$a;
 		// TODO find doctype element??
 		let doc;
 		if (CREATE_DOCUMENT_WITH_CLONE) { 
@@ -1496,7 +1524,7 @@
 
 		// WARN sometimes IE9/IE10/IE11 doesn't read the content of inserted <style>
 		// NOTE this doesn't seem to matter on IE10+. The following is precautionary
-		forEach(findAll('style', doc), function(node) {
+		forEach(findAll$1('style', doc), function(node) {
 			let sheet = node.sheet;
 			if (!sheet || sheet.cssText == null) return;
 			if (sheet.cssText != '') return;
@@ -1524,7 +1552,7 @@
 
 	let domReady = (function() { // WARN this assumes that document.readyState is valid or that content is ready...
 
-	let readyState = document$2.readyState;
+	let readyState = document$a.readyState;
 	let loaded = readyState ? readyStateLookup[readyState] : true;
 	let queue = [];
 
@@ -1540,7 +1568,7 @@
 	}
 
 	let events = {
-		'DOMContentLoaded': document$2,
+		'DOMContentLoaded': document$a,
 		'load': window
 	};
 
@@ -1559,34 +1587,34 @@
 
 	var DOM = /*#__PURE__*/Object.freeze({
 		__proto__: null,
-		uniqueIdAttr: nodeIdProperty,
-		uniqueId: uniqueId,
-		setData: setData,
-		getData: getData,
-		hasData: hasData,
-		releaseNodes: releaseNodes,
-		getTagName: getTagName,
-		contains: contains,
-		matches: matches,
-		findId: findId,
-		find: find$1,
-		findAll: findAll,
-		closest: closest,
-		siblings: siblings,
-		dispatchEvent: dispatchEvent,
-		manageEvent: manageEvent,
 		adoptContents: adoptContents,
-		isVisible: isVisible,
-		whenVisible: whenVisible,
-		insertNode: insertNode,
 		checkStyleSheets: checkStyleSheets,
+		cloneDocument: cloneDocument,
+		closest: closest$1,
+		contains: contains,
 		copyAttributes: copyAttributes,
-		removeAttributes: removeAttributes,
-		ready: domReady,
 		createDocument: createDocument,
 		createHTMLDocument: createHTMLDocument,
-		cloneDocument: cloneDocument,
-		scrollToId: scrollToId
+		dispatchEvent: dispatchEvent,
+		find: find$2,
+		findAll: findAll$1,
+		findId: findId,
+		getData: getData,
+		getTagName: getTagName,
+		hasData: hasData,
+		insertNode: insertNode$1,
+		isVisible: isVisible,
+		manageEvent: manageEvent,
+		matches: matches$2,
+		ready: domReady,
+		releaseNodes: releaseNodes,
+		removeAttributes: removeAttributes,
+		scrollToId: scrollToId,
+		setData: setData,
+		siblings: siblings,
+		uniqueId: uniqueId,
+		uniqueIdAttr: nodeIdProperty,
+		whenVisible: whenVisible
 	});
 
 	/*!
@@ -1595,7 +1623,8 @@
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
 
-	let document$3 = window.document;
+
+	let document$9 = window.document;
 
 	/*
 	 WARN: This description comment was from the former scriptQueue implementation.
@@ -1618,7 +1647,7 @@
 	let queue = [],
 		emptying = false;
 
-	let testScript = document$3.createElement('script'),
+	let testScript = document$9.createElement('script'),
 		supportsSync = (testScript.async === true);
 
 	let scriptQueue = {
@@ -1642,7 +1671,7 @@
 			return;
 		}
 
-		let script = document$3.createElement('script');
+		let script = document$9.createElement('script');
 
 		if (node.src) addListeners(); // WARN must use `node.src` because attrs not copied to `script` yet
 		
@@ -1680,7 +1709,7 @@
 
 		// The following are hoisted
 		function enable() {
-			insertNode('replace', node, script);
+			insertNode$1('replace', node, script);
 			enabledFu.resolve(); 
 			if (!script.src) {
 				spliceItem(queue, current);
@@ -1763,7 +1792,8 @@
 	*/
 
 
-	let document$4 = window.document;
+
+	let document$8 = window.document;
 
 	class Binding {
 		constructor(definition) {
@@ -1919,7 +1949,7 @@
 		if (!matchesEvent(handler, event, true)) return; // NOTE the phase check is below
 		let delegator = current;
 		if (handler.delegator) {
-			let el = closest(target, handler.delegator, current);
+			let el = closest$1(target, handler.delegator, current);
 			if (!el) return;
 			delegator = el;
 		}
@@ -2239,7 +2269,8 @@
 	 Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	*/
 
-	let document$5 = window.document;
+
+	let document$7 = window.document;
 
 	/* FIXME
 		- auto DOM monitoring for node insertion / removal should be a start() option
@@ -2260,8 +2291,8 @@
 	function findAllBoundElements(root, bExcludeRoot) {
 		let selector = map(bindingRules, function(rule) { return rule.selector; })
 			.join(', ');
-		let result = findAll(selector, root);
-		if (!bExcludeRoot && matches(root, selector)) result.unshift(root);
+		let result = findAll$1(selector, root);
+		if (!bExcludeRoot && matches$2(root, selector)) result.unshift(root);
 		return result;
 	}
 
@@ -2279,7 +2310,7 @@
 		if (started) throw Error('sprockets management has already started');
 		started = true;
 		if (options && options.manual) manualDOM = true;
-		nodeInserted(document$5.body);
+		nodeInserted(document$7.body);
 		if (!manualDOM) observe(nodeInserted, nodeRemoved);
 	};
 
@@ -2366,7 +2397,7 @@
 		let selector, composite;
 		if (typeof selectorDescriptor === 'string') {
 			selector = selectorDescriptor;
-			composite = document$5;
+			composite = document$7;
 		}
 		else {
 			selector = selectorDescriptor.selector;
@@ -2389,9 +2420,10 @@
 	 *
 	 * @param options
 	 * @param definition
+	 * @param callback
 	 */
-	let register = function(options, definition) {
-		return registerSprocket(options, definition);
+	let register = function(options, definition, callback) {
+		return registerSprocket(options, definition, callback);
 	};
 
 	/**
@@ -2469,11 +2501,11 @@
 	 * @param node {Node} the node to be inserted.
 	 * @returns {Node} The node (now inserted).
 	 */
-	let insertNode$1 = function(conf, refNode, node) {
+	let insertNode = function(conf, refNode, node) {
 		if (!started) throw Error('sprockets management has not started yet');
 		if (!manualDOM) throw Error('Must not use sprockets.insertNode: auto DOM monitoring');
 		let doc = refNode.ownerDocument;
-		if (doc !== document$5 || !contains(document$5, refNode)) throw Error('sprockets.insertNode must insert into `document`');
+		if (doc !== document$7 || !contains(document$7, refNode)) throw Error('sprockets.insertNode must insert into `document`');
 		if (doc.adoptNode) node = doc.adoptNode(node); // Safari 5 was throwing because imported nodes had been added to a document node
 
 		let nodes = [ node ];
@@ -2512,7 +2544,7 @@
 		if (!started) throw Error('sprockets management has not started yet');
 		if (!manualDOM) throw Error('Must not use sprockets.insertNode: auto DOM monitoring');
 		let doc = node.ownerDocument;
-		if (doc !== document$5 || !contains(document$5, node)) throw Error('sprockets.removeNode must remove from `document`');
+		if (doc !== document$7 || !contains(document$7, node)) throw Error('sprockets.removeNode must remove from `document`');
 		node.parentNode.removeChild(node);
 		nodeRemoved(node);
 		return node;
@@ -2526,7 +2558,7 @@
 		let composites = [];
 		forEach(bindees, function(el) {
 			some(bindingRules, function(rule) {
-				if (!matches(el, rule.selector)) return false;
+				if (!matches$2(el, rule.selector)) return false;
 				let binding = Binding.attachBinding(rule.definition, el);
 				if (binding && binding.rules) composites.push(el);
 				return true;
@@ -2555,7 +2587,7 @@
 			while (el = walker.nextNode()) {
 				forEach(rules, function(rule) {
 					let selector = rule.selector; // FIXME absolutizeSelector??
-					if (!matches(el, selector)) return;
+					if (!matches$2(el, selector)) return;
 					let binding = Binding.attachBinding(rule.definition, el);
 					rule.callback.call(binding.object, el);
 				});
@@ -2582,7 +2614,7 @@
 
 		// TODO leftComponentCallback. Might be hard to implement *after* node is removed
 		// FIXME the following logic maybe completely wrong
-		let nodes = findAll('*', node);
+		let nodes = findAll$1('*', node);
 		nodes.unshift(node);
 		forEach(nodes, Binding.leftDocumentCallback);
 	};
@@ -2598,7 +2630,7 @@
 				forEach(record.removedNodes, onRemoved, sprockets);
 			});
 		});
-		observer.observe(document$5.body, { childList: true, subtree: true });
+		observer.observe(document$7.body, { childList: true, subtree: true });
 		
 		// FIXME when to call observer.disconnect() ??
 	};
@@ -2606,7 +2638,7 @@
 	let innerMatches = function(element, sprocket, rule) { // internal utility method which is passed a "cached" rule
 		let binding = Binding.getInterface(element);
 		if (binding) return prototypeMatchesSprocket(binding.object, sprocket);
-		if (rule && matches(element, rule.selector)) return true; // TODO should make rules scoped by rule.composite
+		if (rule && matches$2(element, rule.selector)) return true; // TODO should make rules scoped by rule.composite
 		return false;
 	};
 
@@ -2620,7 +2652,7 @@
 		return innerMatches(element, sprocket, rule);
 	};
 
-	let closest$1 = function(element, sprocket, inComposite) {
+	let closest = function(element, sprocket, inComposite) {
 		let composite;
 		if (inComposite) {
 			composite = getComposite(element);
@@ -2633,7 +2665,7 @@
 		}
 	};
 
-	let findAll$1 = function(element, sprocket) { // FIXME this search is blocked by descendant composites (scopes). Is this appropriate?
+	let findAll = function(element, sprocket) { // FIXME this search is blocked by descendant composites (scopes). Is this appropriate?
 		let nodeList = [];
 		let rule = getMatchingSprocketRule(element, sprocket);
 		if (!rule) return nodeList;
@@ -2641,19 +2673,19 @@
 		
 		let node;
 		while (node = walker.nextNode()) {
-			if (matches(node, rule.selector)) nodeList.push(node);
+			if (matches$2(node, rule.selector)) nodeList.push(node);
 		}
 		return nodeList;
 	};
 
-	let find$2 = function(element, sprocket) { // FIXME this search is blocked by descendant composites (scopes). Is this appropriate?
+	let find$1 = function(element, sprocket) { // FIXME this search is blocked by descendant composites (scopes). Is this appropriate?
 		let rule = getMatchingSprocketRule(element, sprocket);
 		if (!rule) return null;
 		let walker = createCompositeWalker(element, true); // skipRoot
 		
 		let node;
 		while (node = walker.nextNode()) {
-			if (matches(node, rule.selector)) return node;
+			if (matches$2(node, rule.selector)) return node;
 		}
 		return null;
 	};
@@ -2691,14 +2723,14 @@
 		let composite = getComposite(element);
 		sprocketRule = getRuleFromComposite(composite, element);
 		if (sprocketRule) return sprocketRule;
-		return getRuleFromComposite(document$5, element);
+		return getRuleFromComposite(document$7, element);
 	}
 
 	function getRuleFromComposite(composite, element) {
 		let sprocketRule;
 		let nodeData = getData(composite);
 		some(nodeData.rules, function(rule) {
-			if (!matches(element, rule.selector)) return false; // TODO should be using relative selector
+			if (!matches$2(element, rule.selector)) return false; // TODO should be using relative selector
 			sprocketRule = { composite: composite };
 			defaults(sprocketRule, rule);
 			return true;
@@ -2711,7 +2743,7 @@
 		let composite = getComposite(element);
 		sprocketRule = getMatchingRuleFromComposite(composite, sprocket);
 		if (inComposite || sprocketRule) return sprocketRule;
-		return getMatchingRuleFromComposite(document$5, sprocket);
+		return getMatchingRuleFromComposite(document$7, sprocket);
 	}
 
 	function getMatchingRuleFromComposite(composite, sprocket) {
@@ -2737,7 +2769,7 @@
 	}
 
 	function createCompositeWalker(root, skipRoot) {
-		return document$5.createNodeIterator(
+		return document$7.createNodeIterator(
 				root,
 				1,
 				acceptNode,
@@ -2751,7 +2783,7 @@
 
 	let sprockets = {
 		start,
-		insertNode: insertNode$1,
+		insertNode,
 		removeNode,
 		registerElement,
 		registerComponent,
@@ -2759,10 +2791,10 @@
 		register,
 		evolve,
 		cast,
-		find: find$2,
-		findAll: findAll$1,
+		find: find$1,
+		findAll,
 		matches: matches$1,
-		closest: closest$1
+		closest
 	};
 
 	let basePrototype = {};
@@ -2774,10 +2806,10 @@
 
 	assign(Base.prototype, {
 
-	find: function(selector, scope) { return find$1(selector, this.element, scope); },
-	findAll: function(selector, scope) { return findAll(selector, this.element, scope); },
-	matches: function(selector, scope) { return matches(this.element, selector, scope); },
-	closest: function(selector, scope) { return closest(this.element, selector, scope); },
+	find: function(selector, scope) { return find$2(selector, this.element, scope); },
+	findAll: function(selector, scope) { return findAll$1(selector, this.element, scope); },
+	matches: function(selector, scope) { return matches$2(this.element, selector, scope); },
+	closest: function(selector, scope) { return closest$1(this.element, selector, scope); },
 
 	contains: function(otherNode) { return contains(this.element, otherNode); },
 
@@ -2996,7 +3028,7 @@
 	},
 
 	ariaFindAll: function(role) {
-		return this.$.ariaFindALL(role);
+		return this.$.ariaFindAll(role);
 	},
 
 	ariaMatches: function(role) {
@@ -3064,12 +3096,12 @@
 
 		let baseURL = URL(details.url);
 
-		forEach(findAll('style', doc.body), function(node) {
+		forEach(findAll$1('style', doc.body), function(node) {
 			if (node.hasAttribute('scoped')) return; // ignore
 			doc.head.appendChild(node); // NOTE no adoption
 		});
 		
-		forEach(findAll('style', doc), function(node) {
+		forEach(findAll$1('style', doc), function(node) {
 			// TODO the following rewrites url() property values but isn't robust
 			let text = node.textContent;
 			let replacements = 0;
@@ -3088,21 +3120,21 @@
 	/*
 		resolveAll() resolves all URL attributes
 	*/
-	let urlAttributes$1 = URL.attributes;
+	let urlAttributes = URL.attributes;
 
 	function resolveAll(doc, baseURL) {
 
 		return Thenfu.pipe(null, [
 
 		function () {
-			let selector = Object.keys(urlAttributes$1).join(', ');
-			return findAll(selector, doc);
+			let selector = Object.keys(urlAttributes).join(', ');
+			return findAll$1(selector, doc);
 		},
 
 		function(nodeList) {
 			return Thenfu.reduce(null, nodeList, function(dummy, el) {
 				let tag = getTagName(el);
-				let attrList = urlAttributes$1[tag];
+				let attrList = urlAttributes[tag];
 				forOwn(attrList, function(attrDesc, attrName) {
 					if (!el.hasAttribute(attrName)) return;
 					attrDesc.resolve(el, baseURL);
@@ -3199,7 +3231,7 @@
 		}
 
 		function cacheLookup(request) {
-			let entry = find(cache, function (entry) {
+			let entry = find$3(cache, function (entry) {
 				if (!cacheMatch(request, entry)) return false;
 				return true;
 			});
@@ -3536,7 +3568,7 @@
 		if (!(this instanceof CustomNamespace)) return new CustomNamespace(options);
 		if (!options) return; // WARN for cloning / inheritance
 		let style = options.style = lc(options.style);
-		let styleInfo = find(CustomNamespace.namespaceStyles, function(styleInfo) {
+		let styleInfo = find$3(CustomNamespace.namespaceStyles, function(styleInfo) {
 			return styleInfo.style === style;
 		});
 		if (!styleInfo) throw Error('Unexpected namespace style: ' + style);
@@ -3605,7 +3637,7 @@
 		let coll = this;
 		forEach(map(doc.documentElement.attributes), function(attr) {
 			let fullName = lc(attr.name);
-			let styleInfo = find(CustomNamespace.namespaceStyles, function(styleInfo) {
+			let styleInfo = find$3(CustomNamespace.namespaceStyles, function(styleInfo) {
 				return (fullName.indexOf(styleInfo.configPrefix) === 0);
 			});
 			if (!styleInfo) return;
@@ -3629,7 +3661,7 @@
 
 	add: function(nsDef) {
 		let coll = this;
-		let matchingNS = find(coll.items, function(def) {
+		let matchingNS = find$3(coll.items, function(def) {
 			if (lc(def.urn) === lc(nsDef.urn)) {
 				if (def.prefix !== nsDef.prefix) console.warn('Attempted to add namespace with same urn as one already present: ' + def.urn);
 				return true;
@@ -3646,7 +3678,7 @@
 	lookupNamespace: function(urn) {
 		let coll = this;
 		urn = lc(urn);
-		let nsDef = find(coll.items, function(def) {
+		let nsDef = find$3(coll.items, function(def) {
 			return (lc(def.urn) === urn);
 		});
 		return nsDef;
@@ -3662,7 +3694,7 @@
 	lookupNamespaceURI: function(prefix) {
 		let coll = this;
 		prefix = lc(prefix);
-		let nsDef = find(coll.items, function(def) {
+		let nsDef = find$3(coll.items, function(def) {
 			return (def.prefix === prefix);
 		});
 		return nsDef && nsDef.urn;
@@ -3685,10 +3717,10 @@
 
 	let filters = new Registry({
 		writeOnce: true,
-		testKey: function(key) {
+		keyValidator: function(key) {
 			return /^[_a-zA-Z][_a-zA-Z0-9]*$/.test(key);
 		},
-		testValue: function(fn) {
+		valueValidator: function(fn) {
 			return typeof fn === 'function';
 		}
 	});
@@ -3765,10 +3797,10 @@
 
 	let decoders = new Registry({
 		writeOnce: true,
-		testKey: function(key) {
+		keyValidator: function(key) {
 			return typeof key === 'string' && /^[_a-zA-Z][_a-zA-Z0-9]*/.test(key);
 		},
-		testValue: function(constructor) {
+		valueValidator: function(constructor) {
 			return typeof constructor === 'function';
 		}
 	});
@@ -3783,8 +3815,8 @@
 	});
 
 	// FIXME textAttr & htmlAttr used in HazardProcessor & CSSDecoder
-	const textAttr = '_text';
-	const htmlAttr = '_html';
+	const textAttr$1 = '_text';
+	const htmlAttr$1 = '_html';
 	// TODO what about tagnameAttr, namespaceAttr
 
 	const CSS_CONTEXT_VARIABLE = '_';
@@ -3802,7 +3834,7 @@
 		let queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
 		let selector = queryParts[1];
 		let attr = queryParts[2];
-		if (!matches$2(element, selector)) return;
+		if (!matches(element, selector)) return;
 		let node = element;
 		let result = node;
 
@@ -3817,9 +3849,9 @@
 		function getAttr(node, attr) {
 			switch(attr) {
 			case null: case undefined: case '': return node;
-			case textAttr: 
+			case textAttr$1: 
 				return node.textContent;
-			case htmlAttr:
+			case htmlAttr$1:
 				let frag = doc.createDocumentFragment();
 				forEach(node.childNodes, function(child) { 
 					frag.appendChild(doc.importNode(child, true)); // TODO does `child` really need to be cloned??
@@ -3839,7 +3871,7 @@
 		let queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
 		let selector = queryParts[1];
 		let attr = queryParts[2];
-		let result = find$3(selector, context, variables, wantArray);
+		let result = find(selector, context, variables, wantArray);
 
 		if (attr) {
 			attr = attr.trim();
@@ -3857,9 +3889,9 @@
 		function getAttr(node, attr) {
 			switch(attr) {
 			case null: case undefined: case '': return node;
-			case textAttr: 
+			case textAttr$1: 
 				return node.textContent;
-			case htmlAttr:
+			case htmlAttr$1:
 				let frag = doc.createDocumentFragment();
 				forEach(node.childNodes, function(child) { 
 					frag.appendChild(doc.importNode(child, true)); // TODO does `child` really need to be cloned??
@@ -3874,12 +3906,12 @@
 
 	});
 
-	function matches$2(element, selectorGroup) {
+	function matches(element, selectorGroup) {
 		if (selectorGroup.trim() === '') return;
-		return matches(element, selectorGroup);
+		return matches$2(element, selectorGroup);
 	}
 
-	function find$3(selectorGroup, context, variables, wantArray) { // FIXME currently only implements `context` expansion
+	function find(selectorGroup, context, variables, wantArray) { // FIXME currently only implements `context` expansion
 		selectorGroup = selectorGroup.trim();
 		if (selectorGroup === '') return wantArray ? [ context ] : context;
 		let nullResult = wantArray ? [] : null;
@@ -3965,10 +3997,10 @@
 		let finalSelector = selectors.join(', ');
 
 		if (wantArray) {
-			return findAll(finalSelector, context, !isRoot, !isRoot);
+			return findAll$1(finalSelector, context, !isRoot, !isRoot);
 		}
 		else {
-			return find$1(finalSelector, context, !isRoot, !isRoot);
+			return find$2(finalSelector, context, !isRoot, !isRoot);
 		}
 	}
 
@@ -4302,12 +4334,13 @@
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
 
+
 	let processors = new Registry({
 		writeOnce: true,
-		testKey: function(key) {
+		keyValidator: function(key) {
 			return typeof key === 'string' && /^[_a-zA-Z][_a-zA-Z0-9]*/.test(key);
 		},
-		testValue: function(constructor) {
+		valueValidator: function(constructor) {
 			return typeof constructor === 'function';
 		}
 	});
@@ -4339,7 +4372,7 @@
 		let srcNode = provider.srcNode;
 		let srcDoc = srcNode.nodeType === 9 ? srcNode : srcNode.ownerDocument;
 		let main;
-		if (!main) main = find$1('main, [role=main]', srcNode);
+		if (!main) main = find$2('main, [role=main]', srcNode);
 		if (!main && srcNode === srcDoc) main = srcDoc.body;
 		if (!main) main = srcNode;
 
@@ -4356,6 +4389,7 @@
 	 * Copyright 2014-2016 Sean Hogan (http://meekostuff.net/)
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
+
 
 	function ScriptProcessor(options) {
 		this.processor = options;
@@ -4420,15 +4454,16 @@
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
 
-	let document$7 = window.document;
+
+	let document$5 = window.document;
 
 	// NOTE textAttr & htmlAttr used in HazardProcessor & CSSDecoder
-	const textAttr$1 = '_text';
-	const htmlAttr$1 = '_html';
+	const textAttr = '_text';
+	const htmlAttr = '_html';
 
 	const PIPE_OPERATOR = '//>';
 
-	const HYPERFRAMESET_URN = 'hyperframeset'; // FIXME DRY with libHyperFrameset.js
+	const HYPERFRAMESET_URN$2 = 'hyperframeset'; // FIXME DRY with libHyperFrameset.js
 
 	/* WARN 
 		on IE11 and Edge, certain elements (or attrs) *not* attached to a document 
@@ -4555,7 +4590,7 @@
 	});
 
 	function walkTree(root, skipRoot, callback) { // always "accept" element nodes
-		let walker = document$7.createNodeIterator(
+		let walker = document$5.createNodeIterator(
 				root,
 				1,
 				acceptNode,
@@ -4579,7 +4614,7 @@
 	}
 
 	function htmlToFragment(html, doc) {
-		if (!doc) doc = document$7;
+		if (!doc) doc = document$5;
 		let div = doc.createElement('div');
 		div.innerHTML = html;
 		let result = childNodesToFragment(div);
@@ -4609,13 +4644,13 @@
 		let exprPrefix = namespaces.lookupPrefix(HAZARD_EXPRESSION_URN);
 		let mexprPrefix = namespaces.lookupPrefix(HAZARD_MEXPRESSION_URN);
 
-		let exprHtmlAttr = exprPrefix + htmlAttr$1; // NOTE this is mapped to haz:eval
+		let exprHtmlAttr = exprPrefix + htmlAttr; // NOTE this is mapped to haz:eval
 		let hazEvalTag = hazPrefix + 'eval';
-		let mexprHtmlAttr = mexprPrefix + htmlAttr$1; // NOTE this is invalid
+		let mexprHtmlAttr = mexprPrefix + htmlAttr; // NOTE this is invalid
 
-		let mexprTextAttr = mexprPrefix + textAttr$1; // NOTE this is mapped to haz:mtext
+		let mexprTextAttr = mexprPrefix + textAttr; // NOTE this is mapped to haz:mtext
 		let hazMTextTag = hazPrefix + 'mtext';
-		let exprTextAttr = exprPrefix + textAttr$1; // NOTE this is mapped to haz:text
+		let exprTextAttr = exprPrefix + textAttr; // NOTE this is mapped to haz:text
 		let hazTextTag = hazPrefix + 'text';
 
 		// FIXME extract exprToHazPriority from hazLang
@@ -4705,7 +4740,7 @@
 		if (console.logLevel !== 'debug') return;
 
 		// if debugging then warn about PERFORMANCE_UNFRIENDLY_CONDITIONS (IE11 / Edge)
-		let hfNS = processor.namespaces.lookupNamespace(HYPERFRAMESET_URN);
+		let hfNS = processor.namespaces.lookupNamespace(HYPERFRAMESET_URN$2);
 		walkTree(template, true, function(el) {
 			let tag = getTagName(el);
 			if (tag.indexOf(hazPrefix) === 0) return;
@@ -4766,14 +4801,14 @@
 	getNamedTemplate: function(name) {
 		let processor = this;
 		name = lc(name);
-		return find(processor.templates, function(template) {
+		return find$3(processor.templates, function(template) {
 			return lc(template.getAttribute('name')) === name;
 		});
 	},
 
 	getMatchingTemplate: function(element) {
 		let processor = this;
-		return find(processor.templates, function(template) {
+		return find$3(processor.templates, function(template) {
 			if (!template.hasAttribute('match')) return false;
 			let expression = template.getAttribute('match');
 			return processor.provider.matches(element, expression);
@@ -5201,7 +5236,7 @@
 		let exprNS = namespaces.lookupNamespace(HAZARD_EXPRESSION_URN);
 		let mexprNS = namespaces.lookupNamespace(HAZARD_MEXPRESSION_URN);
 		forEach(map(el.attributes), function(attr) {
-			let ns = find([ exprNS, mexprNS ], function(ns) {
+			let ns = find$3([ exprNS, mexprNS ], function(ns) {
 				return (attr.name.indexOf(ns.prefix) === 0);
 			});
 			if (!ns) return;
@@ -5321,7 +5356,7 @@
 	function processExpression(expr, provider, context, variables, type) { // FIXME robustness
 		let doc = (context && context.nodeType) ? // TODO which document
 			(context.nodeType === 9 ? context : context.ownerDocument) : 
-			document$7; 
+			document$5; 
 		let value = provider.evaluate(expr.selector, context, variables);
 
 		every(expr.filters, function(filter) {
@@ -5381,6 +5416,7 @@
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
 
+
 	processors.register('main', MainProcessor);
 
 	processors.register('script', ScriptProcessor);
@@ -5389,10 +5425,10 @@
 
 	let configData = new Registry({
 		writeOnce: true,
-		testKey: function(key) {
+		keyValidator: function(key) {
 			return typeof key === 'string';
 		},
-		testValue: function(o) {
+		valueValidator: function(o) {
 			return o != null && typeof o === 'object';
 		}
 	});
@@ -5403,7 +5439,8 @@
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
 
-	let document$8 = window.document;
+
+	let document$4 = window.document;
 
 	const eventConfig = 'form@submit,reset,input,change,invalid input,textarea@input,change,invalid,focus,blur select,fieldset@change,invalid,focus,blur button@click';
 
@@ -5490,7 +5527,7 @@
 			if (!callback) return;
 
 			let fn = function(e) {
-				if (closest(e.target, 'form')) return;
+				if (closest$1(e.target, 'form')) return;
 				callback.apply(object, arguments); 
 			};
 			object[ontype] = fn;
@@ -5506,12 +5543,12 @@
 		});
 
 		if (needClickWatcher) {
-			document$8.addEventListener('click', function(e) { 
-				if (closest(e.target, 'form')) return;
+			document$4.addEventListener('click', function(e) { 
+				if (closest$1(e.target, 'form')) return;
 				let type = e.target.type;
 				if (!(type === 'submit' || type === 'reset')) return;
 				Task.asap(function() {
-					let pseudoEvent = document$8.createEvent('CustomEvent');
+					let pseudoEvent = document$4.createEvent('CustomEvent');
 					// NOTE pseudoEvent.detail = e.target
 					pseudoEvent.initCustomEvent(type, true, true, e.target);
 					pseudoEvent.preventDefault();
@@ -5545,13 +5582,13 @@
 	var formElements$1 = /*#__PURE__*/Object.freeze({
 		__proto__: null,
 		ConfigurableBody: ConfigurableBody,
+		ConfigurableButton: ConfigurableButton,
+		ConfigurableFieldset: ConfigurableFieldset,
 		ConfigurableForm: ConfigurableForm,
 		ConfigurableInput: ConfigurableInput,
-		ConfigurableTextarea: ConfigurableTextarea,
-		ConfigurableFieldset: ConfigurableFieldset,
 		ConfigurableSelect: ConfigurableSelect,
-		ConfigurableButton: ConfigurableButton,
-		'default': formElements
+		ConfigurableTextarea: ConfigurableTextarea,
+		default: formElements
 	});
 
 	/*!
@@ -5560,9 +5597,10 @@
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
 
-	let document$9 = window.document;
 
-	let namespace; // will be set by external call to registerFramesetElements()
+	let document$3 = window.document;
+
+	let namespace$1; // will be set by external call to registerFramesetElements()
 
 	/*
 	 * HyperFrameset sprockets
@@ -5753,7 +5791,7 @@
 	owns: {
 		get: function() { 
 			return filter(this.element.children, function(el) { 
-				return matches(el, function(el) { return Panel.isPanel(el) || Layout.isLayout(el); });
+				return matches$2(el, function(el) { return Panel.isPanel(el) || Layout.isLayout(el); });
 			}); 
 		}
 	}
@@ -5783,7 +5821,7 @@
 		let parent = element.parentNode;
 
 		// FIXME dimension setting should occur before becoming visible
-		if (!matches(parent, Layer.isLayer)) return;
+		if (!matches$2(parent, Layer.isLayer)) return;
 		// TODO vh, vw not tested on various platforms
 		let height = this.attr('height'); // TODO css unit parsing / validation
 		if (!height) height = '100vh';
@@ -5810,7 +5848,7 @@
 		let element = this;
 		switch (node.nodeType) {
 		case 1: // hide non-layout elements
-			if (matches(node, function(el) { return Panel.isPanel(el) || Layout.isLayout(el); })) return;
+			if (matches$2(node, function(el) { return Panel.isPanel(el) || Layout.isLayout(el); })) return;
 			node.hidden = true;
 			return;
 		case 3: // hide text nodes by wrapping in <wbr hidden>
@@ -5939,7 +5977,7 @@
 		}
 		controllers.listen(name, function(values) {
 			let panels = deck.ariaGet('owns');
-			let activePanel = find(panels, function(child) {
+			let activePanel = find$3(panels, function(child) {
 				let value = child.getAttribute('value');
 				if (!includes(values, value)) return false;
 				return true;
@@ -5979,7 +6017,7 @@
 	refresh: function() { // TODO should this be static method?
 		let width = parseFloat(window.getComputedStyle(this.element, null).width);
 		let panels = this.ariaGet('owns');
-		let activePanel = find(panels, function(panel) {
+		let activePanel = find$3(panels, function(panel) {
 			let minWidth = window.getComputedStyle(panel, null).minWidth;
 			if (minWidth == null || minWidth === '' || minWidth === '0px') return true;
 			minWidth = parseFloat(minWidth); // FIXME minWidth should be "NNNpx" but need to test
@@ -6001,35 +6039,35 @@
 
 	function registerLayoutElements(ns) {
 
-	namespace = ns; // TODO assert ns instanceof CustomNamespace
+	namespace$1 = ns; // TODO assert ns instanceof CustomNamespace
 
-	sprockets.registerElement(namespace.lookupSelector('layer'), Layer);
-	sprockets.registerElement(namespace.lookupSelector('popup'), Popup);
-	sprockets.registerElement(namespace.lookupSelector('panel'), Panel);
-	sprockets.registerElement(namespace.lookupSelector('vlayout'), VLayout);
-	sprockets.registerElement(namespace.lookupSelector('hlayout'), HLayout);
-	sprockets.registerElement(namespace.lookupSelector('deck'), Deck);
-	sprockets.registerElement(namespace.lookupSelector('rdeck'), ResponsiveDeck);
+	sprockets.registerElement(namespace$1.lookupSelector('layer'), Layer);
+	sprockets.registerElement(namespace$1.lookupSelector('popup'), Popup);
+	sprockets.registerElement(namespace$1.lookupSelector('panel'), Panel);
+	sprockets.registerElement(namespace$1.lookupSelector('vlayout'), VLayout);
+	sprockets.registerElement(namespace$1.lookupSelector('hlayout'), HLayout);
+	sprockets.registerElement(namespace$1.lookupSelector('deck'), Deck);
+	sprockets.registerElement(namespace$1.lookupSelector('rdeck'), ResponsiveDeck);
 
 	let cssText = [
 	'*[hidden] { display: none !important; }', // TODO maybe not !important
-	namespace.lookupSelector('layer, popup, hlayout, vlayout, deck, rdeck, panel, body') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
-	namespace.lookupSelector('layer') + ' { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; }',
-	namespace.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { display: block; width: 0; height: 0; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
-	namespace.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { width: 100%; height: 100%; }', // FIXME should be 0,0 before manual calculations
-	namespace.lookupSelector('panel') + ' { display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
-	namespace.lookupSelector('body') + ' { display: block; width: auto; height: auto; margin: 0; }',
-	namespace.lookupSelector('popup') + ' { display: block; position: relative; width: 0; height: 0; }',
-	namespace.lookupSelector('popup') + ' > * { position: absolute; top: 0; left: 0; }', // TODO or change 'body' styling above
-	namespace.lookupSelector('vlayout') + ' { display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; }',
-	namespace.lookupSelector('hlayout') + ' { display: flex; flex-direction: row; justify-content: flex-end; align-items: stretch; }',
-	namespace.lookupSelector('deck') + ' > * { width: 100%; height: 100%; }',
-	namespace.lookupSelector('rdeck') + ' > * { width: 0; height: 0; }',
+	namespace$1.lookupSelector('layer, popup, hlayout, vlayout, deck, rdeck, panel, body') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
+	namespace$1.lookupSelector('layer') + ' { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; }',
+	namespace$1.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { display: block; width: 0; height: 0; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+	namespace$1.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { width: 100%; height: 100%; }', // FIXME should be 0,0 before manual calculations
+	namespace$1.lookupSelector('panel') + ' { display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
+	namespace$1.lookupSelector('body') + ' { display: block; width: auto; height: auto; margin: 0; }',
+	namespace$1.lookupSelector('popup') + ' { display: block; position: relative; width: 0; height: 0; }',
+	namespace$1.lookupSelector('popup') + ' > * { position: absolute; top: 0; left: 0; }', // TODO or change 'body' styling above
+	namespace$1.lookupSelector('vlayout') + ' { display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; }',
+	namespace$1.lookupSelector('hlayout') + ' { display: flex; flex-direction: row; justify-content: space-between; align-items: stretch; }',
+	namespace$1.lookupSelector('deck') + ' > * { width: 100%; height: 100%; }',
+	namespace$1.lookupSelector('rdeck') + ' > * { width: 0; height: 0; }',
 	].join('\n');
 
-	let style = document$9.createElement('style');
+	let style = document$3.createElement('style');
 	style.textContent = cssText;
-	document$9.head.insertBefore(style, document$9.head.firstChild);
+	document$3.head.insertBefore(style, document$3.head.firstChild);
 
 	} // END registerLayoutElements()
 
@@ -6041,15 +6079,15 @@
 
 	var layoutElements$1 = /*#__PURE__*/Object.freeze({
 		__proto__: null,
-		HBase: HBase,
-		Layer: Layer,
-		Popup: Popup,
-		Panel: Panel,
-		HLayout: HLayout,
-		VLayout: VLayout,
 		Deck: Deck,
+		HBase: HBase,
+		HLayout: HLayout,
+		Layer: Layer,
+		Panel: Panel,
+		Popup: Popup,
 		ResponsiveDeck: ResponsiveDeck,
-		'default': layoutElements
+		VLayout: VLayout,
+		default: layoutElements
 	});
 
 	/*!
@@ -6058,16 +6096,17 @@
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
 
-	let document$a = window.document;
 
-	let namespace$1; // will be set by external call to registerFrameElements()
+	let document$2 = window.document;
+
+	let namespace; // will be set by external call to registerFrameElements()
 
 	let frameDefinitions = new Registry({
 		writeOnce: true,
-		testKey: function(key) {
+		keyValidator: function(key) {
 			return typeof key === 'string';
 		},
-		testValue: function(o) {
+		valueValidator: function(o) {
 			return o != null && typeof o === 'object';
 		}
 	});
@@ -6249,18 +6288,18 @@
 
 	function registerFrameElements(ns) {
 
-	namespace$1 = ns; // TODO assert ns instanceof CustomNamespace
+	namespace = ns; // TODO assert ns instanceof CustomNamespace
 
-	sprockets.registerElement(namespace$1.lookupSelector('frame'), HFrame);
+	sprockets.registerElement(namespace.lookupSelector('frame'), HFrame);
 
 	let cssText = [
-	namespace$1.lookupSelector('frame') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
-	namespace$1.lookupSelector('frame') + ' { display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }' // FIXME text-align: start
+	namespace.lookupSelector('frame') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
+	namespace.lookupSelector('frame') + ' { display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }' // FIXME text-align: start
 	].join('\n');
 
-	let style = document$a.createElement('style');
+	let style = document$2.createElement('style');
 	style.textContent = cssText;
-	document$a.head.insertBefore(style, document$a.head.firstChild);
+	document$2.head.insertBefore(style, document$2.head.firstChild);
 
 	} // END registerFrameElements()
 
@@ -6275,6 +6314,7 @@
 	 * Copyright 2009-2016 Sean Hogan (http://meekostuff.net/)
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
+
 
 	/* BEGIN HFrameset code */
 
@@ -6331,7 +6371,7 @@
 			url: resource && resource.url,
 			mainSelector: frameDef.mainSelector,
 		});
-		let bodyDef = find(frameDef.bodies, function(body) { return body.condition === condition;});
+		let bodyDef = find$3(frameDef.bodies, function(body) { return body.condition === condition;});
 		if (!bodyDef) return; // FIXME what to do here??
 		return bodyDef.render(resource, details);
 	}
@@ -6415,7 +6455,7 @@
 		let doc = resource.document; // FIXME what if resource is a Request?
 		if (!doc) return null;
 		let frag0 = doc;
-		if (details.mainSelector) frag0 = find$1(details.mainSelector, doc);
+		if (details.mainSelector) frag0 = find$2(details.mainSelector, doc);
 
 		return Thenfu.reduce(frag0, bodyDef.transforms, function(fragment, transform) {
 			return transform.process(fragment, details);
@@ -6423,13 +6463,13 @@
 		.then(function(fragment) {
 			let el = bodyDef.element.cloneNode(false);
 			// crop to <body> if it exists
-			let htmlBody = find$1('body', fragment);
+			let htmlBody = find$2('body', fragment);
 			if (htmlBody) fragment = adoptContents(htmlBody, el.ownerDocument);
 			// remove all stylesheets
-			forEach(findAll('link[rel~=stylesheet], style', fragment), function(node) {
+			forEach(findAll$1('link[rel~=stylesheet], style', fragment), function(node) {
 				node.parentNode.removeChild(node);
 			});
-			insertNode('beforeend', el, fragment);
+			insertNode$1('beforeend', el, fragment);
 			return el;
 		});
 	}
@@ -6520,7 +6560,7 @@
 		// NOTE first rebase scope: urls
 		let scopeURL = URL(settings.scope);
 		rebase(doc, scopeURL);
-		let frameElts = findAll(
+		let frameElts = findAll$1(
 			framesetDef.namespaces.lookupSelector('frame', HYPERFRAMESET_URN$1), 
 			doc.body);
 		forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
@@ -6533,7 +6573,7 @@
 		});
 
 		// warn about not using @id
-		let idElements = findAll('*[id]:not(script)', doc.body);
+		let idElements = findAll$1('*[id]:not(script)', doc.body);
 		if (idElements.length) {
 			console.warn('@id is strongly discouraged in frameset-documents (except on <script>).\n' +
 				'Found ' + idElements.length + ', ' + 
@@ -6542,7 +6582,7 @@
 		}
 
 		// Add @id and @sourceurl to inline <script type="text/javascript">
-		let scripts = findAll('script', doc);
+		let scripts = findAll$1('script', doc);
 		forEach(scripts, function(script, i) {
 			// ignore non-javascript scripts
 			if (script.type && !/^text\/javascript/.test(script.type)) return;
@@ -6562,14 +6602,14 @@
 
 		// Move all <script for> in <head> to <body>
 		let firstChild = doc.body.firstChild;
-		forEach(findAll('script[for]', doc.head), function(script) {
+		forEach(findAll$1('script[for]', doc.head), function(script) {
 			doc.body.insertBefore(script, firstChild);
 			script.setAttribute('for', '');
 			console.info('Moved <script for> in frameset <head> to <body>');
 		});
 
 		// Move all non-@for, javascript <script> in <body> to <head>
-		forEach(findAll('script', doc.body), function(script) {
+		forEach(findAll$1('script', doc.body), function(script) {
 			// ignore non-javascript scripts
 			if (script.type && !/^text\/javascript/.test(script.type)) return;
 			// ignore @for scripts
@@ -6595,7 +6635,7 @@
 			frames: {} // all hyperframe definitions. Indexed by @defid (which may be auto-generated)
 		});
 
-		let scripts = findAll('script', body);
+		let scripts = findAll$1('script', body);
 		forEach(scripts, function(script, i) {
 			// Ignore non-javascript scripts
 			if (script.type && !/^text\/javascript/.test(script.type)) return;
@@ -6660,7 +6700,7 @@
 			script.parentNode.removeChild(script); // physical <script> no longer needed
 		});
 
-		let frameElts = findAll(
+		let frameElts = findAll$1(
 			framesetDef.namespaces.lookupSelector('frame', HYPERFRAMESET_URN$1), 
 			body);
 		let frameDefElts = [];
@@ -6733,7 +6773,7 @@
 
 	function rebase(doc, scopeURL) {
 		forOwn(urlAttributes, function(attrList, tag) {
-			forEach(findAll(tag, doc), function(el) {
+			forEach(findAll$1(tag, doc), function(el) {
 				forOwn(attrList, function(attrDesc, attrName) {
 					let relURL = el.getAttribute(attrName);
 					if (relURL == null) return;
@@ -6751,11 +6791,11 @@
 	}
 
 	function normalizeScopedStyles(doc, allowedScopeSelector) {
-		let scopedStyles = findAll('style[scoped]', doc.body);
+		let scopedStyles = findAll$1('style[scoped]', doc.body);
 		let dummyDoc = createHTMLDocument('', doc);
 		forEach(scopedStyles, function(el, index) {
 			let scope = el.parentNode;
-			if (!matches(scope, allowedScopeSelector)) {
+			if (!matches$2(scope, allowedScopeSelector)) {
 				console.warn('Removing <style scoped>. Must be child of ' + allowedScopeSelector);
 				scope.removeChild(el);
 				return;
@@ -6771,7 +6811,7 @@
 				// Firefox doesn't seem to instatiate el.sheet in XHR documents
 				let dummyEl = dummyDoc.createElement('style');
 				dummyEl.textContent = el.textContent;
-				insertNode('beforeend', dummyDoc.head, dummyEl);
+				insertNode$1('beforeend', dummyDoc.head, dummyEl);
 				return dummyEl.sheet;
 			})();
 			forRules(sheet, processRule, scope);
@@ -6779,7 +6819,7 @@
 					return rule.cssText; 
 				}).join('\n');
 			el.textContent = cssText;
-			insertNode('beforeend', doc.head, el);
+			insertNode$1('beforeend', doc.head, el);
 			return;
 		});
 	}
@@ -6832,9 +6872,9 @@
 
 	var framesetDefinitions = /*#__PURE__*/Object.freeze({
 		__proto__: null,
+		HBodyDefinition: HBodyDefinition,
 		HFrameDefinition: HFrameDefinition,
 		HFramesetDefinition: HFramesetDefinition,
-		HBodyDefinition: HBodyDefinition,
 		HTransformDefinition: HTransformDefinition
 	});
 
@@ -6844,13 +6884,14 @@
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
 
-	const HYPERFRAMESET_URN$2 = HFramesetDefinition.HYPERFRAMESET_URN;
+
+	const HYPERFRAMESET_URN = HFramesetDefinition.HYPERFRAMESET_URN;
 
 	// FIXME DRY these @rel values with boot.js
 	const FRAMESET_REL = 'frameset'; // NOTE http://lists.w3.org/Archives/Public/www-html/1996Dec/0143.html
 	const SELF_REL = 'self';
 
-	let document$b = window.document;
+	let document$1 = window.document;
 
 	let framer = {};
 
@@ -6893,7 +6934,7 @@
 		Thenfu.resolve(startOptions.contentDocument)
 		.then(function(doc) { // FIXME potential race condition between document finished loading and frameset rendering
 			return httpProxy.add({
-				url: document$b.URL,
+				url: document$1.URL,
 				type: 'document',
 				document: doc
 			});
@@ -6902,12 +6943,12 @@
 		return Thenfu.pipe(null, [
 			
 		function() { // sanity check
-			return Thenfu.wait(function() { return !!document$b.body; });
+			return Thenfu.wait(function() { return !!document$1.body; });
 		},
 
 		function() { // lookup or detect frameset.URL
 			let framerConfig;
-			framerConfig = framer.lookup(document$b.URL);
+			framerConfig = framer.lookup(document$1.URL);
 			if (framerConfig) return framerConfig;
 			return startOptions.contentDocument
 				.then(function(doc) {
@@ -6933,7 +6974,7 @@
 			
 			function() {
 				framer.definition = definition;
-				return prepareFrameset(document$b, definition)
+				return prepareFrameset(document$1, definition)
 			},
 
 			function() { 
@@ -6941,7 +6982,7 @@
 			},
 
 			function() {
-				return prerenderFrameset(document$b, definition)
+				return prerenderFrameset(document$1, definition)
 			}
 
 			]);
@@ -6962,7 +7003,7 @@
 			registerFrames(framer.definition);
 			interceptFrameElements();
 			retargetFramesetElements();
-			let namespace = framer.definition.namespaces.lookupNamespace(HYPERFRAMESET_URN$2);
+			let namespace = framer.definition.namespaces.lookupNamespace(HYPERFRAMESET_URN);
 			layoutElements.register(namespace);
 			frameElements.register(namespace);
 			registerFramesetElement();
@@ -6977,7 +7018,7 @@
 
 				let changeset = framer.currentChangeset;
 				// FIXME what if no changeset is returned
-				return historyManager.start(changeset, '', document$b.URL,
+				return historyManager.start(changeset, '', document$1.URL,
 					function(state) { }, // FIXME need some sort of rendering status
 					function(state) { return framer.onPopState(state.getData()); }
 					);
@@ -6990,7 +7031,7 @@
 				module: 'frameset',
 				type: 'enteredState',
 				stage: 'after',
-				url: document$b.URL
+				url: document$1.URL
 			});
 
 		},
@@ -7020,7 +7061,7 @@
 		function() { // remove all <link rel=stylesheet /> just in case
 			// FIXME maybe remove all <link>
 			let dstHead = dstDoc.head;
-			forEach(findAll('link[rel|=stylesheet]', dstHead), function(node) {
+			forEach(findAll$1('link[rel|=stylesheet]', dstHead), function(node) {
 				dstHead.removeChild(node);
 			});
 		},
@@ -7052,7 +7093,7 @@
 			mergeElement(dstDoc.head, srcDoc.head);
 			mergeHead(dstDoc, srcDoc.head, true);
 			// allow scripts to run. FIXME scripts should always be appended to document.head
-			forEach(findAll('script', dstDoc.head), function(script) {
+			forEach(findAll$1('script', dstDoc.head), function(script) {
 				scriptQueue.push(script);
 			});
 			return scriptQueue.empty();
@@ -7064,7 +7105,7 @@
 
 	let prerenderFrameset = function(dstDoc, definition) { // FIXME where does this go
 		let srcBody = definition.element;
-		let dstBody = document$b.body;
+		let dstBody = document$1.body;
 		mergeElement(dstBody, srcBody);
 	};
 
@@ -7115,8 +7156,8 @@
 				if (!srcNode.type || /^text\/javascript$/i.test(srcNode.type)) srcNode.type = 'text/javascript?disabled';
 				break;
 			}
-			if (isFrameset) insertNode('beforebegin', selfMarker, srcNode);
-			else insertNode('beforeend', dstHead, srcNode);
+			if (isFrameset) insertNode$1('beforebegin', selfMarker, srcNode);
+			else insertNode$1('beforeend', dstHead, srcNode);
 			if (getTagName(srcNode) == 'link') srcNode.href = srcNode.getAttribute('href'); // Otherwise <link title="..." /> stylesheets don't work on Chrome
 		});
 	}
@@ -7128,14 +7169,14 @@
 	}
 
 	function getFramesetMarker(doc) {
-		if (!doc) doc = document$b;
-		let marker = find$1('link[rel~=' + FRAMESET_REL + ']', doc.head);
+		if (!doc) doc = document$1;
+		let marker = find$2('link[rel~=' + FRAMESET_REL + ']', doc.head);
 		return marker;
 	}
 
 	function getSelfMarker(doc) {
-		if (!doc) doc = document$b;
-		let marker = find$1('link[rel~=' + SELF_REL + ']', doc.head);
+		if (!doc) doc = document$1;
+		let marker = find$2('link[rel~=' + SELF_REL + ']', doc.head);
 		return marker;
 	}
 
@@ -7145,9 +7186,9 @@
 	framesetEntered: function(frameset) {
 		let framer = this;
 		framer.frameset = frameset;
-		let url = document$b.URL;
+		let url = document$1.URL;
 		framer.currentChangeset = frameset.lookup(url, {
-			referrer: document$b.referrer
+			referrer: document$1.referrer
 		});
 		framesetReady.resolve();
 	},
@@ -7160,10 +7201,10 @@
 	frameEntered: function(frame) {
 		let namespaces = framer.definition.namespaces;
 		let parentFrame;
-		let parentElement = closest(frame.element.parentNode, HFrame.isFrame); // TODO frame.element.parentNode.ariaClosest('frame')
+		let parentElement = closest$1(frame.element.parentNode, HFrame.isFrame); // TODO frame.element.parentNode.ariaClosest('frame')
 		if (parentElement) parentFrame = parentElement.$;
 		else {
-			parentElement = document$b.body; // TODO  frame.element.parentNode.ariaClosest('frameset'); 
+			parentElement = document$1.body; // TODO  frame.element.parentNode.ariaClosest('frameset'); 
 			parentFrame = parentElement.$;
 		}
 		parentFrame.frameEntered(frame);
@@ -7187,19 +7228,19 @@
 		if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return; // FIXME do these always trigger modified click behavior??
 
 		// Find closest <a href> to e.target
-		let linkElement = closest(e.target, 'a, [link]');
+		let linkElement = closest$1(e.target, 'a, [link]');
 		if (!linkElement) return;
 		let hyperlink;
 		if (getTagName(linkElement) === 'a') hyperlink = linkElement;
 		else {
-			hyperlink = find$1('a, link', linkElement);
-			if (!hyperlink) hyperlink = closest('a', linkElement);
+			hyperlink = find$2('a, link', linkElement);
+			if (!hyperlink) hyperlink = closest$1('a', linkElement);
 			if (!hyperlink) return;
 		}
 		let href = hyperlink.getAttribute('href');
 		if (!href) return; // not really a hyperlink
 
-		let baseURL = URL(document$b.URL);
+		let baseURL = URL(document$1.URL);
 		let url = baseURL.resolve(href); // TODO probably don't need to resolve on browsers that support pushstate
 
 		// NOTE The following creates a pseudo-event and dispatches to frames in a bubbling order.
@@ -7219,7 +7260,7 @@
 		// test submit
 		let form = e.target;
 		if (form.target) return; // no iframe
-		let baseURL = URL(document$b.URL);
+		let baseURL = URL(document$1.URL);
 		let action = baseURL.resolve(form.action); // TODO probably don't need to resolve on browsers that support pushstate
 		
 		let details = {
@@ -7250,7 +7291,7 @@
 
 	triggerRequestNavigation: function(url, details) {
 		Thenfu.defer(function() {
-			let event = document$b.createEvent('CustomEvent');
+			let event = document$1.createEvent('CustomEvent');
 			event.initCustomEvent('requestnavigation', true, true, details.url);
 			let acceptDefault = details.element.dispatchEvent(event);
 			if (acceptDefault !== false) {
@@ -7279,7 +7320,7 @@
 		}
 		
 		// test hyperlinks
-		let baseURL = URL(document$b.URL);
+		let baseURL = URL(document$1.URL);
 		let oURL = URL(url);
 		if (oURL.origin != baseURL.origin) return; // no external urls
 
@@ -7344,7 +7385,7 @@
 				module: 'frameset',
 				type: 'leftState',
 				stage: 'before',
-				url: document$b.URL
+				url: document$1.URL
 				// TODO details, resource, url, frames??
 				});
 		},
@@ -7385,7 +7426,7 @@
 		let frameset = framer.frameset;
 		let frames = [];
 		let url = changeset.url;
-		if (url !== document$b.URL) {
+		if (url !== document$1.URL) {
 			console.warn('Popped state URL does not match address-bar URL.');
 			// FIXME needs an optional error recovery, perhaps reloading document.URL
 		}
@@ -7417,7 +7458,7 @@
 		if (result == null || result === false) return false;
 
 		// FIXME error if `result` is a relative URL
-		if (typeof result === 'string') result = implyFramesetScope(result, document$b.URL);
+		if (typeof result === 'string') result = implyFramesetScope(result, document$1.URL);
 		if (typeof result !== 'object' || !result.scope || !result.framesetURL) throw Error('Unexpected result from frameset detect');
 		return result;
 	},
@@ -7676,9 +7717,9 @@
 		'html, body { margin: 0; padding: 0; }',
 		'html { width: 100%; height: 100%; }'
 		];
-		let style = document$b.createElement('style');
+		let style = document$1.createElement('style');
 		style.textContent = cssText;
-		document$b.head.insertBefore(style, document$b.head.firstChild);
+		document$1.head.insertBefore(style, document$1.head.firstChild);
 
 	}
 
@@ -7708,4 +7749,4 @@
 
 	}).call(window);
 
-}());
+})();
