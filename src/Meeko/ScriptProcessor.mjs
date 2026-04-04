@@ -7,6 +7,9 @@
 import * as _ from './stuff.mjs';
 import * as DOM from './DOM.mjs';
 
+/**
+ * @implements {Processor}
+ */
 function ScriptProcessor(options) {
 	this.processor = options;
 }

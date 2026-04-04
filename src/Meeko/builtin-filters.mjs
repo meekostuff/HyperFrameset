@@ -1,4 +1,15 @@
 
+/**
+ * @interface Filter
+ * @description Virtual interface for HyperFrameset filters
+ * 
+ * @function
+ * @param {*} value - The input value to filter
+ * @param {...*} args - Additional filter arguments
+ * @returns {*} The filtered value
+ * @description Transform input value using filter logic
+ */
+
 import * as _ from './stuff.mjs';
 import dateFormat from './dateFormat.mjs';
 import filters from './filters.mjs';

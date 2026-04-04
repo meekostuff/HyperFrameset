@@ -203,6 +203,9 @@ getValue: getValue
 })();
 
 
+/**
+ * @implements {Decoder}
+ */
 function MicrodataDecoder(options, namespaces) {}
 
 _.defaults(MicrodataDecoder.prototype, {

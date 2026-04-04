@@ -4,9 +4,6 @@
  * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
  */
 
-/* NOTE
-	+ assumes DOMSprockets
-*/
 /* TODO
     + The passing of nodes between documents needs to be audited.
 		Safari and IE10,11 in particular seem to require nodes to be imported / adopted
@@ -185,6 +182,9 @@ function htmlToFragment(html, doc) {
 	return result;
 }
 
+/**
+ * @implements {Processor}
+ */
 function HazardProcessor(options, namespaces) {
 	this.templates = [];
 	this.namespaces = namespaces = namespaces.clone();

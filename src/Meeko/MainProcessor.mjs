@@ -6,6 +6,9 @@
 import * as _ from './stuff.mjs';
 import * as DOM from './DOM.mjs';
 
+/**
+ * @implements {Processor}
+ */
 function MainProcessor(options) {}
 
 _.defaults(MainProcessor.prototype, {

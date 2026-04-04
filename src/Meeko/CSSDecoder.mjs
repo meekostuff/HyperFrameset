@@ -8,6 +8,9 @@ const htmlAttr = '_html';
 
 const CSS_CONTEXT_VARIABLE = '_';
 
+/**
+ * @implements {Decoder}
+ */
 function CSSDecoder(options, namespaces) {}
 
 _.defaults(CSSDecoder.prototype, {

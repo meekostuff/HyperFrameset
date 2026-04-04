@@ -3,6 +3,9 @@ import * as _ from './stuff.mjs';
 
 // FIXME not really a JSON decoder since expects JSON input and doesn't use JSON paths
 
+/**
+ * @implements {Decoder}
+ */
 function JSONDecoder(options, namespaces) {}
 
 _.defaults(JSONDecoder.prototype, {
