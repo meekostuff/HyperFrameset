@@ -5,7 +5,7 @@
 <html>
 <head>
 <meta charset="UTF-8" />
-<title>post.html</title>
+<title>get.php</title>
 <link rel="frameset" type="text/html" href="decor/frameset.html" />
 <link rel="stylesheet" href="noframeset.css" />
 <style>
@@ -22,7 +22,7 @@ before #page-banner: This is irrelevant content and MUST NOT appear.
 </div>
 <div id="page-header">
 #page-header
-<h1>&lt;form method=&quot;post&quot;&gt; entry-page</h1>
+<h1>&lt;form method=&quot;get&quot;&gt; response-page</h1>
 </div>
 <div class="remove">
 before #page-main: This is irrelevant content and MUST NOT appear.
@@ -30,12 +30,10 @@ before #page-main: This is irrelevant content and MUST NOT appear.
 <div id="page-main">
 #page-main
 <div class="normal">
-<form method="post" action="post.php">
-	<p>Your data: </p>
-	<p><input name="q" type="text" style="width: 20em;" /></p>
-	<p><input type="submit" /></p>
-</form>
+	<p>You asked: </p>
+	<blockquote><%= query.q || '' %></blockquote>
 </div>
+
 </div>
 <div class="remove">
 after #main: This is irrelevant content and MUST NOT appear.

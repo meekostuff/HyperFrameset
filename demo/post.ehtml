@@ -31,7 +31,7 @@ before #page-main: This is irrelevant content and MUST NOT appear.
 #page-main
 <div class="normal">
 	<p>Data received: </p>
-	<blockquote><?= $_POST['q'] ?></blockquote>
+	<blockquote><%= body.q || '' %></blockquote>
 </div>
 </div>
 <div class="remove">
