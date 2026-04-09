@@ -40,6 +40,11 @@ let Thenfu = function(init) { // `init` is called as init(resolve, reject)
 
 _.defaults(Thenfu, {
 
+/**
+ * Attach resolve/reject methods to an object and return a thenable.
+ * @param {Object} [object] - Object to attach resolve/reject to
+ * @returns {Thenfu} A pending thenable
+ */
 applyTo: function(object) {
 	let resolver = {}
 	let promise = new Thenfu(function(resolve, reject) {
@@ -51,8 +56,15 @@ applyTo: function(object) {
 	return promise;
 },
 
+/**
+ * Check if a value has a .then method.
+ * @param {*} value
+ * @returns {boolean}
+ */
 isThenable: function(value) {
-	return value != null && typeof value.then === 'function';
+	return value !== null &&
+		(typeof value === 'object' || typeof value === 'function') &&
+		typeof value.then === 'function';
 }
 
 });
@@ -220,6 +232,11 @@ function wrapResolve(callback, resolve, reject) {
 
 _.defaults(Thenfu, {
 
+/**
+ * Wrap a value in a fulfilled thenable.
+ * @param {*} value
+ * @returns {Thenfu}
+ */
 resolve: function(value) {
 	if (value instanceof Thenfu) return value;
 	let promise = Object.create(Thenfu.prototype);
@@ -228,6 +245,11 @@ resolve: function(value) {
 	return promise;
 },
 
+/**
+ * Wrap an error in a rejected thenable.
+ * @param {*} error
+ * @returns {Thenfu}
+ */
 reject: function(error) { // FIXME should never be used
 return new Thenfu(function(resolve, reject) {
 	reject(error);
@@ -244,7 +266,12 @@ return new Thenfu(function(resolve, reject) {
    delay(timeout) returns a promise which fulfils after timeout ms
    pipe(startValue, [fn1, fn2, ...]) will call functions sequentially
  */
-let wait = (function() { // TODO wait() isn't used much. Can it be simpler?
+/**
+ * Poll a test function until it returns true.
+ * @param {Function} fn - Test function
+ * @returns {Thenfu}
+ */
+let wait = (function() {
 	
 let tests = [];
 
@@ -282,7 +309,12 @@ return wait;
 
 })();
 
-function asap(value) { // FIXME asap(fn) should execute immediately
+/**
+ * Return a thenable that executes immediately if frame time is available, defers otherwise.
+ * @param {*} value - A function, thenable, or value
+ * @returns {Thenfu}
+ */
+function asap(value) {
 	if (value instanceof Thenfu) {
 		if (value.isPending) return value; // already deferred
 		if (Task.getTime(true) <= 0) return value.then(); // will defer
@@ -298,6 +330,11 @@ function asap(value) { // FIXME asap(fn) should execute immediately
 	return Thenfu.resolve(value); // not-deferred
 }
 
+/**
+ * Always defer execution to the next frame.
+ * @param {*} value - A function, thenable, or value
+ * @returns {Thenfu}
+ */
 function defer(value) {
 	if (value instanceof Thenfu) {
 		if (value.isPending) return value; // already deferred
@@ -308,14 +345,25 @@ function defer(value) {
 	return Thenfu.resolve(value).then();
 }
 
-function delay(timeout) { // FIXME delay(timeout, value_or_fn_or_promise)
+/**
+ * Return a thenable that fulfils after a minimum timeout.
+ * @param {number} timeout - Minimum delay in milliseconds
+ * @returns {Thenfu}
+ */
+function delay(timeout) {
 	return new Thenfu(function(resolve, reject) {
 		if (timeout <= 0 || timeout == null) Task.defer(resolve);
 		else Task.delay(resolve, timeout);
 	});
 }
 
-function pipe(startValue, fnList) { // TODO make more efficient with sync introspection
+/**
+ * Chain functions sequentially, passing each result to the next.
+ * @param {*} startValue - Initial value
+ * @param {Function[]} fnList - Functions to chain
+ * @returns {Thenfu}
+ */
+function pipe(startValue, fnList) {
 	let promise = Thenfu.resolve(startValue);
 	for (let n=fnList.length, i=0; i<n; i++) {
 		let fn = fnList[i];
@@ -324,6 +372,14 @@ function pipe(startValue, fnList) { // TODO make more efficient with sync intros
 	return promise;
 }
 
+/**
+ * Async reduce that yields to the browser when frame time runs out.
+ * @param {*} accumulator - Initial accumulator value
+ * @param {Array} a - Array to reduce
+ * @param {Function} fn - Reducer function(acc, val, i, arr)
+ * @param {*} [context] - `this` context for fn
+ * @returns {Thenfu}
+ */
 function reduce(accumulator, a, fn, context) {
 return new Thenfu(function(resolve, reject) {
 	let length = a.length;
