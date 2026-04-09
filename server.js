@@ -12,9 +12,9 @@ app.set('views', DOCUMENT_ROOT);
 app.use(express.urlencoded({ extended: true }));
 
 // Auto-route all .ehtml files anywhere - BEFORE static middleware
-app.all(`*.${TEMPLATE_EXT}`, (req, res) => {
-  const fullPath = req.path.substring(1); // remove leading slash
-  const template = fullPath.replace(`.${TEMPLATE_EXT}`, '');
+app.use((req, res, next) => {
+  if (!req.path.endsWith(`.${TEMPLATE_EXT}`)) return next();
+  const template = req.path.substring(1).replace(`.${TEMPLATE_EXT}`, '');
   const data = req.method === 'GET' ? { query: req.query } : { body: req.body };
   console.log('Template:', template, 'Data:', data);
   res.render(template, data);
