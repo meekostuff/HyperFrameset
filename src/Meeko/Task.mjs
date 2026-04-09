@@ -28,6 +28,11 @@ let deferQueue = [];
 let scheduled = false;
 let processing = false;
 
+/**
+ * Schedule a task to run as soon as possible within the current frame interval.
+ * Not a microtask - runs within ~16ms via requestAnimationFrame.
+ * @param {Function} fn - Function to execute
+ */
 function asap(fn) {
 	asapQueue.push(fn);
 	if (processing) return;
@@ -36,6 +41,10 @@ function asap(fn) {
 	scheduled = true;
 }
 
+/**
+ * Schedule a task to run after all asap tasks have completed.
+ * @param {Function} fn - Function to execute
+ */
 function defer(fn) {
 	if (processing) {
 		deferQueue.push(fn);
@@ -44,6 +53,11 @@ function defer(fn) {
 	asap(fn);
 }
 
+/**
+ * Schedule a task to run after a minimum timeout, then after all asap tasks.
+ * @param {Function} fn - Function to execute
+ * @param {number} timeout - Minimum delay in milliseconds
+ */
 function delay(fn, timeout) {
 	if (timeout <= 0 || timeout == null) {
 		defer(fn);
@@ -60,6 +74,9 @@ function delay(fn, timeout) {
 let execStats = {};
 let frameStats = {};
 
+/**
+ * Reset task execution statistics.
+ */
 function resetStats() {
 	_.forEach([execStats, frameStats], function(stats) {
 		_.assign(stats, {
@@ -80,6 +97,10 @@ function updateStats(stats, currTime) {
 	if (currTime > stats.maxTime) stats.maxTime = currTime;
 }
 
+/**
+ * Get task execution statistics including timing data.
+ * @returns {Object} Statistics object with exec and frame timing data
+ */
 function getStats() {
 	let exec = _.assign({}, execStats);
 	let frame = _.assign({}, frameStats);
@@ -92,6 +113,11 @@ function getStats() {
 }
 
 let lastStartTime = performance.now();
+/**
+ * Get estimated time available in the current frame.
+ * @param {boolean} [bRemaining] - If true, returns time remaining in frame
+ * @returns {number} Time in milliseconds
+ */
 function getTime(bRemaining) {
 	let delta = performance.now() - lastStartTime;
 	if (!bRemaining) return delta;
