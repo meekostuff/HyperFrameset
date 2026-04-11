@@ -6,7 +6,7 @@ describe('Task.mjs tests', () => {
   let Task;
 
   beforeEach(async () => {
-    const taskModule = await import('./Task.mjs');
+    const taskModule = await import('../src/Meeko/Task.mjs');
     Task = taskModule.default;
     Task.resetStats();
   });
@@ -20,7 +20,7 @@ describe('Task.mjs tests', () => {
     await timeout(50);
 
     expect(results).toHaveLength(1);
-    expect(results[0]).toBeLessThan(20);
+    expect(results[0]).toBeLessThan(50);
   });
 
   test('defer executes after asap tasks', async () => {

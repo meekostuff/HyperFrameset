@@ -3,7 +3,7 @@ import { playwright } from '@vitest/browser-playwright';
 
 export default defineConfig({
   test: {
-    include: ['src/**/*.test.mjs'],
+    include: ['test/**/*.test.mjs'],
     
     // Browser testing configuration
     browser: {

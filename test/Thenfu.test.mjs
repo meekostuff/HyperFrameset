@@ -7,7 +7,7 @@ describe('Thenfu static methods', () => {
   let Thenfu;
 
   beforeEach(async () => {
-    const mod = await import('./Thenfu.mjs');
+    const mod = await import('../src/Meeko/Thenfu.mjs');
     Thenfu = mod.default;
   });
 
@@ -219,4 +219,15 @@ describe('Thenfu static methods', () => {
     await timeout(200);
     expect(result).toBe(49995000);
   });
+
+  test('reject delivers error via catch', async () => {
+    let caught;
+    // Use defer to reject after catch is attached
+    Thenfu.defer(() => { throw 'reject-error'; })
+      .catch(e => { caught = e; });
+
+    await timeout(50);
+    expect(caught).toBeDefined();
+  });
+
 });

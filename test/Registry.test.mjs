@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import Registry from './Registry.mjs';
+import { describe, it, expect, test } from 'vitest';
+import Registry from '../src/Meeko/Registry.mjs';
 
 describe('Registry', () => {
   it('stores and retrieves values', () => {
@@ -31,5 +31,19 @@ describe('Registry', () => {
     const reg = new Registry();
     reg.register('a', 1);
     expect(reg.get('a')).toBe(1);
+  });
+
+  test('has returns true for registered keys', () => {
+    const reg = new Registry();
+    reg.register('a', 'value');
+    expect(reg.has('a')).toBe(true);
+    expect(reg.has('b')).toBe(false);
+  });
+
+  test('writeOnce prevents duplicate registration', () => {
+    const reg = new Registry({ writeOnce: true });
+    reg.register('a', 'first');
+    expect(() => reg.register('a', 'second')).toThrow();
+    expect(reg.get('a')).toBe('first');
   });
 });
