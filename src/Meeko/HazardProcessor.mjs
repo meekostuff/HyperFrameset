@@ -118,7 +118,7 @@ function checkElementPerformance(el, namespaces) {
     attrs to elements.
 */
 let hazLangDefinition =
-	'<otherwise <when@test <each@select <one@select +let@name,select <if@test <unless@test ' +
+	'<otherwise <when@test <each@select <one@select +var@name,select <if@test <unless@test ' +
 	'>choose <template@name,match >eval@select >mtext@select >text@select ' +
 	'call@name apply param@name,select clone deepclone element@name attr@name';
 
@@ -520,7 +520,7 @@ transformHazardTree: function(el, context, frag) {
 	case 'template':
 		return frag;
 
-	case 'let':
+	case 'var':
 		name = el.getAttribute('name');
 		selector = el.getAttribute('select');
 		value = context;
@@ -530,7 +530,7 @@ transformHazardTree: function(el, context, frag) {
 			}
 			catch (err) {
 				reportError(err);
-				console.warn('Error evaluating <haz:let name="' + name + '" select="' + selector + '">. Assumed empty.');
+				console.warn('Error evaluating <haz:var name="' + name + '" select="' + selector + '">. Assumed empty.');
 				value = undefined;
 			}
 		}
@@ -892,18 +892,17 @@ function interpretExpression(exprText) { // FIXME robustness
 
 		try {
 			let filterParams = (Function('return [' + text + '];'))();
+			expression.filters.push({
+				text: filterSpec,
+				name: filterName,
+				params: filterParams
+			});
+			return true;
 		}
 		catch (err) {
 			console.warn('Syntax Error in filter call: ' + filterSpec);
 			return false;
 		}
-
-		expression.filters.push({
-			text: filterSpec,
-			name: filterName,
-			params: filterParams
-		});
-		return true;
 	});
 
 	return expression;
