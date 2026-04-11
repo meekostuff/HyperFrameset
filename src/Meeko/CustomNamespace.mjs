@@ -1,6 +1,14 @@
 
 import * as _ from './stuff.mjs';
 
+/**
+ * Represents a namespace with a URN, name, and prefix style.
+ * Supports XML-style (colon separator) and vendor-style (hyphen separator) prefixes.
+ * @param {Object} options
+ * @param {string} options.urn - Namespace URN identifier
+ * @param {string} options.name - Short name used as prefix base
+ * @param {string} options.style - 'xml' or 'vendor'
+ */
 let CustomNamespace = (function() {
 
 function CustomNamespace(options) {
@@ -23,13 +31,28 @@ function CustomNamespace(options) {
 
 _.defaults(CustomNamespace.prototype, {
 
+/**
+ * Create a shallow copy of this namespace definition.
+ * @returns {CustomNamespace}
+ */
 clone: function() {
 	let clone = new CustomNamespace();
 	_.assign(clone, this);
 	return clone;
 },
 
+/**
+ * Return a prefixed tag name.
+ * @param {string} name - Unprefixed tag name
+ * @returns {string} Prefixed tag name (e.g. 'haz:if')
+ */
 lookupTagName: function(name) { return this.prefix + name; },
+
+/**
+ * Prefix each tag in a CSS selector.
+ * @param {string} selector - CSS selector with unprefixed tag names
+ * @returns {string} Selector with prefixed tag names
+ */
 lookupSelector: function(selector) {
 	let prefix = this.selectorPrefix;
 	let tags = selector.split(/\s*,\s*|\s+/);
@@ -55,7 +78,12 @@ _.forOwn(CustomNamespace.namespaceStyles, function(styleInfo) {
 	styleInfo.configPrefix = styleInfo.configNamespace + styleInfo.separator;
 });
 
-CustomNamespace.getNamespaces = function(doc) { // NOTE modelled on IE8, IE9 document.namespaces interface
+/**
+ * Create a NamespaceCollection from a document's root element attributes.
+ * @param {Document} doc
+ * @returns {NamespaceCollection}
+ */
+CustomNamespace.getNamespaces = function(doc) {
 	return new NamespaceCollection(doc);
 }
 
@@ -63,6 +91,11 @@ return CustomNamespace;
 
 })();
 
+/**
+ * A collection of CustomNamespace objects with lookup methods.
+ * Initialized from xmlns: or custom- attributes on a document's root element.
+ * @param {Document} [doc] - Document to scan for namespace declarations
+ */
 let NamespaceCollection = function(doc) {
 	if (!(this instanceof NamespaceCollection)) return new NamespaceCollection(doc);
 	this.items = [];
@@ -90,6 +123,10 @@ init: function(doc) {
 	});
 },
 
+/**
+ * Deep copy this collection and all its namespace definitions.
+ * @returns {NamespaceCollection}
+ */
 clone: function() {
 	let coll = new NamespaceCollection();
 	_.forEach(this.items, function(nsDef) { 
@@ -98,6 +135,10 @@ clone: function() {
 	return coll;
 },
 
+/**
+ * Add a namespace definition. Rejects duplicates by URN or prefix.
+ * @param {CustomNamespace} nsDef
+ */
 add: function(nsDef) {
 	let coll = this;
 	let matchingNS = _.find(coll.items, function(def) {
@@ -114,6 +155,11 @@ add: function(nsDef) {
 	coll.items.push(nsDef);
 },
 
+/**
+ * Find a namespace definition by URN.
+ * @param {string} urn
+ * @returns {CustomNamespace|undefined}
+ */
 lookupNamespace: function(urn) {
 	let coll = this;
 	urn = _.lc(urn);
@@ -123,13 +169,22 @@ lookupNamespace: function(urn) {
 	return nsDef;
 },
 
-
+/**
+ * Get the prefix string for a namespace URN.
+ * @param {string} urn
+ * @returns {string|undefined} e.g. 'haz:'
+ */
 lookupPrefix: function(urn) {
 	let coll = this;
 	let nsDef = coll.lookupNamespace(urn);
 	return nsDef && nsDef.prefix;
 },
 
+/**
+ * Get the URN for a given prefix.
+ * @param {string} prefix
+ * @returns {string|undefined}
+ */
 lookupNamespaceURI: function(prefix) {
 	let coll = this;
 	prefix = _.lc(prefix);
@@ -139,13 +194,25 @@ lookupNamespaceURI: function(prefix) {
 	return nsDef && nsDef.urn;
 },
 
+/**
+ * Return a prefixed tag name for a given URN.
+ * @param {string} name - Unprefixed tag name
+ * @param {string} urn - Namespace URN
+ * @returns {string}
+ */
 lookupTagNameNS: function(name, urn) {
 	let coll = this;
 	let nsDef = coll.lookupNamespace(urn);
-	if (!nsDef) return name; // TODO is this correct?
-	return nsDef.prefix + name; // TODO _.lc(name) ??
+	if (!nsDef) return name;
+	return nsDef.prefix + name;
 },
 
+/**
+ * Prefix a CSS selector for a given URN.
+ * @param {string} selector
+ * @param {string} urn
+ * @returns {string}
+ */
 lookupSelector: function(selector, urn) {
 	let nsDef = this.lookupNamespace(urn);
 	if (!nsDef) return selector;
