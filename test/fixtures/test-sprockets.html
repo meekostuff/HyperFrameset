@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html>
+<head><title>sprockets test</title></head>
+<body>
+<script type="module">
+import sprockets from '../../src/Meeko/sprockets.mjs';
+import Binding from '../../src/Meeko/Binding.mjs';
+import * as DOM from '../../src/Meeko/DOM.mjs';
+window.sprockets = sprockets;
+window.Binding = Binding;
+window.DOM = DOM;
+window.__ready = true;
+</script>
+</body>
+</html>
