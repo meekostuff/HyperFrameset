@@ -1,7 +1,14 @@
 import * as _ from './stuff.mjs';
 import Thenfu from './Thenfu.mjs';
 
-// wrapper for `history` mostly to provide locking around state-updates and throttling of popstate events
+/**
+ * Wrapper around the browser History API providing locking around state updates
+ * and throttling of popstate events via an internal scheduler.
+ * 
+ * Must be started with start() before use. Cannot be restarted.
+ * All state-changing methods are serialized through the scheduler to prevent
+ * concurrent history modifications.
+ */
 let historyManager = (function() {
 
 let historyManager = {};
@@ -13,10 +20,24 @@ let started = false;
 
 _.defaults(historyManager, {
 
+/**
+ * Get the current history state.
+ * @returns {State|undefined}
+ */
 getState: function() {
 	return currentState;
 },
 
+/**
+ * Initialize the history manager. Can only be called once.
+ * Replaces the current history entry and registers a popstate listener.
+ * @param {*} data - Application data to store in state
+ * @param {string} title - Page title
+ * @param {string} url - URL for the history entry
+ * @param {Function} onNewState - Called with the new State on initialization
+ * @param {Function} onPopState - Called with the restored State on popstate events
+ * @returns {Thenfu}
+ */
 start: function(data, title, url, onNewState, onPopState) { // FIXME this should call onPopState if history.state is defined
 return scheduler.now(function() {
 	if (started) throw Error('historyManager has already started');
@@ -31,6 +52,15 @@ return scheduler.now(function() {
 });
 },
 
+/**
+ * Create a new history entry or replace the current one.
+ * @param {*} data - Application data to store in state
+ * @param {string} title - Page title
+ * @param {string} url - URL for the history entry
+ * @param {boolean} useReplace - If true, replaces current entry instead of pushing
+ * @param {Function} [callback] - Called with the new State
+ * @returns {Thenfu}
+ */
 newState: function(data, title, url, useReplace, callback) {
 return scheduler.now(function() {
 	let newState = State.create(data, title, url);
@@ -43,10 +73,26 @@ return scheduler.now(function() {
 });
 },
 
+/**
+ * Replace the current history entry.
+ * @param {*} data
+ * @param {string} title
+ * @param {string} url
+ * @param {Function} [callback]
+ * @returns {Thenfu}
+ */
 replaceState: function(data, title, url, callback) {
 	return this.newState(data, title, url, true, callback);
 },
 
+/**
+ * Push a new history entry.
+ * @param {*} data
+ * @param {string} title
+ * @param {string} url
+ * @param {Function} [callback]
+ * @returns {Thenfu}
+ */
 pushState: function(data, title, url, callback) {
 	return this.newState(data, title, url, false, callback);
 }

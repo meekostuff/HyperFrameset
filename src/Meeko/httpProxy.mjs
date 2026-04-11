@@ -91,10 +91,24 @@ let httpProxy = (function() {
 	}
 
 
+	/**
+	 * HTTP client with response caching and HTML document parsing.
+	 * Fetches URLs via XMLHttpRequest, parses responses into DOM documents,
+	 * and caches GET responses by URL.
+	 */
 	let httpProxy = {
 
 		HTML_IN_XHR: HTML_IN_XHR,
 
+		/**
+		 * Add a pre-existing response to the cache.
+		 * The document is normalized (relative URLs resolved) before caching.
+		 * @param {Object} response
+		 * @param {string} response.url - The URL to cache under
+		 * @param {string} response.type - Response type ('document')
+		 * @param {Document} response.document - The document to cache
+		 * @returns {Thenfu} Resolves when caching is complete
+		 */
 		add: function (response) { // NOTE this is only for the landing page
 			let url = response.url;
 			if (!url) throw Error('Invalid url in response object');
@@ -116,6 +130,14 @@ let httpProxy = (function() {
 			]);
 		},
 
+		/**
+		 * Fetch a URL, returning a cached response if available.
+		 * @param {string} url - URL to fetch
+		 * @param {Object} [requestInfo]
+		 * @param {string} [requestInfo.method='get'] - HTTP method
+		 * @param {string} [requestInfo.responseType='document'] - Response type
+		 * @returns {Thenfu} Resolves with { url, type, status, statusText, document }
+		 */
 		load: function (url, requestInfo) {
 			let info = {
 				url: url

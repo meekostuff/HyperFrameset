@@ -20,7 +20,6 @@ Object.create - IE9+
 
 import * as _ from './stuff.mjs';
 import * as DOM from './DOM.mjs';
-import BindingDefinition from './BindingDefinition.mjs';
 
 
 let document = window.document;
