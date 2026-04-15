@@ -1,29 +1,5 @@
-import Thenfu from './Thenfu.mjs';
 import SimpleTaskQueue from './SimpleTaskQueue.mjs';
-
-const STATE_TAG = 'HyperFrameset';
-
-class State {
-	constructor(settings) {
-		if (!settings[STATE_TAG]) throw Error('Invalid settings for new State');
-		this.settings = settings;
-	}
-
-	static create(data, title, url) {
-		let settings = {
-			title: title,
-			url: url,
-			timeStamp: +(new Date),
-			data: data
-		};
-		settings[STATE_TAG] = true;
-		return new State(settings);
-	}
-
-	getData() {
-		return this.settings.data;
-	}
-}
+import HistoryState from './HistoryState.mjs';
 
 /**
  * Wrapper around the browser History API providing locking around state updates
@@ -46,12 +22,12 @@ constructor() {
 		else e.stopPropagation();
 
 		let newSettings = e.state;
-		if (!newSettings[STATE_TAG]) {
+		if (!HistoryState.isValid(newSettings)) {
 			console.warn('Ignoring invalid PopStateEvent');
 			return;
 		}
 		this.#taskQueue.reset(() => {
-			this.#currentState = new State(newSettings);
+			this.#currentState = new HistoryState(newSettings);
 			if (!this.#popStateHandler) return;
 			return this.#popStateHandler(this.#currentState);
 		});
@@ -60,7 +36,7 @@ constructor() {
 
 /**
  * Get the current history state.
- * @returns {State|undefined}
+ * @returns {HistoryState|undefined}
  */
 getState() {
 	return this.#currentState;
@@ -72,8 +48,8 @@ getState() {
  * @param {*} data - Application data to store in state
  * @param {string} title - Page title
  * @param {string} url - URL for the history entry
- * @param {Function} onNewState - Called with the new State on initialization
- * @param {Function} onPopState - Called with the restored State on popstate events
+ * @param {Function} onNewState - Called with the new HistoryState on initialization
+ * @param {Function} onPopState - Called with the restored HistoryState on popstate events
  * @returns {Thenfu}
  */
 start(data, title, url, onNewState, onPopState) { // FIXME this should call onPopState if history.state is defined
@@ -81,7 +57,7 @@ start(data, title, url, onNewState, onPopState) { // FIXME this should call onPo
 		if (this.#started) throw Error('historyManager has already started');
 		this.#started = true;
 		this.#popStateHandler = onPopState;
-		let newState = State.create(data, title, url);
+		let newState = HistoryState.create(data, title, url);
 		if (history.replaceState) {
 			history.replaceState(newState.settings, title, url);
 		}
@@ -96,12 +72,12 @@ start(data, title, url, onNewState, onPopState) { // FIXME this should call onPo
  * @param {string} title - Page title
  * @param {string} url - URL for the history entry
  * @param {boolean} useReplace - If true, replaces current entry instead of pushing
- * @param {Function} [callback] - Called with the new State
+ * @param {Function} [callback] - Called with the new HistoryState
  * @returns {Thenfu}
  */
 newState(data, title, url, useReplace, callback) {
 	return this.#taskQueue.now(() => {
-		let newState = State.create(data, title, url);
+		let newState = HistoryState.create(data, title, url);
 		if (history.replaceState) {
 			if (useReplace) history.replaceState(newState.settings, title, url);
 			else history.pushState(newState.settings, title, url);
