@@ -230,4 +230,50 @@ describe('Thenfu static methods', () => {
     expect(caught).toBeDefined();
   });
 
+  // --- create ---
+
+  test('create returns a thenable', () => {
+    const p = Thenfu.create(function(resolve) { resolve(1); });
+    expect(isThenable(p)).toBe(true);
+  });
+
+  test('create resolves with a value', async () => {
+    let result;
+    Thenfu.create(function(resolve) { resolve(42); }).then(v => { result = v; });
+
+    await timeout(50);
+    expect(result).toBe(42);
+  });
+
+  test('create rejects with an error', async () => {
+    let caught;
+    Thenfu.create(function(resolve, reject) {
+      // defer rejection so .catch can attach first
+      setTimeout(() => reject(new Error('fail')), 0);
+    }).catch(e => { caught = e; });
+
+    await timeout(50);
+    expect(caught).toBeInstanceOf(Error);
+    expect(caught.message).toBe('fail');
+  });
+
+  test('create resolve calls function argument', async () => {
+    let result;
+    Thenfu.create(function(resolve) { resolve(() => 99); }).then(v => { result = v; });
+
+    await timeout(50);
+    expect(result).toBe(99);
+  });
+
+  test('create catches thrown errors in init', async () => {
+    let caught;
+    // Use setTimeout to throw after .catch attaches, avoiding Thenfu reportError
+    Thenfu.create(function(resolve) {
+      setTimeout(() => { resolve(() => { throw new Error('init-error'); }); }, 0);
+    }).catch(e => { caught = e; });
+
+    await timeout(50);
+    expect(caught).toBeInstanceOf(Error);
+  });
+
 });

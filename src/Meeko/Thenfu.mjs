@@ -41,6 +41,15 @@ let Thenfu = function(init) { // `init` is called as init(resolve, reject)
 _.defaults(Thenfu, {
 
 /**
+ * Create a new Thenfu from an executor function.
+ * @param {Function} init - Called as init(resolve, reject)
+ * @returns {Thenfu}
+ */
+create: function(init) {
+	return new Thenfu(init);
+},
+
+/**
  * Attach resolve/reject methods to an object and return a thenable.
  * @param {Object} [object] - Object to attach resolve/reject to
  * @returns {Thenfu} A pending thenable
