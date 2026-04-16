@@ -63,7 +63,7 @@ reset(fn) {
  */
 whenever(fn, fail, max) {
 	if (max == null) max = this.#maxSize;
-	return new Thenfu((resolve, reject) => {
+	return Thenfu.create((resolve, reject) => {
 		if (this.#queue.length > max || (this.#queue.length === max && this.#processing)) {
 			if (fail) Thenfu.defer(fail).then(resolve, reject);
 			else reject(function() { throw Error('No `fail` callback passed to whenever()'); });

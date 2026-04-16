@@ -37,8 +37,8 @@ let testScript = document.createElement('script'),
 let scriptQueue = {
 
 push: function(node) {
-return new Thenfu(function(resolve, reject) {
-	if (emptying) throw Error('Attempt to append script to scriptQueue while emptying');
+	return Thenfu.create(function(resolve, reject) {
+		if (emptying) throw Error('Attempt to append script to scriptQueue while emptying');
 	
 	// TODO assert node is in document
 
@@ -135,7 +135,7 @@ return new Thenfu(function(resolve, reject) {
 },
 
 empty: function() {
-return new Thenfu(function(resolve, reject) {
+	return Thenfu.create(function(resolve, reject) {
 	
 	emptying = true;
 	if (queue.length <= 0) {

@@ -286,7 +286,7 @@ function isVisible(element) {
 
 
 function whenVisible(element) { // FIXME this quite possibly causes leaks if closestHidden is removed from document before removeEventListener
-	return new Thenfu(function(resolve, reject) {
+	return Thenfu.create(function(resolve, reject) {
 		let closestHidden = closest(element, '[hidden]');
 		if (!closestHidden) {
 			resolve();

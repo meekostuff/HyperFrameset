@@ -56,7 +56,7 @@ create: function(init) {
  */
 applyTo: function(object) {
 	let resolver = {}
-	let promise = new Thenfu(function(resolve, reject) {
+	let promise = Thenfu.create(function(resolve, reject) {
 		resolver.resolve = resolve;
 		resolver.reject = reject;
 	});
@@ -260,7 +260,7 @@ resolve: function(value) {
  * @returns {Thenfu}
  */
 reject: function(error) { // FIXME should never be used
-return new Thenfu(function(resolve, reject) {
+return Thenfu.create(function(resolve, reject) {
 	reject(error);
 });
 }
@@ -332,7 +332,7 @@ function asap(value) {
 	if (Thenfu.isThenable(value)) return Thenfu.resolve(value); // will defer
 	if (typeof value === 'function') {
 		if (Task.getTime(true) <= 0) return Thenfu.resolve().then(value);
-		return new Thenfu(function(resolve) { resolve(value); }); // WARN relies on Meeko.Thenfu behavior
+		return Thenfu.create(function(resolve) { resolve(value); }); // WARN relies on Meeko.Thenfu behavior
 	}
 	// NOTE otherwise we have a non-thenable, non-function something
 	if (Task.getTime(true) <= 0) return Thenfu.resolve(value).then(); // will defer
@@ -360,7 +360,7 @@ function defer(value) {
  * @returns {Thenfu}
  */
 function delay(timeout) {
-	return new Thenfu(function(resolve, reject) {
+	return Thenfu.create(function(resolve, reject) {
 		if (timeout <= 0 || timeout == null) Task.defer(resolve);
 		else Task.delay(resolve, timeout);
 	});
@@ -390,7 +390,7 @@ function pipe(startValue, fnList) {
  * @returns {Thenfu}
  */
 function reduce(accumulator, a, fn, context) {
-return new Thenfu(function(resolve, reject) {
+return Thenfu.create(function(resolve, reject) {
 	let length = a.length;
 	let i = 0;
 
