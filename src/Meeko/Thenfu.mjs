@@ -74,6 +74,15 @@ isThenable: function(value) {
 	return value !== null &&
 		(typeof value === 'object' || typeof value === 'function') &&
 		typeof value.then === 'function';
+},
+
+/**
+ * Execute a function and return a thenable for its result.
+ * @param {Function} fn - Function to execute
+ * @returns {Thenfu} A thenable that resolves with the function's result or rejects with any thrown error
+ */
+try: function(fn) {
+	return Thenfu.resolve().then(fn);
 }
 
 });
@@ -148,7 +157,7 @@ _reject: function(error, sync) { // NOTE equivalent to 'reject algorithm'. Exter
 	promise.isRejected = true;
 	promise.reason = error;
 	if (!promise._willCatch) {
-		reportError(error);
+		reportUnhandledRejection(error, promise);
 	}
 	else promise._requestProcessing(sync);
 },
@@ -442,6 +451,14 @@ return Thenfu.create(function(resolve, reject) {
 		resolve(acc);
 	}
 });
+}
+
+function reportUnhandledRejection(error, thenable) {
+	let event = new Event("unhandledrejection", { cancelable: true });
+	event.reason = error;
+	event.promise = thenable;
+	let performDefault = window.dispatchEvent(event);
+	if (performDefault) window.reportError(error);
 }
 
 function TimeoutPredictor(max, mult) { // FIXME test args are valid

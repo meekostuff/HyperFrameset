@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeEach } from 'vitest';
+import { describe, test, expect, beforeEach, afterEach, vi } from 'vitest';
 
 const timeout = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 const isThenable = (v) => v != null && typeof v.then === 'function';
@@ -9,6 +9,85 @@ describe('Thenfu static methods', () => {
   beforeEach(async () => {
     const mod = await import('../src/Meeko/Thenfu.mjs');
     Thenfu = mod.default;
+  });
+
+  // --- Error handling verification ---
+  let unhandledRejections = [];
+  let rejectionHandler;
+
+  beforeEach(() => {
+    unhandledRejections = [];
+    rejectionHandler = (event) => {
+      unhandledRejections.push(event.reason);
+      event.preventDefault(); // Prevent Vitest from treating as test failure
+    };
+    window.addEventListener('unhandledrejection', rejectionHandler);
+  });
+
+  afterEach(() => {
+    window.removeEventListener('unhandledrejection', rejectionHandler);
+  });
+
+  test('uncaught errors in then() are logged to console', async () => {
+    Thenfu.resolve(42).then(() => {
+      throw new Error('uncaught error');
+    });
+
+    await timeout(100);
+    expect(unhandledRejections).toHaveLength(1);
+    expect(unhandledRejections[0].message).toBe('uncaught error');
+  });
+
+  test('errors caught with catch() do not reach console', async () => {
+    let caughtError;
+    
+    Thenfu.resolve(42)
+      .then(() => { throw new Error('caught error'); })
+      .catch(e => { caughtError = e; });
+
+    await timeout(100);
+    expect(caughtError.message).toBe('caught error');
+    expect(unhandledRejections).toHaveLength(0); // Should not be unhandled
+  });
+
+  test('errors in try() without catch are logged to console', async () => {
+    Thenfu.try(() => {
+      throw new Error('try error');
+    });
+
+    await timeout(100);
+    expect(unhandledRejections).toHaveLength(1);
+    expect(unhandledRejections[0].message).toBe('try error');
+  });
+
+  test('nested promise chain errors are handled', async () => {
+    Thenfu.resolve(1)
+      .then(() => Thenfu.resolve(2))
+      .then(() => {
+        throw new Error('nested error');
+      });
+
+    await timeout(100);
+    expect(unhandledRejections).toHaveLength(1);
+    expect(unhandledRejections[0].message).toBe('nested error');
+  });
+
+  test('Thenfu.reject() without catch is logged to console', async () => {
+    Thenfu.reject(new Error('rejected error'));
+
+    await timeout(100);
+    expect(unhandledRejections).toHaveLength(1);
+    expect(unhandledRejections[0].message).toBe('rejected error');
+  });
+
+  test('reject() in constructor without catch is logged to console', async () => {
+    Thenfu.create((resolve, reject) => {
+      reject(new Error('constructor reject error'));
+    });
+
+    await timeout(100);
+    expect(unhandledRejections).toHaveLength(1);
+    expect(unhandledRejections[0].message).toBe('constructor reject error');
   });
 
   // --- resolve ---
@@ -39,6 +118,30 @@ describe('Thenfu static methods', () => {
     expect(Thenfu.isThenable(42)).toBe(false);
     expect(Thenfu.isThenable(null)).toBe(false);
     expect(Thenfu.isThenable('str')).toBe(false);
+  });
+
+  // --- try ---
+
+  test('try executes function and returns result', async () => {
+    let result;
+    Thenfu.try(() => 42).then(v => { result = v; });
+
+    await timeout(50);
+    expect(result).toBe(42);
+  });
+
+  test('try catches thrown errors', async () => {
+    let error;
+    Thenfu.try(() => { throw new Error('test error'); })
+      .catch(e => { error = e; });
+
+    await timeout(50);
+    expect(error.message).toBe('test error');
+  });
+
+  test('try returns thenable', () => {
+    const result = Thenfu.try(() => 42);
+    expect(Thenfu.isThenable(result)).toBe(true);
   });
 
   // --- Non-blocking behavior ---
