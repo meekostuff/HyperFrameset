@@ -404,7 +404,7 @@ return Thenfu.create(function(resolve, reject) {
 	let i = 0;
 
 	let predictor = new TimeoutPredictor(256, 2);
-	process(accumulator);
+	Task.asap(() => process(accumulator));
 	return;
 
 	function process(acc) {
@@ -414,14 +414,11 @@ return Thenfu.create(function(resolve, reject) {
 
 		while (i < length) {
 			if (Thenfu.isThenable(acc)) {
-				if (!(acc instanceof Thenfu) || !acc.isFulfilled) {
 					acc.then(process, reject);
 					if (j <= 0 || !prevTime || i >= length) return;
 					let currTime = Task.getTime(true);
 					predictor.update(j, prevTime - currTime);
 					return;
-				}
-				/* else */ acc = acc.value;
 			}
 			try {
 				acc = fn.call(context, acc, a[i], i, a);

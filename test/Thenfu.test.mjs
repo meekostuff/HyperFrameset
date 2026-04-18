@@ -305,22 +305,58 @@ describe('Thenfu static methods', () => {
 
   test('reduce accumulates values sequentially', async () => {
     let result;
-    Thenfu.reduce(0, [1, 2, 3, 4], (acc, val) => acc + val)
+    let order = [];
+    Thenfu.reduce(0, [1, 2, 3, 4], (acc, val) => { order.push(val); return acc + val; })
       .then(v => { result = v; });
 
-    await timeout(100);
+    await timeout(50);
+    expect(order).toStrictEqual([1, 2, 3, 4]);
     expect(result).toBe(10);
   });
 
-  test('reduce is non-blocking for large arrays', async () => {
-    const arr = Array.from({ length: 10000 }, (_, i) => i);
+  // Test that reduce doesn't block requestAnimationFrame by counting frames during processing
+  test('reduce does not block animation frames', async () => {
+    let frameCount = 0;
+    
+    function countFrames() {
+      frameCount++;
+      requestAnimationFrame(countFrames);
+    }
+    requestAnimationFrame(countFrames);
+    
+    const fragment = document.createDocumentFragment();
+    const arr = new Array(100).fill(1);
+    
+    const result = await Thenfu.reduce(fragment, arr, (frag, val) => {
+      const start = performance.now();
+      while (performance.now() - start < 1) { /* busy wait 1ms */ }
+      const div = document.createElement('div');
+      div.textContent = performance.now();
+      frag.appendChild(div);
+      return frag;
+    });
+    
+    expect(result.children.length).toBe(100);
+    expect(frameCount).toBeGreaterThanOrEqual(2);
+  });
+
+  test('reduce handles callbacks that return thenables', async () => {
     let result;
+    let order = [];
+    
+    Thenfu.reduce(0, [1, 2, 3], (acc, val) => {
+      order.push(`start-${val}`);
+      return Thenfu.resolve(acc + val).then(sum => {
+        order.push(`end-${val}`);
+        return sum;
+      });
+    }).then(v => { result = v; });
 
-    Thenfu.reduce(0, arr, (acc, val) => acc + val)
-      .then(v => { result = v; });
+    expect(order).toHaveLength(0);
 
-    await timeout(200);
-    expect(result).toBe(49995000);
+    await timeout(50);
+    expect(result).toBe(6);
+    expect(order).toStrictEqual([ 'start-1', 'end-1', 'start-2', 'end-2', 'start-3', 'end-3']);
   });
 
   test('reject delivers error via catch', async () => {
