@@ -403,47 +403,30 @@ return Thenfu.create(function(resolve, reject) {
 	let length = a.length;
 	let i = 0;
 
-	let predictor = new TimeoutPredictor(256, 2);
 	Task.asap(() => process(accumulator));
 	return;
 
 	function process(acc) {
-		let prevTime;
-		let j = 0;
-		let timeoutCount = 1;
-
 		while (i < length) {
 			if (Thenfu.isThenable(acc)) {
 					acc.then(process, reject);
-					if (j <= 0 || !prevTime || i >= length) return;
-					let currTime = Task.getTime(true);
-					predictor.update(j, prevTime - currTime);
 					return;
 			}
 			try {
 				acc = fn.call(context, acc, a[i], i, a);
-				i++; j++;
+				i++;
 			}
 			catch (error) {
 				reject(error);
 				return;
 			}
 			if (i >= length) break;
-			if (j < timeoutCount) continue;
 
-			// update timeout counter data
 			let currTime = Task.getTime(true); // NOTE *remaining* time
-			if (prevTime) predictor.update(j, prevTime - currTime); // NOTE based on *remaining* time
 			if (currTime <= 0) {
-				// Could use Promise.resolve(acc).then(process, reject)
-				// ... but this is considerably quicker
-				// FIXME ... although with TimeoutPredictor maybe it doesn't matter
 				Task.asap(function() { process(acc); });
 				return;
 			}
-			j = 0;
-			timeoutCount = predictor.getTimeoutCount(currTime);
-			prevTime = currTime;
 		}
 		resolve(acc);
 	}
@@ -457,46 +440,6 @@ function reportUnhandledRejection(error, thenable) {
 	let performDefault = window.dispatchEvent(event);
 	if (performDefault) window.reportError(error);
 }
-
-function TimeoutPredictor(max, mult) { // FIXME test args are valid
-	if (!(this instanceof TimeoutPredictor)) return new TimeoutPredictor(max, mult);
-	let predictor = this;
-	_.assign(predictor, {
-		count: 0,
-		totalTime: 0,
-		currLimit: 1,
-		absLimit: !max ? 256 : max < 1 ? 1 : max,
-		multiplier: !mult ? 2 : mult < 1 ? 1 : mult
-	});
-}
-
-_.assign(TimeoutPredictor.prototype, {
-
-update: function(count, delta) {
-	let predictor = this;
-	predictor.count += count;
-	predictor.totalTime += delta;
-},
-
-getTimeoutCount: function(remainingTime) {
-	let predictor = this;
-	if (predictor.count <= 0) return 1;
-	let avgTime = predictor.totalTime / predictor.count;
-	let n = Math.floor( remainingTime / avgTime );
-	if (n <= 0) return 1;
-	if (n < predictor.currLimit) return n;
-	n = predictor.currLimit;
-	if (predictor.currLimit >= predictor.absLimit) return n;
-	predictor.currLimit = predictor.multiplier * predictor.currLimit;
-	if (predictor.currLimit < predictor.absLimit) return n;
-	predictor.currLimit = predictor.absLimit;
-	// FIXME do methods other than reduce() use TimeoutPredictor??
-	console.debug('Promise.reduce() hit absLimit: ', predictor.absLimit);
-	return n;
-}
-
-
-});
 
 _.defaults(Thenfu, {
 	asap: asap, defer: defer, delay: delay, wait: wait, pipe: pipe, reduce: reduce

@@ -317,12 +317,13 @@ describe('Thenfu static methods', () => {
   // Test that reduce doesn't block requestAnimationFrame by counting frames during processing
   test('reduce does not block animation frames', async () => {
     let frameCount = 0;
+    let rafHandle;
     
     function countFrames() {
       frameCount++;
-      requestAnimationFrame(countFrames);
+      if (frameCount < 10) rafHandle = requestAnimationFrame(countFrames);
     }
-    requestAnimationFrame(countFrames);
+    rafHandle = requestAnimationFrame(countFrames);
     
     const fragment = document.createDocumentFragment();
     const arr = new Array(100).fill(1);
@@ -336,8 +337,36 @@ describe('Thenfu static methods', () => {
       return frag;
     });
     
+    cancelAnimationFrame(rafHandle);
     expect(result.children.length).toBe(100);
     expect(frameCount).toBeGreaterThanOrEqual(2);
+  });
+
+  // Test that reduce progresses at least one element per frame even with slow callbacks
+  test('reduce progresses at least one element per frame', async () => {
+    let frameCount = 0;
+    let processedCount = 0;
+    let rafHandle;
+    
+    function countFrames() {
+      frameCount++;
+      if (frameCount < 5) rafHandle = requestAnimationFrame(countFrames);
+    }
+    rafHandle = requestAnimationFrame(countFrames);
+
+    const arr = new Array(3).fill(1);
+    
+    const result = await Thenfu.reduce(0, arr, (acc, val) => {
+      processedCount++;
+      const start = performance.now();
+      while (performance.now() - start < 50) { /* busy wait 50ms */ }
+      return acc + val;
+    });
+    
+    cancelAnimationFrame(rafHandle);
+    expect(result).toBe(3);
+    expect(processedCount).toBe(3);
+    expect(frameCount).toBeLessThanOrEqual(4); // There may have been a frame before processing started.
   });
 
   test('reduce handles callbacks that return thenables', async () => {
