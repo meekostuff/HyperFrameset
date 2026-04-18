@@ -13,6 +13,9 @@
     "test:firefox": "vitest run --browser --browser.name=firefox",
     "test:safari": "vitest run --browser --browser.name=webkit",
     "test:e2e": "npx playwright test",
+    "test:e2e:chrome": "npx playwright test --project=chromium",
+    "test:e2e:firefox": "npx playwright test --project=firefox",
+    "test:e2e:safari": "npx playwright test --project=webkit",
     "build": "rollup -c",
     "demo": "node server.js",
     "demo:stop": "pkill -f 'node server.js' || echo 'No demo server running'"
