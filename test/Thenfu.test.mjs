@@ -139,6 +139,39 @@ describe('Thenfu static methods', () => {
     expect(Thenfu.isThenable(result)).toBe(true);
   });
 
+  test('try accepts parameters', async () => {
+    const result = await Thenfu.try((a, b) => a + b, 5, 3);
+    expect(result).toBe(8);
+  });
+
+  test('try waits for promise parameters', async () => {
+    const p1 = Promise.resolve(10);
+    const p2 = Promise.resolve(20);
+    const result = await Thenfu.try((a, b) => a * b, p1, p2);
+    expect(result).toBe(200);
+  });
+
+  test('try rejects if parameter promise rejects', async () => {
+    const p1 = Promise.resolve(5);
+    const p2 = Promise.reject(new Error('param error'));
+    
+    try {
+      await Thenfu.try((a, b) => a + b, p1, p2);
+      expect.fail('Should have thrown');
+    } catch (error) {
+      expect(error.message).toBe('param error');
+    }
+  });
+
+  test('try rejects if function throws', async () => {
+    try {
+      await Thenfu.try(() => { throw new Error('fn error'); });
+      expect.fail('Should have thrown');
+    } catch (error) {
+      expect(error.message).toBe('fn error');
+    }
+  });
+
   test('withResolvers returns promise with exposed resolvers', async () => {
     const { promise, resolve, reject } = Thenfu.withResolvers();
     
