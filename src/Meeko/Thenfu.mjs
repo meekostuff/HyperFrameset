@@ -66,15 +66,9 @@ isThenable: function(value) {
  * @returns {Promise} A thenable that resolves with the function's result or rejects with any thrown error
  */
 try: function(fn, ...params) {
-	let { promise, resolve, reject } = Thenfu.withResolvers();
-	Task.asap(async () => {
-		try {
-			const resolvedParams = await Promise.all(params);
-			resolve(fn(...resolvedParams));
-		}
-		catch (ex) { reject(ex); }
-	});
-	return promise;
+	return Promise.all(params).then(resolvedParams => 
+		Thenfu.asap(() => fn(...resolvedParams))
+	);
 }
 
 });
