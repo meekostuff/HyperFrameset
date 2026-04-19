@@ -107,7 +107,7 @@ let httpProxy = (function() {
 		 * @param {string} response.url - The URL to cache under
 		 * @param {string} response.type - Response type ('document')
 		 * @param {Document} response.document - The document to cache
-		 * @returns {Thenfu} Resolves when caching is complete
+		 * @returns {Promise} Resolves when caching is complete
 		 */
 		add: function (response) { // NOTE this is only for the landing page
 			let url = response.url;
@@ -136,7 +136,7 @@ let httpProxy = (function() {
 		 * @param {Object} [requestInfo]
 		 * @param {string} [requestInfo.method='get'] - HTTP method
 		 * @param {string} [requestInfo.responseType='document'] - Response type
-		 * @returns {Thenfu} Resolves with { url, type, status, statusText, document }
+		 * @returns {Promise} Resolves with { url, type, status, statusText, document }
 		 */
 		load: function (url, requestInfo) {
 			let info = {

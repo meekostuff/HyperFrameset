@@ -1,58 +1,28 @@
 /*
  ### Thenfu
- This is an enhanced Promise implementation but it defers to allow animation.
- WARN: This was based on early DOM Futures specification. This has been evolved towards ES6 Promises.
+ Frame-aware asynchronous utilities for non-blocking operations.
+ Provides static methods for creating and managing promises that respect animation frame budgets.
  */
 
 import * as _ from './stuff.mjs';
 import Task from './Task.mjs';
 
-let Thenfu = function(init) { // `init` is called as init(resolve, reject)
-	if (!(this instanceof Thenfu)) return new Thenfu(init);
-	
-	let promise = this;
-	promise._initialize();
-
-	try { init(resolve, reject); }
-	catch(error) { reject(error); }
-
-	// NOTE promise is returned by `new` invocation but anyway
-	return promise;
-
-	// The following are hoisted
-	function resolve(result) {
-		if (typeof result !== 'function') {
-			promise._resolve(result);
-			return;
-		}
-		try { promise._resolve(result()); }
-		catch (err) { promise._reject(err); }
-	}
-	function reject(error) {
-		if (typeof error !== 'function') {
-			promise._reject(error);
-			return;
-		}
-		try { promise._reject(error()); }
-		catch (err) { promise._reject(err); }
-	}
-}
-
+let Thenfu = {}
 _.defaults(Thenfu, {
 
 /**
- * Create a new Thenfu from an executor function.
+ * Create a new Promise from an executor function.
  * @param {Function} init - Called as init(resolve, reject)
- * @returns {Thenfu}
+ * @returns {Promise}
  */
 create: function(init) {
-	return new Thenfu(init);
+	return new Promise(init);
 },
 
 /**
  * Attach resolve/reject methods to an object and return a thenable.
  * @param {Object} [object] - Object to attach resolve/reject to
- * @returns {Thenfu} A pending thenable
+ * @returns {Promise} A pending thenable
  */
 applyTo: function(object) {
 	let resolver = {}
@@ -67,7 +37,7 @@ applyTo: function(object) {
 
 /**
  * Create a thenable with exposed resolve and reject functions.
- * @returns {{promise: Thenfu, resolve: Function, reject: Function}}
+ * @returns {{promise: Promise, resolve: Function, reject: Function}}
  */
 withResolvers: function() {
 	let resolve, reject;
@@ -92,7 +62,7 @@ isThenable: function(value) {
 /**
  * Execute a function and return a thenable for its result.
  * @param {Function} fn - Function to execute
- * @returns {Thenfu} A thenable that resolves with the function's result or rejects with any thrown error
+ * @returns {Promise} A thenable that resolves with the function's result or rejects with any thrown error
  */
 try: function(fn) {
 	let { promise, resolve, reject } = Thenfu.withResolvers();
@@ -104,154 +74,6 @@ try: function(fn) {
 }
 
 });
-
-_.defaults(Thenfu.prototype, {
-
-_initialize: function() {
-	let promise = this;
-	_.defaults(promise, {
-		/* 
-			use lazy creation for callback lists - 
-			with synchronous inspection they may never be called
-		// _fulfilCallbacks: [],
-		// _rejectCallbacks: [],
-		*/
-		isPending: true,
-		isFulfilled: false,
-		isRejected: false,
-		value: undefined,
-		reason: undefined,
-		_willCatch: false,
-		_processing: false
-	});
-},
-
-/*
-See https://github.com/promises-aplus/synchronous-inspection-spec/issues/6 and
-https://github.com/petkaantonov/bluebird/blob/master/API.md#synchronous-inspection
-*/
-inspectState: function() { 
-	return this;
-},
-
-_fulfil: function(result, sync) { // NOTE equivalent to 'fulfil algorithm'. External calls MUST NOT use sync
-	let promise = this;
-	if (!promise.isPending) return;
-	promise.isPending = false;
-	promise.isRejected = false;
-	promise.isFulfilled = true;
-	promise.value = result;
-	promise._requestProcessing(sync);
-},
-
-_resolve: function(value, sync) { // NOTE equivalent to 'resolve algorithm'. External calls MUST NOT use sync
-	let promise = this;
-	if (!promise.isPending) return;
-	if (value instanceof Thenfu && !value.isPending) {
-		if (value.isFulfilled) promise._fulfil(value.value, sync);
-		else /* if (value.isRejected) */ promise._reject(value.reason, sync);
-		return;
-	}
-	/* else */ if (Thenfu.isThenable(value)) {
-		try {
-			value.then(
-				function(result) { promise._resolve(result, true); },
-				function(error) { promise._reject(error, true); }
-			);
-		}
-		catch(error) {
-			promise._reject(error, sync);
-		}
-		return;
-	}
-	/* else */ promise._fulfil(value, sync);
-},
-
-_reject: function(error, sync) { // NOTE equivalent to 'reject algorithm'. External calls MUST NOT use sync
-	let promise = this;
-	if (!promise.isPending) return;
-	promise.isPending = false;
-	promise.isFulfilled = false;
-	promise.isRejected = true;
-	promise.reason = error;
-	if (!promise._willCatch) {
-		reportUnhandledRejection(error, promise);
-	}
-	else promise._requestProcessing(sync);
-},
-
-_requestProcessing: function(sync) { // NOTE schedule callback processing. TODO may want to disable sync option
-	let promise = this;
-	if (promise.isPending) return;
-	if (!promise._willCatch) return;
-	if (promise._processing) return;
-	if (sync) {
-		promise._processing = true;
-		promise._process();
-		promise._processing = false;
-	}
-	else {
-		Task.asap(function() {
-			promise._processing = true;
-			promise._process();
-			promise._processing = false;
-		});
-	}
-},
-
-_process: function() { // NOTE process a promises callbacks
-	let promise = this;
-	let result;
-	let callbacks, cb;
-	if (promise.isFulfilled) {
-		result = promise.value;
-		callbacks = promise._fulfilCallbacks;
-	}
-	else {
-		result = promise.reason;
-		callbacks = promise._rejectCallbacks;
-	}
-
-	// NOTE callbacks may not exist
-	delete promise._fulfilCallbacks;
-	delete promise._rejectCallbacks;
-	if (callbacks) while (callbacks.length) {
-		cb = callbacks.shift();
-		if (typeof cb === 'function') cb(result);
-	}
-},
-
-then: function(fulfilCallback, rejectCallback) {
-	let promise = this;
-	return new Thenfu(function(resolve, reject) {
-		let fulfilWrapper = fulfilCallback ?
-			wrapResolve(fulfilCallback, resolve, reject) :
-			function(value) { resolve(value); }
-	
-		let rejectWrapper = rejectCallback ?
-			wrapResolve(rejectCallback, resolve, reject) :
-			function(error) { reject(error); }
-	
-		if (!promise._fulfilCallbacks) promise._fulfilCallbacks = [];
-		if (!promise._rejectCallbacks) promise._rejectCallbacks = [];
-		
-		promise._fulfilCallbacks.push(fulfilWrapper);
-		promise._rejectCallbacks.push(rejectWrapper);
-	
-		promise._willCatch = true;
-	
-		promise._requestProcessing();
-		
-	});
-},
-
-'catch': function(rejectCallback) { // WARN 'catch' is unexpected identifier in IE8-
-	let promise = this;
-	return promise.then(undefined, rejectCallback);
-}
-
-});
-
 
 /* Functional composition wrapper for `then` */
 function wrapResolve(callback, resolve, reject) {
@@ -265,12 +87,6 @@ function wrapResolve(callback, resolve, reject) {
 	}
 }
 
-
-_.defaults(Thenfu, {
-
-});
-
-
 /*
  ### Async functions
    wait(test) waits until test() returns true
@@ -281,7 +97,7 @@ _.defaults(Thenfu, {
 /**
  * Poll a test function until it returns true.
  * @param {Function} fn - Test function
- * @returns {Thenfu}
+ * @returns {Promise}
  */
 let wait = (function() {
 	
@@ -324,7 +140,7 @@ return wait;
 /**
  * Return a thenable that executes immediately if frame time is available, defers otherwise.
  * @param {*} value - A function, thenable, or value
- * @returns {Thenfu}
+ * @returns {Promise}
  */
 function asap(value) {
 	let resolver = Thenfu.withResolvers();
@@ -342,7 +158,7 @@ function asap(value) {
 /**
  * Always defer execution to the next frame.
  * @param {*} value - A function, thenable, or value
- * @returns {Thenfu}
+ * @returns {Promise}
  */
 function defer(value) {
 	let resolver = Thenfu.withResolvers();
@@ -374,7 +190,7 @@ function settle({ resolve, reject }, value) {
 /**
  * Return a thenable that fulfils after a minimum timeout.
  * @param {number} timeout - Minimum delay in milliseconds
- * @returns {Thenfu}
+ * @returns {Promise}
  */
 function delay(timeout) {
 	let { promise, resolve, reject } = Thenfu.withResolvers();
@@ -387,7 +203,7 @@ function delay(timeout) {
  * Chain functions sequentially, passing each result to the next.
  * @param {*} startValue - Initial value
  * @param {Function[]} fnList - Functions to chain
- * @returns {Thenfu}
+ * @returns {Promise}
  */
 function pipe(startValue, fnList) {
 	let promise = Thenfu.asap(startValue);
@@ -404,7 +220,7 @@ function pipe(startValue, fnList) {
  * @param {Array} a - Array to reduce
  * @param {Function} fn - Reducer function(acc, val, i, arr)
  * @param {*} [context] - `this` context for fn
- * @returns {Thenfu}
+ * @returns {Promise}
  */
 function reduce(accumulator, a, fn, context) {
 return Thenfu.create(function(resolve, reject) {

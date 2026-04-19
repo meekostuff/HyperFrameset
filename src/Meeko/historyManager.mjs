@@ -50,7 +50,7 @@ getState() {
  * @param {string} url - URL for the history entry
  * @param {Function} onNewState - Called with the new HistoryState on initialization
  * @param {Function} onPopState - Called with the restored HistoryState on popstate events
- * @returns {Thenfu}
+ * @returns {Promise}
  */
 start(data, title, url, onNewState, onPopState) { // FIXME this should call onPopState if history.state is defined
 	return this.#taskQueue.now(() => {
@@ -73,7 +73,7 @@ start(data, title, url, onNewState, onPopState) { // FIXME this should call onPo
  * @param {string} url - URL for the history entry
  * @param {boolean} useReplace - If true, replaces current entry instead of pushing
  * @param {Function} [callback] - Called with the new HistoryState
- * @returns {Thenfu}
+ * @returns {Promise}
  */
 newState(data, title, url, useReplace, callback) {
 	return this.#taskQueue.now(() => {
@@ -93,7 +93,7 @@ newState(data, title, url, useReplace, callback) {
  * @param {string} title
  * @param {string} url
  * @param {Function} [callback]
- * @returns {Thenfu}
+ * @returns {Promise}
  */
 replaceState(data, title, url, callback) {
 	return this.newState(data, title, url, true, callback);
@@ -105,7 +105,7 @@ replaceState(data, title, url, callback) {
  * @param {string} title
  * @param {string} url
  * @param {Function} [callback]
- * @returns {Thenfu}
+ * @returns {Promise}
  */
 pushState(data, title, url, callback) {
 	return this.newState(data, title, url, false, callback);

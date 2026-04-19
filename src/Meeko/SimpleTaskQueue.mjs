@@ -38,7 +38,7 @@ constructor(maxSize = 1) {
  * Queue a task to run as soon as possible. Fails if the queue is non-empty.
  * @param {Function} fn - Task function to execute
  * @param {Function} [fail] - Called if the queue is full
- * @returns {Thenfu} Resolves with fn's return value, or rejects if full and no fail callback
+ * @returns {Promise} Resolves with fn's return value, or rejects if full and no fail callback
  */
 now(fn, fail) {
 	return this.whenever(fn, fail, 0);
@@ -47,7 +47,7 @@ now(fn, fail) {
 /**
  * Clear the queue and schedule a task.
  * @param {Function} fn - Task function to execute
- * @returns {Thenfu} Resolves with fn's return value
+ * @returns {Promise} Resolves with fn's return value
  */
 reset(fn) {
 	this.#queue.length = 0;
@@ -59,7 +59,7 @@ reset(fn) {
  * @param {Function} fn - Task function to execute
  * @param {Function} [fail] - Called if the queue is full
  * @param {number} [max] - Override for maximum queue size (defaults to constructor maxSize)
- * @returns {Thenfu} Resolves with fn's return value, or rejects if full and no fail callback
+ * @returns {Promise} Resolves with fn's return value, or rejects if full and no fail callback
  */
 whenever(fn, fail, max) {
 	if (max == null) max = this.#maxSize;
