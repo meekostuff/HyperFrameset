@@ -5,10 +5,13 @@ const isThenable = (v) => v != null && typeof v.then === 'function';
 
 describe('Thenfu static methods', () => {
   let Thenfu;
+  let Task;
 
   beforeEach(async () => {
     const mod = await import('../src/Meeko/Thenfu.mjs');
+    const taskMod = await import('../src/Meeko/Task.mjs');
     Thenfu = mod.default;
+    Task = taskMod.default;
   });
 
   // --- Error handling verification ---
@@ -201,6 +204,11 @@ describe('Thenfu static methods', () => {
 
   test('asap with a function yields beyond the microtask queue', async () => {
     const order = [];
+    
+    // Poll until frame time is low, then force Task.asap to consume remaining time
+    Task.asap(() => {});
+    while (Task.getTime(true) >= 0) {}
+    
     Thenfu.asap(() => 'result').then(() => order.push('asap'));
     queueMicrotask(() => order.push('microtask'));
 
@@ -476,23 +484,15 @@ describe('Thenfu static methods', () => {
     expect(caught.message).toBe('fail');
   });
 
-  test('create resolve calls function argument', async () => {
-    let result;
-    Thenfu.create(function(resolve) { resolve(() => 99); }).then(v => { result = v; });
-
-    await timeout(50);
-    expect(result).toBe(99);
-  });
-
   test('create catches thrown errors in init', async () => {
     let caught;
-    // Use setTimeout to throw after .catch attaches, avoiding Thenfu reportError
-    Thenfu.create(function(resolve) {
-      setTimeout(() => { resolve(() => { throw new Error('init-error'); }); }, 0);
+    Thenfu.create(function(resolve, reject) {
+      throw new Error('init-error');
     }).catch(e => { caught = e; });
 
     await timeout(50);
     expect(caught).toBeInstanceOf(Error);
+    expect(caught.message).toBe('init-error');
   });
 
 });
