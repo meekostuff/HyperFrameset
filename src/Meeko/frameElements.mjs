@@ -106,7 +106,7 @@ refresh: function() {
 	let element = this.element;
 	let src = frame.attr('src');
 
-	return Thenfu.resolve().then(function() {
+	return Thenfu.asap().then(function() {
 
 		if (src == null) { // a non-src frame
 			return frame.load(null, { condition: 'loaded' });

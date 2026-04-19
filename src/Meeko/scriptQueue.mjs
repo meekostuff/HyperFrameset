@@ -80,7 +80,7 @@ push: function(node) {
 		if (prevScript.hasAttribute('async') || script.src && supportsSync && !script.hasAttribute('async')) triggerFu = prev.enabled;
 		else triggerFu = prev.complete; 
 	}
-	else triggerFu = Thenfu.resolve();
+	else triggerFu = Thenfu.asap();
 	
 	triggerFu.then(enable, enable);
 

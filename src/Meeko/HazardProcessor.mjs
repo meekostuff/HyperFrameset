@@ -570,7 +570,7 @@ transformHazardTree: function(el, context, frag) {
 
 	case 'apply': // WARN only applies to DOM-based provider
 		template = processor.getMatchingTemplate(context);
-		let promise = Thenfu.resolve(el);
+		let promise = Thenfu.asap(el);
 		if (template) {
 			return processor.transformTemplate(template, context, null, frag);
 		}

@@ -268,19 +268,6 @@ function wrapResolve(callback, resolve, reject) {
 
 _.defaults(Thenfu, {
 
-/**
- * Wrap a value in a fulfilled thenable.
- * @param {*} value
- * @returns {Thenfu}
- */
-resolve: function(value) {
-	if (value instanceof Thenfu) return value;
-	let promise = Object.create(Thenfu.prototype);
-	promise._initialize();
-	promise._resolve(value);
-	return promise;
-}
-
 });
 
 
@@ -403,7 +390,7 @@ function delay(timeout) {
  * @returns {Thenfu}
  */
 function pipe(startValue, fnList) {
-	let promise = Thenfu.resolve(startValue);
+	let promise = Thenfu.asap(startValue);
 	for (let n=fnList.length, i=0; i<n; i++) {
 		let fn = fnList[i];
 		promise = promise.then(fn);

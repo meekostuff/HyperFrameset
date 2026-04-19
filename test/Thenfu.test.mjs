@@ -29,7 +29,7 @@ describe('Thenfu static methods', () => {
   });
 
   test('uncaught errors in then() are logged to console', async () => {
-    Thenfu.resolve(42).then(() => {
+    Thenfu.asap(42).then(() => {
       throw new Error('uncaught error');
     });
 
@@ -41,7 +41,7 @@ describe('Thenfu static methods', () => {
   test('errors caught with catch() do not reach console', async () => {
     let caughtError;
     
-    Thenfu.resolve(42)
+    Thenfu.asap(42)
       .then(() => { throw new Error('caught error'); })
       .catch(e => { caughtError = e; });
 
@@ -61,8 +61,8 @@ describe('Thenfu static methods', () => {
   });
 
   test('nested promise chain errors are handled', async () => {
-    Thenfu.resolve(1)
-      .then(() => Thenfu.resolve(2))
+    Thenfu.asap(1)
+      .then(() => Thenfu.asap(2))
       .then(() => {
         throw new Error('nested error');
       });
@@ -86,7 +86,7 @@ describe('Thenfu static methods', () => {
 
   test('resolve delivers a value', async () => {
     let result;
-    Thenfu.resolve(42).then(v => { result = v; });
+    Thenfu.asap(42).then(v => { result = v; });
 
     await timeout(50);
     expect(result).toBe(42);
@@ -94,7 +94,7 @@ describe('Thenfu static methods', () => {
 
   test('resolve does not deliver in the same microtask loop', async () => {
     const order = [];
-    Thenfu.resolve(42).then(() => order.push('resolved'));
+    Thenfu.asap(42).then(() => order.push('resolved'));
     queueMicrotask(() => order.push('microtask'));
 
     await timeout(50);
@@ -105,7 +105,7 @@ describe('Thenfu static methods', () => {
 
   test('isThenable detects objects with .then', () => {
     expect(Thenfu.isThenable({ then: () => {} })).toBe(true);
-    expect(Thenfu.isThenable(Thenfu.resolve(1))).toBe(true);
+    expect(Thenfu.isThenable(Thenfu.asap(1))).toBe(true);
     expect(Thenfu.isThenable(Promise.resolve(1))).toBe(true);
     expect(Thenfu.isThenable(42)).toBe(false);
     expect(Thenfu.isThenable(null)).toBe(false);
@@ -189,7 +189,7 @@ describe('Thenfu static methods', () => {
 
   test('settle resolves with thenables', async () => {
     const resolver = Thenfu.withResolvers();
-    const thenable = Thenfu.resolve(123);
+    const thenable = Thenfu.asap(123);
     Thenfu.settle(resolver, thenable);
     const result = await resolver.promise;
     expect(result).toBe(123);
@@ -220,7 +220,7 @@ describe('Thenfu static methods', () => {
 
   test('asap with a value delivers that value', async () => {
     let result;
-    Thenfu.resolve(Thenfu.asap(99)).then(v => { result = v; });
+    Thenfu.asap(Thenfu.asap(99)).then(v => { result = v; });
 
     await timeout(50);
     expect(result).toBe(99);
@@ -228,7 +228,7 @@ describe('Thenfu static methods', () => {
 
   test('asap with a settled thenable delivers its value', async () => {
     let result;
-    Thenfu.asap(Thenfu.resolve('val')).then(v => { result = v; });
+    Thenfu.asap(Thenfu.asap('val')).then(v => { result = v; });
 
     await timeout(50);
     expect(result).toBe('val');
@@ -299,7 +299,7 @@ describe('Thenfu static methods', () => {
     Thenfu.pipe(1, [
       v => Thenfu.delay(10).then(() => v + 1),
       v => Promise.resolve(v * 3),
-      v => Thenfu.resolve(v + 10),
+      v => Thenfu.asap(v + 10),
     ]).then(v => { result = v; });
 
     await timeout(200);
@@ -426,7 +426,7 @@ describe('Thenfu static methods', () => {
     
     Thenfu.reduce(0, [1, 2, 3], (acc, val) => {
       order.push(`start-${val}`);
-      return Thenfu.resolve(acc + val).then(sum => {
+      return Thenfu.asap(acc + val).then(sum => {
         order.push(`end-${val}`);
         return sum;
       });

@@ -68,7 +68,7 @@ start: function(startOptions) {
 	if (!startOptions || !startOptions.contentDocument) throw Error('No contentDocument passed to start()');
 
 	framer.started = true;
-	Thenfu.resolve(startOptions.contentDocument)
+	Thenfu.asap(startOptions.contentDocument)
 	.then(function(doc) { // FIXME potential race condition between document finished loading and frameset rendering
 		return httpProxy.add({
 			url: document.URL,
@@ -661,10 +661,10 @@ let notify = function(msg) { // FIXME this isn't being used called everywhere it
 	let module;
 	switch (msg.module) {
 	case 'frameset': module = framer.frameset.options; break;
-	default: return Thenfu.resolve();
+	default: return Thenfu.asap();
 	}
 	let handler = module[msg.type];
-	if (!handler) return Thenfu.resolve();
+	if (!handler) return Thenfu.asap();
 	let listener;
 
 	if (handler[msg.stage]) listener = handler[msg.stage];
@@ -691,7 +691,7 @@ let notify = function(msg) { // FIXME this isn't being used called everywhere it
 		promise['catch'](function(err) { throw Error(err); });
 		return promise;
 	}
-	else return Thenfu.resolve();
+	else return Thenfu.asap();
 }
 
 function registerFrames(framesetDef) {

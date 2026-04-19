@@ -162,7 +162,7 @@ let httpProxy = (function() {
 				break;
 			case 'get':
 				let response = cacheLookup(info);
-				if (response) return Thenfu.resolve(response);
+				if (response) return Thenfu.asap(response);
 				return doRequest(info)
 					.then(function (response) {
 						cacheAdd(info, response);
