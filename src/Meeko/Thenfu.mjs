@@ -66,6 +66,19 @@ applyTo: function(object) {
 },
 
 /**
+ * Create a thenable with exposed resolve and reject functions.
+ * @returns {{promise: Thenfu, resolve: Function, reject: Function}}
+ */
+withResolvers: function() {
+	let resolve, reject;
+	let promise = Thenfu.create((res, rej) => {
+		resolve = res;
+		reject = rej;
+	});
+	return { promise, resolve, reject };
+},
+
+/**
  * Check if a value has a .then method.
  * @param {*} value
  * @returns {boolean}
@@ -82,7 +95,12 @@ isThenable: function(value) {
  * @returns {Thenfu} A thenable that resolves with the function's result or rejects with any thrown error
  */
 try: function(fn) {
-	return Thenfu.resolve().then(fn);
+	let { promise, resolve, reject } = Thenfu.withResolvers();
+	Task.asap(() => {
+		try { resolve(fn()); }
+		catch (ex) { reject(ex); }
+	});
+	return promise;
 }
 
 });
@@ -261,17 +279,6 @@ resolve: function(value) {
 	promise._initialize();
 	promise._resolve(value);
 	return promise;
-},
-
-/**
- * Wrap an error in a rejected thenable.
- * @param {*} error
- * @returns {Thenfu}
- */
-reject: function(error) { // FIXME should never be used
-return Thenfu.create(function(resolve, reject) {
-	reject(error);
-});
 }
 
 });
@@ -333,19 +340,16 @@ return wait;
  * @returns {Thenfu}
  */
 function asap(value) {
-	if (value instanceof Thenfu) {
-		if (value.isPending) return value; // already deferred
-		if (Task.getTime(true) <= 0) return value.then(); // will defer
-		return value; // not-deferred
+	let resolver = Thenfu.withResolvers();
+	if (Task.getTime(true) > 0) {
+		// Frame time available - execute immediately
+		settle(resolver, value);
 	}
-	if (Thenfu.isThenable(value)) return Thenfu.resolve(value); // will defer
-	if (typeof value === 'function') {
-		if (Task.getTime(true) <= 0) return Thenfu.resolve().then(value);
-		return Thenfu.create(function(resolve) { resolve(value); }); // WARN relies on Meeko.Thenfu behavior
+	else {
+		// No frame time - defer everything
+		Task.asap(() => settle(resolver, value));
 	}
-	// NOTE otherwise we have a non-thenable, non-function something
-	if (Task.getTime(true) <= 0) return Thenfu.resolve(value).then(); // will defer
-	return Thenfu.resolve(value); // not-deferred
+	return resolver.promise;
 }
 
 /**
@@ -354,13 +358,30 @@ function asap(value) {
  * @returns {Thenfu}
  */
 function defer(value) {
-	if (value instanceof Thenfu) {
-		if (value.isPending) return value; // already deferred
-		return value.then();
+	let resolver = Thenfu.withResolvers();
+	Task.defer(() => settle(resolver, value));
+	return resolver.promise;
+}
+
+/**
+ * Settle a promise resolver with a value, handling different value types appropriately.
+ * @param {{resolve: Function, reject: Function}} resolver - Promise resolver object from withResolvers()
+ * @param {*} value - Value to settle with: thenable (resolved), Error (rejected), function (executed), or other (resolved)
+ */
+function settle({ resolve, reject }, value) {
+	if (Thenfu.isThenable(value)) {
+		resolve(value);
 	}
-	if (Thenfu.isThenable(value)) return Thenfu.resolve(value);
-	if (typeof value === 'function') return Thenfu.resolve().then(value);
-	return Thenfu.resolve(value).then();
+	else if (value instanceof Error) {
+		reject(value);
+	}
+	else if (typeof value === 'function') {
+		try { resolve(value()); }
+		catch (ex) { reject(ex); }
+	}
+	else {
+		resolve(value);
+	}
 }
 
 /**
@@ -369,10 +390,10 @@ function defer(value) {
  * @returns {Thenfu}
  */
 function delay(timeout) {
-	return Thenfu.create(function(resolve, reject) {
-		if (timeout <= 0 || timeout == null) Task.defer(resolve);
-		else Task.delay(resolve, timeout);
-	});
+	let { promise, resolve, reject } = Thenfu.withResolvers();
+	if (timeout <= 0 || timeout == null) Task.defer(resolve);
+	else Task.delay(resolve, timeout);
+	return promise;
 }
 
 /**
@@ -442,7 +463,7 @@ function reportUnhandledRejection(error, thenable) {
 }
 
 _.defaults(Thenfu, {
-	asap: asap, defer: defer, delay: delay, wait: wait, pipe: pipe, reduce: reduce
+	asap: asap, defer: defer, delay: delay, wait: wait, pipe: pipe, reduce: reduce, settle: settle
 });
 
 export default Thenfu;
