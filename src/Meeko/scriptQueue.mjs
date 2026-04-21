@@ -71,21 +71,21 @@ push: function(node) {
 	script.type = 'text/javascript';
 	
 	// enabledFu resolves after script is inserted
-	let enabledFu = Thenfu.applyTo();
+	let enabledFu = Promise.withResolvers();
 	
 	let prev = queue[queue.length - 1], prevScript = prev && prev.script;
 
 	let triggerFu; // triggerFu allows this script to be enabled, i.e. inserted
 	if (prev) {
-		if (prevScript.hasAttribute('async') || script.src && supportsSync && !script.hasAttribute('async')) triggerFu = prev.enabled;
-		else triggerFu = prev.complete; 
+		if (prevScript.hasAttribute('async') || script.src && supportsSync && !script.hasAttribute('async')) triggerFu = prev.enabled.promise;
+		else triggerFu = prev.complete.promise; 
 	}
 	else triggerFu = Thenfu.asap();
 	
 	triggerFu.then(enable, enable);
 
-	let completeFu = Thenfu.applyTo();
-	completeFu.then(resolve, reject);
+	let completeFu = Promise.withResolvers();
+	completeFu.promise.then(resolve, reject);
 
 	let current = { script: script, complete: completeFu, enabled: enabledFu };
 	queue.push(current);

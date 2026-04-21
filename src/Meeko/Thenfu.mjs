@@ -7,57 +7,25 @@
 import * as _ from './stuff.mjs';
 import Task from './Task.mjs';
 
-let Thenfu = {}
-_.defaults(Thenfu, {
-
 /**
  * Create a new Promise from an executor function.
  * @param {Function} init - Called as init(resolve, reject)
  * @returns {Promise}
  */
-create: function(init) {
+function create(init) {
 	return new Promise(init);
-},
-
-/**
- * Attach resolve/reject methods to an object and return a thenable.
- * @param {Object} [object] - Object to attach resolve/reject to
- * @returns {Promise} A pending thenable
- */
-applyTo: function(object) {
-	let resolver = {}
-	let promise = Thenfu.create(function(resolve, reject) {
-		resolver.resolve = resolve;
-		resolver.reject = reject;
-	});
-	if (!object) object = promise;
-	_.assign(object, resolver);
-	return promise;
-},
-
-/**
- * Create a thenable with exposed resolve and reject functions.
- * @returns {{promise: Promise, resolve: Function, reject: Function}}
- */
-withResolvers: function() {
-	let resolve, reject;
-	let promise = Thenfu.create((res, rej) => {
-		resolve = res;
-		reject = rej;
-	});
-	return { promise, resolve, reject };
-},
+}
 
 /**
  * Check if a value has a .then method.
  * @param {*} value
  * @returns {boolean}
  */
-isThenable: function(value) {
+function isThenable(value) {
 	return value !== null &&
 		(typeof value === 'object' || typeof value === 'function') &&
 		typeof value.then === 'function';
-},
+}
 
 /**
  * Execute a function and return a thenable for its result.
@@ -65,33 +33,12 @@ isThenable: function(value) {
  * @param {...*} params - Parameters to pass to the function (can include promises)
  * @returns {Promise} A thenable that resolves with the function's result or rejects with any thrown error
  */
-try: function(fn, ...params) {
+function tryFn(fn, ...params) {
 	return Promise.all(params).then(resolvedParams => 
-		Thenfu.asap(() => fn(...resolvedParams))
+		asap(() => fn(...resolvedParams))
 	);
 }
 
-});
-
-/* Functional composition wrapper for `then` */
-function wrapResolve(callback, resolve, reject) {
-	return function() {
-		try {
-			let value = callback.apply(undefined, arguments);
-			resolve(value);
-		} catch (error) {
-			reject(error);
-		}
-	}
-}
-
-/*
- ### Async functions
-   wait(test) waits until test() returns true
-   asap(fn) returns a promise which is fulfilled / rejected by fn which is run asap after the current micro-task
-   delay(timeout) returns a promise which fulfils after timeout ms
-   pipe(startValue, [fn1, fn2, ...]) will call functions sequentially
- */
 /**
  * Poll a test function until it returns true.
  * @param {Function} fn - Test function
@@ -103,9 +50,11 @@ let tests = [];
 
 function wait(fn) {
 	let test = { fn: fn };
-	let promise = Thenfu.applyTo(test);
+	let resolver = Promise.withResolvers();
+	test.resolve = resolver.resolve;
+	test.reject = resolver.reject;
 	asapTest(test);
-	return promise;
+	return resolver.promise;
 }
 
 function asapTest(test) {
@@ -141,7 +90,7 @@ return wait;
  * @returns {Promise}
  */
 function asap(value) {
-	let resolver = Thenfu.withResolvers();
+	let resolver = Promise.withResolvers();
 	if (Task.getTime(true) > 0) {
 		// Frame time available - execute immediately
 		settle(resolver, value);
@@ -159,7 +108,7 @@ function asap(value) {
  * @returns {Promise}
  */
 function defer(value) {
-	let resolver = Thenfu.withResolvers();
+	let resolver = Promise.withResolvers();
 	Task.defer(() => settle(resolver, value));
 	return resolver.promise;
 }
@@ -170,7 +119,7 @@ function defer(value) {
  * @param {*} value - Value to settle with: thenable (resolved), Error (rejected), function (executed), or other (resolved)
  */
 function settle({ resolve, reject }, value) {
-	if (Thenfu.isThenable(value)) {
+	if (isThenable(value)) {
 		resolve(value);
 	}
 	else if (value instanceof Error) {
@@ -191,7 +140,7 @@ function settle({ resolve, reject }, value) {
  * @returns {Promise}
  */
 function delay(timeout) {
-	let { promise, resolve, reject } = Thenfu.withResolvers();
+	let { promise, resolve, reject } = Promise.withResolvers();
 	if (timeout <= 0 || timeout == null) Task.defer(resolve);
 	else Task.delay(resolve, timeout);
 	return promise;
@@ -204,7 +153,7 @@ function delay(timeout) {
  * @returns {Promise}
  */
 function pipe(startValue, fnList) {
-	let promise = Thenfu.asap(startValue);
+	let promise = asap(startValue);
 	for (let n=fnList.length, i=0; i<n; i++) {
 		let fn = fnList[i];
 		promise = promise.then(fn);
@@ -221,7 +170,7 @@ function pipe(startValue, fnList) {
  * @returns {Promise}
  */
 function reduce(accumulator, a, fn, context) {
-return Thenfu.create(function(resolve, reject) {
+return create(function(resolve, reject) {
 	let length = a.length;
 	let i = 0;
 
@@ -230,7 +179,7 @@ return Thenfu.create(function(resolve, reject) {
 
 	function process(acc) {
 		while (i < length) {
-			if (Thenfu.isThenable(acc)) {
+			if (isThenable(acc)) {
 					acc.then(process, reject);
 					return;
 			}
@@ -255,20 +204,18 @@ return Thenfu.create(function(resolve, reject) {
 });
 }
 
-function reportUnhandledRejection(error, thenable) {
-	let event = new Event("unhandledrejection", { cancelable: true });
-	event.reason = error;
-	event.promise = thenable;
-	let performDefault = window.dispatchEvent(event);
-	if (performDefault) window.reportError(error);
-}
-
-_.defaults(Thenfu, {
-	asap: asap, defer: defer, delay: delay, wait: wait, pipe: pipe, reduce: reduce, settle: settle
-});
-
-export default Thenfu;
-
-
-
-
+export default {
+	create,
+	withResolvers: function () {
+		return Promise.withResolvers();
+	},
+	isThenable,
+	try: tryFn,
+	asap,
+	defer, 
+	delay,
+	wait,
+	pipe,
+	reduce,
+	settle
+};

@@ -53,7 +53,7 @@ config: function(options) {
 });
 
 
-let framesetReady = Thenfu.applyTo();
+let framesetReady = Promise.withResolvers();
 
 _.defaults(framer, {
 
@@ -150,7 +150,7 @@ start: function(startOptions) {
 	},
 
 	function() { // TODO ideally frameset rendering wouldn't start until after this step
-		return framesetReady
+		return framesetReady.promise
 		.then(function() {
 
 			let changeset = framer.currentChangeset;
