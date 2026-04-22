@@ -176,7 +176,7 @@ let httpProxy = (function() {
 	}
 
 	let doRequest = function (info) {
-		return Thenfu.create(function (resolve, reject) {
+		return new Promise(function (resolve, reject) {
 			let method = info.method;
 			let url = info.url;
 			let sendText = info.body; // FIXME not-implemented

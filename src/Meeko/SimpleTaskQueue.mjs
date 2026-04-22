@@ -63,13 +63,13 @@ reset(fn) {
  */
 whenever(fn, fail, max) {
 	if (max == null) max = this.#maxSize;
-	return Thenfu.create((resolve, reject) => {
+	return new Promise((resolve, reject) => {
 		if (this.#queue.length > max || (this.#queue.length === max && this.#processing)) {
 			if (fail) Thenfu.defer(fail).then(resolve, reject);
 			else reject(function() { throw Error('No `fail` callback passed to whenever()'); });
 			return;
 		}
-		this.#queue.push({ fn: fn, resolve: resolve, reject: reject });
+		this.#queue.push({fn, resolve, reject});
 		this.#bump();
 	});
 }

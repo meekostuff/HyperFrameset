@@ -75,16 +75,6 @@ describe('Thenfu static methods', () => {
     expect(unhandledRejections[0].message).toBe('nested error');
   });
 
-  test('reject() in constructor without catch is logged to console', async () => {
-    Thenfu.create((resolve, reject) => {
-      reject(new Error('constructor reject error'));
-    });
-
-    await timeout(100);
-    expect(unhandledRejections).toHaveLength(1);
-    expect(unhandledRejections[0].message).toBe('constructor reject error');
-  });
-
   // --- resolve ---
 
   test('resolve delivers a value', async () => {
@@ -172,59 +162,34 @@ describe('Thenfu static methods', () => {
     }
   });
 
-  test('withResolvers returns promise with exposed resolvers', async () => {
-    const { promise, resolve, reject } = Thenfu.withResolvers();
-    
-    expect(Thenfu.isThenable(promise)).toBe(true);
-    expect(typeof resolve).toBe('function');
-    expect(typeof reject).toBe('function');
-    
-    resolve(42);
-    const result = await promise;
-    expect(result).toBe(42);
-  });
-
-  test('withResolvers reject works', async () => {
-    const { promise, resolve, reject } = Thenfu.withResolvers();
-    
-    reject(new Error('test error'));
-    
-    try {
-      await promise;
-      expect.fail('Should have thrown');
-    } catch (error) {
-      expect(error.message).toBe('test error');
-    }
-  });
-
   test('settle resolves with values', () => {
-    const resolver = Thenfu.withResolvers();
+    const resolver = Promise.withResolvers();
     Thenfu.settle(resolver, 42);
     return expect(resolver.promise).resolves.toBe(42);
   });
 
   test('settle rejects with Error objects', () => {
-    const resolver = Thenfu.withResolvers();
+    const resolver = Promise.withResolvers();
     const error = new Error('test error');
     Thenfu.settle(resolver, error);
     return expect(resolver.promise).rejects.toBe(error);
   });
 
   test('settle executes functions', () => {
-    const resolver = Thenfu.withResolvers();
+    const resolver = Promise.withResolvers();
     Thenfu.settle(resolver, () => 'result');
     return expect(resolver.promise).resolves.toBe('result');
   });
 
   test('settle catches function errors', () => {
-    const resolver = Thenfu.withResolvers();
+    const resolver = Promise.withResolvers();
     const error = new Error('function error');
     Thenfu.settle(resolver, () => { throw error; });
     return expect(resolver.promise).rejects.toBe(error);
   });
 
   test('settle resolves with thenables', async () => {
-    const resolver = Thenfu.withResolvers();
+    const resolver = Promise.withResolvers();
     const thenable = Thenfu.asap(123);
     Thenfu.settle(resolver, thenable);
     const result = await resolver.promise;
@@ -491,41 +456,5 @@ describe('Thenfu static methods', () => {
   });
 
   // --- create ---
-
-  test('create returns a thenable', () => {
-    const p = Thenfu.create(function(resolve) { resolve(1); });
-    expect(isThenable(p)).toBe(true);
-  });
-
-  test('create resolves with a value', async () => {
-    let result;
-    Thenfu.create(function(resolve) { resolve(42); }).then(v => { result = v; });
-
-    await timeout(50);
-    expect(result).toBe(42);
-  });
-
-  test('create rejects with an error', async () => {
-    let caught;
-    Thenfu.create(function(resolve, reject) {
-      // defer rejection so .catch can attach first
-      setTimeout(() => reject(new Error('fail')), 0);
-    }).catch(e => { caught = e; });
-
-    await timeout(50);
-    expect(caught).toBeInstanceOf(Error);
-    expect(caught.message).toBe('fail');
-  });
-
-  test('create catches thrown errors in init', async () => {
-    let caught;
-    Thenfu.create(function(resolve, reject) {
-      throw new Error('init-error');
-    }).catch(e => { caught = e; });
-
-    await timeout(50);
-    expect(caught).toBeInstanceOf(Error);
-    expect(caught.message).toBe('init-error');
-  });
 
 });

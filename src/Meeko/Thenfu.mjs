@@ -8,15 +8,6 @@ import * as _ from './stuff.mjs';
 import Task from './Task.mjs';
 
 /**
- * Create a new Promise from an executor function.
- * @param {Function} init - Called as init(resolve, reject)
- * @returns {Promise}
- */
-function create(init) {
-	return new Promise(init);
-}
-
-/**
  * Check if a value has a .then method.
  * @param {*} value
  * @returns {boolean}
@@ -170,7 +161,7 @@ function pipe(startValue, fnList) {
  * @returns {Promise}
  */
 function reduce(accumulator, a, fn, context) {
-return create(function(resolve, reject) {
+return new Promise(function(resolve, reject) {
 	let length = a.length;
 	let i = 0;
 
@@ -205,10 +196,6 @@ return create(function(resolve, reject) {
 }
 
 export default {
-	create,
-	withResolvers: function () {
-		return Promise.withResolvers();
-	},
 	isThenable,
 	try: tryFn,
 	asap,
