@@ -376,6 +376,11 @@
 	let scheduled = false;
 	let processing = false;
 
+	/**
+	 * Schedule a task to run as soon as possible within the current frame interval.
+	 * Not a microtask - runs within ~16ms via requestAnimationFrame.
+	 * @param {Function} fn - Function to execute
+	 */
 	function asap$1(fn) {
 		asapQueue.push(fn);
 		if (processing) return;
@@ -384,6 +389,10 @@
 		scheduled = true;
 	}
 
+	/**
+	 * Schedule a task to run after all asap tasks have completed.
+	 * @param {Function} fn - Function to execute
+	 */
 	function defer$1(fn) {
 		if (processing) {
 			deferQueue.push(fn);
@@ -392,6 +401,11 @@
 		asap$1(fn);
 	}
 
+	/**
+	 * Schedule a task to run after a minimum timeout, then after all asap tasks.
+	 * @param {Function} fn - Function to execute
+	 * @param {number} timeout - Minimum delay in milliseconds
+	 */
 	function delay$1(fn, timeout) {
 		if (timeout <= 0 || timeout == null) {
 			defer$1(fn);
@@ -408,6 +422,9 @@
 	let execStats = {};
 	let frameStats = {};
 
+	/**
+	 * Reset task execution statistics.
+	 */
 	function resetStats() {
 		forEach([execStats, frameStats], function(stats) {
 			assign(stats, {
@@ -428,6 +445,10 @@
 		if (currTime > stats.maxTime) stats.maxTime = currTime;
 	}
 
+	/**
+	 * Get task execution statistics including timing data.
+	 * @returns {Object} Statistics object with exec and frame timing data
+	 */
 	function getStats() {
 		let exec = assign({}, execStats);
 		let frame = assign({}, frameStats);
@@ -440,6 +461,11 @@
 	}
 
 	let lastStartTime = performance.now();
+	/**
+	 * Get estimated time available in the current frame.
+	 * @param {boolean} [bRemaining] - If true, returns time remaining in frame
+	 * @returns {number} Time in milliseconds
+	 */
 	function getTime(bRemaining) {
 		let delta = performance.now() - lastStartTime;
 		if (!bRemaining) return delta;
@@ -487,257 +513,50 @@
 
 	/*
 	 ### Thenfu
-	 This is an enhanced Promise implementation but it defers to allow animation.
-	 WARN: This was based on early DOM Futures specification. This has been evolved towards ES6 Promises.
+	 Frame-aware asynchronous utilities for non-blocking operations.
+	 Provides static methods for creating and managing promises that respect animation frame budgets.
 	 */
 
 
-	let Thenfu = function(init) { // `init` is called as init(resolve, reject)
-		if (!(this instanceof Thenfu)) return new Thenfu(init);
-		
-		let promise = this;
-		promise._initialize();
-
-		try { init(resolve, reject); }
-		catch(error) { reject(error); }
-
-		// NOTE promise is returned by `new` invocation but anyway
-		return promise;
-
-		// The following are hoisted
-		function resolve(result) {
-			if (typeof result !== 'function') {
-				promise._resolve(result);
-				return;
-			}
-			try { promise._resolve(result()); }
-			catch (err) { promise._reject(err); }
-		}
-		function reject(error) {
-			if (typeof error !== 'function') {
-				promise._reject(error);
-				return;
-			}
-			try { promise._reject(error()); }
-			catch (err) { promise._reject(err); }
-		}
-	};
-
-	defaults(Thenfu, {
-
-	applyTo: function(object) {
-		let resolver = {};
-		let promise = new Thenfu(function(resolve, reject) {
-			resolver.resolve = resolve;
-			resolver.reject = reject;
-		});
-		if (!object) object = promise;
-		assign(object, resolver);
-		return promise;
-	},
-
-	isThenable: function(value) {
-		return value != null && typeof value.then === 'function';
-	}
-
-	});
-
-	defaults(Thenfu.prototype, {
-
-	_initialize: function() {
-		let promise = this;
-		defaults(promise, {
-			/* 
-				use lazy creation for callback lists - 
-				with synchronous inspection they may never be called
-			// _fulfilCallbacks: [],
-			// _rejectCallbacks: [],
-			*/
-			isPending: true,
-			isFulfilled: false,
-			isRejected: false,
-			value: undefined,
-			reason: undefined,
-			_willCatch: false,
-			_processing: false
-		});
-	},
-
-	/*
-	See https://github.com/promises-aplus/synchronous-inspection-spec/issues/6 and
-	https://github.com/petkaantonov/bluebird/blob/master/API.md#synchronous-inspection
-	*/
-	inspectState: function() { 
-		return this;
-	},
-
-	_fulfil: function(result, sync) { // NOTE equivalent to 'fulfil algorithm'. External calls MUST NOT use sync
-		let promise = this;
-		if (!promise.isPending) return;
-		promise.isPending = false;
-		promise.isRejected = false;
-		promise.isFulfilled = true;
-		promise.value = result;
-		promise._requestProcessing(sync);
-	},
-
-	_resolve: function(value, sync) { // NOTE equivalent to 'resolve algorithm'. External calls MUST NOT use sync
-		let promise = this;
-		if (!promise.isPending) return;
-		if (value instanceof Thenfu && !value.isPending) {
-			if (value.isFulfilled) promise._fulfil(value.value, sync);
-			else /* if (value.isRejected) */ promise._reject(value.reason, sync);
-			return;
-		}
-		/* else */ if (Thenfu.isThenable(value)) {
-			try {
-				value.then(
-					function(result) { promise._resolve(result, true); },
-					function(error) { promise._reject(error, true); }
-				);
-			}
-			catch(error) {
-				promise._reject(error, sync);
-			}
-			return;
-		}
-		/* else */ promise._fulfil(value, sync);
-	},
-
-	_reject: function(error, sync) { // NOTE equivalent to 'reject algorithm'. External calls MUST NOT use sync
-		let promise = this;
-		if (!promise.isPending) return;
-		promise.isPending = false;
-		promise.isFulfilled = false;
-		promise.isRejected = true;
-		promise.reason = error;
-		if (!promise._willCatch) {
-			reportError(error);
-		}
-		else promise._requestProcessing(sync);
-	},
-
-	_requestProcessing: function(sync) { // NOTE schedule callback processing. TODO may want to disable sync option
-		let promise = this;
-		if (promise.isPending) return;
-		if (!promise._willCatch) return;
-		if (promise._processing) return;
-		if (sync) {
-			promise._processing = true;
-			promise._process();
-			promise._processing = false;
-		}
-		else {
-			Task.asap(function() {
-				promise._processing = true;
-				promise._process();
-				promise._processing = false;
-			});
-		}
-	},
-
-	_process: function() { // NOTE process a promises callbacks
-		let promise = this;
-		let result;
-		let callbacks, cb;
-		if (promise.isFulfilled) {
-			result = promise.value;
-			callbacks = promise._fulfilCallbacks;
-		}
-		else {
-			result = promise.reason;
-			callbacks = promise._rejectCallbacks;
-		}
-
-		// NOTE callbacks may not exist
-		delete promise._fulfilCallbacks;
-		delete promise._rejectCallbacks;
-		if (callbacks) while (callbacks.length) {
-			cb = callbacks.shift();
-			if (typeof cb === 'function') cb(result);
-		}
-	},
-
-	then: function(fulfilCallback, rejectCallback) {
-		let promise = this;
-		return new Thenfu(function(resolve, reject) {
-			let fulfilWrapper = fulfilCallback ?
-				wrapResolve(fulfilCallback, resolve, reject) :
-				function(value) { resolve(value); };
-		
-			let rejectWrapper = rejectCallback ?
-				wrapResolve(rejectCallback, resolve, reject) :
-				function(error) { reject(error); };
-		
-			if (!promise._fulfilCallbacks) promise._fulfilCallbacks = [];
-			if (!promise._rejectCallbacks) promise._rejectCallbacks = [];
-			
-			promise._fulfilCallbacks.push(fulfilWrapper);
-			promise._rejectCallbacks.push(rejectWrapper);
-		
-			promise._willCatch = true;
-		
-			promise._requestProcessing();
-			
-		});
-	},
-
-	'catch': function(rejectCallback) { // WARN 'catch' is unexpected identifier in IE8-
-		let promise = this;
-		return promise.then(undefined, rejectCallback);
-	}
-
-	});
-
-
-	/* Functional composition wrapper for `then` */
-	function wrapResolve(callback, resolve, reject) {
-		return function() {
-			try {
-				let value = callback.apply(undefined, arguments);
-				resolve(value);
-			} catch (error) {
-				reject(error);
-			}
-		}
-	}
-
-
-	defaults(Thenfu, {
-
-	resolve: function(value) {
-		if (value instanceof Thenfu) return value;
-		let promise = Object.create(Thenfu.prototype);
-		promise._initialize();
-		promise._resolve(value);
-		return promise;
-	},
-
-	reject: function(error) { // FIXME should never be used
-	return new Thenfu(function(resolve, reject) {
-		reject(error);
-	});
-	}
-
-	});
-
-
-	/*
-	 ### Async functions
-	   wait(test) waits until test() returns true
-	   asap(fn) returns a promise which is fulfilled / rejected by fn which is run asap after the current micro-task
-	   delay(timeout) returns a promise which fulfils after timeout ms
-	   pipe(startValue, [fn1, fn2, ...]) will call functions sequentially
+	/**
+	 * Check if a value has a .then method.
+	 * @param {*} value
+	 * @returns {boolean}
 	 */
-	let wait = (function() { // TODO wait() isn't used much. Can it be simpler?
+	function isThenable(value) {
+		return value !== null &&
+			(typeof value === 'object' || typeof value === 'function') &&
+			typeof value.then === 'function';
+	}
+
+	/**
+	 * Execute a function and return a thenable for its result.
+	 * @param {Function} fn - Function to execute
+	 * @param {...*} params - Parameters to pass to the function (can include promises)
+	 * @returns {Promise} A thenable that resolves with the function's result or rejects with any thrown error
+	 */
+	function tryFn(fn, ...params) {
+		return Promise.all(params).then(resolvedParams => 
+			asap(() => fn(...resolvedParams))
+		);
+	}
+
+	/**
+	 * Poll a test function until it returns true.
+	 * @param {Function} fn - Test function
+	 * @returns {Promise}
+	 */
+	let wait = (function() {
 		
 	let tests = [];
 
 	function wait(fn) {
 		let test = { fn: fn };
-		let promise = Thenfu.applyTo(test);
+		let resolver = Promise.withResolvers();
+		test.resolve = resolver.resolve;
+		test.reject = resolver.reject;
 		asapTest(test);
-		return promise;
+		return resolver.promise;
 	}
 
 	function asapTest(test) {
@@ -767,41 +586,76 @@
 
 	})();
 
-	function asap(value) { // FIXME asap(fn) should execute immediately
-		if (value instanceof Thenfu) {
-			if (value.isPending) return value; // already deferred
-			if (Task.getTime(true) <= 0) return value.then(); // will defer
-			return value; // not-deferred
+	/**
+	 * Return a thenable that executes immediately if frame time is available, defers otherwise.
+	 * @param {*} value - A function, thenable, or value
+	 * @returns {Promise}
+	 */
+	function asap(value) {
+		let resolver = Promise.withResolvers();
+		if (Task.getTime(true) > 0) {
+			// Frame time available - execute immediately
+			settle(resolver, value);
 		}
-		if (Thenfu.isThenable(value)) return Thenfu.resolve(value); // will defer
-		if (typeof value === 'function') {
-			if (Task.getTime(true) <= 0) return Thenfu.resolve().then(value);
-			return new Thenfu(function(resolve) { resolve(value); }); // WARN relies on Meeko.Thenfu behavior
+		else {
+			// No frame time - defer everything
+			Task.asap(() => settle(resolver, value));
 		}
-		// NOTE otherwise we have a non-thenable, non-function something
-		if (Task.getTime(true) <= 0) return Thenfu.resolve(value).then(); // will defer
-		return Thenfu.resolve(value); // not-deferred
+		return resolver.promise;
 	}
 
+	/**
+	 * Always defer execution to the next frame.
+	 * @param {*} value - A function, thenable, or value
+	 * @returns {Promise}
+	 */
 	function defer(value) {
-		if (value instanceof Thenfu) {
-			if (value.isPending) return value; // already deferred
-			return value.then();
+		let resolver = Promise.withResolvers();
+		Task.defer(() => settle(resolver, value));
+		return resolver.promise;
+	}
+
+	/**
+	 * Settle a promise resolver with a value, handling different value types appropriately.
+	 * @param {{resolve: Function, reject: Function}} resolver - Promise resolver object from withResolvers()
+	 * @param {*} value - Value to settle with: thenable (resolved), Error (rejected), function (executed), or other (resolved)
+	 */
+	function settle({ resolve, reject }, value) {
+		if (isThenable(value)) {
+			resolve(value);
 		}
-		if (Thenfu.isThenable(value)) return Thenfu.resolve(value);
-		if (typeof value === 'function') return Thenfu.resolve().then(value);
-		return Thenfu.resolve(value).then();
+		else if (value instanceof Error) {
+			reject(value);
+		}
+		else if (typeof value === 'function') {
+			try { resolve(value()); }
+			catch (ex) { reject(ex); }
+		}
+		else {
+			resolve(value);
+		}
 	}
 
-	function delay(timeout) { // FIXME delay(timeout, value_or_fn_or_promise)
-		return new Thenfu(function(resolve, reject) {
-			if (timeout <= 0 || timeout == null) Task.defer(resolve);
-			else Task.delay(resolve, timeout);
-		});
+	/**
+	 * Return a thenable that fulfils after a minimum timeout.
+	 * @param {number} timeout - Minimum delay in milliseconds
+	 * @returns {Promise}
+	 */
+	function delay(timeout) {
+		let { promise, resolve, reject } = Promise.withResolvers();
+		if (timeout <= 0 || timeout == null) Task.defer(resolve);
+		else Task.delay(resolve, timeout);
+		return promise;
 	}
 
-	function pipe(startValue, fnList) { // TODO make more efficient with sync introspection
-		let promise = Thenfu.resolve(startValue);
+	/**
+	 * Chain functions sequentially, passing each result to the next.
+	 * @param {*} startValue - Initial value
+	 * @param {Function[]} fnList - Functions to chain
+	 * @returns {Promise}
+	 */
+	function pipe(startValue, fnList) {
+		let promise = asap(startValue);
 		for (let n=fnList.length, i=0; i<n; i++) {
 			let fn = fnList[i];
 			promise = promise.then(fn);
@@ -809,104 +663,60 @@
 		return promise;
 	}
 
+	/**
+	 * Async reduce that yields to the browser when frame time runs out.
+	 * @param {*} accumulator - Initial accumulator value
+	 * @param {Array} a - Array to reduce
+	 * @param {Function} fn - Reducer function(acc, val, i, arr)
+	 * @param {*} [context] - `this` context for fn
+	 * @returns {Promise}
+	 */
 	function reduce(accumulator, a, fn, context) {
-	return new Thenfu(function(resolve, reject) {
+	return new Promise(function(resolve, reject) {
 		let length = a.length;
 		let i = 0;
 
-		let predictor = new TimeoutPredictor(256, 2);
-		process(accumulator);
+		Task.asap(() => process(accumulator));
 		return;
 
 		function process(acc) {
-			let prevTime;
-			let j = 0;
-			let timeoutCount = 1;
-
 			while (i < length) {
-				if (Thenfu.isThenable(acc)) {
-					if (!(acc instanceof Thenfu) || !acc.isFulfilled) {
+				if (isThenable(acc)) {
 						acc.then(process, reject);
-						if (j <= 0 || !prevTime || i >= length) return;
-						let currTime = Task.getTime(true);
-						predictor.update(j, prevTime - currTime);
 						return;
-					}
-					/* else */ acc = acc.value;
 				}
 				try {
 					acc = fn.call(context, acc, a[i], i, a);
-					i++; j++;
+					i++;
 				}
 				catch (error) {
 					reject(error);
 					return;
 				}
 				if (i >= length) break;
-				if (j < timeoutCount) continue;
 
-				// update timeout counter data
 				let currTime = Task.getTime(true); // NOTE *remaining* time
-				if (prevTime) predictor.update(j, prevTime - currTime); // NOTE based on *remaining* time
 				if (currTime <= 0) {
-					// Could use Promise.resolve(acc).then(process, reject)
-					// ... but this is considerably quicker
-					// FIXME ... although with TimeoutPredictor maybe it doesn't matter
 					Task.asap(function() { process(acc); });
 					return;
 				}
-				j = 0;
-				timeoutCount = predictor.getTimeoutCount(currTime);
-				prevTime = currTime;
 			}
 			resolve(acc);
 		}
 	});
 	}
 
-	function TimeoutPredictor(max, mult) { // FIXME test args are valid
-		if (!(this instanceof TimeoutPredictor)) return new TimeoutPredictor(max, mult);
-		let predictor = this;
-		assign(predictor, {
-			count: 0,
-			totalTime: 0,
-			currLimit: 1,
-			absLimit: !max ? 256 : max < 1 ? 1 : max,
-			multiplier: !mult ? 2 : mult < 1 ? 1 : mult
-		});
-	}
-
-	assign(TimeoutPredictor.prototype, {
-
-	update: function(count, delta) {
-		let predictor = this;
-		predictor.count += count;
-		predictor.totalTime += delta;
-	},
-
-	getTimeoutCount: function(remainingTime) {
-		let predictor = this;
-		if (predictor.count <= 0) return 1;
-		let avgTime = predictor.totalTime / predictor.count;
-		let n = Math.floor( remainingTime / avgTime );
-		if (n <= 0) return 1;
-		if (n < predictor.currLimit) return n;
-		n = predictor.currLimit;
-		if (predictor.currLimit >= predictor.absLimit) return n;
-		predictor.currLimit = predictor.multiplier * predictor.currLimit;
-		if (predictor.currLimit < predictor.absLimit) return n;
-		predictor.currLimit = predictor.absLimit;
-		// FIXME do methods other than reduce() use TimeoutPredictor??
-		console.debug('Promise.reduce() hit absLimit: ', predictor.absLimit);
-		return n;
-	}
-
-
-	});
-
-	defaults(Thenfu, {
-		asap: asap, defer: defer, delay: delay, wait: wait, pipe: pipe, reduce: reduce
-	});
+	var Thenfu = {
+		isThenable,
+		try: tryFn,
+		asap,
+		defer, 
+		delay,
+		wait,
+		pipe,
+		reduce,
+		settle
+	};
 
 	let document$b = window.document;
 
@@ -1355,7 +1165,7 @@
 
 
 	function whenVisible(element) { // FIXME this quite possibly causes leaks if closestHidden is removed from document before removeEventListener
-		return new Thenfu(function(resolve, reject) {
+		return new Promise(function(resolve) {
 			let closestHidden = closest$1(element, '[hidden]');
 			if (!closestHidden) {
 				resolve();
@@ -1653,8 +1463,8 @@
 	let scriptQueue = {
 
 	push: function(node) {
-	return new Thenfu(function(resolve, reject) {
-		if (emptying) throw Error('Attempt to append script to scriptQueue while emptying');
+		return new Promise(function(resolve, reject) {
+			if (emptying) throw Error('Attempt to append script to scriptQueue while emptying');
 		
 		// TODO assert node is in document
 
@@ -1687,23 +1497,23 @@
 		script.type = 'text/javascript';
 		
 		// enabledFu resolves after script is inserted
-		let enabledFu = Thenfu.applyTo();
+		let enabledFu = Promise.withResolvers();
 		
 		let prev = queue[queue.length - 1], prevScript = prev && prev.script;
 
-		let triggerFu; // triggerFu allows this script to be enabled, i.e. inserted
+		let trigger; // trigger allows this script to be enabled, i.e. inserted
 		if (prev) {
-			if (prevScript.hasAttribute('async') || script.src && supportsSync && !script.hasAttribute('async')) triggerFu = prev.enabled;
-			else triggerFu = prev.complete; 
+			if (prevScript.hasAttribute('async') || script.src && supportsSync && !script.hasAttribute('async')) trigger = prev.enabled;
+			else trigger = prev.complete;
 		}
-		else triggerFu = Thenfu.resolve();
+		else trigger = Thenfu.asap();
 		
-		triggerFu.then(enable, enable);
+		trigger.then(enable, enable);
 
-		let completeFu = Thenfu.applyTo();
-		completeFu.then(resolve, reject);
+		let completeFu = Promise.withResolvers();
+		completeFu.promise.then(resolve, reject);
 
-		let current = { script: script, complete: completeFu, enabled: enabledFu };
+		let current = { script: script, complete: completeFu.promise, enabled: enabledFu.promise };
 		queue.push(current);
 		return;
 
@@ -1751,7 +1561,7 @@
 	},
 
 	empty: function() {
-	return new Thenfu(function(resolve, reject) {
+		return new Promise(function(resolve, reject) {
 		
 		emptying = true;
 		if (queue.length <= 0) {
@@ -3255,10 +3065,24 @@
 		}
 
 
+		/**
+		 * HTTP client with response caching and HTML document parsing.
+		 * Fetches URLs via XMLHttpRequest, parses responses into DOM documents,
+		 * and caches GET responses by URL.
+		 */
 		let httpProxy = {
 
 			HTML_IN_XHR: HTML_IN_XHR,
 
+			/**
+			 * Add a pre-existing response to the cache.
+			 * The document is normalized (relative URLs resolved) before caching.
+			 * @param {Object} response
+			 * @param {string} response.url - The URL to cache under
+			 * @param {string} response.type - Response type ('document')
+			 * @param {Document} response.document - The document to cache
+			 * @returns {Promise} Resolves when caching is complete
+			 */
 			add: function (response) { // NOTE this is only for the landing page
 				let url = response.url;
 				if (!url) throw Error('Invalid url in response object');
@@ -3280,6 +3104,14 @@
 				]);
 			},
 
+			/**
+			 * Fetch a URL, returning a cached response if available.
+			 * @param {string} url - URL to fetch
+			 * @param {Object} [requestInfo]
+			 * @param {string} [requestInfo.method='get'] - HTTP method
+			 * @param {string} [requestInfo.responseType='document'] - Response type
+			 * @returns {Promise} Resolves with { url, type, status, statusText, document }
+			 */
 			load: function (url, requestInfo) {
 				let info = {
 					url: url
@@ -3304,7 +3136,7 @@
 					break;
 				case 'get':
 					let response = cacheLookup(info);
-					if (response) return Thenfu.resolve(response);
+					if (response) return Thenfu.asap(response);
 					return doRequest(info)
 						.then(function (response) {
 							cacheAdd(info, response);
@@ -3318,7 +3150,7 @@
 		};
 
 		let doRequest = function (info) {
-			return new Thenfu(function (resolve, reject) {
+			return new Promise(function (resolve, reject) {
 				let method = info.method;
 				let url = info.url;
 				let sendText = info.body; // FIXME not-implemented
@@ -3398,170 +3230,232 @@
 		return httpProxy;
 	})();
 
-	// wrapper for `history` mostly to provide locking around state-updates and throttling of popstate events
-	let historyManager = (function() {
+	/**
+	 * A serial async task queue that executes tasks one at a time,
+	 * deferring each to allow the browser to remain responsive.
+	 */
+	class SimpleTaskQueue {
 
-	let historyManager = {};
+	#queue = [];
+	#maxSize;
+	#processing = false;
 
-	const STATE_TAG = 'HyperFrameset';
-	let currentState;
-	let popStateHandler;
-	let started = false;
-
-	defaults(historyManager, {
-
-	getState: function() {
-		return currentState;
-	},
-
-	start: function(data, title, url, onNewState, onPopState) { // FIXME this should call onPopState if history.state is defined
-	return scheduler.now(function() {
-		if (started) throw Error('historyManager has already started');
-		started = true;
-		popStateHandler = onPopState;
-		let newState = State.create(data, title, url);
-		if (history.replaceState) {
-			history.replaceState(newState.settings, title, url);
-		}
-		currentState = newState;
-		return onNewState(newState);
-	});
-	},
-
-	newState: function(data, title, url, useReplace, callback) {
-	return scheduler.now(function() {
-		let newState = State.create(data, title, url);
-		if (history.replaceState) {
-			if (useReplace) history.replaceState(newState.settings, title, url);
-			else history.pushState(newState.settings, title, url);
-		}
-		currentState = newState;
-		if (callback) return callback(newState);
-	});
-	},
-
-	replaceState: function(data, title, url, callback) {
-		return this.newState(data, title, url, true, callback);
-	},
-
-	pushState: function(data, title, url, callback) {
-		return this.newState(data, title, url, false, callback);
+	/**
+	 * @param {number} [maxSize=1] - Maximum number of tasks allowed to be queued while processing.
+	 */
+	constructor(maxSize = 1) {
+		this.#maxSize = maxSize;
 	}
 
-	});
-
-	if (history.replaceState) window.addEventListener('popstate', function(e) {
-			if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-			else e.stopPropagation();
-			
-			let newSettings = e.state;
-			if (!newSettings[STATE_TAG]) {
-				console.warn('Ignoring invalid PopStateEvent');
-				return;
-			}
-			scheduler.reset(function() {
-				currentState = new State(newSettings);
-				if (!popStateHandler) return;
-				return popStateHandler(currentState);
-			});
-		}, true);
-
-	function State(settings) {
-		if (!settings[STATE_TAG]) throw Error('Invalid settings for new State');
-		this.settings = settings;
+	#bump() {
+		if (this.#processing) return;
+		this.#processing = true;
+		this.#process();
 	}
 
-	State.create = function(data, title, url) {
-		let timeStamp = +(new Date);
-		let settings = {
-			title: title,
-			url: url,
-			timeStamp: timeStamp,
-			data: data
-		};
-		settings[STATE_TAG] = true;
-		return new State(settings);
-	};
-
-	defaults(State.prototype, {
-
-	getData: function() {
-		return this.settings.data;
-	},
-
-	update: function(data, callback) { // FIXME not being used. Can it be reomved?
-		let state = this;
-		return Thenfu.resolve(function() {
-			if (state !== currentState) throw Error('Cannot update state: not current');
-			return scheduler.now(function() {
-				if (history.replaceState) history.replaceState(state.settings, title, url);
-				return callback(state);
-			});
-		});
-	}
-
-	});
-
-	return historyManager;
-
-	})();
-
-
-	let scheduler = (function() { // NOTE only used in historyManager
-
-	let queue = [];
-	let maxSize = 1;
-	let processing = false;
-
-	function bump() {
-		if (processing) return;
-		processing = true;
-		process();
-	}
-
-	function process() {
-		if (queue.length <= 0) {
-			processing = false;
+	#process() {
+		if (this.#queue.length <= 0) {
+			this.#processing = false;
 			return;
 		}
-		let task = queue.shift();
+		let task = this.#queue.shift();
 		let promise = Thenfu.defer(task.fn);
-		promise.then(process, process);
+		promise.then(() => this.#process(), () => this.#process());
 		promise.then(task.resolve, task.reject);
 	}
 
-	let scheduler = {
-		
-	now: function(fn, fail) {
+	/**
+	 * Queue a task to run as soon as possible. Fails if the queue is non-empty.
+	 * @param {Function} fn - Task function to execute
+	 * @param {Function} [fail] - Called if the queue is full
+	 * @returns {Promise} Resolves with fn's return value, or rejects if full and no fail callback
+	 */
+	now(fn, fail) {
 		return this.whenever(fn, fail, 0);
-	},
-
-	reset: function(fn) {
-		queue.length = 0;
-		return this.whenever(fn, null, 1);
-	},
-
-	whenever: function(fn, fail, max) {
-	return new Thenfu(function(resolve, reject) {
-
-		if (max == null) max = maxSize;
-		if (queue.length > max || (queue.length === max && processing)) {
-			if (fail) Thenfu.defer(fail).then(resolve, reject);
-			else reject(function() { throw Error('No `fail` callback passed to whenever()'); });
-			return;
-		}
-		queue.push({ fn: fn, resolve: resolve, reject: reject });
-
-		bump();
-	});
 	}
 
-	};
+	/**
+	 * Clear the queue and schedule a task.
+	 * @param {Function} fn - Task function to execute
+	 * @returns {Promise} Resolves with fn's return value
+	 */
+	reset(fn) {
+		this.#queue.length = 0;
+		return this.whenever(fn, null, 1);
+	}
 
-	return scheduler;
+	/**
+	 * Queue a task if the queue size is within the allowed limit.
+	 * @param {Function} fn - Task function to execute
+	 * @param {Function} [fail] - Called if the queue is full
+	 * @param {number} [max] - Override for maximum queue size (defaults to constructor maxSize)
+	 * @returns {Promise} Resolves with fn's return value, or rejects if full and no fail callback
+	 */
+	whenever(fn, fail, max) {
+		if (max == null) max = this.#maxSize;
+		return new Promise((resolve, reject) => {
+			if (this.#queue.length > max || (this.#queue.length === max && this.#processing)) {
+				if (fail) Thenfu.defer(fail).then(resolve, reject);
+				else reject(function() { throw Error('No `fail` callback passed to whenever()'); });
+				return;
+			}
+			this.#queue.push({fn, resolve, reject});
+			this.#bump();
+		});
+	}
 
-	})();
+	}
 
+	class HistoryState {
+	    static #STATE_TAG = 'HyperFrameset';
+
+	    constructor(settings) {
+	        if (!HistoryState.isValid(settings)) throw Error('Invalid settings for new HistoryState');
+	        this.settings = settings;
+	    }
+
+	    static isValid(settings) {
+	        return settings != null && settings[HistoryState.#STATE_TAG] === true;
+	    }
+
+	    static create(data, title, url) {
+	        let settings = {
+	            title: title,
+	            url: url,
+	            timeStamp: Date.now(),
+	            data: data
+	        };
+	        settings[HistoryState.#STATE_TAG] = true;
+	        return new HistoryState(settings);
+	    }
+
+	    getData() {
+	        return this.settings.data;
+	    }
+	}
+
+	/**
+	 * Wrapper around the browser History API providing locking around state updates
+	 * and throttling of popstate events via an internal task queue.
+	 * 
+	 * Must be started with start() before use. Cannot be restarted.
+	 * All state-changing methods are serialized through the task queue to prevent
+	 * concurrent history modifications.
+	 */
+	class HistoryManager {
+
+	#taskQueue = new SimpleTaskQueue();
+	#currentState;
+	#popStateHandler;
+	#started = false;
+
+	constructor() {
+		if (history.replaceState) window.addEventListener('popstate', (e) => {
+			if (e.stopImmediatePropagation) e.stopImmediatePropagation();
+			else e.stopPropagation();
+
+			let newSettings = e.state;
+			if (!HistoryState.isValid(newSettings)) {
+				console.warn('Ignoring invalid PopStateEvent');
+				return;
+			}
+			this.#taskQueue.reset(() => {
+				this.#currentState = new HistoryState(newSettings);
+				if (!this.#popStateHandler) return;
+				return this.#popStateHandler(this.#currentState);
+			});
+		}, true);
+	}
+
+	/**
+	 * Get the current history state.
+	 * @returns {HistoryState|undefined}
+	 */
+	getState() {
+		return this.#currentState;
+	}
+
+	/**
+	 * Initialize the history manager. Can only be called once.
+	 * Replaces the current history entry and registers a popstate listener.
+	 * @param {*} data - Application data to store in state
+	 * @param {string} title - Page title
+	 * @param {string} url - URL for the history entry
+	 * @param {Function} onNewState - Called with the new HistoryState on initialization
+	 * @param {Function} onPopState - Called with the restored HistoryState on popstate events
+	 * @returns {Promise}
+	 */
+	start(data, title, url, onNewState, onPopState) { // FIXME this should call onPopState if history.state is defined
+		return this.#taskQueue.now(() => {
+			if (this.#started) throw Error('historyManager has already started');
+			this.#started = true;
+			this.#popStateHandler = onPopState;
+			let newState = HistoryState.create(data, title, url);
+			if (history.replaceState) {
+				history.replaceState(newState.settings, title, url);
+			}
+			this.#currentState = newState;
+			return onNewState(newState);
+		});
+	}
+
+	/**
+	 * Create a new history entry or replace the current one.
+	 * @param {*} data - Application data to store in state
+	 * @param {string} title - Page title
+	 * @param {string} url - URL for the history entry
+	 * @param {boolean} useReplace - If true, replaces current entry instead of pushing
+	 * @param {Function} [callback] - Called with the new HistoryState
+	 * @returns {Promise}
+	 */
+	newState(data, title, url, useReplace, callback) {
+		return this.#taskQueue.now(() => {
+			let newState = HistoryState.create(data, title, url);
+			if (history.replaceState) {
+				if (useReplace) history.replaceState(newState.settings, title, url);
+				else history.pushState(newState.settings, title, url);
+			}
+			this.#currentState = newState;
+			if (callback) return callback(newState);
+		});
+	}
+
+	/**
+	 * Replace the current history entry.
+	 * @param {*} data
+	 * @param {string} title
+	 * @param {string} url
+	 * @param {Function} [callback]
+	 * @returns {Promise}
+	 */
+	replaceState(data, title, url, callback) {
+		return this.newState(data, title, url, true, callback);
+	}
+
+	/**
+	 * Push a new history entry.
+	 * @param {*} data
+	 * @param {string} title
+	 * @param {string} url
+	 * @param {Function} [callback]
+	 * @returns {Promise}
+	 */
+	pushState(data, title, url, callback) {
+		return this.newState(data, title, url, false, callback);
+	}
+
+	}
+
+	var historyManager = new HistoryManager();
+
+	/**
+	 * Represents a namespace with a URN, name, and prefix style.
+	 * Supports XML-style (colon separator) and vendor-style (hyphen separator) prefixes.
+	 * @param {Object} options
+	 * @param {string} options.urn - Namespace URN identifier
+	 * @param {string} options.name - Short name used as prefix base
+	 * @param {string} options.style - 'xml' or 'vendor'
+	 */
 	let CustomNamespace = (function() {
 
 	function CustomNamespace(options) {
@@ -3584,13 +3478,28 @@
 
 	defaults(CustomNamespace.prototype, {
 
+	/**
+	 * Create a shallow copy of this namespace definition.
+	 * @returns {CustomNamespace}
+	 */
 	clone: function() {
 		let clone = new CustomNamespace();
 		assign(clone, this);
 		return clone;
 	},
 
+	/**
+	 * Return a prefixed tag name.
+	 * @param {string} name - Unprefixed tag name
+	 * @returns {string} Prefixed tag name (e.g. 'haz:if')
+	 */
 	lookupTagName: function(name) { return this.prefix + name; },
+
+	/**
+	 * Prefix each tag in a CSS selector.
+	 * @param {string} selector - CSS selector with unprefixed tag names
+	 * @returns {string} Selector with prefixed tag names
+	 */
 	lookupSelector: function(selector) {
 		let prefix = this.selectorPrefix;
 		let tags = selector.split(/\s*,\s*|\s+/);
@@ -3616,7 +3525,12 @@
 		styleInfo.configPrefix = styleInfo.configNamespace + styleInfo.separator;
 	});
 
-	CustomNamespace.getNamespaces = function(doc) { // NOTE modelled on IE8, IE9 document.namespaces interface
+	/**
+	 * Create a NamespaceCollection from a document's root element attributes.
+	 * @param {Document} doc
+	 * @returns {NamespaceCollection}
+	 */
+	CustomNamespace.getNamespaces = function(doc) {
 		return new NamespaceCollection(doc);
 	};
 
@@ -3624,6 +3538,11 @@
 
 	})();
 
+	/**
+	 * A collection of CustomNamespace objects with lookup methods.
+	 * Initialized from xmlns: or custom- attributes on a document's root element.
+	 * @param {Document} [doc] - Document to scan for namespace declarations
+	 */
 	let NamespaceCollection = function(doc) {
 		if (!(this instanceof NamespaceCollection)) return new NamespaceCollection(doc);
 		this.items = [];
@@ -3651,6 +3570,10 @@
 		});
 	},
 
+	/**
+	 * Deep copy this collection and all its namespace definitions.
+	 * @returns {NamespaceCollection}
+	 */
 	clone: function() {
 		let coll = new NamespaceCollection();
 		forEach(this.items, function(nsDef) { 
@@ -3659,6 +3582,10 @@
 		return coll;
 	},
 
+	/**
+	 * Add a namespace definition. Rejects duplicates by URN or prefix.
+	 * @param {CustomNamespace} nsDef
+	 */
 	add: function(nsDef) {
 		let coll = this;
 		let matchingNS = find$3(coll.items, function(def) {
@@ -3675,6 +3602,11 @@
 		coll.items.push(nsDef);
 	},
 
+	/**
+	 * Find a namespace definition by URN.
+	 * @param {string} urn
+	 * @returns {CustomNamespace|undefined}
+	 */
 	lookupNamespace: function(urn) {
 		let coll = this;
 		urn = lc(urn);
@@ -3684,13 +3616,22 @@
 		return nsDef;
 	},
 
-
+	/**
+	 * Get the prefix string for a namespace URN.
+	 * @param {string} urn
+	 * @returns {string|undefined} e.g. 'haz:'
+	 */
 	lookupPrefix: function(urn) {
 		let coll = this;
 		let nsDef = coll.lookupNamespace(urn);
 		return nsDef && nsDef.prefix;
 	},
 
+	/**
+	 * Get the URN for a given prefix.
+	 * @param {string} prefix
+	 * @returns {string|undefined}
+	 */
 	lookupNamespaceURI: function(prefix) {
 		let coll = this;
 		prefix = lc(prefix);
@@ -3700,13 +3641,25 @@
 		return nsDef && nsDef.urn;
 	},
 
+	/**
+	 * Return a prefixed tag name for a given URN.
+	 * @param {string} name - Unprefixed tag name
+	 * @param {string} urn - Namespace URN
+	 * @returns {string}
+	 */
 	lookupTagNameNS: function(name, urn) {
 		let coll = this;
 		let nsDef = coll.lookupNamespace(urn);
-		if (!nsDef) return name; // TODO is this correct?
-		return nsDef.prefix + name; // TODO _.lc(name) ??
+		if (!nsDef) return name;
+		return nsDef.prefix + name;
 	},
 
+	/**
+	 * Prefix a CSS selector for a given URN.
+	 * @param {string} selector
+	 * @param {string} urn
+	 * @returns {string}
+	 */
 	lookupSelector: function(selector, urn) {
 		let nsDef = this.lookupNamespace(urn);
 		if (!nsDef) return selector;
@@ -3821,6 +3774,9 @@
 
 	const CSS_CONTEXT_VARIABLE = '_';
 
+	/**
+	 * @implements {Decoder}
+	 */
 	function CSSDecoder(options, namespaces) {}
 
 	defaults(CSSDecoder.prototype, {
@@ -4214,6 +4170,9 @@
 	})();
 
 
+	/**
+	 * @implements {Decoder}
+	 */
 	function MicrodataDecoder(options, namespaces) {}
 
 	defaults(MicrodataDecoder.prototype, {
@@ -4277,6 +4236,9 @@
 
 	// FIXME not really a JSON decoder since expects JSON input and doesn't use JSON paths
 
+	/**
+	 * @implements {Decoder}
+	 */
 	function JSONDecoder(options, namespaces) {}
 
 	defaults(JSONDecoder.prototype, {
@@ -4360,6 +4322,9 @@
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */
 
+	/**
+	 * @implements {Processor}
+	 */
 	function MainProcessor(options) {}
 
 	defaults(MainProcessor.prototype, {
@@ -4391,6 +4356,9 @@
 	 */
 
 
+	/**
+	 * @implements {Processor}
+	 */
 	function ScriptProcessor(options) {
 		this.processor = options;
 	}
@@ -4557,7 +4525,7 @@
 	    attrs to elements.
 	*/
 	let hazLangDefinition =
-		'<otherwise <when@test <each@select <one@select +let@name,select <if@test <unless@test ' +
+		'<otherwise <when@test <each@select <one@select +var@name,select <if@test <unless@test ' +
 		'>choose <template@name,match >eval@select >mtext@select >text@select ' +
 		'call@name apply param@name,select clone deepclone element@name attr@name';
 
@@ -4621,6 +4589,9 @@
 		return result;
 	}
 
+	/**
+	 * @implements {Processor}
+	 */
 	function HazardProcessor(options, namespaces) {
 		this.templates = [];
 		this.namespaces = namespaces = namespaces.clone();
@@ -4956,7 +4927,7 @@
 		case 'template':
 			return frag;
 
-		case 'let':
+		case 'var':
 			name = el.getAttribute('name');
 			selector = el.getAttribute('select');
 			value = context;
@@ -4966,7 +4937,7 @@
 				}
 				catch (err) {
 					reportError(err);
-					console.warn('Error evaluating <haz:let name="' + name + '" select="' + selector + '">. Assumed empty.');
+					console.warn('Error evaluating <haz:var name="' + name + '" select="' + selector + '">. Assumed empty.');
 					value = undefined;
 				}
 			}
@@ -5006,7 +4977,7 @@
 
 		case 'apply': // WARN only applies to DOM-based provider
 			template = processor.getMatchingTemplate(context);
-			let promise = Thenfu.resolve(el);
+			let promise = Thenfu.asap(el);
 			if (template) {
 				return processor.transformTemplate(template, context, null, frag);
 			}
@@ -5328,18 +5299,17 @@
 
 			try {
 				let filterParams = (Function('return [' + text + '];'))();
+				expression.filters.push({
+					text: filterSpec,
+					name: filterName,
+					params: filterParams
+				});
+				return true;
 			}
 			catch (err) {
 				console.warn('Syntax Error in filter call: ' + filterSpec);
 				return false;
 			}
-
-			expression.filters.push({
-				text: filterSpec,
-				name: filterName,
-				params: filterParams
-			});
-			return true;
 		});
 
 		return expression;
@@ -6186,7 +6156,7 @@
 		let element = this.element;
 		let src = frame.attr('src');
 
-		return Thenfu.resolve().then(function() {
+		return Thenfu.asap().then(function() {
 
 			if (src == null) { // a non-src frame
 				return frame.load(null, { condition: 'loaded' });
@@ -6916,7 +6886,7 @@
 	});
 
 
-	let framesetReady = Thenfu.applyTo();
+	let framesetReady = Promise.withResolvers();
 
 	defaults(framer, {
 
@@ -6931,7 +6901,7 @@
 		if (!startOptions || !startOptions.contentDocument) throw Error('No contentDocument passed to start()');
 
 		framer.started = true;
-		Thenfu.resolve(startOptions.contentDocument)
+		Thenfu.asap(startOptions.contentDocument)
 		.then(function(doc) { // FIXME potential race condition between document finished loading and frameset rendering
 			return httpProxy.add({
 				url: document$1.URL,
@@ -7013,7 +6983,7 @@
 		},
 
 		function() { // TODO ideally frameset rendering wouldn't start until after this step
-			return framesetReady
+			return framesetReady.promise
 			.then(function() {
 
 				let changeset = framer.currentChangeset;
@@ -7524,10 +7494,10 @@
 		let module;
 		switch (msg.module) {
 		case 'frameset': module = framer.frameset.options; break;
-		default: return Thenfu.resolve();
+		default: return Thenfu.asap();
 		}
 		let handler = module[msg.type];
-		if (!handler) return Thenfu.resolve();
+		if (!handler) return Thenfu.asap();
 		let listener;
 
 		if (handler[msg.stage]) listener = handler[msg.stage];
@@ -7554,7 +7524,7 @@
 			promise['catch'](function(err) { throw Error(err); });
 			return promise;
 		}
-		else return Thenfu.resolve();
+		else return Thenfu.asap();
 	};
 
 	function registerFrames(framesetDef) {
