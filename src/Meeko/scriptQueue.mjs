@@ -75,19 +75,19 @@ push: function(node) {
 	
 	let prev = queue[queue.length - 1], prevScript = prev && prev.script;
 
-	let triggerFu; // triggerFu allows this script to be enabled, i.e. inserted
+	let trigger; // trigger allows this script to be enabled, i.e. inserted
 	if (prev) {
-		if (prevScript.hasAttribute('async') || script.src && supportsSync && !script.hasAttribute('async')) triggerFu = prev.enabled.promise;
-		else triggerFu = prev.complete.promise; 
+		if (prevScript.hasAttribute('async') || script.src && supportsSync && !script.hasAttribute('async')) trigger = prev.enabled;
+		else trigger = prev.complete;
 	}
-	else triggerFu = Thenfu.asap();
+	else trigger = Thenfu.asap();
 	
-	triggerFu.then(enable, enable);
+	trigger.then(enable, enable);
 
 	let completeFu = Promise.withResolvers();
 	completeFu.promise.then(resolve, reject);
 
-	let current = { script: script, complete: completeFu, enabled: enabledFu };
+	let current = { script: script, complete: completeFu.promise, enabled: enabledFu.promise };
 	queue.push(current);
 	return;
 
