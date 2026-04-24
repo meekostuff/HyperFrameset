@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('HyperFrameset integration', () => {
 
   test('frameset applies to landing page', async ({ page }) => {
-    await page.goto('/demo/normal.html');
+    await page.goto('/demo/normal.html?dev');
     // Wait for HyperFrameset to process the page
     await page.waitForSelector('hf-frame', { timeout: 5000 });
 
@@ -13,7 +13,7 @@ test.describe('HyperFrameset integration', () => {
   });
 
   test('page content is transcluded into frameset', async ({ page }) => {
-    await page.goto('/demo/normal.html');
+    await page.goto('/demo/normal.html?dev');
     await page.waitForSelector('#page-main', { timeout: 5000 });
 
     // The page's #page-main content should be present
@@ -22,7 +22,7 @@ test.describe('HyperFrameset integration', () => {
   });
 
   test('frameset header and footer are rendered', async ({ page }) => {
-    await page.goto('/demo/normal.html');
+    await page.goto('/demo/normal.html?dev');
     await page.waitForSelector('#frameset-header', { timeout: 5000 });
 
     const header = await page.locator('#frameset-header').textContent();
@@ -33,7 +33,7 @@ test.describe('HyperFrameset integration', () => {
   });
 
   test('irrelevant content is removed', async ({ page }) => {
-    await page.goto('/demo/normal.html');
+    await page.goto('/demo/normal.html?dev');
     await page.waitForSelector('hf-frame', { timeout: 5000 });
 
     // Elements with class "remove" should not be visible
@@ -42,7 +42,7 @@ test.describe('HyperFrameset integration', () => {
   });
 
   test('frameset styles are applied', async ({ page }) => {
-    await page.goto('/demo/normal.html');
+    await page.goto('/demo/normal.html?dev');
     await page.waitForSelector('.external.frameset', { timeout: 5000 });
 
     // The frameset stylesheet should apply a green border
@@ -54,7 +54,7 @@ test.describe('HyperFrameset integration', () => {
   });
 
   test('page-specific styles are not applied', async ({ page }) => {
-    await page.goto('/demo/normal.html');
+    await page.goto('/demo/normal.html?dev');
     await page.waitForSelector('.external.noframeset', { timeout: 5000 });
 
     // The page's noframeset stylesheet should NOT apply red background
@@ -66,7 +66,7 @@ test.describe('HyperFrameset integration', () => {
   });
 
   test('navigation index is loaded into frame', async ({ page }) => {
-    await page.goto('/demo/normal.html');
+    await page.goto('/demo/normal.html?dev');
     await page.waitForSelector('nav', { timeout: 5000 });
 
     // The nav from index.html should be transcluded
@@ -75,7 +75,7 @@ test.describe('HyperFrameset integration', () => {
   });
 
   test('pushState navigation updates frame content', async ({ page }) => {
-    await page.goto('/demo/normal.html');
+    await page.goto('/demo/normal.html?dev');
     await page.waitForSelector('nav a', { timeout: 5000 });
 
     // Click a nav link

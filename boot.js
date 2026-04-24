@@ -17,8 +17,9 @@ var defaults = { // NOTE defaults also define the type of the associated config 
 	"polling_interval": 1000/60,
 	"html5_block_elements": 'article aside figcaption figure footer header hgroup main nav section',
 	"html5_inline_elements": 'abbr mark output time audio video picture',
-	"main_script": '{bootscriptdir}HyperFrameset.js',
-//	"main_script": '{bootscriptdir}src/HyperFrameset.mjs', // for development
+	"main_script": /[?&]dev($|[=&])/.test(location.search)
+		? '{bootscriptdir}src/HyperFrameset.mjs'
+		: '{bootscriptdir}HyperFrameset.js',
 	"config_script": '{bootscriptdir}config.js'
 }
 
