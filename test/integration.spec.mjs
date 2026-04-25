@@ -96,4 +96,95 @@ test.describe('HyperFrameset integration', () => {
       }
     }
   });
+
+  test('forward and back navigation preserves content', async ({ page }) => {
+    await page.goto('/demo/normal.html?dev');
+    await page.waitForSelector('nav a', { timeout: 5000 });
+
+    // Set flag to verify no full page reload occurs
+    await page.evaluate(() => window.__noReload = true);
+
+    // normal.html -> get.html (forward 1)
+    await page.locator('nav a[href*="get.html"]').click();
+    await page.waitForSelector('#page-main form', { timeout: 5000 });
+    expect(page.url()).toContain('get.html');
+
+    // get.html -> long.html (forward 2)
+    await page.locator('nav a[href*="long.html"]').click();
+    await page.waitForFunction(() => document.querySelector('#page-header h1')?.textContent?.includes('Long'), { timeout: 5000 });
+    expect(page.url()).toContain('long.html');
+
+    // long.html -> normal.html (forward 3)
+    await page.locator('nav a[href*="normal.html"]').click();
+    await page.waitForFunction(() => document.querySelector('#page-header h1')?.textContent?.includes('Normal'), { timeout: 5000 });
+    expect(page.url()).toContain('normal.html');
+
+    // back to long.html (back 1)
+    await page.goBack();
+    await page.waitForFunction(() => document.querySelector('#page-header h1')?.textContent?.includes('Long'), { timeout: 5000 });
+    expect(page.url()).toContain('long.html');
+
+    // back to get.html (back 2)
+    await page.goBack();
+    await page.waitForSelector('#page-main form', { timeout: 5000 });
+    expect(page.url()).toContain('get.html');
+
+    // forward to long.html (forward 4)
+    await page.goForward();
+    await page.waitForFunction(() => document.querySelector('#page-header h1')?.textContent?.includes('Long'), { timeout: 5000 });
+    expect(page.url()).toContain('long.html');
+
+    // back to get.html (back 3)
+    await page.goBack();
+    await page.waitForSelector('#page-main form', { timeout: 5000 });
+    expect(page.url()).toContain('get.html');
+
+    // back to normal.html (back 4)
+    await page.goBack();
+    await page.waitForFunction(() => document.querySelector('#page-header h1')?.textContent?.includes('Normal'), { timeout: 5000 });
+    expect(page.url()).toContain('normal.html');
+
+    // Verify no full page reload occurred throughout
+    const survived = await page.evaluate(() => window.__noReload);
+    expect(survived).toBe(true);
+  });
+
+  test('GET form submission navigates with pushState', async ({ page }) => {
+    await page.goto('/demo/get.html?dev');
+    await page.waitForSelector('#page-main form', { timeout: 5000 });
+
+    // Set flag to verify no full page reload occurs
+    await page.evaluate(() => window.__noReload = true);
+
+    // Fill in the form and submit
+    await page.locator('input[name="q"]').fill('hello world');
+    await page.locator('input[type="submit"]').click();
+
+    // Wait for response page
+    await page.waitForFunction(
+      () => document.querySelector('#page-main')?.textContent?.includes('You asked'),
+      { timeout: 5000 }
+    );
+
+    // URL should contain the query parameter
+    expect(page.url()).toContain('get.ehtml');
+    expect(page.url()).toContain('q=hello');
+
+    // Response should show the submitted value
+    const text = await page.locator('#page-main').textContent();
+    expect(text).toContain('hello world');
+
+    // Verify pushState was used, not a full reload
+    const survived = await page.evaluate(() => window.__noReload);
+    expect(survived).toBe(true);
+
+    // Back should return to the form
+    await page.goBack();
+    await page.waitForSelector('#page-main form', { timeout: 5000 });
+    expect(page.url()).toContain('get.html');
+
+    // Still no reload after back navigation
+    const survivedBack = await page.evaluate(() => window.__noReload);
+    expect(survivedBack).toBe(true);
+  });
 });
