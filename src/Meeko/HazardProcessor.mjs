@@ -4,12 +4,6 @@
  * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
  */
 
-/* TODO
-    + The passing of nodes between documents needs to be audited.
-		Safari and IE10,11 in particular seem to require nodes to be imported / adopted
-		(not fully understood right now)
- */
-
 import * as _ from './stuff.mjs';
 import * as DOM from './DOM.mjs';
 import Thenfu from './Thenfu.mjs';
@@ -25,18 +19,6 @@ const htmlAttr = '_html';
 const PIPE_OPERATOR = '//>';
 
 const HYPERFRAMESET_URN = 'hyperframeset'; // FIXME DRY with libHyperFrameset.js
-
-/* WARN 
-	on IE11 and Edge, certain elements (or attrs) *not* attached to a document 
-	can trash the layout engine. Examples:
-		- <custom-element>
-		- <element style="...">
-		- <li value="NaN">
-*/
-const FRAGMENTS_ARE_INERT = !(window.HTMLUnknownElement &&
-	'runtimeStyle' in window.HTMLUnknownElement.prototype);
-// NOTE actually IE10 is okay, but no reasonable feature detection has been determined
-
 const HAZARD_TRANSFORM_URN = 'HazardTransform';
 const hazDefaultNS = new CustomNamespace({
 	urn: HAZARD_TRANSFORM_URN,
@@ -55,56 +37,6 @@ const mexprDefaultNS = new CustomNamespace({
 	name: 'mexpr',
 	style: 'xml'
 });
-
-/* 
- NOTE IE11 / Edge has a bad performance regression with DOM fragments 
- containing certain elements / attrs, see
-     https://connect.microsoft.com/IE/feedback/details/1776195/ie11-edge-performance-regression-with-dom-fragments
-*/
-let PERFORMANCE_UNFRIENDLY_CONDITIONS = [
-	{
-		tag: '*', // must be present for checkElementPerformance()
-		attr: 'style',
-		description: 'an element with @style'
-	},
-	{
-		tag: 'li',
-		attr: 'value',
-		description: 'a <li> element with @value'
-	},
-	{
-		tag: undefined,
-		description: 'an unknown or custom element'
-	}
-];
-
-function checkElementPerformance(el, namespaces) {
-	let exprPrefix = namespaces.lookupPrefix(HAZARD_EXPRESSION_URN);
-	let mexprPrefix = namespaces.lookupPrefix(HAZARD_MEXPRESSION_URN);
-
-	let outerHTML;
-	_.forEach(PERFORMANCE_UNFRIENDLY_CONDITIONS, function(cond) {
-		switch (cond.tag) {
-		case undefined: case null:
-			if (el.toString() !== '[object HTMLUnknownElement]') return;
-			break;
-		default:
-			if (DOM.getTagName(el) !== cond.tag) return;
-			// fall-thru
-		case '*': case '':
-			if (_.every(
-				['', exprPrefix, mexprPrefix], function(prefix) {
-					let attr = prefix + cond.attr;
-					return !el.hasAttribute(attr);
-				})
-			) return;
-			break;
-		}
-		if (!outerHTML) outerHTML = el.cloneNode(false).outerHTML; // FIXME caniuse outerHTML??
-		console.debug('Found ' + cond.description + ':\n\t\t' + outerHTML + '\n\t' +
-			'This can cause poor performance on IE / Edge.');
-	});
-}
 
 /*
  - items in hazLangDefinition are element@list-of-attrs
@@ -301,18 +233,6 @@ loadTemplate: function(template) {
 		el.hazardDetails = getHazardDetails(el, processor.namespaces);
 	});
 	
-	if (console.logLevel !== 'debug') return;
-
-	// if debugging then warn about PERFORMANCE_UNFRIENDLY_CONDITIONS (IE11 / Edge)
-	let hfNS = processor.namespaces.lookupNamespace(HYPERFRAMESET_URN);
-	walkTree(template, true, function(el) {
-		let tag = DOM.getTagName(el);
-		if (tag.indexOf(hazPrefix) === 0) return;
-		if (tag.indexOf(hfNS.prefix) === 0) return; // HyperFrameset element
-		checkElementPerformance(el, namespaces);
-	});
-
-
 	function implyOtherwise(el) { // NOTE this slurps *any* non-<haz:when>, including <haz:otherwise>
 		let otherwise = el.ownerDocument.createElement(hazPrefix + 'otherwise');
 		_.forEach(_.map(el.childNodes), function(node) {
@@ -379,27 +299,13 @@ getMatchingTemplate: function(element) {
 	});	
 },
 
-transform: FRAGMENTS_ARE_INERT ?
-function(provider, details) { // TODO how to use details
+transform: function(provider, details) {
 	let processor = this;
 	let root = processor.root;
 	let doc = root.ownerDocument;
 	let frag = doc.createDocumentFragment();
 	return processor._transform(provider, details, frag)
 	.then(function() {
-		return frag;
-	});
-} :
-
-// NOTE IE11, Edge needs a different transform() because fragments are not inert
-function(provider, details) {
-	let processor = this;
-	let root = processor.root;
-	let doc = DOM.createHTMLDocument('', root.ownerDocument);
-	let frag = doc.body; // WARN don't know why `doc.body` is inert but fragments aren't
-	return processor._transform(provider, details, frag)
-	.then(function() {
-		frag = childNodesToFragment(frag);
 		return frag;
 	});
 },
