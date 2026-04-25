@@ -157,23 +157,100 @@ describe('DOM.mjs', () => {
     expect(div.attributes).toHaveLength(0);
   });
 
-  test('insertNode appends at end', () => {
-    const parent = document.createElement('div');
-    parent.innerHTML = '<span>a</span>';
-    const child = document.createElement('span');
-    child.textContent = 'b';
-    DOM.insertNode('end', parent, child);
-    expect(parent.children).toHaveLength(2);
-    expect(parent.lastElementChild.textContent).toBe('b');
+  test('insertNode handles all conf options', () => {
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+
+    // before / beforebegin
+    container.innerHTML = '<span id="ref">ref</span>';
+    let ref = container.querySelector('#ref');
+    let node = document.createElement('b');
+    node.textContent = 'B';
+    DOM.insertNode('before', ref, node);
+    expect(container.innerHTML).toBe('<b>B</b><span id="ref">ref</span>');
+
+    container.innerHTML = '<span id="ref">ref</span>';
+    ref = container.querySelector('#ref');
+    node = document.createElement('b');
+    node.textContent = 'B';
+    DOM.insertNode('beforebegin', ref, node);
+    expect(container.innerHTML).toBe('<b>B</b><span id="ref">ref</span>');
+
+    // after / afterend
+    container.innerHTML = '<span id="ref">ref</span>';
+    ref = container.querySelector('#ref');
+    node = document.createElement('b');
+    node.textContent = 'A';
+    DOM.insertNode('after', ref, node);
+    expect(container.innerHTML).toBe('<span id="ref">ref</span><b>A</b>');
+
+    container.innerHTML = '<span id="ref">ref</span>';
+    ref = container.querySelector('#ref');
+    node = document.createElement('b');
+    node.textContent = 'A';
+    DOM.insertNode('afterend', ref, node);
+    expect(container.innerHTML).toBe('<span id="ref">ref</span><b>A</b>');
+
+    // start / afterbegin
+    container.innerHTML = '<span>existing</span>';
+    node = document.createElement('b');
+    node.textContent = 'first';
+    DOM.insertNode('start', container, node);
+    expect(container.firstElementChild.textContent).toBe('first');
+
+    container.innerHTML = '<span>existing</span>';
+    node = document.createElement('b');
+    node.textContent = 'first';
+    DOM.insertNode('afterbegin', container, node);
+    expect(container.firstElementChild.textContent).toBe('first');
+
+    // end / beforeend
+    container.innerHTML = '<span>existing</span>';
+    node = document.createElement('b');
+    node.textContent = 'last';
+    DOM.insertNode('end', container, node);
+    expect(container.lastElementChild.textContent).toBe('last');
+
+    container.innerHTML = '<span>existing</span>';
+    node = document.createElement('b');
+    node.textContent = 'last';
+    DOM.insertNode('beforeend', container, node);
+    expect(container.lastElementChild.textContent).toBe('last');
+
+    // replace
+    container.innerHTML = '<span id="old">old</span>';
+    ref = container.querySelector('#old');
+    node = document.createElement('b');
+    node.textContent = 'new';
+    DOM.insertNode('replace', ref, node);
+    expect(container.innerHTML).toBe('<b>new</b>');
+
+    // empty / contents
+    container.innerHTML = '<span>a</span><span>b</span>';
+    node = document.createElement('b');
+    node.textContent = 'only';
+    DOM.insertNode('empty', container, node);
+    expect(container.children).toHaveLength(1);
+    expect(container.firstElementChild.textContent).toBe('only');
+
+    container.innerHTML = '<span>a</span><span>b</span>';
+    node = document.createElement('b');
+    node.textContent = 'only';
+    DOM.insertNode('contents', container, node);
+    expect(container.children).toHaveLength(1);
+    expect(container.firstElementChild.textContent).toBe('only');
+
+    container.remove();
   });
 
-  test('insertNode inserts at start', () => {
+  test('insertNode adopts node from another document', () => {
     const parent = document.createElement('div');
-    parent.innerHTML = '<span>a</span>';
-    const child = document.createElement('span');
-    child.textContent = 'b';
-    DOM.insertNode('start', parent, child);
-    expect(parent.firstElementChild.textContent).toBe('b');
+    const otherDoc = document.implementation.createHTMLDocument('other');
+    const foreign = otherDoc.createElement('span');
+    foreign.textContent = 'adopted';
+    DOM.insertNode('end', parent, foreign);
+    expect(parent.lastElementChild.textContent).toBe('adopted');
+    expect(parent.lastElementChild.ownerDocument).toBe(document);
   });
 
   test('adoptContents moves children to fragment', () => {

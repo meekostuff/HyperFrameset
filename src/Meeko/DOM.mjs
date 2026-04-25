@@ -380,32 +380,20 @@ function whenVisible(element) { // FIXME this quite possibly causes leaks if clo
  * @param {Node} node - Node to insert
  * @returns {Element} Reference node
  */
-function insertNode(conf, refNode, node) { // like imsertAdjacentHTML but with a node and auto-adoption
-	let doc = refNode.ownerDocument;
-	if (doc.adoptNode) node = doc.adoptNode(node); // Safari 5 was throwing because imported nodes had been added to a document node
+function insertNode(conf, refNode, node) { // like insertAdjacentElement but with a node and auto-adoption
+	node = refNode.ownerDocument.adoptNode(node);
 	switch(conf) {
-
 	case 'before':
-	case 'beforebegin': refNode.parentNode.insertBefore(node, refNode); break;
-
+	case 'beforebegin': refNode.before(node); break;
 	case 'after':
-	case 'afterend': refNode.parentNode.insertBefore(node, refNode.nextSibling); break;
-
+	case 'afterend': refNode.after(node); break;
 	case 'start':
-	case 'afterbegin': refNode.insertBefore(node, refNode.firstChild); break;
-
+	case 'afterbegin': refNode.prepend(node); break;
 	case 'end':
-	case 'beforeend': refNode.appendChild(node); break;
-
-	case 'replace': refNode.parentNode.replaceChild(node, refNode); break;
-
+	case 'beforeend': refNode.append(node); break;
+	case 'replace': refNode.replaceWith(node); break;
 	case 'empty':
-	case 'contents': 
-		// TODO empty(refNode);
-		let child;
-		while (child = refNode.firstChild) refNode.removeChild(child);
-		refNode.appendChild(node);
-		break;
+	case 'contents': refNode.replaceChildren(node); break;
 	}
 	return refNode;
 }
