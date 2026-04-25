@@ -33,10 +33,6 @@ const nodeIdSuffix = Math.round(Math.random() * 1000000);
 const nodeIdProperty = '__' + vendorPrefix + nodeIdSuffix;
 /** @type {number} Counter for generating unique node IDs */
 let nodeCount = 0; // used to generated node IDs
-/** @type {Array<Node>} List of tagged nodes */
-let nodeTable = []; // list of tagged nodes
-/** @type {Object} Hash of storage for nodes, keyed off nodeIdProperty */
-let nodeStorage = {}; // hash of storage for nodes, keyed off `nodeIdProperty`
 
 /**
  * Generate unique ID for a DOM node
@@ -49,18 +45,19 @@ function uniqueId(node) {
 	nodeId = '__' + nodeCount++;
 	node[nodeIdProperty] = nodeId; // WARN would need `new String(nodeId)` in IE<=8
 			// so that node cloning doesn't copy the node ID property
-	nodeTable.push(node);
 	return nodeId;
 }
+
+/** @type {WeakMap<Node, *>} Storage for node-associated data */
+const nodeData = new WeakMap();
 
 /**
  * Store data associated with a DOM node
  * @param {Element} node - DOM element to store data for
  * @param {*} data - Data to store
  */
-function setData(node, data) { // FIXME assert node is element
-	let nodeId = uniqueId(node);
-	nodeStorage[nodeId] = data;
+function setData(node, data) {
+	nodeData.set(node, data);
 }
 
 /**
@@ -69,8 +66,7 @@ function setData(node, data) { // FIXME assert node is element
  * @returns {boolean} True if node has stored data
  */
 function hasData(node) {
-	let nodeId = node[nodeIdProperty];
-	return !nodeId ? false : nodeId in nodeStorage;
+	return nodeData.has(node);
 }
 
 /**
@@ -78,26 +74,8 @@ function hasData(node) {
  * @param {Node} node - DOM node to get data for
  * @returns {*} Stored data or undefined
  */
-function getData(node) { // TODO should this throw if no data?
-	let nodeId = node[nodeIdProperty];
-	if (!nodeId) return;
-	return nodeStorage[nodeId];
-}
-
-/**
- * Release all stored node data and call cleanup callback
- * @param {Function} callback - Cleanup function to call for each node
- * @param {*} context - Context for callback execution
- */
-function releaseNodes(callback, context) { // FIXME this is never called
-	for (let i=nodeTable.length-1; i>=0; i--) {
-		let node = nodeTable[i];
-		delete nodeTable[i];
-		if (callback) callback.call(context, node);
-		let nodeId = node[nodeIdProperty];
-		delete nodeStorage[nodeId];
-	}
-	nodeTable.length = 0;
+function getData(node) {
+	return nodeData.get(node);
 }
 
 /**
@@ -109,21 +87,6 @@ function getTagName(el) {
 	return el && el.nodeType === 1 ? _.lc(el.tagName) : '';
 }
 
-/** @type {Function|undefined} Cross-browser element matching function */
-let matchesSelector;
-
-if (document.documentElement.matches) matchesSelector = function(element, selector) {
-	return (element && element.nodeType === 1) ? element.matches(selector) : false; 
-}
-else _.some(_.words('moz webkit ms o'), function(prefix) {
-	let method = prefix + 'MatchesSelector';
-	if (document.documentElement[method]) {
-		matchesSelector = function(element, selector) { return (element && element.nodeType === 1) ? element[method](selector) : false; }
-		return true;
-	}
-	return false;
-});
-
 /**
  * Test if element matches CSS selector
  * @param {Element} element - Element to test
@@ -131,15 +94,13 @@ else _.some(_.words('moz webkit ms o'), function(prefix) {
  * @param {Element} [scope] - Scope element for relative selectors
  * @returns {boolean} True if element matches selector
  */
-let matches = matchesSelector ?
-function(element, selector, scope) {
+function matches(element, selector, scope) {
 	if (!(element && element.nodeType === 1)) return false;
 	if (typeof selector === 'function') return selector(element, scope);
 	return scopeify(function(absSelector) {
-		return matchesSelector(element, absSelector);
+		return element.matches(absSelector);
 	}, selector, scope);
-} :
-function() { throw Error('matches not supported'); } // NOTE fallback
+}
 
 /**
  * Find closest ancestor element matching selector
@@ -148,8 +109,7 @@ function() { throw Error('matches not supported'); } // NOTE fallback
  * @param {Element} [scope] - Scope element to stop at
  * @returns {Element|null} Matching ancestor or null
  */
-let closest = matchesSelector ?
-function(element, selector, scope) {
+function closest(element, selector, scope) {
 	if (typeof selector === 'function') {
 		for (let el=element; el && el!==scope; el=el.parentNode) {
 			if (el.nodeType !== 1) continue;
@@ -161,12 +121,11 @@ function(element, selector, scope) {
 
 		for (let el=element; el && el!==scope; el=el.parentNode) {
 			if (el.nodeType !== 1) continue;
-			if (matchesSelector(el, absSelector)) return el;
+			if (el.matches(absSelector)) return el;
 		}
 
 	}, selector, scope);
-} :
-function() { throw Error('closest not supported'); } // NOTE fallback
+}
 
 /**
  * Execute function with scoped selector
@@ -247,18 +206,16 @@ function findId(id, doc) {
  * @param {boolean} [inclusive] - Include root node in results if it matches
  * @returns {Array<Element>} Array of matching elements
  */
-let findAll = document.querySelectorAll ?
-function(selector, node, scope, inclusive) {
+function findAll(selector, node, scope, inclusive) {
 	if (!node) node = document;
 	if (!node.querySelectorAll) return [];
 	if (scope && !scope.nodeType) scope = node; // `true` but not the scope element
 	return scopeify(function(absSelector) {
 		let result = _.map(node.querySelectorAll(absSelector));
-		if (inclusive && matchesSelector(node, absSelector)) result.unshift(node);
+		if (inclusive && node.nodeType === 1 && node.matches(absSelector)) result.unshift(node);
 		return result;
 	}, selector, scope);
-} :
-function() { throw Error('findAll() not supported'); };
+}
 
 /**
  * Find first element matching selector
@@ -268,17 +225,15 @@ function() { throw Error('findAll() not supported'); };
  * @param {boolean} [inclusive] - Include root node in results if it matches
  * @returns {Element|null} First matching element or null
  */
-let find = document.querySelector ?
-function(selector, node, scope, inclusive) {
+function find(selector, node, scope, inclusive) {
 	if (!node) node = document;
 	if (!node.querySelector) return null;
 	if (scope && !scope.nodeType) scope = node; // `true` but not the scope element
 	return scopeify(function(absSelector) {
-		if (inclusive && matchesSelector(node, absSelector)) return node;
+		if (inclusive && node.nodeType === 1 && node.matches(absSelector)) return node;
 		return node.querySelector(absSelector);
 	}, selector, scope);
-} :
-function() { throw Error('find() not supported'); };
+}
 
 /**
  * Get sibling elements relative to reference node
@@ -320,20 +275,14 @@ function siblings(conf, refNode, conf2, refNode2) {
 }
 
 /**
- * Check if node contains another node
+ * Check if node contains another node. Equivalent to Node.contains().
  * @param {Node} node - Container node
  * @param {Node} otherNode - Node to check
- * @returns {boolean} True if node contains otherNode
+ * @returns {boolean} True if otherNode is a descendant of node, or is node itself
  */
-let contains = // WARN `contains()` means contains-or-isSameNode
-document.documentElement.contains && function(node, otherNode) {
-	if (node === otherNode) return true;
-	if (node.contains) return node.contains(otherNode);
-	if (node.documentElement) return node.documentElement.contains(otherNode); // FIXME won't be valid on pseudo-docs
-	return false;
-} ||
-document.documentElement.compareDocumentPosition && function(node, otherNode) { return (node === otherNode) || !!(node.compareDocumentPosition(otherNode) & 16); } ||
-function(node, otherNode) { throw Error('contains not supported'); };
+function contains(node, otherNode) {
+	return node.contains(otherNode);
+}
 
 /**
  * Dispatch custom event on target element
@@ -347,12 +296,12 @@ function dispatchEvent(target, type, params) { // NOTE every JS initiated event 
 		params = type;
 		type = params.type;
 	}
-	let bubbles = params && 'bubbles' in params ? !!params.bubbles : true;
-	let cancelable = params && 'cancelable' in params ? !!params.cancelable : true;
 	if (typeof type !== 'string') throw Error('trigger() called with invalid event type');
-	let detail = params && params.detail;
-	let event = document.createEvent('CustomEvent');
-	event.initCustomEvent(type, bubbles, cancelable, detail);
+	let event = new CustomEvent(type, {
+		bubbles: params && 'bubbles' in params ? !!params.bubbles : true,
+		cancelable: params && 'cancelable' in params ? !!params.cancelable : true,
+		detail: params && params.detail
+	});
 	if (params) _.defaults(event, params);
 	return target.dispatchEvent(event);
 }
@@ -713,7 +662,7 @@ function onLoaded(e) {
 
 export {
 	nodeIdProperty as uniqueIdAttr,
-	uniqueId, setData, getData, hasData, releaseNodes, // FIXME releaseNodes
+	uniqueId, setData, getData, hasData,
 	getTagName,
 	contains, matches,
 	findId, find, findAll, closest, siblings,
