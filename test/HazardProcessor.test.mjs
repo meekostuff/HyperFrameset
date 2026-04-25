@@ -244,3 +244,96 @@ describe('HazardProcessor', () => {
     expect(result.querySelector('span').getAttribute('class')).toBe('item-active');
   });
 });
+
+/*
+  These tests verify that IE11/Edge-specific workarounds in HazardProcessor are
+  unnecessary on modern browsers.
+
+  HazardProcessor.mjs contained two workarounds:
+
+  1. FRAGMENTS_ARE_INERT — detected via:
+       !(window.HTMLUnknownElement && 'runtimeStyle' in HTMLUnknownElement.prototype)
+     On IE11/Edge, DOM fragments containing certain elements or attributes could
+     crash or severely degrade the layout engine. When fragments were NOT inert,
+     HazardProcessor used document.body as a container instead.
+
+  2. PERFORMANCE_UNFRIENDLY_CONDITIONS — a list of element/attribute combinations
+     that triggered the IE11/Edge performance regression:
+       - Any element with a @style attribute
+       - A <li> element with a @value attribute
+       - An unknown or custom element (HTMLUnknownElement)
+     See: https://connect.microsoft.com/IE/feedback/details/1776195
+*/
+const FRAGMENTS_ARE_INERT = !(window.HTMLUnknownElement &&
+    'runtimeStyle' in window.HTMLUnknownElement.prototype);
+
+const PERFORMANCE_UNFRIENDLY_CONDITIONS = [
+  { tag: '*', attr: 'style', description: 'an element with @style' },
+  { tag: 'li', attr: 'value', description: 'a <li> element with @value' },
+  { tag: undefined, description: 'an unknown or custom element' }
+];
+
+describe('modern browser assumptions', () => {
+
+  test('FRAGMENTS_ARE_INERT is true', () => {
+    expect(FRAGMENTS_ARE_INERT).toBe(true);
+  });
+
+  test('HTMLUnknownElement does not have runtimeStyle', () => {
+    expect('runtimeStyle' in HTMLUnknownElement.prototype).toBe(false);
+  });
+
+  test('fragments safely handle all PERFORMANCE_UNFRIENDLY_CONDITIONS', () => {
+    for (const cond of PERFORMANCE_UNFRIENDLY_CONDITIONS) {
+      const frag = document.createDocumentFragment();
+      let el;
+      if (cond.tag === undefined) {
+        // unknown/custom element
+        el = document.createElement('my-custom-element');
+      } else {
+        el = document.createElement(cond.tag === '*' ? 'div' : cond.tag);
+      }
+      if (cond.attr) el.setAttribute(cond.attr, 'test');
+      frag.appendChild(el);
+      expect(frag.childNodes.length).toBe(1);
+    }
+  });
+
+  test('fragment operations with risky elements are not slower than baseline', () => {
+    const iterations = 1000;
+
+    // baseline: plain div in fragment
+    const t0 = performance.now();
+    for (let i = 0; i < iterations; i++) {
+      const frag = document.createDocumentFragment();
+      const el = document.createElement('div');
+      frag.appendChild(el);
+    }
+    const baseline = performance.now() - t0;
+
+    // custom element with style attribute (triggered IE11/Edge perf bug)
+    const t1 = performance.now();
+    for (let i = 0; i < iterations; i++) {
+      const frag = document.createDocumentFragment();
+      const el = document.createElement('my-custom-element');
+      el.setAttribute('style', 'color: red;');
+      frag.appendChild(el);
+    }
+    const customStyled = performance.now() - t1;
+
+    // li with value="NaN" (triggered IE11/Edge perf bug)
+    const t2 = performance.now();
+    for (let i = 0; i < iterations; i++) {
+      const frag = document.createDocumentFragment();
+      const el = document.createElement('li');
+      el.setAttribute('value', 'NaN');
+      frag.appendChild(el);
+    }
+    const liValue = performance.now() - t2;
+
+    // risky ops should be within 10x of baseline (on IE11 they were 1000x+)
+    expect(customStyled).toBeLessThan(baseline * 10);
+    expect(liValue).toBeLessThan(baseline * 10);
+  });
+
+});
