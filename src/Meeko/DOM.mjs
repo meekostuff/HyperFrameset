@@ -1,41 +1,48 @@
 /*!
  DOM utils
- (c) Sean Hogan, 2008,2012,2013,2014
+ (c) Sean Hogan, 2008,2012,2013,2014,2026
  Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 */
 
-/* NOTE
-Requires some features not implemented on older browsers:
-MutationOberver - IE10+
-element.matchesSelector (or prefixed equivalent) - IE9+
-element.querySelectorAll - IE8+
-element.addEventListener - IE9+
-element.dispatchEvent - IE9+
-Object.create - IE9+
-*/
+/**
+ * @fileoverview DOM utility functions for element manipulation, event handling, and node management
+ * @requires MutationObserver (IE10+)
+ * @requires element.matchesSelector (IE9+)
+ * @requires element.querySelectorAll (IE8+)
+ * @requires element.addEventListener (IE9+)
+ * @requires element.dispatchEvent (IE9+)
+ * @requires Object.create (IE9+)
+ */
 
 import * as _ from './stuff.mjs';
 import Thenfu from './Thenfu.mjs';
 
+/** @constant {string} Vendor prefix for internal properties */
 const vendorPrefix = 'meeko'; // FIXME DRY with other instances of `vendorPrefix`
 
+/** @type {Document} Reference to the document object */
 let document = window.document;
-
-/*
- ### DOM utility functions
- */
 
 // TODO all this node manager stuff assumes that nodes are only released on unload
 // This might need revising
-
 // TODO A node-manager API would be useful elsewhere
 
+/** @constant {number} Random suffix for node ID property names */
 const nodeIdSuffix = Math.round(Math.random() * 1000000);
+/** @constant {string} Property name for storing node IDs */
 const nodeIdProperty = '__' + vendorPrefix + nodeIdSuffix;
+/** @type {number} Counter for generating unique node IDs */
 let nodeCount = 0; // used to generated node IDs
+/** @type {Array<Node>} List of tagged nodes */
 let nodeTable = []; // list of tagged nodes
+/** @type {Object} Hash of storage for nodes, keyed off nodeIdProperty */
 let nodeStorage = {}; // hash of storage for nodes, keyed off `nodeIdProperty`
 
+/**
+ * Generate unique ID for a DOM node
+ * @param {Node} node - DOM node to get ID for
+ * @returns {string} Unique node identifier
+ */
 function uniqueId(node) {
 	let nodeId = node[nodeIdProperty];
 	if (nodeId) return nodeId;
@@ -46,22 +53,42 @@ function uniqueId(node) {
 	return nodeId;
 }
 
+/**
+ * Store data associated with a DOM node
+ * @param {Element} node - DOM element to store data for
+ * @param {*} data - Data to store
+ */
 function setData(node, data) { // FIXME assert node is element
 	let nodeId = uniqueId(node);
 	nodeStorage[nodeId] = data;
 }
 
+/**
+ * Check if node has associated data
+ * @param {Node} node - DOM node to check
+ * @returns {boolean} True if node has stored data
+ */
 function hasData(node) {
 	let nodeId = node[nodeIdProperty];
 	return !nodeId ? false : nodeId in nodeStorage;
 }
 
+/**
+ * Retrieve data associated with a DOM node
+ * @param {Node} node - DOM node to get data for
+ * @returns {*} Stored data or undefined
+ */
 function getData(node) { // TODO should this throw if no data?
 	let nodeId = node[nodeIdProperty];
 	if (!nodeId) return;
 	return nodeStorage[nodeId];
 }
 
+/**
+ * Release all stored node data and call cleanup callback
+ * @param {Function} callback - Cleanup function to call for each node
+ * @param {*} context - Context for callback execution
+ */
 function releaseNodes(callback, context) { // FIXME this is never called
 	for (let i=nodeTable.length-1; i>=0; i--) {
 		let node = nodeTable[i];
@@ -73,10 +100,16 @@ function releaseNodes(callback, context) { // FIXME this is never called
 	nodeTable.length = 0;
 }
 
+/**
+ * Get lowercase tag name of element
+ * @param {Element} el - DOM element
+ * @returns {string} Lowercase tag name or empty string
+ */
 function getTagName(el) {
 	return el && el.nodeType === 1 ? _.lc(el.tagName) : '';
 }
 
+/** @type {Function|undefined} Cross-browser element matching function */
 let matchesSelector;
 
 if (document.documentElement.matches) matchesSelector = function(element, selector) {
@@ -91,7 +124,13 @@ else _.some(_.words('moz webkit ms o'), function(prefix) {
 	return false;
 });
 
-
+/**
+ * Test if element matches CSS selector
+ * @param {Element} element - Element to test
+ * @param {string|Function} selector - CSS selector or test function
+ * @param {Element} [scope] - Scope element for relative selectors
+ * @returns {boolean} True if element matches selector
+ */
 let matches = matchesSelector ?
 function(element, selector, scope) {
 	if (!(element && element.nodeType === 1)) return false;
@@ -102,6 +141,13 @@ function(element, selector, scope) {
 } :
 function() { throw Error('matches not supported'); } // NOTE fallback
 
+/**
+ * Find closest ancestor element matching selector
+ * @param {Element} element - Starting element
+ * @param {string|Function} selector - CSS selector or test function
+ * @param {Element} [scope] - Scope element to stop at
+ * @returns {Element|null} Matching ancestor or null
+ */
 let closest = matchesSelector ?
 function(element, selector, scope) {
 	if (typeof selector === 'function') {
@@ -122,6 +168,14 @@ function(element, selector, scope) {
 } :
 function() { throw Error('closest not supported'); } // NOTE fallback
 
+/**
+ * Execute function with scoped selector
+ * @private
+ * @param {Function} fn - Function to execute with absolute selector
+ * @param {string} selector - CSS selector
+ * @param {Element} [scope] - Scope element
+ * @returns {*} Result of function execution
+ */
 function scopeify(fn, selector, scope) {
 	let absSelector = selector;
 	if (scope) {
@@ -139,6 +193,13 @@ function scopeify(fn, selector, scope) {
 	return result;
 }
 
+/**
+ * Convert relative selector to absolute selector within scope
+ * @private
+ * @param {string} selectorGroup - CSS selector group
+ * @param {Element} scope - Scope element
+ * @returns {string} Absolute selector
+ */
 function absolutizeSelector(selectorGroup, scope) { // WARN does not handle relative selectors that start with sibling selectors
 	switch (scope.nodeType) {
 	case 1:
@@ -164,6 +225,12 @@ function absolutizeSelector(selectorGroup, scope) { // WARN does not handle rela
 	return selectors.join(', ');
 }
 
+/**
+ * Find element by ID
+ * @param {string} id - Element ID
+ * @param {Document} [doc] - Document to search in
+ * @returns {Element|null} Found element or null
+ */
 function findId(id, doc) {
 	if (!id) return;
 	if (!doc) doc = document;
@@ -172,6 +239,14 @@ function findId(id, doc) {
 	// WARN would need a work around for broken getElementById in IE <= 7
 }
 
+/**
+ * Find all elements matching selector
+ * @param {string} selector - CSS selector
+ * @param {Element|Document} [node] - Root node to search from
+ * @param {Element|boolean} [scope] - Scope element or true for node scope
+ * @param {boolean} [inclusive] - Include root node in results if it matches
+ * @returns {Array<Element>} Array of matching elements
+ */
 let findAll = document.querySelectorAll ?
 function(selector, node, scope, inclusive) {
 	if (!node) node = document;
@@ -185,6 +260,14 @@ function(selector, node, scope, inclusive) {
 } :
 function() { throw Error('findAll() not supported'); };
 
+/**
+ * Find first element matching selector
+ * @param {string} selector - CSS selector
+ * @param {Element|Document} [node] - Root node to search from
+ * @param {Element|boolean} [scope] - Scope element or true for node scope
+ * @param {boolean} [inclusive] - Include root node in results if it matches
+ * @returns {Element|null} First matching element or null
+ */
 let find = document.querySelector ?
 function(selector, node, scope, inclusive) {
 	if (!node) node = document;
@@ -197,6 +280,14 @@ function(selector, node, scope, inclusive) {
 } :
 function() { throw Error('find() not supported'); };
 
+/**
+ * Get sibling elements relative to reference node
+ * @param {string} conf - Configuration: 'starting', 'after', 'ending', 'before'
+ * @param {Element} refNode - Reference node
+ * @param {string} [conf2] - Second configuration for range
+ * @param {Element} [refNode2] - Second reference node for range
+ * @returns {Array<Element>} Array of sibling elements
+ */
 function siblings(conf, refNode, conf2, refNode2) {
 	
 	conf = _.lc(conf);
@@ -228,6 +319,12 @@ function siblings(conf, refNode, conf2, refNode2) {
 	return nodeList;
 }
 
+/**
+ * Check if node contains another node
+ * @param {Node} node - Container node
+ * @param {Node} otherNode - Node to check
+ * @returns {boolean} True if node contains otherNode
+ */
 let contains = // WARN `contains()` means contains-or-isSameNode
 document.documentElement.contains && function(node, otherNode) {
 	if (node === otherNode) return true;
@@ -238,6 +335,13 @@ document.documentElement.contains && function(node, otherNode) {
 document.documentElement.compareDocumentPosition && function(node, otherNode) { return (node === otherNode) || !!(node.compareDocumentPosition(otherNode) & 16); } ||
 function(node, otherNode) { throw Error('contains not supported'); };
 
+/**
+ * Dispatch custom event on target element
+ * @param {Element} target - Target element
+ * @param {string|Object} type - Event type or event object
+ * @param {Object} [params] - Event parameters
+ * @returns {boolean} True if event was not cancelled
+ */
 function dispatchEvent(target, type, params) { // NOTE every JS initiated event is a custom-event
 	if (typeof type === 'object') {
 		params = type;
@@ -253,8 +357,13 @@ function dispatchEvent(target, type, params) { // NOTE every JS initiated event 
 	return target.dispatchEvent(event);
 }
 
+/** @type {Array<string>} List of managed event types */
 let managedEvents = [];
 
+/**
+ * Set up event management for specified event type
+ * @param {string} type - Event type to manage
+ */
 function manageEvent(type) {
 	if (_.includes(managedEvents, type)) return;
 	managedEvents.push(type);
@@ -266,6 +375,7 @@ function manageEvent(type) {
 }
 
 // DOM node visibilitychange implementation and monitoring
+/** @type {MutationObserver} Observer for visibility changes */
 let observer = new MutationObserver(function(mutations, observer) {
 	_.forEach(mutations, function(entry) {
 		triggerVisibilityChangeEvent(entry.target);
@@ -273,18 +383,31 @@ let observer = new MutationObserver(function(mutations, observer) {
 });
 observer.observe(document, { attributes: true, attributeFilter: ['hidden'], subtree: true });
 
+/**
+ * Trigger visibility change event on target element
+ * @param {Element} target - Target element
+ */
 // FIXME this should use observers, not events
 function triggerVisibilityChangeEvent(target) {
 	let visibilityState = target.hidden ? 'hidden' : 'visible';
 	dispatchEvent(target, 'visibilitychange', { bubbles: false, cancelable: false, detail: visibilityState }); // NOTE doesn't bubble to avoid clash with same event on document (and also performance)
 }
 
+/**
+ * Check if element is visible (not hidden)
+ * @param {Element} element - Element to check
+ * @returns {boolean} True if element is visible
+ */
 function isVisible(element) {
 	let closestHidden = closest(element, '[hidden]');
 	return (!closestHidden);
 }
 
-
+/**
+ * Return promise that resolves when element becomes visible
+ * @param {Element} element - Element to watch
+ * @returns {Promise} Promise that resolves when visible
+ */
 function whenVisible(element) { // FIXME this quite possibly causes leaks if closestHidden is removed from document before removeEventListener
 	return new Promise(function(resolve) {
 		let closestHidden = closest(element, '[hidden]');
@@ -301,7 +424,13 @@ function whenVisible(element) { // FIXME this quite possibly causes leaks if clo
 	});
 }
 
-
+/**
+ * Insert node relative to reference node
+ * @param {string} conf - Position: 'before', 'after', 'start', 'end', 'replace', 'empty'
+ * @param {Element} refNode - Reference node
+ * @param {Node} node - Node to insert
+ * @returns {Element} Reference node
+ */
 function insertNode(conf, refNode, node) { // like imsertAdjacentHTML but with a node and auto-adoption
 	let doc = refNode.ownerDocument;
 	if (doc.adoptNode) node = doc.adoptNode(node); // Safari 5 was throwing because imported nodes had been added to a document node
@@ -332,6 +461,12 @@ function insertNode(conf, refNode, node) { // like imsertAdjacentHTML but with a
 	return refNode;
 }
 
+/**
+ * Adopt all child nodes into document fragment
+ * @param {Element} parentNode - Parent node to adopt from
+ * @param {Document} [doc] - Target document
+ * @returns {DocumentFragment} Fragment containing adopted nodes
+ */
 function adoptContents(parentNode, doc) {
 	if (!doc) doc = document;
 	let frag = doc.createDocumentFragment();
@@ -349,6 +484,10 @@ TODO: does this still work when there are errors loading stylesheets??
 // TODO should be able to use <link>.onload, see
 // http://stackoverflow.com/a/13610128/108354
 // https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link
+/**
+ * Check if all stylesheets have loaded
+ * @returns {boolean} True if all stylesheets are loaded
+ */
 function checkStyleSheets() {
 	// check that every <link rel="stylesheet" type="text/css" /> 
 	// has loaded
@@ -387,6 +526,12 @@ function checkStyleSheets() {
 // WARN IE <= 8 would need styleText() to get/set <style> contents
 // WARN old non-IE would need scriptText() to get/set <script> contents
 
+/**
+ * Copy all attributes from source node to target node
+ * @param {Element} node - Target node
+ * @param {Element} srcNode - Source node
+ * @returns {Element} Target node
+ */
 function copyAttributes(node, srcNode) {
 	_.forEach(_.map(srcNode.attributes), function(attr) {
 		node.setAttribute(attr.name, attr.value); // WARN needs to be more complex for IE <= 7
@@ -394,6 +539,11 @@ function copyAttributes(node, srcNode) {
 	return node;
 }
 
+/**
+ * Remove all attributes from node
+ * @param {Element} node - Target node
+ * @returns {Element} Target node
+ */
 function removeAttributes(node) {
 	_.forEach(_.map(node.attributes), function(attr) {
 		node.removeAttribute(attr.name);
@@ -401,11 +551,13 @@ function removeAttributes(node) {
 	return node;
 }
 
+/** @constant {boolean} Whether createHTMLDocument copies URL from current document */
 const CREATE_DOCUMENT_COPIES_URL = (function() {
 	let doc = document.implementation.createHTMLDocument('');
 	return doc.URL === document.URL;
 })();
 
+/** @constant {boolean} Whether cloneNode copies URL from current document */
 const CLONE_DOCUMENT_COPIES_URL = (function() {
 	try {
 		let doc = document.cloneNode(false);
@@ -416,8 +568,14 @@ const CLONE_DOCUMENT_COPIES_URL = (function() {
 })();
 		
 // NOTE we want create*Document() to have a URL
+/** @constant {boolean} Whether to use cloneNode for document creation */
 const CREATE_DOCUMENT_WITH_CLONE = !CREATE_DOCUMENT_COPIES_URL && CLONE_DOCUMENT_COPIES_URL;
 
+/**
+ * Create new empty document
+ * @param {Document} [srcDoc] - Source document for cloning
+ * @returns {Document} New document
+ */
 function createDocument(srcDoc) { // modern browsers. IE >= 9
 	if (!srcDoc) srcDoc = document;
 	// TODO find doctype element??
@@ -432,6 +590,12 @@ function createDocument(srcDoc) { // modern browsers. IE >= 9
 	return doc;
 }
 
+/**
+ * Create new HTML document with title
+ * @param {string} title - Document title
+ * @param {Document} [srcDoc] - Source document for cloning
+ * @returns {Document} New HTML document
+ */
 function createHTMLDocument(title, srcDoc) { // modern browsers. IE >= 9
 	if (!srcDoc) srcDoc = document;
 	// TODO find doctype element??
@@ -448,6 +612,11 @@ function createHTMLDocument(title, srcDoc) { // modern browsers. IE >= 9
 	return doc;
 }
 
+/**
+ * Clone document with all content
+ * @param {Document} srcDoc - Source document to clone
+ * @returns {Document} Cloned document
+ */
 function cloneDocument(srcDoc) {
 	let doc = createDocument(srcDoc);
 	let docEl = doc.importNode(srcDoc.documentElement, true);
@@ -465,6 +634,10 @@ function cloneDocument(srcDoc) {
 	return doc;
 }
 
+/**
+ * Scroll to element with given ID
+ * @param {string} id - Element ID to scroll to
+ */
 function scrollToId(id) { // FIXME this isn't being used
 	if (id) {
 		let el = findId(id);
@@ -473,6 +646,7 @@ function scrollToId(id) { // FIXME this isn't being used
 	else window.scroll(0, 0);
 }
 
+/** @constant {Object} Lookup table for document ready states */
 let readyStateLookup = { // used in domReady() and checkStyleSheets()
 	'uninitialized': false,
 	'loading': false,
@@ -481,23 +655,39 @@ let readyStateLookup = { // used in domReady() and checkStyleSheets()
 	'complete': true
 }
 
+/**
+ * Execute function when DOM is ready
+ * @type {Function}
+ */
 let domReady = (function() { // WARN this assumes that document.readyState is valid or that content is ready...
 
+/** @type {string} Current document ready state */
 let readyState = document.readyState;
+/** @type {boolean} Whether DOM is loaded */
 let loaded = readyState ? readyStateLookup[readyState] : true;
+/** @type {Array<Function>} Queue of functions to execute when ready */
 let queue = [];
 
+/**
+ * Execute function when DOM is ready
+ * @param {Function} fn - Function to execute
+ */
 function domReady(fn) {
 	if (typeof fn !== 'function') return;
 	queue.push(fn);
 	if (loaded) processQueue();
 }
 
+/**
+ * Process queued functions
+ * @private
+ */
 function processQueue() {
 	_.forEach(queue, function(fn) { setTimeout(fn); });
 	queue.length = 0;
 }
 
+/** @type {Object} Event listeners for DOM ready */
 let events = {
 	'DOMContentLoaded': document,
 	'load': window
@@ -508,6 +698,11 @@ if (!loaded) _.forOwn(events, function(node, type) { node.addEventListener(type,
 return domReady;
 
 // NOTE the following functions are hoisted
+/**
+ * Handle DOM loaded event
+ * @private
+ * @param {Event} e - DOM event
+ */
 function onLoaded(e) {
 	loaded = true;
 	_.forOwn(events, function(node, type) { node.removeEventListener(type, onLoaded, false); });
