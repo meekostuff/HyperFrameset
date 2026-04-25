@@ -336,4 +336,49 @@ describe('DOM.mjs', () => {
     DOM.dispatchEvent(div, 'test-event');
     expect(received).toBe(true);
   });
+
+  test('isVisible returns false when element has hidden', () => {
+    const div = document.createElement('div');
+    div.hidden = true;
+    document.body.appendChild(div);
+    expect(DOM.isVisible(div)).toBe(false);
+    div.remove();
+  });
+
+  test('isVisible returns false when ancestor has hidden', () => {
+    const parent = document.createElement('div');
+    parent.hidden = true;
+    const child = document.createElement('span');
+    parent.appendChild(child);
+    document.body.appendChild(parent);
+    expect(DOM.isVisible(child)).toBe(false);
+    parent.remove();
+  });
+
+  test('isVisible returns true when not hidden', () => {
+    const div = document.createElement('div');
+    document.body.appendChild(div);
+    expect(DOM.isVisible(div)).toBe(true);
+    div.remove();
+  });
+
+  test('whenVisible resolves immediately if not hidden', async () => {
+    const div = document.createElement('div');
+    document.body.appendChild(div);
+    await DOM.whenVisible(div);
+    div.remove();
+  });
+
+  test('whenVisible resolves when hidden is removed', async () => {
+    const div = document.createElement('div');
+    div.hidden = true;
+    document.body.appendChild(div);
+    let resolved = false;
+    DOM.whenVisible(div).then(() => { resolved = true; });
+    expect(resolved).toBe(false);
+    div.hidden = false;
+    await new Promise(r => setTimeout(r, 50));
+    expect(resolved).toBe(true);
+    div.remove();
+  });
 });
