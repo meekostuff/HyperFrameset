@@ -6,12 +6,13 @@
 
 /**
  * @fileoverview DOM utility functions for element manipulation, event handling, and node management
- * @requires MutationObserver (IE10+)
- * @requires element.matchesSelector (IE9+)
- * @requires element.querySelectorAll (IE8+)
- * @requires element.addEventListener (IE9+)
- * @requires element.dispatchEvent (IE9+)
- * @requires Object.create (IE9+)
+ * @requires MutationObserver
+ * @requires Element.matches
+ * @requires Element.querySelector/querySelectorAll
+ * @requires CustomEvent constructor
+ * @requires WeakMap
+ * @requires ChildNode (before, after, replaceWith)
+ * @requires ParentNode (prepend, append, replaceChildren)
  */
 
 import * as _ from './stuff.mjs';
@@ -22,10 +23,6 @@ const vendorPrefix = 'meeko'; // FIXME DRY with other instances of `vendorPrefix
 
 /** @type {Document} Reference to the document object */
 let document = window.document;
-
-// TODO all this node manager stuff assumes that nodes are only released on unload
-// This might need revising
-// TODO A node-manager API would be useful elsewhere
 
 /** @constant {number} Random suffix for node ID property names */
 const nodeIdSuffix = Math.round(Math.random() * 1000000);
@@ -43,8 +40,7 @@ function uniqueId(node) {
 	let nodeId = node[nodeIdProperty];
 	if (nodeId) return nodeId;
 	nodeId = '__' + nodeCount++;
-	node[nodeIdProperty] = nodeId; // WARN would need `new String(nodeId)` in IE<=8
-			// so that node cloning doesn't copy the node ID property
+	node[nodeIdProperty] = nodeId;
 	return nodeId;
 }
 
@@ -195,7 +191,6 @@ function findId(id, doc) {
 	if (!doc) doc = document;
 	if (!doc.getElementById) throw Error('Context for findId() must be a Document node');
 	return doc.getElementById(id);
-	// WARN would need a work around for broken getElementById in IE <= 7
 }
 
 /**
@@ -323,33 +318,13 @@ function manageEvent(type) {
 	}, true);
 }
 
-// DOM node visibilitychange implementation and monitoring
-/** @type {MutationObserver} Observer for visibility changes */
-let observer = new MutationObserver(function(mutations, observer) {
-	_.forEach(mutations, function(entry) {
-		triggerVisibilityChangeEvent(entry.target);
-	});
-});
-observer.observe(document, { attributes: true, attributeFilter: ['hidden'], subtree: true });
-
-/**
- * Trigger visibility change event on target element
- * @param {Element} target - Target element
- */
-// FIXME this should use observers, not events
-function triggerVisibilityChangeEvent(target) {
-	let visibilityState = target.hidden ? 'hidden' : 'visible';
-	dispatchEvent(target, 'visibilitychange', { bubbles: false, cancelable: false, detail: visibilityState }); // NOTE doesn't bubble to avoid clash with same event on document (and also performance)
-}
-
 /**
  * Check if element is visible (not hidden)
  * @param {Element} element - Element to check
  * @returns {boolean} True if element is visible
  */
 function isVisible(element) {
-	let closestHidden = closest(element, '[hidden]');
-	return (!closestHidden);
+	return !closest(element, '[hidden]');
 }
 
 /**
@@ -357,19 +332,19 @@ function isVisible(element) {
  * @param {Element} element - Element to watch
  * @returns {Promise} Promise that resolves when visible
  */
-function whenVisible(element) { // FIXME this quite possibly causes leaks if closestHidden is removed from document before removeEventListener
+function whenVisible(element) {
 	return new Promise(function(resolve) {
-		let closestHidden = closest(element, '[hidden]');
-		if (!closestHidden) {
+		if (isVisible(element)) {
 			resolve();
 			return;
 		}
-		let listener = function(e) {
-			if (e.target.hidden) return;
-			closestHidden.removeEventListener('visibilitychange', listener, false);
-			whenVisible(element).then(resolve);
-		}
-		closestHidden.addEventListener('visibilitychange', listener, false);
+		let observer = new MutationObserver(function() {
+			if (isVisible(element)) {
+				observer.disconnect();
+				resolve();
+			}
+		});
+		observer.observe(document, { attributes: true, attributeFilter: ['hidden'], subtree: true });
 	});
 }
 
@@ -459,9 +434,6 @@ function checkStyleSheets() {
 		} 
 	});
 }
-
-// WARN IE <= 8 would need styleText() to get/set <style> contents
-// WARN old non-IE would need scriptText() to get/set <script> contents
 
 /**
  * Copy all attributes from source node to target node
