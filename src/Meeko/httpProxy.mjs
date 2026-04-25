@@ -23,8 +23,6 @@ let httpProxy = (function() {
 
 	function cacheAdd(request, response) {
 		let rq = _.defaults({}, request);
-		let resp;
-
 		let entry = {
 			invalid: false,
 			request: rq

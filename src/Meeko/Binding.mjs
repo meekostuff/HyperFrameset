@@ -116,7 +116,7 @@ _.assign(Binding.prototype, {
 				return handleEvent.call(object, event, handler);
 			}
 			catch (error) {
-				reportError(error);
+				window.reportError(error);
 				throw error;
 			}
 		}

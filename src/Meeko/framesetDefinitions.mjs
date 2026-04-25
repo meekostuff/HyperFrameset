@@ -392,7 +392,7 @@ preprocess: function() {
 		catch(err) { 
 			console.warn('Error evaluating inline script in frameset:\n' +
 				framesetDef.url + '#' + script.id);
-			reportError(err);
+			window.reportError(err);
 		}
 
 		script.parentNode.removeChild(script); // physical <script> no longer needed

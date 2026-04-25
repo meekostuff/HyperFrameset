@@ -81,7 +81,7 @@ insert: function(bodyElement, replace) { // FIXME need a teardown method that re
 	if (frame.bodyElement) {
 		if (options && options.bodyLeft) {
 			try { options.bodyLeft(frame, frame.bodyElement); } 
-			catch (err) { reportError(err); }
+			catch (err) { window.reportError(err); }
 		}
 		sprockets.removeNode(frame.bodyElement);
 	}
@@ -97,7 +97,7 @@ insert: function(bodyElement, replace) { // FIXME need a teardown method that re
 
 	if (options && options.bodyEntered) {
 		try { options.bodyEntered(frame, frame.bodyElement); } 
-		catch (err) { reportError(err); }
+		catch (err) { window.reportError(err); }
 	}
 },
 

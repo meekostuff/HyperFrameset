@@ -66,7 +66,7 @@ function delay(fn, timeout) {
 
 	setTimeout(function() {
 		try { fn(); }
-		catch (error) { reportError(error); }
+		catch (error) { window.reportError(error); }
 		processTasks();
 	}, timeout);
 }
@@ -136,7 +136,7 @@ function processTasks() {
 		fn = asapQueue.shift();
 		if (typeof fn !== 'function') continue;
 		try { fn(); }
-		catch (error) { reportError(error); }
+		catch (error) { window.reportError(error); }
 		currTime = getTime();
 		if (currTime >= frameExecutionTimeout) break;
 	}

@@ -435,7 +435,7 @@ transformHazardTree: function(el, context, frag) {
 				value = processor.provider.evaluate(selector, context, processor.variables, false);
 			}
 			catch (err) {
-				reportError(err);
+				window.reportError(err);
 				console.warn('Error evaluating <haz:var name="' + name + '" select="' + selector + '">. Assumed empty.');
 				value = undefined;
 			}
@@ -453,7 +453,7 @@ transformHazardTree: function(el, context, frag) {
 				value = processor.provider.evaluate(selector, context, processor.variables, false);
 			}
 			catch (err) {
-				reportError(err);
+				window.reportError(err);
 				console.warn('Error evaluating <haz:param name="' + name + '" select="' + selector + '">. Assumed empty.');
 				value = undefined;
 			}
@@ -575,7 +575,7 @@ transformHazardTree: function(el, context, frag) {
 			pass = evalExpression(testVal, processor.provider, context, processor.variables, 'boolean');
 		}
 		catch (err) {
-			reportError(err);
+			window.reportError(err);
 			console.warn('Error evaluating <haz:if test="' + testVal + '">. Assumed false.');
 			pass = false;
 		}
@@ -615,7 +615,7 @@ transformHazardTree: function(el, context, frag) {
 			subContext = processor.provider.evaluate(selector, context, processor.variables, false);
 		}
 		catch (err) {
-			reportError(err);
+			window.reportError(err);
 			console.warn('Error evaluating <haz:one select="' + selector + '">. Assumed empty.');
 			return frag;
 		}
@@ -632,7 +632,7 @@ transformHazardTree: function(el, context, frag) {
 			subContexts = processor.provider.evaluate(selector, context, processor.variables, true);
 		}
 		catch (err) {
-			reportError(err);
+			window.reportError(err);
 			console.warn('Error evaluating <haz:each select="' + selector + '">. Assumed empty.');
 			return frag;
 		}
@@ -672,7 +672,7 @@ transformSingleElement: function(srcNode, context) {
 				processExpression(desc.expression, processor.provider, context, processor.variables, desc.type);
 		}
 		catch (err) {
-			reportError(err);
+			window.reportError(err);
 			console.warn('Error evaluating @' + desc.attrName + '="' + desc.expression + '". Assumed false.');
 			value = false;
 		}
@@ -839,7 +839,7 @@ function processExpression(expr, provider, context, variables, type) { // FIXME 
 			return true;
 		}
 		catch (err) {
-			reportError(err);
+			window.reportError(err);
 			console.warn('Failure processing filter call: "' + filter.text + '" with input: "' + value + '"');
 			value = '';
 			return false;

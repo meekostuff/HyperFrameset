@@ -48,7 +48,7 @@ loadTemplate: function(template) {
 		return;
 	}
 	try { this.processor = (Function('return (' + script.text + ')'))(); }
-	catch(err) { reportError(err); }
+	catch(err) { window.reportError(err); }
 	
 	if (!this.processor || !this.processor.transform) {
 		console.warn('"script" transform template did not produce valid transform object');
