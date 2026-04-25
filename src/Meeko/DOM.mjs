@@ -470,9 +470,7 @@ function checkStyleSheets() {
  * @returns {Element} Target node
  */
 function copyAttributes(node, srcNode) {
-	_.forEach(_.map(srcNode.attributes), function(attr) {
-		node.setAttribute(attr.name, attr.value); // WARN needs to be more complex for IE <= 7
-	});
+	for (const { name, value } of srcNode.attributes) node.setAttribute(name, value);
 	return node;
 }
 
@@ -482,9 +480,7 @@ function copyAttributes(node, srcNode) {
  * @returns {Element} Target node
  */
 function removeAttributes(node) {
-	_.forEach(_.map(node.attributes), function(attr) {
-		node.removeAttribute(attr.name);
-	});
+	while (node.attributes.length) node.removeAttribute(node.attributes[0].name);
 	return node;
 }
 
