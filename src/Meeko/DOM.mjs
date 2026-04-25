@@ -484,64 +484,27 @@ function removeAttributes(node) {
 	return node;
 }
 
-/** @constant {boolean} Whether createHTMLDocument copies URL from current document */
-const CREATE_DOCUMENT_COPIES_URL = (function() {
-	let doc = document.implementation.createHTMLDocument('');
-	return doc.URL === document.URL;
-})();
-
-/** @constant {boolean} Whether cloneNode copies URL from current document */
-const CLONE_DOCUMENT_COPIES_URL = (function() {
-	try {
-		let doc = document.cloneNode(false);
-		if (doc.URL === document.URL) return true;
-	}
-	catch (err) { }
-	return false;
-})();
-		
-// NOTE we want create*Document() to have a URL
-/** @constant {boolean} Whether to use cloneNode for document creation */
-const CREATE_DOCUMENT_WITH_CLONE = !CREATE_DOCUMENT_COPIES_URL && CLONE_DOCUMENT_COPIES_URL;
-
 /**
- * Create new empty document
- * @param {Document} [srcDoc] - Source document for cloning
- * @returns {Document} New document
+ * Create new empty document, preserving the source document's URL.
+ * @param {Document} [srcDoc] - Source document to clone from
+ * @returns {Document} New empty document with source URL
  */
-function createDocument(srcDoc) { // modern browsers. IE >= 9
+function createDocument(srcDoc) {
 	if (!srcDoc) srcDoc = document;
-	// TODO find doctype element??
-	let doc;
-	if (CREATE_DOCUMENT_WITH_CLONE) { 
-		doc = srcDoc.cloneNode(false);
-	}
-	else {
-		doc = srcDoc.implementation.createHTMLDocument('');
-		doc.removeChild(doc.documentElement);
-	}
-	return doc;
+	return srcDoc.cloneNode(false);
 }
 
 /**
- * Create new HTML document with title
+ * Create new HTML document with title, preserving the source document's URL.
  * @param {string} title - Document title
- * @param {Document} [srcDoc] - Source document for cloning
- * @returns {Document} New HTML document
+ * @param {Document} [srcDoc] - Source document to clone from
+ * @returns {Document} New HTML document with source URL
  */
-function createHTMLDocument(title, srcDoc) { // modern browsers. IE >= 9
-	if (!srcDoc) srcDoc = document;
-	// TODO find doctype element??
-	let doc;
-	if (CREATE_DOCUMENT_WITH_CLONE) { 
-		doc = srcDoc.cloneNode(false);
-		let docEl = doc.createElement('html');
-		docEl.innerHTML = '<head><title>' + title + '</title></head><body></body>';
-		doc.appendChild(docEl);
-	}
-	else {
-		doc = srcDoc.implementation.createHTMLDocument(title);
-	}
+function createHTMLDocument(title, srcDoc) {
+	let doc = createDocument(srcDoc);
+	let docEl = doc.createElement('html');
+	docEl.innerHTML = '<head><title>' + title + '</title></head><body></body>';
+	doc.appendChild(docEl);
 	return doc;
 }
 
@@ -551,20 +514,7 @@ function createHTMLDocument(title, srcDoc) { // modern browsers. IE >= 9
  * @returns {Document} Cloned document
  */
 function cloneDocument(srcDoc) {
-	let doc = createDocument(srcDoc);
-	let docEl = doc.importNode(srcDoc.documentElement, true);
-	doc.appendChild(docEl); // NOTE already adopted
-
-	// WARN sometimes IE9/IE10/IE11 doesn't read the content of inserted <style>
-	// NOTE this doesn't seem to matter on IE10+. The following is precautionary
-	_.forEach(findAll('style', doc), function(node) {
-		let sheet = node.sheet;
-		if (!sheet || sheet.cssText == null) return;
-		if (sheet.cssText != '') return;
-		node.textContent = node.textContent;
-	});
-	
-	return doc;
+	return srcDoc.cloneNode(true);
 }
 
 /**
