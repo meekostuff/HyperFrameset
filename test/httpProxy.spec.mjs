@@ -5,6 +5,17 @@ async function setup(page) {
   await page.waitForFunction(() => window.__ready);
 }
 
+test('XMLHttpRequest supports responseType document', async ({ page }) => {
+  await setup(page);
+  const supported = await page.evaluate(() => {
+    let xhr = new XMLHttpRequest();
+    xhr.open('get', document.URL, true);
+    try { xhr.responseType = 'document'; } catch (e) { return false; }
+    return xhr.responseType === 'document';
+  });
+  expect(supported).toBe(true);
+});
+
 test('load fetches and parses a document', async ({ page }) => {
   await page.route('http://mock.test/page.html', route => {
     route.fulfill({

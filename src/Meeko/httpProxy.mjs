@@ -4,32 +4,8 @@ import * as DOM from './DOM.mjs';
 import Thenfu from './Thenfu.mjs';
 import htmlParser from './htmlParser.mjs';
 
-/*
-	HTML_IN_XHR indicates if XMLHttpRequest supports HTML parsing
-*/
-const HTML_IN_XHR = (function() { // FIXME more testing, especially Webkit
-	if (!window.XMLHttpRequest) return false;
-	let xhr = new XMLHttpRequest;
-	if (!('responseType' in xhr)) return false;
-	if (!('response' in xhr)) return false;
-	xhr.open('get', document.URL, true);
-
-	try { xhr.responseType = 'document'; } // not sure if any browser throws for this, but they should
-	catch (err) { return false; }
-
-	try { if (xhr.responseText == '') return false; } // Opera-12. Other browsers will throw
-	catch(err) { }
-
-	try { if (xhr.status) return false; } // this should be 0 but throws on Chrome and Safari-5.1
-	catch(err) { // Chrome and Safari-5.1
-		xhr.abort(); 
-		try { xhr.responseType = 'document'; } // throws on Safari-5.1 which doesn't support HTML requests 
-		catch(err2) { return false; }
-	}
-
-	return true;
-})();
-
+/** @constant {boolean} XMLHttpRequest supports responseType 'document' */
+const HTML_IN_XHR = true;
 
 let httpProxy = (function() {
 
