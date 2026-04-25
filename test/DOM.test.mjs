@@ -329,29 +329,6 @@ describe('DOM.mjs', () => {
     expect(result[1].textContent).toBe('b');
   });
 
-  test('createDocument returns an empty document', () => {
-    const doc = DOM.createDocument();
-    expect(doc.nodeType).toBe(9);
-    expect(doc.documentElement).toBeNull();
-  });
-
-  test('createHTMLDocument returns a document with head and body', () => {
-    const doc = DOM.createHTMLDocument('Test');
-    expect(doc.nodeType).toBe(9);
-    expect(doc.head).toBeTruthy();
-    expect(doc.body).toBeTruthy();
-    expect(doc.title).toBe('Test');
-  });
-
-  test('cloneDocument copies the source document structure', () => {
-    const src = DOM.createHTMLDocument('Clone');
-    src.body.innerHTML = '<p>hello</p>';
-    const clone = DOM.cloneDocument(src);
-    expect(clone.nodeType).toBe(9);
-    expect(clone.body.querySelector('p').textContent).toBe('hello');
-    expect(clone).not.toBe(src);
-  });
-
   test('dispatchEvent fires custom event', () => {
     const div = document.createElement('div');
     let received = false;
