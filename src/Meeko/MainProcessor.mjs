@@ -9,15 +9,15 @@ import * as DOM from './DOM.mjs';
 /**
  * @implements {Processor}
  */
-function MainProcessor(options) {}
+class MainProcessor {
 
-_.defaults(MainProcessor.prototype, {
+constructor(options) {}
 
-loadTemplate: function(template) {
+loadTemplate(template) {
 	if (/\S+/.test(template.textContent)) console.warn('"main" transforms do not use templates');
-},
+}
 
-transform: function(provider, details) { // TODO how to use details?
+transform(provider, details) { // TODO how to use details?
 	let srcNode = provider.srcNode;
 	let srcDoc = srcNode.nodeType === 9 ? srcNode : srcNode.ownerDocument;
 	let main;
@@ -31,6 +31,6 @@ transform: function(provider, details) { // TODO how to use details?
 	return frag;
 }
 	
-});
+}
 
 export default MainProcessor;

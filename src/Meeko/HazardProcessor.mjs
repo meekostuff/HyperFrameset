@@ -117,7 +117,9 @@ function htmlToFragment(html, doc) {
 /**
  * @implements {Processor}
  */
-function HazardProcessor(options, namespaces) {
+class HazardProcessor {
+
+constructor(options, namespaces) {
 	this.templates = [];
 	this.namespaces = namespaces = namespaces.clone();
 	if (!namespaces.lookupNamespace(HAZARD_TRANSFORM_URN))
@@ -128,9 +130,7 @@ function HazardProcessor(options, namespaces) {
 		namespaces.add(mexprDefaultNS);
 }
 
-_.defaults(HazardProcessor.prototype, {
-	
-loadTemplate: function(template) {
+loadTemplate(template) {
 	let processor = this;
 	processor.root = template; // FIXME assert template is Fragment
 	processor.templates = [];
@@ -276,30 +276,30 @@ loadTemplate: function(template) {
 		processor.templates.unshift(entryTemplate);
 	}
 
-},
+}
 
-getEntryTemplate: function() {
+getEntryTemplate() {
 	return this.templates[0];
-},
+}
 
-getNamedTemplate: function(name) {
+getNamedTemplate(name) {
 	let processor = this;
 	name = _.lc(name);
 	return _.find(processor.templates, function(template) {
 		return _.lc(template.getAttribute('name')) === name;
 	});
-},
+}
 
-getMatchingTemplate: function(element) {
+getMatchingTemplate(element) {
 	let processor = this;
 	return _.find(processor.templates, function(template) {
 		if (!template.hasAttribute('match')) return false;
 		let expression = template.getAttribute('match');
 		return processor.provider.matches(element, expression);
 	});	
-},
+}
 
-transform: function(provider, details) {
+transform(provider, details) {
 	let processor = this;
 	let root = processor.root;
 	let doc = root.ownerDocument;
@@ -308,9 +308,9 @@ transform: function(provider, details) {
 	.then(function() {
 		return frag;
 	});
-},
+}
 
-_transform: function(provider, details, frag) {
+_transform(provider, details, frag) {
 	let processor = this;
 	processor.provider = provider;
 
@@ -368,9 +368,9 @@ _transform: function(provider, details, frag) {
 		let template = processor.getEntryTemplate();
 		return processor.transformTemplate(template, null, null, frag);
 	});
-},
+}
 
-transformTemplate: function(template, context, params, frag) {
+transformTemplate(template, context, params, frag) {
 	let processor = this;
 	processor.variables.push(params);
 
@@ -379,17 +379,17 @@ transformTemplate: function(template, context, params, frag) {
 		processor.variables.pop(); 
 		return frag;
 	});
-},
+}
 
-transformChildNodes: function(srcNode, context, frag) {
+transformChildNodes(srcNode, context, frag) {
 	let processor = this;
 
 	return Thenfu.reduce(null, srcNode.childNodes, function(dummy, current) {
 		return processor.transformNode(current, context, frag);
 	});
-},
+}
 
-transformNode: function(srcNode, context, frag) {
+transformNode(srcNode, context, frag) {
 	let processor = this;
 
 	switch (srcNode.nodeType) {
@@ -406,9 +406,9 @@ transformNode: function(srcNode, context, frag) {
 		if (details.definition) return processor.transformHazardTree(srcNode, context, frag);
 		else return processor.transformTree(srcNode, context, frag);
 	}
-},
+}
 
-transformHazardTree: function(el, context, frag) {
+transformHazardTree(el, context, frag) {
 	let processor = this;
 	let doc = el.ownerDocument;
 
@@ -643,9 +643,9 @@ transformHazardTree: function(el, context, frag) {
 
 	}
 			
-},
+}
 
-transformTree: function(srcNode, context, frag) { // srcNode is Element
+transformTree(srcNode, context, frag) { // srcNode is Element
 	let processor = this;
 	
 	let nodeType = srcNode.nodeType;
@@ -656,9 +656,9 @@ transformTree: function(srcNode, context, frag) { // srcNode is Element
 	// ... allows a different type of output construction
 
 	return processor.transformChildNodes(srcNode, context, nodeAsFrag);
-},
+}
 
-transformSingleElement: function(srcNode, context) {
+transformSingleElement(srcNode, context) {
 	let processor = this;
 	let details = srcNode.hazardDetails;
 
@@ -682,7 +682,7 @@ transformSingleElement: function(srcNode, context) {
 	return el;
 }
 
-});
+}
 
 function getHazardDetails(el, namespaces) {
 	let details = {};

@@ -10,13 +10,13 @@ import * as DOM from './DOM.mjs';
 /**
  * @implements {Processor}
  */
-function ScriptProcessor(options) {
+class ScriptProcessor {
+
+constructor(options) {
 	this.processor = options;
 }
 
-_.defaults(ScriptProcessor.prototype, {
-
-loadTemplate: function(template) {
+loadTemplate(template) {
 	let script;
 	_.forEach(_.map(template.childNodes), function(node) {
 		switch (node.nodeType) {
@@ -54,9 +54,9 @@ loadTemplate: function(template) {
 		console.warn('"script" transform template did not produce valid transform object');
 		return;
 	}
-},
+}
 
-transform: function(provider, details) {
+transform(provider, details) {
 	let srcNode = provider.srcNode;
 	if (!this.processor || !this.processor.transform) {
 		console.warn('"script" transform template did not produce valid transform object');
@@ -65,6 +65,6 @@ transform: function(provider, details) {
 	return this.processor.transform(srcNode, details);
 }
 	
-});
+}
 
 export default ScriptProcessor;
