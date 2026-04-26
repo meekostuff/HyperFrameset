@@ -9,10 +9,9 @@ import * as _ from './stuff.mjs';
  * @param {string} options.name - Short name used as prefix base
  * @param {string} options.style - 'xml' or 'vendor'
  */
-let CustomNamespace = (function() {
+class CustomNamespace {
 
-function CustomNamespace(options) {
-	if (!(this instanceof CustomNamespace)) return new CustomNamespace(options);
+constructor(options) {
 	if (!options) return; // WARN for cloning / inheritance
 	let style = options.style = _.lc(options.style);
 	let styleInfo = _.find(CustomNamespace.namespaceStyles, function(styleInfo) {
@@ -22,44 +21,41 @@ function CustomNamespace(options) {
 	let name = options.name = _.lc(options.name);
 	if (!name) throw Error('Unexpected name: ' + name);
 	
-	let nsDef = this;
-	_.assign(nsDef, options);
+	_.assign(this, options);
 	let separator = styleInfo.separator;
-	nsDef.prefix = nsDef.name + separator;
-	nsDef.selectorPrefix = nsDef.name + (separator === ':' ? '\\:' : separator);
+	this.prefix = this.name + separator;
+	this.selectorPrefix = this.name + (separator === ':' ? '\\:' : separator);
 }
-
-_.defaults(CustomNamespace.prototype, {
 
 /**
  * Create a shallow copy of this namespace definition.
  * @returns {CustomNamespace}
  */
-clone: function() {
+clone() {
 	let clone = new CustomNamespace();
 	_.assign(clone, this);
 	return clone;
-},
+}
 
 /**
  * Return a prefixed tag name.
  * @param {string} name - Unprefixed tag name
  * @returns {string} Prefixed tag name (e.g. 'haz:if')
  */
-lookupTagName: function(name) { return this.prefix + name; },
+lookupTagName(name) { return this.prefix + name; }
 
 /**
  * Prefix each tag in a CSS selector.
  * @param {string} selector - CSS selector with unprefixed tag names
  * @returns {string} Selector with prefixed tag names
  */
-lookupSelector: function(selector) {
+lookupSelector(selector) {
 	let prefix = this.selectorPrefix;
 	let tags = selector.split(/\s*,\s*|\s+/);
 	return _.map(tags, function(tag) { return prefix + tag; }).join(', ');
 }
 
-});
+}
 
 CustomNamespace.namespaceStyles = [
 	{
@@ -87,25 +83,20 @@ CustomNamespace.getNamespaces = function(doc) {
 	return new NamespaceCollection(doc);
 }
 
-return CustomNamespace;
-
-})();
-
 /**
  * A collection of CustomNamespace objects with lookup methods.
  * Initialized from xmlns: or custom- attributes on a document's root element.
  * @param {Document} [doc] - Document to scan for namespace declarations
  */
-let NamespaceCollection = function(doc) {
-	if (!(this instanceof NamespaceCollection)) return new NamespaceCollection(doc);
+class NamespaceCollection {
+
+constructor(doc) {
 	this.items = [];
 	if (!doc) return; // WARN for cloning / inheritance
 	this.init(doc); 
 }
 
-_.assign(NamespaceCollection.prototype, {
-
-init: function(doc) {
+init(doc) {
 	let coll = this;
 	_.forEach(_.map(doc.documentElement.attributes), function(attr) {
 		let fullName = _.lc(attr.name);
@@ -121,25 +112,17 @@ init: function(doc) {
 		});
 		coll.add(nsDef);
 	});
-},
+}
 
-/**
- * Deep copy this collection and all its namespace definitions.
- * @returns {NamespaceCollection}
- */
-clone: function() {
+clone() {
 	let coll = new NamespaceCollection();
 	_.forEach(this.items, function(nsDef) { 
 		coll.items.push(nsDef.clone());
 	});
 	return coll;
-},
+}
 
-/**
- * Add a namespace definition. Rejects duplicates by URN or prefix.
- * @param {CustomNamespace} nsDef
- */
-add: function(nsDef) {
+add(nsDef) {
 	let coll = this;
 	let matchingNS = _.find(coll.items, function(def) {
 		if (_.lc(def.urn) === _.lc(nsDef.urn)) {
@@ -153,72 +136,45 @@ add: function(nsDef) {
 	});
 	if (matchingNS) return;
 	coll.items.push(nsDef);
-},
+}
 
-/**
- * Find a namespace definition by URN.
- * @param {string} urn
- * @returns {CustomNamespace|undefined}
- */
-lookupNamespace: function(urn) {
+lookupNamespace(urn) {
 	let coll = this;
 	urn = _.lc(urn);
 	let nsDef = _.find(coll.items, function(def) {
 		return (_.lc(def.urn) === urn);
 	});
 	return nsDef;
-},
+}
 
-/**
- * Get the prefix string for a namespace URN.
- * @param {string} urn
- * @returns {string|undefined} e.g. 'haz:'
- */
-lookupPrefix: function(urn) {
+lookupPrefix(urn) {
 	let coll = this;
 	let nsDef = coll.lookupNamespace(urn);
 	return nsDef && nsDef.prefix;
-},
+}
 
-/**
- * Get the URN for a given prefix.
- * @param {string} prefix
- * @returns {string|undefined}
- */
-lookupNamespaceURI: function(prefix) {
+lookupNamespaceURI(prefix) {
 	let coll = this;
 	prefix = _.lc(prefix);
 	let nsDef = _.find(coll.items, function(def) {
 		return (def.prefix === prefix);
 	});
 	return nsDef && nsDef.urn;
-},
+}
 
-/**
- * Return a prefixed tag name for a given URN.
- * @param {string} name - Unprefixed tag name
- * @param {string} urn - Namespace URN
- * @returns {string}
- */
-lookupTagNameNS: function(name, urn) {
+lookupTagNameNS(name, urn) {
 	let coll = this;
 	let nsDef = coll.lookupNamespace(urn);
 	if (!nsDef) return name;
 	return nsDef.prefix + name;
-},
+}
 
-/**
- * Prefix a CSS selector for a given URN.
- * @param {string} selector
- * @param {string} urn
- * @returns {string}
- */
-lookupSelector: function(selector, urn) {
+lookupSelector(selector, urn) {
 	let nsDef = this.lookupNamespace(urn);
 	if (!nsDef) return selector;
 	return nsDef.lookupSelector(selector);
 }
 
-});
+}
 
 export default CustomNamespace;

@@ -11,16 +11,16 @@ const CSS_CONTEXT_VARIABLE = '_';
 /**
  * @implements {Decoder}
  */
-function CSSDecoder(options, namespaces) {}
+class CSSDecoder {
 
-_.defaults(CSSDecoder.prototype, {
+constructor(options, namespaces) {}
 
-init: function(node) {
+init(node) {
 	this.srcNode = node;
-},
+}
 
 // TODO should matches() support Hazard variables
-matches: function(element, query) { // FIXME refactor common-code in matches / evaluate
+matches(element, query) { // FIXME refactor common-code in matches / evaluate
 	let queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
 	let selector = queryParts[1];
 	let attr = queryParts[2];
@@ -52,10 +52,9 @@ matches: function(element, query) { // FIXME refactor common-code in matches / e
 		}
 	}
 
+}
 
-},
-
-evaluate: function(query, context, variables, wantArray) {
+evaluate(query, context, variables, wantArray) {
 	if (!context) context = this.srcNode;
 	let doc = context.nodeType === 9 ? context : context.ownerDocument; // FIXME which document??
 	let queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
@@ -94,7 +93,7 @@ evaluate: function(query, context, variables, wantArray) {
 
 }
 
-});
+}
 
 function matches(element, selectorGroup) {
 	if (selectorGroup.trim() === '') return;

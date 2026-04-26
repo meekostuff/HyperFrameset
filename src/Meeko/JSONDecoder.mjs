@@ -6,16 +6,16 @@ import * as _ from './stuff.mjs';
 /**
  * @implements {Decoder}
  */
-function JSONDecoder(options, namespaces) {}
+class JSONDecoder {
 
-_.defaults(JSONDecoder.prototype, {
+constructor(options, namespaces) {}
 
-init: function(object) {
+init(object) {
 	if (typeof object !== 'object' || object === null) throw 'JSONDecoder cannot handle non-object';
 	this.object = object;
-},
+}
 
-evaluate: function(query, context, variables, wantArray) {
+evaluate(query, context, variables, wantArray) {
 	if (!context) context = this.object;
 
 	query = query.trim();
@@ -49,6 +49,6 @@ evaluate: function(query, context, variables, wantArray) {
 	return value;
 }
 
-});
+}
 
 export default JSONDecoder;
