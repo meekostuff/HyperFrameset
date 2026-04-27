@@ -21,8 +21,7 @@ import formElements, { ConfigurableBody } from './formElements.mjs';
 import layoutElements, { HBase } from './layoutElements.mjs';
 import frameElements, { frameDefinitions, HFrame } from './frameElements.mjs';
 import { HFramesetDefinition } from './framesetDefinitions.mjs';
-
-const HYPERFRAMESET_URN = HFramesetDefinition.HYPERFRAMESET_URN;
+import { HYPERFRAMESET_URN } from './CustomNamespace.mjs';
 
 // FIXME DRY these @rel values with boot.js
 const FRAMESET_REL = 'frameset'; // NOTE http://lists.w3.org/Archives/Public/www-html/1996Dec/0143.html
