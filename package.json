@@ -8,10 +8,10 @@
     "test": "demo"
   },
   "scripts": {
-    "test": "vitest run --browser && npx playwright test",
-    "test:chrome": "vitest run --browser --browser.name=chromium",
-    "test:firefox": "vitest run --browser --browser.name=firefox",
-    "test:safari": "vitest run --browser --browser.name=webkit",
+    "test": "vitest run && npx playwright test",
+    "test:chrome": "vitest run --browser.name=chromium",
+    "test:firefox": "vitest run --browser.name=firefox",
+    "test:safari": "vitest run --browser.name=webkit",
     "test:e2e": "npx playwright test",
     "test:e2e:chrome": "npx playwright test --project=chromium",
     "test:e2e:firefox": "npx playwright test --project=firefox",

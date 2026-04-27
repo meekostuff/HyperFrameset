@@ -7,7 +7,7 @@ export default defineConfig({
     
     // Browser testing configuration
     browser: {
-      enabled: false, // Enable with --browser flag
+      enabled: true,
       provider: playwright(),
       instances: [
         {
