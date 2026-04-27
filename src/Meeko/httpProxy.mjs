@@ -7,154 +7,134 @@ import htmlParser from './htmlParser.mjs';
 /** @constant {boolean} XMLHttpRequest supports responseType 'document' */
 const HTML_IN_XHR = true;
 
-let httpProxy = (function() {
-
-	let methods = _.words('get'); // TODO words('get post put delete');
-	let responseTypes = _.words('document'); // TODO words('document json text');
-	let defaultInfo = {
+/**
+ * HTTP client with response caching and HTML document parsing.
+ * Fetches URLs via XMLHttpRequest, parses responses into DOM documents,
+ * and caches GET responses by URL.
+ */
+class HttpProxy {
+	#methods = _.words('get'); // TODO words('get post put delete');
+	#responseTypes = _.words('document'); // TODO words('document json text');
+	#defaultInfo = {
 		method: 'get',
 		responseType: 'document'
-	}
+	};
+	#cache = [];
 
-// NOTE cache, etc is currently used only for landing page
-// TODO test that cacheAdd/Lookup doesn't trigger new XHR when url already pending
-// TODO an API like ServiceWorker may be more appropriate
-	let cache = [];
-
-	function cacheAdd(request, response) {
-		let rq = _.defaults({}, request);
-		let entry = {
+	#cacheAdd(request, response) {
+		const rq = _.defaults({}, request);
+		const entry = {
 			invalid: false,
 			request: rq
 		};
 
 		if (Thenfu.isThenable(response)) entry.response = response.then(
-			cloneResponse,
+			this.#cloneResponse,
 			function (status) {
 				entry.invalid = true;
 				entry.response = null;
 			}
 		);
-		else entry.response = cloneResponse(response);
+		else entry.response = this.#cloneResponse(response);
 
-		cache.push(entry);
+		this.#cache.push(entry);
 	}
 
-	function cacheLookup(request) {
-		let entry = _.find(cache, function (entry) {
-			if (!cacheMatch(request, entry)) return false;
+	#cacheLookup(request) {
+		const entry = _.find(this.#cache, (entry) => {
+			if (!this.#cacheMatch(request, entry)) return false;
 			return true;
 		});
 		if (!(entry && entry.response)) return;
-		let response = entry.response;
-		if (Thenfu.isThenable(response)) return response.then(cloneResponse);
-		else return cloneResponse(response);
+		const response = entry.response;
+		if (Thenfu.isThenable(response)) return response.then(this.#cloneResponse);
+		else return this.#cloneResponse(response);
 	}
 
-	function cacheMatch(request, entry) {
+	#cacheMatch(request, entry) {
 		if (entry.invalid || entry.response == null) return false;
 		if (request.url !== entry.request.url) return false;
 		// FIXME what testing is appropriate?? `method`, other headers??
 		return true;
 	}
 
-	function cloneResponse(response) {
-		let resp = _.defaults({}, response);
+	#cloneResponse(response) {
+		const resp = _.defaults({}, response);
 		resp.document = DOM.cloneDocument(response.document); // TODO handle other response types
 		return resp;
 	}
 
-
 	/**
-	 * HTTP client with response caching and HTML document parsing.
-	 * Fetches URLs via XMLHttpRequest, parses responses into DOM documents,
-	 * and caches GET responses by URL.
+	 * Add a pre-existing response to the cache.
+	 * The document is normalized (relative URLs resolved) before caching.
+	 * @param {Object} response
+	 * @param {string} response.url - The URL to cache under
+	 * @param {string} response.type - Response type ('document')
+	 * @param {Document} response.document - The document to cache
+	 * @returns {Promise} Resolves when caching is complete
 	 */
-	let httpProxy = {
+	add(response) { // NOTE this is only for the landing page
+		const url = response.url;
+		if (!url) throw Error('Invalid url in response object');
+		if (!_.includes(this.#responseTypes, response.type)) throw Error('Invalid type in response object');
+		const request = {
+			url: response.url
+		};
+		_.defaults(request, this.#defaultInfo);
+		return Thenfu.pipe(undefined, [
 
-		HTML_IN_XHR: HTML_IN_XHR,
-
-		/**
-		 * Add a pre-existing response to the cache.
-		 * The document is normalized (relative URLs resolved) before caching.
-		 * @param {Object} response
-		 * @param {string} response.url - The URL to cache under
-		 * @param {string} response.type - Response type ('document')
-		 * @param {Document} response.document - The document to cache
-		 * @returns {Promise} Resolves when caching is complete
-		 */
-		add: function (response) { // NOTE this is only for the landing page
-			let url = response.url;
-			if (!url) throw Error('Invalid url in response object');
-			if (!_.includes(responseTypes, response.type)) throw Error('Invalid type in response object');
-			let request = {
-				url: response.url
+			() => htmlParser.normalize(response.document, request),
+			(doc) => {
+				response.document = doc;
+				this.#cacheAdd(request, response);
 			}
-			_.defaults(request, defaultInfo);
-			return Thenfu.pipe(undefined, [
 
-				function () {
-					return htmlParser.normalize(response.document, request);
-				},
-				function (doc) {
-					response.document = doc;
-					cacheAdd(request, response);
-				}
-
-			]);
-		},
-
-		/**
-		 * Fetch a URL, returning a cached response if available.
-		 * @param {string} url - URL to fetch
-		 * @param {Object} [requestInfo]
-		 * @param {string} [requestInfo.method='get'] - HTTP method
-		 * @param {string} [requestInfo.responseType='document'] - Response type
-		 * @returns {Promise} Resolves with { url, type, status, statusText, document }
-		 */
-		load: function (url, requestInfo) {
-			let info = {
-				url: url
-			};
-			if (requestInfo) _.defaults(info, requestInfo);
-			_.defaults(info, defaultInfo);
-			if (!_.includes(methods, info.method)) throw Error('method not supported: ' + info.method);
-			if (!_.includes(responseTypes, info.responseType)) throw Error('responseType not supported: ' + info.responseType);
-			return request(info);
-		}
-
+		]);
 	}
 
-	let request = function (info) {
-		let sendText = null;
-		let method = _.lc(info.method);
+	/**
+	 * Fetch a URL, returning a cached response if available.
+	 * @param {string} url - URL to fetch
+	 * @param {Object} [requestInfo]
+	 * @param {string} [requestInfo.method='get'] - HTTP method
+	 * @param {string} [requestInfo.responseType='document'] - Response type
+	 * @returns {Promise} Resolves with { url, type, status, statusText, document }
+	 */
+	load(url, requestInfo) {
+		const info = {
+			url: url
+		};
+		if (requestInfo) _.defaults(info, requestInfo);
+		_.defaults(info, this.#defaultInfo);
+		if (!_.includes(this.#methods, info.method)) throw Error('method not supported: ' + info.method);
+		if (!_.includes(this.#responseTypes, info.responseType)) throw Error('responseType not supported: ' + info.responseType);
+		return this.#request(info);
+	}
+
+	#request(info) {
+		const method = _.lc(info.method);
 		switch (method) {
 			case 'post':
 				throw Error('POST not supported'); // FIXME proper error handling
-				info.body = serialize(info.body, info.type);
-				return doRequest(info);
-				break;
 			case 'get':
-				let response = cacheLookup(info);
+				const response = this.#cacheLookup(info);
 				if (response) return Thenfu.asap(response);
-				return doRequest(info)
-					.then(function (response) {
-						cacheAdd(info, response);
+				return this.#doRequest(info)
+					.then((response) => {
+						this.#cacheAdd(info, response);
 						return response;
 					});
-				break;
 			default:
 				throw Error(_.uc(method) + ' not supported');
-				break;
 		}
 	}
 
-	let doRequest = function (info) {
-		return new Promise(function (resolve, reject) {
-			let method = info.method;
-			let url = info.url;
-			let sendText = info.body; // FIXME not-implemented
-			let xhr = new XMLHttpRequest;
+	#doRequest(info) {
+		return new Promise((resolve, reject) => {
+			const method = info.method;
+			const url = info.url;
+			const sendText = info.body; // FIXME not-implemented
+			const xhr = new XMLHttpRequest;
 			xhr.onreadystatechange = onchange;
 			xhr.open(method, url, true);
 			if (HTML_IN_XHR) {
@@ -168,13 +148,13 @@ let httpProxy = (function() {
 
 			function onchange() { // FIXME rewrite this to use onload/onerror/onabort/ontimeout
 				if (xhr.readyState != 4) return;
-				let protocol = new URL(url).protocol;
+				const protocol = new URL(url).protocol;
 				switch (protocol) {
 					case 'http:':
 					case 'https:':
 						switch (xhr.status) {
 							default:
-								reject(function () {
+								reject(() => {
 									throw Error('Unexpected status ' + xhr.status + ' for ' + url);
 								});
 								return;
@@ -187,7 +167,7 @@ let httpProxy = (function() {
 
 					default:
 						if (HTML_IN_XHR ? !xhr.response : !xhr.responseText) {
-							reject(function () {
+							reject(() => {
 								throw Error('No response for ' + url);
 							});
 							return;
@@ -198,15 +178,15 @@ let httpProxy = (function() {
 				Thenfu.defer(onload); // Use delay to stop the readystatechange event interrupting other event handlers (on IE).
 			}
 
-			function onload() {
-				let result = handleResponse(xhr, info);
+			const onload = () => {
+				const result = this.#handleResponse(xhr, info);
 				resolve(result);
-			}
+			};
 		});
 	}
 
-	function handleResponse(xhr, info) { // TODO handle info.responseType
-		let response = {
+	#handleResponse(xhr, info) { // TODO handle info.responseType
+		const response = {
 			url: info.url,
 			type: info.responseType,
 			status: xhr.status,
@@ -214,20 +194,18 @@ let httpProxy = (function() {
 		};
 		if (HTML_IN_XHR) {
 			return htmlParser.normalize(xhr.response, info)
-				.then(function (doc) {
+				.then((doc) => {
 					response.document = doc;
 					return response;
 				});
 		} else {
-			return htmlParser.parse(new String(xhr.responseText), info)
-				.then(function (doc) {
+			return htmlParser.parse(String(xhr.responseText), info)
+				.then((doc) => {
 					response.document = doc;
 					return response;
 				});
 		}
 	}
+}
 
-	return httpProxy;
-})();
-
-export default httpProxy;
+export default new HttpProxy();
