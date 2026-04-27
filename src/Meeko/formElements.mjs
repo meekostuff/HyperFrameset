@@ -147,14 +147,11 @@ export {
 	ConfigurableBody
 }
 
-export let {
-	// FIXME can we export these interfaces programmatically?
-	ConfigurableForm,
-	ConfigurableInput,
-	ConfigurableTextarea,
-	ConfigurableFieldset,
-	ConfigurableSelect,
-	ConfigurableButton
-} = interfaces;
+export const ConfigurableForm = interfaces['ConfigurableForm'];
+export const ConfigurableInput = interfaces['ConfigurableInput'];
+export const ConfigurableTextarea = interfaces['ConfigurableTextarea'];
+export const ConfigurableFieldset = interfaces['ConfigurableFieldset'];
+export const ConfigurableSelect = interfaces['ConfigurableSelect'];
+export const ConfigurableButton = interfaces['ConfigurableButton'];
 
 export default formElements;
