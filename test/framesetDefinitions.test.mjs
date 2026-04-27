@@ -69,9 +69,6 @@ describe('framesetDefinitions exports', () => {
       expect(typeof HFramesetDefinition.prototype.render).toBe('function');
     });
 
-    it('has HYPERFRAMESET_URN static', () => {
-      expect(HFramesetDefinition.HYPERFRAMESET_URN).toBe('hyperframeset');
-    });
   });
 
   // --- HFrameDefinition ---

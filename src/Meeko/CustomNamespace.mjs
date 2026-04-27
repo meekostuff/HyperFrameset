@@ -177,4 +177,8 @@ lookupSelector(selector, urn) {
 
 }
 
+/** URN identifying the HyperFrameset custom namespace. */
+const HYPERFRAMESET_URN = 'hyperframeset';
+
 export default CustomNamespace;
+export { HYPERFRAMESET_URN };
