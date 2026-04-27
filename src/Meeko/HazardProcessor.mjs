@@ -18,7 +18,6 @@ const htmlAttr = '_html';
 
 const PIPE_OPERATOR = '//>';
 
-const HYPERFRAMESET_URN = 'hyperframeset'; // FIXME DRY with libHyperFrameset.js
 const HAZARD_TRANSFORM_URN = 'HazardTransform';
 const hazDefaultNS = new CustomNamespace({
 	urn: HAZARD_TRANSFORM_URN,
