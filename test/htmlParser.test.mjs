@@ -312,3 +312,76 @@ describe('normalizeScopedStyles', () => {
     expect(doc.head.querySelectorAll('style').length).toBe(0);
   });
 });
+
+describe('browser assumptions: style.sheet in parsed documents', () => {
+
+  const testHTML = '<!DOCTYPE html><html><head></head><body><div><style>.x { color: red; }</style></div></body></html>';
+
+  /**
+   * Detect whether the browser fails to instantiate .sheet on style elements
+   * dynamically added to DOMParser-produced documents. Returns true if workaround is needed.
+   */
+  function DOMPARSER_STYLE_NEEDS_DUMMY_DOC() {
+    let doc = (new DOMParser).parseFromString(testHTML, 'text/html');
+    let style = doc.createElement('style');
+    style.textContent = '.dynamic { color: green; }';
+    doc.head.appendChild(style);
+    return !style.sheet;
+  }
+
+  /**
+   * Detect whether the browser fails to instantiate .sheet on style elements
+   * dynamically added to XHR-fetched documents. Returns a promise resolving to
+   * true if workaround is needed.
+   */
+  function XHR_STYLE_NEEDS_DUMMY_DOC() {
+    return new Promise(function(resolve, reject) {
+      let blob = new Blob([testHTML], { type: 'text/html' });
+      let url = URL.createObjectURL(blob);
+      let xhr = new XMLHttpRequest();
+      xhr.open('GET', url);
+      xhr.responseType = 'document';
+      xhr.onload = function() {
+        URL.revokeObjectURL(url);
+        let doc = xhr.responseXML;
+        // Test a style element dynamically created and appended to the XHR document
+        let style = doc.createElement('style');
+        style.textContent = '.dynamic { color: green; }';
+        doc.head.appendChild(style);
+        resolve(!style.sheet);
+      };
+      xhr.onerror = function() {
+        URL.revokeObjectURL(url);
+        reject(new Error('XHR failed'));
+      };
+      xhr.send();
+    });
+  }
+
+  /**
+   * The dummy document workaround: create a style element in a separate document
+   * to force the browser to instantiate a stylesheet.
+   */
+  function dummyDocWorkaround(cssText) {
+    let dummyDoc = document.implementation.createHTMLDocument('');
+    let dummyEl = dummyDoc.createElement('style');
+    dummyEl.textContent = cssText;
+    dummyDoc.head.appendChild(dummyEl);
+    return dummyEl.sheet;
+  }
+
+  test('style.sheet is available in DOMParser documents (no dummy doc needed)', () => {
+    expect(DOMPARSER_STYLE_NEEDS_DUMMY_DOC()).toBe(false);
+  });
+
+  test('style.sheet is available in XHR-fetched documents (no dummy doc needed)', async () => {
+    let needsDummy = await XHR_STYLE_NEEDS_DUMMY_DOC();
+    expect(needsDummy).toBe(false);
+  });
+
+  test('dummy document workaround produces a valid stylesheet', () => {
+    let sheet = dummyDocWorkaround('.test { color: red; }');
+    expect(sheet).not.toBeNull();
+    expect(sheet.cssRules.length).toBe(1);
+  });
+});
