@@ -134,7 +134,6 @@ function rebase(doc, scopeURL) {
  */
 function normalizeScopedStyles(doc, allowedScopeSelector) {
 	let scopedStyles = DOM.findAll('style[scoped]', doc.body);
-	let dummyDoc = DOM.createHTMLDocument('', doc);
 	_.forEach(scopedStyles, function(el, index) {
 		let scope = el.parentNode;
 		if (!DOM.matches(scope, allowedScopeSelector)) {
@@ -149,13 +148,7 @@ function normalizeScopedStyles(doc, allowedScopeSelector) {
 		else scope.setAttribute('id', scopeId);
 
 		el.removeAttribute('scoped');
-		let sheet = el.sheet || (function() {
-			// Firefox doesn't seem to instantiate el.sheet in XHR documents
-			let dummyEl = dummyDoc.createElement('style');
-			dummyEl.textContent = el.textContent;
-			DOM.insertNode('beforeend', dummyDoc.head, dummyEl);
-			return dummyEl.sheet;
-		})();
+		let sheet = el.sheet;
 		forRules(sheet, processRule, scope);
 		let cssText = _.map(sheet.cssRules, function(rule) {
 				return rule.cssText; 
