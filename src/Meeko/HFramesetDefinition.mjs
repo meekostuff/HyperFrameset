@@ -4,6 +4,9 @@ import * as DOM from './DOM.mjs';
 import configData from './configData.mjs';
 import CustomNamespace, { HYPERFRAMESET_URN } from './CustomNamespace.mjs';
 import HFrameDefinition from './HFrameDefinition.mjs';
+import htmlParser from './htmlParser.mjs';
+
+const { rebase, rebaseURL, normalizeScopedStyles } = htmlParser;
 
 /** Fallback namespace registered when the frameset document doesn't declare one. */
 const hfDefaultNamespace = new CustomNamespace({
@@ -11,102 +14,6 @@ const hfDefaultNamespace = new CustomNamespace({
 	style: 'vendor',
 	urn: HYPERFRAMESET_URN
 });
-
-/*
- Rebase scope URLs:
-	scope:{path}
- is rewritten with `path` being relative to the current scope.
- */
-
-let urlAttributes = URL.attributes;
-
-function rebase(doc, scopeURL) {
-	_.forOwn(urlAttributes, function(attrList, tag) {
-		_.forEach(DOM.findAll(tag, doc), function(el) {
-			_.forOwn(attrList, function(attrDesc, attrName) {
-				let relURL = el.getAttribute(attrName);
-				if (relURL == null) return;
-				let url = rebaseURL(relURL, scopeURL);
-				if (url != relURL) el[attrName] = url;
-			});
-		});
-	});
-}
-
-function rebaseURL(url, baseURL) {
-	let relURL = url.replace(/^scope:/i, '');
-	if (relURL == url) return url;
-	return baseURL.resolve(relURL);
-}
-
-function normalizeScopedStyles(doc, allowedScopeSelector) {
-	let scopedStyles = DOM.findAll('style[scoped]', doc.body);
-	let dummyDoc = DOM.createHTMLDocument('', doc);
-	_.forEach(scopedStyles, function(el, index) {
-		let scope = el.parentNode;
-		if (!DOM.matches(scope, allowedScopeSelector)) {
-			console.warn('Removing <style scoped>. Must be child of ' + allowedScopeSelector);
-			scope.removeChild(el);
-			return;
-		}
-		
-		let scopeId = '__scope_' + index + '__';
-		scope.setAttribute('scopeid', scopeId);
-		if (scope.hasAttribute('id')) scopeId = scope.getAttribute('id');
-		else scope.setAttribute('id', scopeId);
-
-		el.removeAttribute('scoped');
-		let sheet = el.sheet || (function() {
-			// Firefox doesn't seem to instatiate el.sheet in XHR documents
-			let dummyEl = dummyDoc.createElement('style');
-			dummyEl.textContent = el.textContent;
-			DOM.insertNode('beforeend', dummyDoc.head, dummyEl);
-			return dummyEl.sheet;
-		})();
-		forRules(sheet, processRule, scope);
-		let cssText = _.map(sheet.cssRules, function(rule) {
-				return rule.cssText; 
-			}).join('\n');
-		el.textContent = cssText;
-		DOM.insertNode('beforeend', doc.head, el);
-		return;
-	});
-}
-
-function processRule(rule, id, parentRule) {
-	let scope = this;
-	switch (rule.type) {
-	case 1: // CSSRule.STYLE_RULE
-		// prefix each selector in selector-chain with scopePrefix
-		// selector-chain is split on COMMA (,) that is not inside BRACKETS. Technically: not followed by a RHB ')' unless first followed by LHB '(' 
-		let scopeId = scope.getAttribute('scopeid');
-		let scopePrefix = '#' + scopeId + ' ';
-		let selectorText = scopePrefix + rule.selectorText.replace(/,(?![^(]*\))/g, ', ' + scopePrefix);
-		let cssText = rule.cssText.replace(rule.selectorText, '');
-		cssText = selectorText + ' ' + cssText;
-		parentRule.deleteRule(id);
-		parentRule.insertRule(cssText, id);
-		break;
-
-	case 11: // CSSRule.COUNTER_STYLE_RULE
-		break;
-
-	case 4: // CSSRule.MEDIA_RULE
-	case 12: // CSSRule.SUPPORTS_RULE
-		forRules(rule, processRule, scope);
-		break;
-	
-	default:
-		console.warn('Deleting invalid rule for <style scoped>: \n' + rule.cssText);
-		parentRule.deleteRule(id);
-		break;
-	}
-}
-
-function forRules(parentRule, callback, context) {
-	let ruleList = parentRule.cssRules;
-	for (let i=ruleList.length-1; i>=0; i--) callback.call(context, ruleList[i], i, parentRule);
-}
 
 
 class HFramesetDefinition {
