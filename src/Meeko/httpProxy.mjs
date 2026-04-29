@@ -106,8 +106,8 @@ class HttpProxy {
 		};
 		if (requestInfo) _.defaults(info, requestInfo);
 		_.defaults(info, this.#defaultInfo);
-		if (!_.includes(this.#methods, info.method)) throw Error('method not supported: ' + info.method);
-		if (!_.includes(this.#responseTypes, info.responseType)) throw Error('responseType not supported: ' + info.responseType);
+		if (!_.includes(this.#methods, info.method)) throw Error(`method not supported: ${info.method}`);
+		if (!_.includes(this.#responseTypes, info.responseType)) throw Error(`responseType not supported: ${info.responseType}`);
 		return this.#request(info);
 	}
 
@@ -125,7 +125,8 @@ class HttpProxy {
 						return response;
 					});
 			default:
-				throw Error(_.uc(method) + ' not supported');
+				let METHOD = _.uc(method);
+				throw Error(`${METHOD} not supported`);
 		}
 	}
 
@@ -155,7 +156,7 @@ class HttpProxy {
 						switch (xhr.status) {
 							default:
 								reject(() => {
-									throw Error('Unexpected status ' + xhr.status + ' for ' + url);
+									throw Error(`Unexpected status ${xhr.status} for ${url}`);
 								});
 								return;
 
@@ -168,7 +169,7 @@ class HttpProxy {
 					default:
 						if (HTML_IN_XHR ? !xhr.response : !xhr.responseText) {
 							reject(() => {
-								throw Error('No response for ' + url);
+								throw Error(`No response for ${url}`);
 							});
 							return;
 						}

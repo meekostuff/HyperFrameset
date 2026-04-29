@@ -216,7 +216,7 @@ let convertXBLHandler = function(config) {
 		let result;
 		if (attrValue) {
 			result = lookup[attrValue];
-			if (null == result) console.info('Ignoring invalid property ' + attrName + ': ' + attrValue);
+			if (null == result) console.info(`Ignoring invalid property ${attrName}: ${attrValue}`);
 		}
 		return result;
 	}

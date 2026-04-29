@@ -41,7 +41,7 @@ init(el) {
 		finalCondition = normalizeCondition(condition);
 		if (!finalCondition) {
 			finalCondition = condition;
-			console.warn('Frame body defined with unknown condition: ' + condition);
+			console.warn(`Frame body defined with unknown condition: ${condition}`);
 		}
 	}
 	else finalCondition = 'loaded';

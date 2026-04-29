@@ -132,7 +132,7 @@ let registerElement = function(tagName, definition) { // FIXME test tagName
 	if (started) throw Error('sprockets management already started');
 	if (definition.rules) console.warn('registerElement() does not support rules. Try registerComposite()');
 	let bindingDefn = new BindingDefinition(definition);
-	let selector = tagName + ', [is=' + tagName + ']'; // TODO why should @is be supported??
+	let selector = `${tagName}, [is=${tagName}]`; // TODO why should @is be supported??
 	let rule = new BindingRule(selector, bindingDefn);
 	bindingRules.push(rule);
 	return rule;
@@ -279,7 +279,7 @@ let insertNode = function(conf, refNode, node) {
 		else parent.appendChild(node);
 		break;
 
-	default: throw Error('Unsupported configuration in sprockets.insertNode: ' + conf);
+	default: throw Error(`Unsupported configuration in sprockets.insertNode: ${conf}`);
 	// TODO maybe case 'replace' which will call sprockets.removeNode() first
 	}
 	
@@ -659,7 +659,7 @@ role: 'roletype',
 aria: function(name, value) {
 	let element = this.element;
 	let defn = ariaProperties[name];
-	if (defn == null) throw Error('No such aria property: ' + name);
+	if (defn == null) throw Error(`No such aria property: ${name}`);
 
 	if (name === 'hidden') {
 		if (typeof value === 'undefined') return element.hasAttribute('hidden');
@@ -668,7 +668,7 @@ aria: function(name, value) {
 		return;
 	}
 	
-	let ariaName = 'aria-' + name;
+	let ariaName = `aria-${name}`;
 	let type = typeof defn;
 	if (typeof value === 'undefined') {
 		let result = element.getAttribute(ariaName);
@@ -691,15 +691,15 @@ aria: function(name, value) {
 
 ariaCan: function(name, value) {
 	let desc = this.__properties__[name];
-	if (!desc) throw Error('Property not defined: ' + name);
+	if (!desc) throw Error(`Property not defined: ${name}`);
 	if (desc.type !== 'boolean' || desc.can && !desc.can.call(this)) return false;
 	return true;
 },
 
 ariaToggle: function(name, value) {
 	let desc = this.__properties__[name];
-	if (!desc) throw Error('Property not defined: ' + name);
-	if (desc.type !== 'boolean' || desc.can && !desc.can.call(this)) throw Error('Property can not toggle: ' + name);
+	if (!desc) throw Error(`Property not defined: ${name}`);
+	if (desc.type !== 'boolean' || desc.can && !desc.can.call(this)) throw Error(`Property can not toggle: ${name}`);
 	let oldValue = desc.get.call(this);
 	
 	if (typeof value === 'undefined') desc.set.call(this, !oldValue);
@@ -709,13 +709,13 @@ ariaToggle: function(name, value) {
 
 ariaGet: function(name) {
 	let desc = this.__properties__[name];
-	if (!desc) throw Error('Property not defined: ' + name);
+	if (!desc) throw Error(`Property not defined: ${name}`);
 	return desc.get.call(this); // TODO type and error handling
 },
 
 ariaSet: function(name, value) {
 	let desc = this.__properties__[name];
-	if (!desc) throw Error('Property not defined: ' + name);
+	if (!desc) throw Error(`Property not defined: ${name}`);
 	return desc.set.call(this, value); // TODO type and error handling
 },
 

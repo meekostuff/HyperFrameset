@@ -18,12 +18,12 @@ has: function(name) {
 },
 
 get: function(name) { 
-        if (!this.has(name)) throw name + ' is not a registered controller';
+        if (!this.has(name)) throw Error(`${name} is not a registered controller`);
         return this.values[name];
 },
 
 set: function(name, value) {
-        if (!this.has(name)) throw name + ' is not a registered controller';
+        if (!this.has(name)) throw Error(`${name} is not a registered controller`);
         if (value === false || value == null) value = [];
         else if (typeof value === 'string' || !('length' in value)) value = [ value ];
         let oldValue = this.values[name];
@@ -35,7 +35,7 @@ set: function(name, value) {
 },
 
 listen: function(name, listener) {
-        if (!this.has(name)) throw name + ' is not a registered controller';
+        if (!this.has(name)) throw Error(`${name} is not a registered controller`);
         this.listeners[name].push(listener);
         let value = this.values[name];
         Task.asap(function() { listener(value) });

@@ -27,7 +27,7 @@ let document = window.document;
 /** @constant {number} Random suffix for node ID property names */
 const nodeIdSuffix = Math.round(Math.random() * 1000000);
 /** @constant {string} Property name for storing node IDs */
-const nodeIdProperty = '__' + vendorPrefix + nodeIdSuffix;
+const nodeIdProperty = `__${vendorPrefix}${nodeIdSuffix}`;
 /** @type {number} Counter for generating unique node IDs */
 let nodeCount = 0; // used to generated node IDs
 
@@ -39,7 +39,7 @@ let nodeCount = 0; // used to generated node IDs
 function uniqueId(node) {
 	let nodeId = node[nodeIdProperty];
 	if (nodeId) return nodeId;
-	nodeId = '__' + nodeCount++;
+	nodeId = `__${nodeCount++}`;
 	node[nodeIdProperty] = nodeId;
 	return nodeId;
 }
@@ -168,13 +168,13 @@ function absolutizeSelector(selectorGroup, scope) { // WARN does not handle rela
 	}
 	
 	let nodeId = uniqueId(scope);
-	let scopeSelector = '[' + nodeIdProperty + '=' + nodeId + ']';
+	let scopeSelector = `[${nodeIdProperty}=${nodeId}]`;
 
 	// split on COMMA (,) that is not inside BRACKETS. Technically: not followed by a RHB ')' or ']' unless first followed by LHB '(' or '[' 
 	let selectors = selectorGroup.split(/,(?![^\(]*\)|[^\[]*\])/);
 	selectors = _.map(selectors, function(s) {
 		if (/^:scope\b/.test(s)) return s.replace(/^:scope\b/, scopeSelector);
-		else return scopeSelector + ' ' + s;
+		else return `${scopeSelector} ${s}`;
 	});
 		
 	return selectors.join(', ');
@@ -257,7 +257,7 @@ function siblings(conf, refNode, conf2, refNode2) {
 	case 'after': node = refNode.nextSibling; break;
 	case 'ending': node = first; stopNode = refNode.nextSibling; break;
 	case 'before': node = first; stopNode = refNode; break;
-	default: throw Error(conf + ' is not a valid configuration in siblings()');
+	default: throw Error(`${conf} is not a valid configuration in siblings()`);
 	}
 	if (conf2) switch (conf2) {
 	case 'ending': stopNode = refNode2.nextSibling; break;

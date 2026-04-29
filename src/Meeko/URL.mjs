@@ -40,6 +40,10 @@ function parse(href) {
 	return url;
 }
 
+function toAbsolutePath(pathParts) {
+	return pathParts.length ? '/' + pathParts.join('/') + '/' : '/';
+}
+
 function enhance(url) {
 	url.protocol = _.lc(url.protocol);
 	url.supportsResolve = /^(http|https|ftp|file):$/i.test(url.protocol);
@@ -47,14 +51,14 @@ function enhance(url) {
 	if (url.hostname) url.hostname = _.lc(url.hostname);
 	if (!url.host) {
 		url.host = url.hostname;
-		if (url.port) url.host += ':' + url.port;
+		if (url.port) url.host += `:${url.port}`;
 	}
-	if (!url.origin || url.origin === 'null') url.origin = url.protocol + '//' + url.host;
+	if (!url.origin || url.origin === 'null') url.origin = `${url.protocol}//${url.host}`;
 	if (!url.pathname) url.pathname = '/';
 	let pathParts = url.pathname.split('/'); // creates an array of at least 2 strings with the first string empty: ['', ...]
 	pathParts.shift(); // leaves an array of at least 1 string [...]
 	url.filename = pathParts.pop(); // filename could be ''
-	url.basepath = pathParts.length ? '/' + pathParts.join('/') + '/' : '/'; // either '/rel-path-prepended-by-slash/' or '/'
+	url.basepath = toAbsolutePath(pathParts); // either '/rel-path-prepended-by-slash/' or '/'
 	url.base = url.origin + url.basepath;
 	url.nosearch = url.origin + url.pathname;
 	url.nohash = url.nosearch + url.search;

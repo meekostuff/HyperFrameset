@@ -53,7 +53,7 @@ describe('NamespaceCollection', () => {
   }
 
   function makeNS(name, urn) {
-    return new CustomNamespace({ urn: urn || name + 'URN', name, style: 'xml' });
+    return new CustomNamespace({ urn: urn || `${name}URN`, name, style: 'xml' });
   }
 
   test('getNamespaces returns a collection', () => {

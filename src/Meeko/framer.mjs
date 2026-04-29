@@ -96,7 +96,7 @@ start: function(startOptions) {
 		if (!framerConfig) throw Error('No frameset could be determined for this page');
 		framer.scope = framerConfig.scope; // FIXME shouldn't set this until loadFramesetDefinition() returns success
 		let framesetURL = URL(framerConfig.framesetURL);
-		if (framesetURL.hash) console.info('Ignoring hash component of frameset URL: ' + framesetURL.hash);
+		if (framesetURL.hash) console.info(`Ignoring hash component of frameset URL: ${framesetURL.hash}`);
 		framer.framesetURL = framerConfig.framesetURL = framesetURL.nohash;
 		return httpProxy.load(framer.framesetURL, { responseType: 'document' })
 		.then(function(response) {
@@ -249,7 +249,7 @@ let prerenderFrameset = function(dstDoc, definition) { // FIXME where does this 
 function separateHead(dstDoc, isFrameset) {
 	let dstHead = dstDoc.head;
 	let framesetMarker = getFramesetMarker(dstDoc);
-	if (!framesetMarker) throw Error('No ' + FRAMESET_REL + ' marker found. ');
+	if (!framesetMarker) throw Error(`No ${FRAMESET_REL} marker found. `);
 
 	let selfMarker = getSelfMarker(dstDoc);
 	// remove frameset / page elements except for <script type=text/javascript>
@@ -266,7 +266,7 @@ function mergeHead(dstDoc, srcHead, isFrameset) {
 	let baseURL = URL(dstDoc.URL);
 	let dstHead = dstDoc.head;
 	let framesetMarker = getFramesetMarker();
-	if (!framesetMarker) throw Error('No ' + FRAMESET_REL + ' marker found. ');
+	if (!framesetMarker) throw Error(`No ${FRAMESET_REL} marker found. `);
 	let selfMarker = getSelfMarker();
 
 	separateHead(dstDoc, isFrameset);
@@ -306,13 +306,13 @@ function mergeElement(dst, src) { // NOTE this removes all dst (= landing page) 
 
 function getFramesetMarker(doc) {
 	if (!doc) doc = document;
-	let marker = DOM.find('link[rel~=' + FRAMESET_REL + ']', doc.head);
+	let marker = DOM.find(`link[rel~=${FRAMESET_REL}]`, doc.head);
 	return marker;
 }
 
 function getSelfMarker(doc) {
 	if (!doc) doc = document;
-	let marker = DOM.find('link[rel~=' + SELF_REL + ']', doc.head);
+	let marker = DOM.find(`link[rel~=${SELF_REL}]`, doc.head);
 	return marker;
 }
 

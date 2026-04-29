@@ -42,7 +42,7 @@ filters.register('map', function(value, dict) { // dict can be {} or []
 		let results = _.filter(dict, function(item, i) { return !!(i % 2); });
 		_.some(patterns, function(pattern, i) {
 			// FIXME what if pattern not RegExp && not string??
-			if (!(pattern instanceof RegExp)) pattern = new RegExp('^' + pattern + '$');
+			if (!(pattern instanceof RegExp)) pattern = new RegExp(`^${pattern}$`);
 			if (!pattern.test(value)) return false;
 			value = results[i];
 			return true;
@@ -56,7 +56,7 @@ filters.register('map', function(value, dict) { // dict can be {} or []
 
 filters.register('match', function(value, pattern, yep, nope) {
 	// FIXME what if pattern not RegExp && not string??
-	if (!(pattern instanceof RegExp)) pattern = new RegExp('^' + pattern + '$'); // FIXME sanity TODO case-insensitive??
+	if (!(pattern instanceof RegExp)) pattern = new RegExp(`^${pattern}$`); // FIXME sanity TODO case-insensitive??
 	let bMatch = pattern.test(value);
 	if (yep != null && bMatch) return yep;
 	if (nope != null && !bMatch) return nope;

@@ -11,7 +11,7 @@ class JSONDecoder {
 constructor(options, namespaces) {}
 
 init(object) {
-	if (typeof object !== 'object' || object === null) throw 'JSONDecoder cannot handle non-object';
+	if (typeof object !== 'object' || object === null) throw Error('JSONDecoder cannot handle non-object');
 	this.object = object;
 }
 

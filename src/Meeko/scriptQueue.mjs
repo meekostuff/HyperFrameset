@@ -44,13 +44,13 @@ push: function(node) {
 
 	// TODO this filtering may need reworking now we don't support older browsers
 	if (!node.type || /^text\/javascript$/i.test(node.type)) {
-		console.info('Attempt to queue already executed script ' + node.src);
+		console.info(`Attempt to queue already executed script ${node.src}`);
 		resolve(); // TODO should this be reject() ??
 		return;
 	}
 
 	if (!/^text\/javascript\?disabled$/i.test(node.type)) {
-		console.info('Unsupported script-type ' + node.type);
+		console.info(`Unsupported script-type ${node.type}`);
 		resolve(); // TODO should this be reject() ??
 		return;
 	}

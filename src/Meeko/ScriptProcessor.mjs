@@ -47,7 +47,7 @@ loadTemplate(template) {
 		console.warn('No <script> found in "script" transform template');
 		return;
 	}
-	try { this.processor = (Function('return (' + script.text + ')'))(); }
+	try { this.processor = (Function(`return (${script.text})`))(); }
 	catch(err) { window.reportError(err); }
 	
 	if (!this.processor || !this.processor.transform) {

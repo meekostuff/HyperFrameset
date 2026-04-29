@@ -215,7 +215,7 @@ describe('normalizeScopedStyles', () => {
 
   function makeDoc(bodyHTML) {
     return (new DOMParser).parseFromString(
-      '<!DOCTYPE html><html><head></head><body>' + bodyHTML + '</body></html>',
+      `<!DOCTYPE html><html><head></head><body>${bodyHTML}</body></html>`,
       'text/html'
     );
   }
@@ -301,8 +301,8 @@ describe('normalizeScopedStyles', () => {
     let cssText = doc.head.querySelector('style').textContent;
     let scopeId = doc.body.querySelector('.allowed').getAttribute('scopeid');
     // both selectors should be prefixed
-    let prefix = '#' + scopeId;
-    let prefixCount = (cssText.match(new RegExp('#' + scopeId, 'g')) || []).length;
+    let prefix = `#${scopeId}`;
+    let prefixCount = (cssText.match(new RegExp(`#${scopeId}`, 'g')) || []).length;
     expect(prefixCount).toBeGreaterThanOrEqual(2);
   });
 

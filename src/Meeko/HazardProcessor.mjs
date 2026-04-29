@@ -140,13 +140,13 @@ loadTemplate(template) {
 	let mexprPrefix = namespaces.lookupPrefix(HAZARD_MEXPRESSION_URN);
 
 	let exprHtmlAttr = exprPrefix + htmlAttr; // NOTE this is mapped to haz:eval
-	let hazEvalTag = hazPrefix + 'eval';
+	let hazEvalTag = `${hazPrefix}eval`;
 	let mexprHtmlAttr = mexprPrefix + htmlAttr; // NOTE this is invalid
 
 	let mexprTextAttr = mexprPrefix + textAttr; // NOTE this is mapped to haz:mtext
-	let hazMTextTag = hazPrefix + 'mtext';
+	let hazMTextTag = `${hazPrefix}mtext`;
 	let exprTextAttr = exprPrefix + textAttr; // NOTE this is mapped to haz:text
-	let hazTextTag = hazPrefix + 'text';
+	let hazTextTag = `${hazPrefix}text`;
 
 	// FIXME extract exprToHazPriority from hazLang
 	let exprToHazPriority = [ exprHtmlAttr, mexprTextAttr, exprTextAttr ];
@@ -172,7 +172,7 @@ loadTemplate(template) {
 		});
 
 		if (el.hasAttribute(mexprHtmlAttr)) {
-			console.warn('Removing unsupported @' + mexprHtmlAttr);
+			console.warn(`Removing unsupported @${mexprHtmlAttr}`);
 			el.removeAttribute(mexprHtmlAttr);
 		}
 

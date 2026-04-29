@@ -29,7 +29,7 @@ function normalize(doc, details) {
 				let absURL = baseURL.resolve(url);
 				if (absURL === url) return match;
 				replacements++;
-				return "url(" + quote + absURL + quote + ")";
+				return `url(${quote}${absURL}${quote})`;
 			});
 		if (replacements) node.textContent = text;
 	});
@@ -137,12 +137,12 @@ function normalizeScopedStyles(doc, allowedScopeSelector) {
 	_.forEach(scopedStyles, function(el, index) {
 		let scope = el.parentNode;
 		if (!DOM.matches(scope, allowedScopeSelector)) {
-			console.warn('Removing <style scoped>. Must be child of ' + allowedScopeSelector);
+			console.warn(`Removing <style scoped>. Must be child of ${allowedScopeSelector}`);
 			scope.removeChild(el);
 			return;
 		}
 		
-		let scopeId = '__scope_' + index + '__';
+		let scopeId = `__scope_${index}__`;
 		scope.setAttribute('scopeid', scopeId);
 		if (scope.hasAttribute('id')) scopeId = scope.getAttribute('id');
 		else scope.setAttribute('id', scopeId);
@@ -174,10 +174,10 @@ function processRule(rule, id, parentRule) {
 		// prefix each selector in selector-chain with scopePrefix
 		// selector-chain is split on COMMA (,) that is not inside BRACKETS. Technically: not followed by a RHB ')' unless first followed by LHB '(' 
 		let scopeId = scope.getAttribute('scopeid');
-		let scopePrefix = '#' + scopeId + ' ';
-		let selectorText = scopePrefix + rule.selectorText.replace(/,(?![^(]*\))/g, ', ' + scopePrefix);
+		let scopePrefix = `#${scopeId} `;
+		let selectorText = scopePrefix + rule.selectorText.replace(/,(?![^(]*\))/g, `, ${scopePrefix}`);
 		let cssText = rule.cssText.replace(rule.selectorText, '');
-		cssText = selectorText + ' ' + cssText;
+		cssText = `${selectorText} ${cssText}`;
 		parentRule.deleteRule(id);
 		parentRule.insertRule(cssText, id);
 		break;

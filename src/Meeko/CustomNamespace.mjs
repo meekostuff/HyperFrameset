@@ -17,9 +17,9 @@ constructor(options) {
 	let styleInfo = _.find(CustomNamespace.namespaceStyles, function(styleInfo) {
 		return styleInfo.style === style;
 	});
-	if (!styleInfo) throw Error('Unexpected namespace style: ' + style);
+	if (!styleInfo) throw Error(`Unexpected namespace style: ${style}`);
 	let name = options.name = _.lc(options.name);
-	if (!name) throw Error('Unexpected name: ' + name);
+	if (!name) throw Error(`Unexpected name: ${name}`);
 	
 	_.assign(this, options);
 	let separator = styleInfo.separator;
@@ -126,11 +126,11 @@ add(nsDef) {
 	let coll = this;
 	let matchingNS = _.find(coll.items, function(def) {
 		if (_.lc(def.urn) === _.lc(nsDef.urn)) {
-			if (def.prefix !== nsDef.prefix) console.warn('Attempted to add namespace with same urn as one already present: ' + def.urn);
+			if (def.prefix !== nsDef.prefix) console.warn(`Attempted to add namespace with same urn as one already present: ${def.urn}`);
 			return true;
 		}
 		if (def.prefix === nsDef.prefix) {
-			if (_.lc(def.urn) !== _.lc(nsDef.urn)) console.warn('Attempted to add namespace with same prefix as one already present: ' + def.prefix);
+			if (_.lc(def.urn) !== _.lc(nsDef.urn)) console.warn(`Attempted to add namespace with same prefix as one already present: ${def.prefix}`);
 			return true;
 		}
 	});

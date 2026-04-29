@@ -114,7 +114,7 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 		if (!m) {
 			if (i > 0 && contextVar) {
 				invalidVarUse = true;
-				console.warn('All individual selectors in a selector-group must share same context: ' + selectorGroup);
+				console.warn(`All individual selectors in a selector-group must share same context: ${selectorGroup}`);
 			}
 			return; // if no matches then m will be null not []
 		}
@@ -124,13 +124,13 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 			let varPos = s.indexOf(varRef);
 			if (j > 0 || varPos > 0) {
 				invalidVarUse = true;
-				console.warn('Invalid use of ' + varRef + ' in ' + selectorGroup);
+				console.warn(`Invalid use of ${varRef} in ${selectorGroup}`);
 				return;
 			}
 			if (i > 0) {
 				if (varName !== contextVar) {
 					invalidVarUse = true;
-					console.warn('All individual selectors in a selector-group must share same context: ' + selectorGroup);
+					console.warn(`All individual selectors in a selector-group must share same context: ${selectorGroup}`);
 				}
 				return;
 			}
@@ -145,14 +145,14 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 
 	if (contextVar && contextVar !== CSS_CONTEXT_VARIABLE) {
 		if (!variables.has(contextVar)) {
-			console.debug('Context variable $' + contextVar + ' not defined for ' + selectorGroup);
+			console.debug(`Context variable $${contextVar} not defined for ${selectorGroup}`);
 			return nullResult;
 		}
 		if (contextVar !== CSS_CONTEXT_VARIABLE) context = variables.get(contextVar);
 
 		// NOTE if the selector is just '$variable' then 
 		// context doesn't even need to be a node
-		if (selectorGroup === '$' + contextVar) return context;
+		if (selectorGroup === `$${contextVar}`) return context;
 
 		if (!(context && context.nodeType === 1)) {
 			console.debug('Context variable $' + contextVar + ' not an element in ' + selectorGroup);

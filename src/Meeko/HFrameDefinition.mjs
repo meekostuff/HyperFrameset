@@ -31,7 +31,7 @@ init(el) {
 			frameDef.bodies.push(new HBodyDefinition(node, framesetDef));
 			return;
 		}
-		console.warn('Unexpected element in HFrame: ' + tag);
+		console.warn(`Unexpected element in HFrame: ${tag}`);
 		return;
 	});
 

@@ -47,7 +47,8 @@ function registerFormElements() {
 
 _.forOwn(eventTable, function(events, tag) {
 
-let ClassName = 'Configurable' + _.ucFirst(tag);
+let Tag = _.ucFirst(tag);
+let ClassName = `Configurable${Tag}`;
 
 let Interface = sprockets.evolve(sprockets.RoleType, {});
 _.assign(Interface, {
@@ -60,7 +61,7 @@ attached: function(handlers) {
 	let options = configData.get(configID);
 	if (!options) return;
 	_.forEach(events, function(type) {
-		let ontype = 'on' + type;
+		let ontype = `on${type}`;
 		let callback = options[ontype];
 		if (!callback) return;
 
@@ -96,7 +97,7 @@ attached: function(handlers) {
 	let needClickWatcher = false;
 
 	_.forEach(events, function(type) {
-		let ontype = 'on' + type;
+		let ontype = `on${type}`;
 		let callback = options[ontype];
 		if (!callback) return;
 

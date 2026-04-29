@@ -15,7 +15,6 @@ const hfDefaultNamespace = new CustomNamespace({
 	urn: HYPERFRAMESET_URN
 });
 
-
 class HFramesetDefinition {
 
 constructor(doc, settings) {
@@ -54,10 +53,9 @@ init(doc, settings) {
 	// warn about not using @id
 	let idElements = DOM.findAll('*[id]:not(script)', doc.body);
 	if (idElements.length) {
-		console.warn('@id is strongly discouraged in frameset-documents (except on <script>).\n' +
-			'Found ' + idElements.length + ', ' + 
-			'first @id is ' + idElements[0].getAttribute('id')
-		);
+		let firstId = idElements[0].getAttribute('id');
+		console.warn(`@id is strongly discouraged in frameset-documents (except on <<script>>).
+			Found ${idElements.length}, first @id is ${firstId}`);
 	}
 
 	// Add @id and @sourceurl to inline <script type="text/javascript">
@@ -69,14 +67,14 @@ init(doc, settings) {
 		if (script.hasAttribute('src')) return;
 		let id = script.id;
 		// TODO generating ID always has a chance of duplicating IDs
-		if (!id) id = script.id = 'script[' + i + ']'; // FIXME doc that i is zero-indexed
+		if (!id) id = script.id = `script[${i}]`; // FIXME doc that i is zero-indexed
 		let sourceURL;
 		if (script.hasAttribute('sourceurl')) sourceURL = script.getAttribute('sourceurl');
 		else {
-			sourceURL = framesetDef.url + '__' + id; // FIXME this should be configurable
+			sourceURL = `${framesetDef.url}__${id}`; // FIXME this should be configurable
 			script.setAttribute('sourceurl', sourceURL);
 		}
-		script.text += '\n//# sourceURL=' + sourceURL;
+		script.text += `\n//# sourceURL=${sourceURL}`;
 	});
 
 	// Move all <script for> in <head> to <body>
