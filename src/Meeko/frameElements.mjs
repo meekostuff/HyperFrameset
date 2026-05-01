@@ -10,7 +10,7 @@
 
 import * as _ from './stuff.mjs';
 import Thenfu from './Thenfu.mjs';
-import URL from './URL.mjs';
+import URLux from './URLux.mjs';
 import * as DOM from './DOM.mjs';
 import httpProxy from './httpProxy.mjs';
 import Registry from './Registry.mjs';
@@ -116,7 +116,7 @@ refresh: function() {
 			return; // FIXME frame.load(null, { condition: 'uninitialized' })
 		}
 
-		let fullURL = URL(src);
+		let fullURL = URLux.create(src);
 		let nohash = fullURL.nohash;
 		let hash = fullURL.hash;
 

@@ -3,7 +3,7 @@ import * as _ from './Meeko/stuff.mjs';
 import Registry from './Meeko/Registry.mjs';
 import Task from './Meeko/Task.mjs';
 import Thenfu from './Meeko/Thenfu.mjs';
-import URL from './Meeko/URL.mjs';
+import URLux from './Meeko/URLux.mjs';
 import * as DOM from './Meeko/DOM.mjs';
 import scriptQueue from './Meeko/scriptQueue.mjs';
 import sprockets from './Meeko/sprockets.mjs';
@@ -38,7 +38,7 @@ import framer, { HFrameset } from './Meeko/framer.mjs';
 
     if (!this.Meeko) this.Meeko = {};
     _.assign(this.Meeko, {
-        stuff, Registry, Task, Thenfu, URL, DOM, scriptQueue,
+        stuff, Registry, Task, Thenfu, URLux, DOM, scriptQueue,
         sprockets,
         htmlParser, httpProxy, historyManager,
         CustomNamespace,

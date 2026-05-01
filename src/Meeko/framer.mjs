@@ -11,7 +11,7 @@
 
 import * as _ from './stuff.mjs';
 import Thenfu from './Thenfu.mjs';
-import URL from './URL.mjs';
+import URLux from './URLux.mjs';
 import * as DOM from './DOM.mjs';
 import scriptQueue from './scriptQueue.mjs';
 import httpProxy from './httpProxy.mjs';
@@ -95,7 +95,7 @@ start: function(startOptions) {
 	function(framerConfig) { // initiate fetch of frameset.URL
 		if (!framerConfig) throw Error('No frameset could be determined for this page');
 		framer.scope = framerConfig.scope; // FIXME shouldn't set this until loadFramesetDefinition() returns success
-		let framesetURL = URL(framerConfig.framesetURL);
+		let framesetURL = URLux.create(framerConfig.framesetURL);
 		if (framesetURL.hash) console.info(`Ignoring hash component of frameset URL: ${framesetURL.hash}`);
 		framer.framesetURL = framerConfig.framesetURL = framesetURL.nohash;
 		return httpProxy.load(framer.framesetURL, { responseType: 'document' })
@@ -263,7 +263,7 @@ function separateHead(dstDoc, isFrameset) {
 }
 
 function mergeHead(dstDoc, srcHead, isFrameset) {
-	let baseURL = URL(dstDoc.URL);
+	let baseURL = URLux.create(dstDoc.URL);
 	let dstHead = dstDoc.head;
 	let framesetMarker = getFramesetMarker();
 	if (!framesetMarker) throw Error(`No ${FRAMESET_REL} marker found. `);
@@ -376,7 +376,7 @@ onClick: function(e) { // return false means success
 	let href = hyperlink.getAttribute('href');
 	if (!href) return; // not really a hyperlink
 
-	let baseURL = URL(document.URL);
+	let baseURL = URLux.create(document.URL);
 	let url = baseURL.resolve(href); // TODO probably don't need to resolve on browsers that support pushstate
 
 	// NOTE The following creates a pseudo-event and dispatches to frames in a bubbling order.
@@ -396,7 +396,7 @@ onSubmit: function(e) { // return false means success
 	// test submit
 	let form = e.target;
 	if (form.target) return; // no iframe
-	let baseURL = URL(document.URL);
+	let baseURL = URLux.create(document.URL);
 	let action = baseURL.resolve(form.action); // TODO probably don't need to resolve on browsers that support pushstate
 	
 	let details = {
@@ -405,7 +405,7 @@ onSubmit: function(e) { // return false means success
 	let method = _.lc(form.method);
 	switch(method) {
 	case 'get':
-		let oURL = URL(action);
+		let oURL = URLux.create(action);
 		let query = encode(form);
 		details.url = oURL.nosearch + (oURL.search || '?') + query + oURL.hash;
 		break;
@@ -456,8 +456,8 @@ onRequestNavigation: function(e, frame) { // `return false` means success (so pr
 	}
 	
 	// test hyperlinks
-	let baseURL = URL(document.URL);
-	let oURL = URL(url);
+	let baseURL = URLux.create(document.URL);
+	let oURL = URLux.create(url);
 	if (oURL.origin != baseURL.origin) return; // no external urls
 
 	// TODO perhaps should test same-site and same-page links
@@ -508,7 +508,7 @@ load: function(url, changeset, changeState) { // FIXME doesn't support replaceSt
 		return true;
 	});
 	
-	let fullURL = URL(url);
+	let fullURL = URLux.create(url);
 	let hash = fullURL.hash;
 	let nohash = fullURL.nohash;
 	let request = { method: 'get', url: nohash, responseType: 'document' }; // TODO one day may support different response-type
@@ -611,8 +611,8 @@ inferChangeset: inferChangeset
 });
 
 function implyFramesetScope(framesetSrc, docSrc) {
-	let docURL = URL(docSrc);
-	let docSiteURL = URL(docURL.origin);
+	let docURL = URLux.create(docSrc);
+	let docSiteURL = URLux.create(docURL.origin);
 	framesetSrc = docSiteURL.resolve(framesetSrc);
 	let scope = implyScope(framesetSrc, docSrc);
 	return {
@@ -622,8 +622,8 @@ function implyFramesetScope(framesetSrc, docSrc) {
 }
 
 function implyScope(framesetSrc, docSrc) {
-	let docURL = URL(docSrc);
-	let framesetURL = URL(framesetSrc);
+	let docURL = URLux.create(docSrc);
+	let framesetURL = URLux.create(framesetSrc);
 	let scope = docURL.base;
 	let framesetBase = framesetURL.base;
 	if (scope.indexOf(framesetBase) >= 0) scope = framesetBase;

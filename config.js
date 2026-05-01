@@ -2,7 +2,7 @@
 
 var _ = Meeko.stuff;
 var DOM = Meeko.DOM;
-var URL = Meeko.URL, baseURL = URL(document.URL);
+var URLux = Meeko.URLux, baseURL = URLux.create(document.URL);
 
 var framesetURL, scope;
 

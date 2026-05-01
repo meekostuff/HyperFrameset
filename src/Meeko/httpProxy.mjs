@@ -1,5 +1,5 @@
 import * as _ from './stuff.mjs';
-import URL from './URL.mjs';
+import URLux from './URLux.mjs';
 import * as DOM from './DOM.mjs';
 import Thenfu from './Thenfu.mjs';
 import htmlParser from './htmlParser.mjs';
@@ -149,7 +149,7 @@ class HttpProxy {
 
 			function onchange() { // FIXME rewrite this to use onload/onerror/onabort/ontimeout
 				if (xhr.readyState != 4) return;
-				const protocol = new URL(url).protocol;
+				const protocol = URLux.create(url).protocol;
 				switch (protocol) {
 					case 'http:':
 					case 'https:':

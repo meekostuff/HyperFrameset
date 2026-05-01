@@ -1,5 +1,5 @@
 import * as _ from './stuff.mjs';
-import URL from './URL.mjs';
+import URLux from './URLux.mjs';
 import * as DOM from './DOM.mjs';
 import configData from './configData.mjs';
 import CustomNamespace, { HYPERFRAMESET_URN } from './CustomNamespace.mjs';
@@ -36,7 +36,7 @@ init(doc, settings) {
 	}
 
 	// NOTE first rebase scope: urls
-	let scopeURL = URL(settings.scope);
+	let scopeURL = URLux.create(settings.scope);
 	rebase(doc, scopeURL);
 	let frameElts = DOM.findAll(
 		framesetDef.namespaces.lookupSelector('frame', HYPERFRAMESET_URN), 

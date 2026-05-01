@@ -1,6 +1,6 @@
 
 import * as _ from './stuff.mjs';
-import URL from './URL.mjs';
+import URLux from './URLux.mjs';
 import * as DOM from './DOM.mjs';
 import Thenfu from './Thenfu.mjs';
 
@@ -14,7 +14,7 @@ import Thenfu from './Thenfu.mjs';
  */
 function normalize(doc, details) { 
 
-	let baseURL = URL(details.url);
+	let baseURL = URLux.create(details.url);
 
 	_.forEach(DOM.findAll('style', doc.body), function(node) {
 		if (node.hasAttribute('scoped')) return; // ignore
@@ -44,7 +44,7 @@ function normalize(doc, details) {
  * @returns {Promise<Document>}
  */
 function resolveAll(doc, baseURL) {
-	let urlAttributes = URL.attributes;
+	let urlAttributes = URLux.attributes;
 
 	return Thenfu.pipe(null, [
 
@@ -112,7 +112,7 @@ function rebaseURL(url, baseURL) {
  * @param {URL} scopeURL - The scope base URL.
  */
 function rebase(doc, scopeURL) {
-	let urlAttributes = URL.attributes;
+	let urlAttributes = URLux.attributes;
 	_.forOwn(urlAttributes, function(attrList, tag) {
 		_.forEach(DOM.findAll(tag, doc), function(el) {
 			_.forOwn(attrList, function(attrDesc, attrName) {
