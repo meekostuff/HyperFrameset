@@ -40,7 +40,7 @@ function normalize(doc, details) {
 /**
  * Resolve all URL attributes in a document to absolute form.
  * @param {Document} doc
- * @param {URL} baseURL
+ * @param {URLux} baseURL
  * @returns {Promise<Document>}
  */
 function resolveAll(doc, baseURL) {
@@ -96,7 +96,7 @@ function nativeParser(html, details) {
  * Rewrite a single URL, replacing a `scope:` prefix with resolution against baseURL.
  * URLs without the `scope:` prefix are returned unchanged. Case-insensitive.
  * @param {string} url - The URL to potentially rebase.
- * @param {URL} baseURL - The scope base URL to resolve against.
+ * @param {URLux} baseURL - The scope base URL to resolve against.
  * @returns {string} The resolved URL, or the original if no `scope:` prefix.
  */
 function rebaseURL(url, baseURL) {
@@ -109,7 +109,7 @@ function rebaseURL(url, baseURL) {
  * Walk all URL-bearing attributes in a document and rewrite any `scope:`-prefixed
  * values to be resolved against the given scope URL.
  * @param {Document} doc - The document to rebase.
- * @param {URL} scopeURL - The scope base URL.
+ * @param {URLux} scopeURL - The scope base URL.
  */
 function rebase(doc, scopeURL) {
 	let urlAttributes = URLux.attributes;

@@ -1,24 +1,47 @@
-/*
- ### URLux - extended URL utility
+/**
+ * URLux - extended URL utility.
+ *
+ * Extends the native URL class with pre-computed path components
+ * and a resolve method that handles non-standard protocols gracefully.
+ *
+ * Instances are effectively immutable by convention — always create
+ * new instances via {@link URLux.create} rather than mutating properties.
+ * WARN: native URL setters are inherited and will NOT update the custom fields.
  */
 
 const document = window.document;
 
 class URLux extends URL {
 
+/**
+ * @param {string} href - Absolute or relative URL string.
+ * @param {string} [base] - Base URL for resolving relative href.
+ */
 constructor(href, base) {
 	super(href, base);
+	/** @type {boolean} Whether this URL's protocol supports relative resolution. */
 	this.supportsResolve = /^(https?|ftp|file):$/.test(this.protocol);
 	if (!this.supportsResolve) return;
 	const pathParts = this.pathname.split('/'); // ['', ...segments, filename]
 	pathParts.shift();
+	/** @type {string} The final path segment (e.g. 'page.html'). */
 	this.filename = pathParts.pop() || '';
+	/** @type {string} The directory path with leading and trailing slashes. */
 	this.basepath = pathParts.length ? '/' + pathParts.join('/') + '/' : '/';
+	/** @type {string} Origin + basepath — the base for resolving relative URLs. */
 	this.base = this.origin + this.basepath;
+	/** @type {string} Origin + pathname, without search or hash. */
 	this.nosearch = this.origin + this.pathname;
+	/** @type {string} Origin + pathname + search, without hash. */
 	this.nohash = this.nosearch + this.search;
 }
 
+/**
+ * Resolve a relative URL against this URL.
+ * Returns the href unchanged for absolute URLs or unsupported protocols.
+ * @param {string} relHref - The relative (or absolute) URL to resolve.
+ * @returns {string} The resolved absolute URL string.
+ */
 resolve(relHref) {
 	relHref = relHref.trim();
 	if (!this.supportsResolve) return relHref;
@@ -41,8 +64,17 @@ resolve(relHref) {
 
 }
 
+/**
+ * Describes an HTML attribute that contains a URL, with logic to resolve it.
+ */
 class AttributeDescriptor {
 
+/**
+ * @param {string} tagName - HTML tag name (e.g. 'img').
+ * @param {string} attrName - Attribute name (e.g. 'src').
+ * @param {boolean} loads - Whether the attribute triggers a resource load.
+ * @param {boolean} compound - Whether the attribute contains multiple URLs.
+ */
 constructor(tagName, attrName, loads, compound) {
 	this.tagName = tagName;
 	this.attrName = attrName;
@@ -51,6 +83,11 @@ constructor(tagName, attrName, loads, compound) {
 	this.supported = attrName in document.createElement(tagName);
 }
 
+/**
+ * Resolve the URL attribute on an element in-place.
+ * @param {Element} el - The DOM element.
+ * @param {URLux} baseURL - The base URL to resolve against.
+ */
 resolve(el, baseURL) {
 	const url = el.getAttribute(this.attrName);
 	if (url == null) return;
@@ -58,6 +95,12 @@ resolve(el, baseURL) {
 	if (finalURL !== url) el.setAttribute(this.attrName, finalURL);
 }
 
+/**
+ * Resolve a URL string against a base. May be overridden for compound attributes.
+ * @param {string} url - The raw attribute value.
+ * @param {URLux} baseURL - The base URL to resolve against.
+ * @returns {string} The resolved URL string.
+ */
 resolveURL(url, baseURL) {
 	const relURL = url.trim();
 	if (relURL.charAt(0) === '') return relURL; // empty, but not null
@@ -66,12 +109,14 @@ resolveURL(url, baseURL) {
 
 }
 
+/** @param {string} urlSet @param {URLux} baseURL @returns {string} */
 function resolveSrcset(urlSet, baseURL) {
 	return urlSet.split(/\s*,\s*/).map((urlDesc, i, list) =>
 		urlDesc.replace(/^\s*(\S+)(?=\s|$)/, (all, url) => baseURL.resolve(url))
 	).join(', ');
 }
 
+/** @param {string} urlSet @param {URLux} baseURL @returns {string} */
 function resolvePing(urlSet, baseURL) {
 	return urlSet.split(/\s+/).map(url => baseURL.resolve(url)).join(' ');
 }
@@ -94,7 +139,15 @@ urlAttributes['img']['srcset'].resolveURL = resolveSrcset;
 urlAttributes['source']['srcset'].resolveURL = resolveSrcset;
 urlAttributes['a']['ping'].resolveURL = resolvePing;
 
+/** @type {Object<string, Object<string, AttributeDescriptor>>} Registry of URL-bearing HTML attributes by tag. */
 URLux.attributes = urlAttributes;
+
+/**
+ * Factory method. Preferred way to create URLux instances.
+ * @param {string} href - Absolute or relative URL string.
+ * @param {string} [base] - Base URL for resolving relative href.
+ * @returns {URLux}
+ */
 URLux.create = function(href, base) { return new URLux(href, base); };
 
 export default URLux;
