@@ -125,4 +125,82 @@ describe('URL.mjs', () => {
     expect(el.getAttribute('href')).toBe('http://example.com/dir/other.html');
   });
 
+  test('source srcset resolveURL resolves each URL in set', () => {
+    const base = URL('http://example.com/dir/page.html');
+    const desc = URL.attributes['source']['srcset'];
+    const result = desc.resolveURL('sm.jpg 100w, lg.jpg 200w', base);
+    expect(result).toContain('http://example.com/dir/sm.jpg 100w');
+    expect(result).toContain('http://example.com/dir/lg.jpg 200w');
+  });
+
+  test('resolve skips element when attribute is absent', () => {
+    const base = URL('http://example.com/dir/page.html');
+    const el = document.createElement('a');
+    // no href set
+    URL.attributes['a']['href'].resolve(el, base);
+    expect(el.getAttribute('href')).toBeNull();
+  });
+
+  test('resolveURL returns empty string unchanged', () => {
+    const base = URL('http://example.com/dir/page.html');
+    const desc = URL.attributes['a']['href'];
+    expect(desc.resolveURL('', base)).toBe('');
+  });
+
+  test('loads flag is true for download-triggering attributes', () => {
+    expect(URL.attributes['script']['src'].loads).toBe(true);
+    expect(URL.attributes['img']['src'].loads).toBe(true);
+    expect(URL.attributes['iframe']['src'].loads).toBe(true);
+  });
+
+  test('loads flag is false for non-downloading attributes', () => {
+    expect(URL.attributes['a']['href'].loads).toBe(false);
+    expect(URL.attributes['form']['action'].loads).toBe(false);
+  });
+
+  test('compound flag is true for multi-URL attributes', () => {
+    expect(URL.attributes['img']['srcset'].compound).toBe(true);
+    expect(URL.attributes['source']['srcset'].compound).toBe(true);
+    expect(URL.attributes['a']['ping'].compound).toBe(true);
+  });
+
+  test('compound flag is false for single-URL attributes', () => {
+    expect(URL.attributes['a']['href'].compound).toBe(false);
+    expect(URL.attributes['script']['src'].compound).toBe(false);
+  });
+
+  describe('URL.attributes registry completeness', () => {
+    const expected = {
+      link:       { href: { loads: true, compound: false } },
+      script:     { src: { loads: true, compound: false } },
+      img:        { longDesc: { loads: true, compound: false }, src: { loads: true, compound: false }, srcset: { loads: false, compound: true } },
+      iframe:     { longDesc: { loads: true, compound: false }, src: { loads: true, compound: false } },
+      object:     { data: { loads: true, compound: false } },
+      embed:      { src: { loads: true, compound: false } },
+      video:      { poster: { loads: true, compound: false }, src: { loads: true, compound: false } },
+      audio:      { src: { loads: true, compound: false } },
+      source:     { src: { loads: true, compound: false }, srcset: { loads: false, compound: true } },
+      input:      { formAction: { loads: false, compound: false }, src: { loads: true, compound: false } },
+      button:     { formAction: { loads: false, compound: false }, src: { loads: true, compound: false } },
+      a:          { ping: { loads: false, compound: true }, href: { loads: false, compound: false } },
+      area:       { href: { loads: false, compound: false } },
+      q:          { cite: { loads: false, compound: false } },
+      blockquote: { cite: { loads: false, compound: false } },
+      ins:        { cite: { loads: false, compound: false } },
+      del:        { cite: { loads: false, compound: false } },
+      form:       { action: { loads: false, compound: false } },
+    };
+
+    for (const [tag, attrs] of Object.entries(expected)) {
+      for (const [attr, flags] of Object.entries(attrs)) {
+        test(`${tag}@${attr} exists with loads=${flags.loads}, compound=${flags.compound}`, () => {
+          const desc = URL.attributes[tag]?.[attr];
+          expect(desc).toBeDefined();
+          expect(desc.loads).toBe(flags.loads);
+          expect(desc.compound).toBe(flags.compound);
+        });
+      }
+    }
+  });
+
 });
