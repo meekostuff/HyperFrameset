@@ -271,7 +271,7 @@ function mergeHead(dstDoc, srcHead, isFrameset) {
 
 	separateHead(dstDoc, isFrameset);
 
-	_.forEach(_.map(srcHead.childNodes), function(srcNode) {
+	_.forEach(Array.from(srcHead.childNodes), function(srcNode) {
 		if (srcNode.nodeType != 1) return;
 		switch (DOM.getTagName(srcNode)) {
 		default:
@@ -768,7 +768,7 @@ render: function() {
 	return Thenfu.pipe(null, [
 
 	function() {
-		_.forEach(_.map(srcBody.childNodes), function(node) {
+		_.forEach(Array.from(srcBody.childNodes), function(node) {
 			sprockets.insertNode('beforeend', dstBody, node);
 		});
 	}

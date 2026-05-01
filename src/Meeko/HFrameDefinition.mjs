@@ -22,7 +22,7 @@ init(el) {
 		mainSelector: el.getAttribute('main') // TODO consider using a hash in `@src`
     });
 	frameDef.bodies = [];
-	_.forEach(_.map(el.childNodes), function(node) {
+	_.forEach(Array.from(el.childNodes), function(node) {
 		let tag = DOM.getTagName(node);
 		if (!tag) return;
 		if (_.includes(hfHeadTags, tag)) return; // ignore typical <head> elements

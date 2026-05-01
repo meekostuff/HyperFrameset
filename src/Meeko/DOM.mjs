@@ -172,7 +172,7 @@ function absolutizeSelector(selectorGroup, scope) { // WARN does not handle rela
 
 	// split on COMMA (,) that is not inside BRACKETS. Technically: not followed by a RHB ')' or ']' unless first followed by LHB '(' or '[' 
 	let selectors = selectorGroup.split(/,(?![^\(]*\)|[^\[]*\])/);
-	selectors = _.map(selectors, function(s) {
+	selectors = Array.from(selectors, function(s) {
 		if (/^:scope\b/.test(s)) return s.replace(/^:scope\b/, scopeSelector);
 		else return `${scopeSelector} ${s}`;
 	});
@@ -206,7 +206,7 @@ function findAll(selector, node, scope, inclusive) {
 	if (!node.querySelectorAll) return [];
 	if (scope && !scope.nodeType) scope = node; // `true` but not the scope element
 	return scopeify(function(absSelector) {
-		let result = _.map(node.querySelectorAll(absSelector));
+		let result = Array.from(node.querySelectorAll(absSelector));
 		if (inclusive && node.nodeType === 1 && node.matches(absSelector)) result.unshift(node);
 		return result;
 	}, selector, scope);

@@ -55,7 +55,7 @@ evaluate(query, context, variables, wantArray) {
 	});
 
 	// now convert elements to values
-	resultList = _.map(resultList, function(el) {
+	resultList = Array.from(resultList, function(el) {
 		let props = Microdata.getProperties(el);
 		if (props) return el;
 		return Microdata.getValue(el);

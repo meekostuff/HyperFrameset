@@ -52,7 +52,7 @@ lookupTagName(name) { return this.prefix + name; }
 lookupSelector(selector) {
 	let prefix = this.selectorPrefix;
 	let tags = selector.split(/\s*,\s*|\s+/);
-	return _.map(tags, function(tag) { return prefix + tag; }).join(', ');
+	return Array.from(tags, function(tag) { return prefix + tag; }).join(', ');
 }
 
 }
@@ -98,7 +98,7 @@ constructor(doc) {
 
 init(doc) {
 	let coll = this;
-	_.forEach(_.map(doc.documentElement.attributes), function(attr) {
+	_.forEach(Array.from(doc.documentElement.attributes), function(attr) {
 		let fullName = _.lc(attr.name);
 		let styleInfo = _.find(CustomNamespace.namespaceStyles, function(styleInfo) {
 			return (fullName.indexOf(styleInfo.configPrefix) === 0);

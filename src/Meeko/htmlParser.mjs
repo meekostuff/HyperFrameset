@@ -150,7 +150,7 @@ function normalizeScopedStyles(doc, allowedScopeSelector) {
 		el.removeAttribute('scoped');
 		let sheet = el.sheet;
 		forRules(sheet, processRule, scope);
-		let cssText = _.map(sheet.cssRules, function(rule) {
+		let cssText = Array.from(sheet.cssRules, function(rule) {
 				return rule.cssText; 
 			}).join('\n');
 		el.textContent = cssText;

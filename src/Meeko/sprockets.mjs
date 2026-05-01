@@ -42,7 +42,7 @@ let bindingRules = [];
 
 
 function findAllBoundElements(root, bExcludeRoot) {
-	let selector = _.map(bindingRules, function(rule) { return rule.selector; })
+	let selector = Array.from(bindingRules, function(rule) { return rule.selector; })
 		.join(', ');
 	let result = DOM.findAll(selector, root);
 	if (!bExcludeRoot && DOM.matches(root, selector)) result.unshift(root);
@@ -262,7 +262,7 @@ let insertNode = function(conf, refNode, node) {
 	if (doc.adoptNode) node = doc.adoptNode(node); // Safari 5 was throwing because imported nodes had been added to a document node
 
 	let nodes = [ node ];
-	if (node.nodeType === 11) nodes = _.map(node.childNodes);
+	if (node.nodeType === 11) nodes = Array.from(node.childNodes);
 
 	switch(conf) {
 	case 'beforebegin': refNode.parentNode.insertBefore(node, refNode); break;

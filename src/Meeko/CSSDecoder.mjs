@@ -67,7 +67,7 @@ evaluate(query, context, variables, wantArray) {
 		if (attr.charAt(0) === '@') attr = attr.substr(1);
 
 		if (!wantArray) result = [ result ];
-		result = _.map(result, function(node) {
+		result = Array.from(result, function(node) {
 			return getAttr(node, attr);
 		});
 		if (!wantArray) result = result[0];
@@ -105,7 +105,7 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 	if (selectorGroup === '') return wantArray ? [ context ] : context;
 	let nullResult = wantArray ? [] : null;
 	let selectors = selectorGroup.split(/,(?![^\(]*\)|[^\[]*\])/);
-	selectors = _.map(selectors, function(s) { return s.trim(); });
+	selectors = Array.from(selectors, function(s) { return s.trim(); });
 
 	let invalidVarUse = false;
 	let contextVar;
@@ -175,7 +175,7 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 
 	if (selectors.length <= 0) return nullResult;
 
-	selectors = _.map(selectors, function(s) {
+	selectors = Array.from(selectors, function(s) {
 			if (isRoot) return s;
 			let prefix = ':scope';
 			return (contextVar) ? 

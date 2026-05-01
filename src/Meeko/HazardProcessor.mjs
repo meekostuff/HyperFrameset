@@ -53,7 +53,7 @@ let hazLangDefinition =
 	'>choose <template@name,match >eval@select >mtext@select >text@select ' +
 	'call@name apply param@name,select clone deepclone element@name attr@name';
 
-let hazLang = _.map(_.words(hazLangDefinition), function(def) {
+let hazLang = Array.from(_.words(hazLangDefinition), function(def) {
 	def = def.split('@');
 	let tag = def[0];
 	let attrToElement = tag.charAt(0);
@@ -101,7 +101,7 @@ function walkTree(root, skipRoot, callback) { // always "accept" element nodes
 function childNodesToFragment(el) {
 	let doc = el.ownerDocument;
 	let frag = doc.createDocumentFragment();
-	_.forEach(_.map(el.childNodes), function(child) { frag.appendChild(child); });
+	_.forEach(Array.from(el.childNodes), function(child) { frag.appendChild(child); });
 	return frag;
 }
 
@@ -234,7 +234,7 @@ loadTemplate(template) {
 	
 	function implyOtherwise(el) { // NOTE this slurps *any* non-<haz:when>, including <haz:otherwise>
 		let otherwise = el.ownerDocument.createElement(hazPrefix + 'otherwise');
-		_.forEach(_.map(el.childNodes), function(node) {
+		_.forEach(Array.from(el.childNodes), function(node) {
 			let tag = DOM.getTagName(node);
 			if (tag === hazPrefix + 'when') return;
 			otherwise.appendChild(node);
@@ -704,7 +704,7 @@ function getExprAttributes(el, namespaces) {
 	
 	let exprNS = namespaces.lookupNamespace(HAZARD_EXPRESSION_URN);
 	let mexprNS = namespaces.lookupNamespace(HAZARD_MEXPRESSION_URN);
-	_.forEach(_.map(el.attributes), function(attr) {
+	_.forEach(Array.from(el.attributes), function(attr) {
 		let ns = _.find([ exprNS, mexprNS ], function(ns) {
 			return (attr.name.indexOf(ns.prefix) === 0);
 		});

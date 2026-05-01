@@ -63,10 +63,6 @@ describe('stuff.mjs', () => {
     expect(_.every([2, 3, 6], v => v % 2 === 0)).toBe(false);
   });
 
-  test('map transforms elements', () => {
-    expect(_.map([1, 2, 3], v => v * 2)).toEqual([2, 4, 6]);
-  });
-
   test('filter selects matching elements', () => {
     expect(_.filter([1, 2, 3, 4], v => v % 2 === 0)).toEqual([2, 4]);
   });
@@ -124,13 +120,6 @@ describe('stuff.mjs', () => {
     expect(dest).toEqual({ a: 99, b: 2 });
   });
 
-  test('map without callback copies array', () => {
-    const a = [1, 2, 3];
-    const copy = _.map(a);
-    expect(copy).toEqual([1, 2, 3]);
-    expect(copy).not.toBe(a);
-  });
-
   test('forEach passes context as this', () => {
     const ctx = { count: 0 };
     _.forEach([1, 2], function() { this.count++; }, ctx);
@@ -147,12 +136,6 @@ describe('stuff.mjs', () => {
     const ctx = { min: 0 };
     const result = _.every([1, 2, 3], function(v) { return v > this.min; }, ctx);
     expect(result).toBe(true);
-  });
-
-  test('map passes context as this', () => {
-    const ctx = { mult: 10 };
-    const result = _.map([1, 2], function(v) { return v * this.mult; }, ctx);
-    expect(result).toEqual([10, 20]);
   });
 
   test('filter passes context as this', () => {

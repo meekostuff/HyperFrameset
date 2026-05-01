@@ -29,7 +29,7 @@ class Binding {
 		let binding = this;
 		binding.definition = definition;
 		binding.object = Object.create(definition.prototype);
-		binding.handlers = definition.handlers ? _.map(definition.handlers) : [];
+		binding.handlers = definition.handlers ? Array.from(definition.handlers) : [];
 		binding.listeners = [];
 		binding.inDocument = null; // TODO state assertions in attach/onenter/leftDocumentCallback/detach
 	}

@@ -96,7 +96,7 @@ let SwitchBox = sprockets.evolve(RoleType, {
 role: 'group',
 
 owns: {
-	get: function() { return _.map(this.element.children); }
+	get: function() { return Array.from(this.element.children); }
 },
 
 activedescendant: {

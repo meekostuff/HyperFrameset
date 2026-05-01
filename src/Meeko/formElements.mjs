@@ -26,7 +26,7 @@ _.forEach(config.split(/\s+/), function(combo) {
 	let tags = m[0].split(',');
 	let events = m[1].split(',');
 	_.forEach(tags, function(tag) {
-		table[tag] = _.map(events);
+		table[tag] = Array.from(events);
 	});
 });
 

@@ -40,7 +40,7 @@ function ucFirst(str) {
  */
 function camelCase(str) {
 	return str ?
-		map(str.split('-'), function(part, i) { return i === 0 ? part :
+		Array.from(str.split('-'), function(part, i) { return i === 0 ? part :
 		ucFirst(part); }).join('') : ''; 
 }
 
@@ -51,7 +51,7 @@ function camelCase(str) {
  */
 function kebabCase(str) {
 	return str ?
-	map(str.split(/(?=[A-Z])/), function(part, i) { return i === 0 ? part :
+	Array.from(str.split(/(?=[A-Z])/), function(part, i) { return i === 0 ? part :
 	lc(part); }).join('-') : '';
 }
 
@@ -91,25 +91,6 @@ function some(a, fn, context) { for (let n=a.length, i=0; i<n; i++) { if (fn.cal
  * @returns {boolean} True if all elements pass test
  */
 function every(a, fn, context) { for (let n=a.length, i=0; i<n; i++) { if (!fn.call(context, a[i], i, a)) return false; } return true; }
-
-/**
- * Create new array with results of calling function on every element
- * @param {Array} a - Array to map
- * @param {Function} fn - Transform function
- * @param {*} context - Context for function execution
- * @returns {Array} New array with transformed elements
- */
-function map(a, fn, context) {
-	let output = [];
-	for (let n=a.length, i=0; i<n; i++) {
-		let value = a[i];
-		output[i] = fn ? 
-			fn.call(context, value, i, a) :
-			value;
-	}
-	return output;
-}
-
 /**
  * Filter array elements that pass the test
  * @param {Array} a - Array to filter
@@ -263,7 +244,7 @@ function assign(dest, src) {
 
 export {
 	uc, lc, ucFirst, camelCase, kebabCase, words,
-	includes, forEach, some, every, map, filter, find, findIndex, // array
+	includes, forEach, some, every, filter, find, findIndex, // array
 	without, difference,
 	forIn, forOwn, isEmpty, defaults, assign // object
 };

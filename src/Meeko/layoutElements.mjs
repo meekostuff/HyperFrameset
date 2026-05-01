@@ -247,7 +247,7 @@ adjustBox: function() {
 
 normalizeChildren: function() {
 	let element = this.element;
-	_.forEach(_.map(element.childNodes), normalizeChild, element);
+	_.forEach(Array.from(element.childNodes), normalizeChild, element);
 },
 
 isLayout: function(element) {

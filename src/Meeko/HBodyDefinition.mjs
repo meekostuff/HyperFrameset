@@ -51,7 +51,7 @@ init(el) {
 		condition: finalCondition,
 		transforms: []
 	});
-	_.forEach(_.map(el.childNodes), function(node) {
+	_.forEach(Array.from(el.childNodes), function(node) {
 		if (DOM.getTagName(node) === framesetDef.namespaces.lookupTagNameNS('transform', HYPERFRAMESET_URN)) {
 			el.removeChild(node);
 			bodyDef.transforms.push(new HTransformDefinition(node, framesetDef));
