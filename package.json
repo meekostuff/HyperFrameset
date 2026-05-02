@@ -16,7 +16,7 @@
     "test:e2e:chrome": "npx playwright test --project=chromium",
     "test:e2e:firefox": "npx playwright test --project=firefox",
     "test:e2e:safari": "npx playwright test --project=webkit",
-    "build": "rollup -c",
+    "build": "rollup -c && cp src/UI.js UI.js && cp src/ARIA.js ARIA.js",
     "demo": "node server.js",
     "demo:stop": "pkill -f 'node server.js' || echo 'No demo server running'"
   },
