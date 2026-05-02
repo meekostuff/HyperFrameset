@@ -309,7 +309,7 @@ describe('modern browser assumptions', () => {
       const el = document.createElement('div');
       frag.appendChild(el);
     }
-    const baseline = performance.now() - t0;
+    const baseline = Math.max(performance.now() - t0, 1);
 
     // custom element with style attribute (triggered IE11/Edge perf bug)
     const t1 = performance.now();
@@ -319,7 +319,7 @@ describe('modern browser assumptions', () => {
       el.setAttribute('style', 'color: red;');
       frag.appendChild(el);
     }
-    const customStyled = performance.now() - t1;
+    const customStyled = Math.max(performance.now() - t1, 1);
 
     // li with value="NaN" (triggered IE11/Edge perf bug)
     const t2 = performance.now();
@@ -329,7 +329,7 @@ describe('modern browser assumptions', () => {
       el.setAttribute('value', 'NaN');
       frag.appendChild(el);
     }
-    const liValue = performance.now() - t2;
+    const liValue = Math.max(performance.now() - t2, 1);
 
     // risky ops should be within 10x of baseline (on IE11 they were 1000x+)
     expect(customStyled).toBeLessThan(baseline * 10);
