@@ -27,7 +27,7 @@ set: function(name, value) {
         if (value === false || value == null) value = [];
         else if (typeof value === 'string' || !('length' in value)) value = [ value ];
         let oldValue = this.values[name];
-        if (_.difference(value, oldValue).length <= 0) return;
+        if (symmetricDifference(value, oldValue).size === 0) return;
         this.values[name] = value;
         _.forEach(this.listeners[name], function(listener) {
                 Task.asap(function() { listener(value); });
@@ -42,5 +42,15 @@ listen: function(name, listener) {
 }
 
 };
+
+/**
+ * Compute the symmetric difference of two arrays as a Set.
+ * @param {Array} a1 - First array
+ * @param {Array} a2 - Second array
+ * @returns {Set} Elements in either but not both
+ */
+function symmetricDifference(a1, a2) {
+        return new Set(a1).symmetricDifference(new Set(a2));
+}
 
 export default controllers;

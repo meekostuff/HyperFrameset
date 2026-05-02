@@ -1,4 +1,4 @@
-import { describe, test, expect } from 'vitest';
+import {describe, expect, test} from 'vitest';
 import * as _ from '../src/Meeko/stuff.mjs';
 
 describe('stuff.mjs', () => {
@@ -75,14 +75,6 @@ describe('stuff.mjs', () => {
   test('findIndex returns index of first match', () => {
     expect(_.findIndex([1, 2, 3], v => v > 1)).toBe(1);
     expect(_.findIndex([1, 2, 3], v => v > 5)).toBe(-1);
-  });
-
-  test('without removes items in second array', () => {
-    expect(_.without([1, 2, 3, 4], [2, 4])).toEqual([1, 3]);
-  });
-
-  test('difference returns symmetric difference', () => {
-    expect(_.difference([1, 2, 3], [2, 3, 4])).toEqual([1, 4]);
   });
 
   // --- object utils ---

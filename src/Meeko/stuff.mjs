@@ -62,8 +62,7 @@ function kebabCase(str) {
  * @returns {boolean} True if item is found
  */
 function includes(a, item) {
-	for (let n=a.length, i=0; i<n; i++) if (a[i] === item) return true;
-	return false;
+	return a.includes(item);
 }
 
 /**
@@ -143,35 +142,6 @@ function find(a, fn, context) {
 }
 
 /**
- * Create array with elements from a1 not in a2
- * @param {Array} a1 - Source array
- * @param {Array} a2 - Array of elements to exclude
- * @returns {Array} New array without duplicates
- */
-function without(a1, a2) {
-	let result = [];
-	forEach(a1, function(item) {
-		if (includes(a2, item) || includes(result, item)) return;
-		result.push(item);
-	});
-	return result;
-}
-
-/**
- * Create array with elements that are in either a1 or a2 but not both
- * @param {Array} a1 - First array
- * @param {Array} a2 - Second array
- * @returns {Array} Array containing symmetric difference
- */
-function difference(a1, a2) {
-	let result = [].concat(
-		without(a1, a2),
-		without(a2, a1)
-	);
-	return result;
-}
-
-/**
  * Split text into array of words
  * @param {string} text - Text to split
  * @returns {Array<string>} Array of words
@@ -245,6 +215,5 @@ function assign(dest, src) {
 export {
 	uc, lc, ucFirst, camelCase, kebabCase, words,
 	includes, forEach, some, every, filter, find, findIndex, // array
-	without, difference,
 	forIn, forOwn, isEmpty, defaults, assign // object
 };
