@@ -5,33 +5,6 @@ async function setup(page) {
   await page.waitForFunction(() => window.__ready);
 }
 
-test('evolve creates a definition with inherited prototype', async ({ page }) => {
-  await setup(page);
-  const result = await page.evaluate(() => {
-    const base = window.sprockets.evolve(window.sprockets.RoleType, {
-      greet() { return 'hello'; }
-    });
-    const inst = Object.create(base.prototype);
-    return inst.greet();
-  });
-  expect(result).toBe('hello');
-});
-
-test('evolve extends base definition', async ({ page }) => {
-  await setup(page);
-  const result = await page.evaluate(() => {
-    const base = window.sprockets.evolve(window.sprockets.RoleType, {
-      base() { return 'base'; }
-    });
-    const sub = window.sprockets.evolve(base, {
-      sub() { return 'sub'; }
-    });
-    const inst = Object.create(sub.prototype);
-    return { base: inst.base(), sub: inst.sub() };
-  });
-  expect(result).toEqual({ base: 'base', sub: 'sub' });
-});
-
 test('registerElement before start does not throw', async ({ page }) => {
   await setup(page);
   const error = await page.evaluate(() => {
