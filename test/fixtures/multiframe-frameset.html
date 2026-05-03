@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html custom-hf="HyperFrameset">
+<head>
+<style>
+nav { background: #eee; padding: 0.5em; }
+main { padding: 0.5em; }
+</style>
+</head>
+<body>
+<script for>
+({
+	lookup: function(url) { return 'hf_main'; }
+})
+</script>
+
+<nav>
+<hf-frame targetname="hf_nav" src="scope:./multiframe-nav.html" main="nav">
+	<hf-body condition="loaded">
+		<hf-transform type="main">
+		</hf-transform>
+	</hf-body>
+</hf-frame>
+</nav>
+
+<main>
+<hf-frame targetname="hf_main" main="main">
+	<hf-body condition="loaded">
+		<hf-transform type="main">
+		</hf-transform>
+	</hf-body>
+	<hf-body condition="loading">
+		<p>Loading...</p>
+	</hf-body>
+</hf-frame>
+</main>
+</body>
+</html>
