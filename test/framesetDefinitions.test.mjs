@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   HFrameDefinition,
   HFramesetDefinition,
@@ -350,6 +350,209 @@ describe('framesetDefinitions exports', () => {
       // Render returns a clone of the frameset body
       const rendered = def.render();
       expect(rendered).toBeInstanceOf(HTMLElement);
+    });
+  });
+
+  // --- HFramesetDefinition init() edge cases ---
+
+  describe('HFramesetDefinition init edge cases', () => {
+    it('warns about @id usage in frameset body', () => {
+      const doc = createFramesetDoc('<div id="bad">content</div>');
+      const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      new HFramesetDefinition(doc, {
+        framesetURL: 'http://example.com/frameset.html',
+        scope: 'http://example.com/'
+      });
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('@id is strongly discouraged'));
+      spy.mockRestore();
+    });
+
+    it('skips non-javascript scripts', () => {
+      const doc = createFramesetDoc('');
+      const script = doc.createElement('script');
+      script.type = 'text/x-template';
+      script.text = '<div>template</div>';
+      doc.head.appendChild(script);
+      new HFramesetDefinition(doc, {
+        framesetURL: 'http://example.com/frameset.html',
+        scope: 'http://example.com/'
+      });
+      // Should not have sourceurl added
+      expect(script.hasAttribute('sourceurl')).toBe(false);
+    });
+
+    it('skips external scripts (with @src)', () => {
+      const doc = createFramesetDoc('');
+      const script = doc.createElement('script');
+      script.setAttribute('src', 'external.js');
+      doc.head.appendChild(script);
+      new HFramesetDefinition(doc, {
+        framesetURL: 'http://example.com/frameset.html',
+        scope: 'http://example.com/'
+      });
+      expect(script.hasAttribute('sourceurl')).toBe(false);
+    });
+
+    it('preserves pre-existing @sourceurl on scripts', () => {
+      const doc = createFramesetDoc('');
+      const script = doc.createElement('script');
+      script.setAttribute('sourceurl', 'custom://my-source');
+      script.text = '({})';
+      doc.head.appendChild(script);
+      new HFramesetDefinition(doc, {
+        framesetURL: 'http://example.com/frameset.html',
+        scope: 'http://example.com/'
+      });
+      expect(script.getAttribute('sourceurl')).toBe('custom://my-source');
+      expect(script.text).toContain('//# sourceURL=custom://my-source');
+    });
+
+    it('moves <script for> from head to body', () => {
+      const doc = createFramesetDoc('<p>content</p>');
+      const script = doc.createElement('script');
+      script.setAttribute('for', 'something');
+      script.text = '({})';
+      doc.head.appendChild(script);
+      const spy = vi.spyOn(console, 'info').mockImplementation(() => {});
+      const def = new HFramesetDefinition(doc, {
+        framesetURL: 'http://example.com/frameset.html',
+        scope: 'http://example.com/'
+      });
+      // Script should now be in the detached body element with empty @for
+      const scripts = def.element.querySelectorAll('script[for]');
+      expect(scripts.length).toBe(1);
+      expect(scripts[0].getAttribute('for')).toBe('');
+      spy.mockRestore();
+    });
+
+    it('moves non-@for scripts from body to head', () => {
+      const doc = createFramesetDoc('<script>var x = 1;</script>');
+      const spy = vi.spyOn(console, 'info').mockImplementation(() => {});
+      const def = new HFramesetDefinition(doc, {
+        framesetURL: 'http://example.com/frameset.html',
+        scope: 'http://example.com/'
+      });
+      // Script should have been moved to head before body was detached
+      const headScripts = def.document.querySelectorAll('head script');
+      expect(headScripts.length).toBeGreaterThan(0);
+      spy.mockRestore();
+    });
+  });
+
+  // --- HFramesetDefinition preprocess() edge cases ---
+
+  describe('HFramesetDefinition preprocess edge cases', () => {
+    it('warns and removes external scripts in body', () => {
+      const doc = createFramesetDoc(
+        '<script for="" src="external.js"></script><p>content</p>'
+      );
+      const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const def = new HFramesetDefinition(doc, {
+        framesetURL: 'http://example.com/frameset.html',
+        scope: 'http://example.com/'
+      });
+      def.preprocess();
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('may not contain external scripts'));
+      expect(def.element.querySelectorAll('script[src]').length).toBe(0);
+      spy.mockRestore();
+    });
+
+    it('warns and removes non-@for scripts in body during preprocess', () => {
+      // Create a script that survives init (has @for but non-empty value)
+      const doc = createFramesetDoc('<p>content</p>');
+      const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const def = new HFramesetDefinition(doc, {
+        framesetURL: 'http://example.com/frameset.html',
+        scope: 'http://example.com/'
+      });
+      // Manually insert a script without @for into the detached body
+      const script = document.createElement('script');
+      script.text = 'var x = 1;';
+      def.element.appendChild(script);
+      def.preprocess();
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('may not contain non-@for scripts'));
+      expect(def.element.querySelectorAll('script:not([for])').length).toBe(0);
+      spy.mockRestore();
+    });
+
+    it('warns and removes scripts with non-empty @for', () => {
+      const doc = createFramesetDoc('<p>content</p>');
+      const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const def = new HFramesetDefinition(doc, {
+        framesetURL: 'http://example.com/frameset.html',
+        scope: 'http://example.com/'
+      });
+      const script = document.createElement('script');
+      script.setAttribute('for', 'non-empty');
+      script.setAttribute('sourceurl', 'test');
+      script.text = '({})';
+      def.element.appendChild(script);
+      def.preprocess();
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('may only contain EMPTY @for'));
+      spy.mockRestore();
+    });
+
+    it('evaluates inline @for script and stores in configData', () => {
+      const doc = createFramesetDoc(
+        '<div><script for="">({ myOption: true })</script></div>'
+      );
+      const spy = vi.spyOn(console, 'info').mockImplementation(() => {});
+      const def = new HFramesetDefinition(doc, {
+        framesetURL: 'http://example.com/frameset.html',
+        scope: 'http://example.com/'
+      });
+      def.preprocess();
+      // The div should have a @config attribute set by preprocess
+      const div = def.element.querySelector('div');
+      expect(div.hasAttribute('config')).toBe(true);
+      // Script should have been removed
+      expect(def.element.querySelectorAll('script').length).toBe(0);
+      spy.mockRestore();
+    });
+
+    it('handles script evaluation errors gracefully', () => {
+      const doc = createFramesetDoc(
+        '<div><script for="">this is not valid JS object {{{</script></div>'
+      );
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
+      const errorSpy = vi.spyOn(window, 'reportError').mockImplementation(() => {});
+      const def = new HFramesetDefinition(doc, {
+        framesetURL: 'http://example.com/frameset.html',
+        scope: 'http://example.com/'
+      });
+      def.preprocess();
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Error evaluating inline script'));
+      warnSpy.mockRestore();
+      infoSpy.mockRestore();
+      errorSpy.mockRestore();
+    });
+
+    it('frame @def referencing non-existent definition warns', () => {
+      const doc = createFramesetDoc(
+        '<hf-frame def="nonexistent"></hf-frame>'
+      );
+      const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const def = new HFramesetDefinition(doc, {
+        framesetURL: 'http://example.com/frameset.html',
+        scope: 'http://example.com/'
+      });
+      def.preprocess();
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('non-existant frame definition'));
+      spy.mockRestore();
+    });
+
+    it('frame def and ref with matching defid/def', () => {
+      const doc = createFramesetDoc(
+        '<hf-frame defid="shared" def="shared"><hf-body condition="loading">Loading</hf-body></hf-frame>' +
+        '<hf-frame def="shared"></hf-frame>'
+      );
+      const def = new HFramesetDefinition(doc, {
+        framesetURL: 'http://example.com/frameset.html',
+        scope: 'http://example.com/'
+      });
+      def.preprocess();
+      expect(def.frames['shared']).toBeInstanceOf(HFrameDefinition);
     });
   });
 });
