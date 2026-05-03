@@ -85,10 +85,10 @@ let create = function(prototype) {
  * Create a sprocket-definition which extends a base-definition.
  *
  * @param baseDefn The base-definition.
- * @param properties The new properties for the extended sprocket-definition.
+ * @param ariaProperties The new ariaProperties for the extended sprocket-definition.
  * @returns {constructor} The sprocket-definition.
  */
-let evolve = function(baseDefn, properties) {
+let evolve = function(baseDefn, ariaProperties) {
 	let prototype = Object.create(baseDefn.prototype);
 	let sub = create(prototype);
 	let baseProperties = baseDefn.prototype.__properties__ || {};
@@ -96,14 +96,36 @@ let evolve = function(baseDefn, properties) {
 	_.forOwn(baseProperties, function(desc, name) {
 		subProperties[name] = Object.create(desc);
 	});
-	if (properties) defineProperties(sub, properties);
+	if (ariaProperties) extendAriaProperties(sub, ariaProperties);
 	return sub;
 }
 
-let defineProperties = function(sprocket, properties) {
+/**
+ * Define properties on a sprocket prototype. Each entry in `ariaProperties` is handled
+ * based on its type:
+ *
+ * - **object** entries are treated as ARIA property descriptors. The descriptor is merged
+ *   (via `_.assign`) into `prototype.__properties__[name]`, allowing sub-definitions to
+ *   partially override inherited descriptors. A trap getter/setter is installed on the
+ *   prototype that throws on direct property access, enforcing use of `ariaGet` / `ariaSet` /
+ *   `ariaToggle` / `ariaCan` instead.
+ *
+ * - **non-object** entries (functions, strings, booleans, etc.) are assigned directly to
+ *   the prototype as regular properties or methods.
+ *
+ * @param {Function} sprocket - The sprocket constructor whose prototype will be extended.
+ * @param {Object<string, Object|*>} ariaProperties - A map of property names to definitions.
+ * @param {string} [ariaProperties.<name>.type] - The property type, e.g. `'boolean'` or `'node'`.
+ *   Used by `ariaCan` and `ariaToggle` to determine if toggling is supported.
+ * @param {Function} [ariaProperties.<name>.get] - Getter called with `this` bound to the sprocket instance.
+ * @param {Function} [ariaProperties.<name>.set] - Setter called with `this` bound to the sprocket instance.
+ * @param {Function} [ariaProperties.<name>.can] - Optional guard returning whether the property
+ *   can be toggled. Used by `ariaCan` and `ariaToggle`.
+ */
+let extendAriaProperties = function(sprocket, ariaProperties) {
 	let prototype = sprocket.prototype;
 	let definition = prototype.__properties__ || (prototype.__properties__ = {});
-	_.forOwn(properties, function(desc, name) {
+	_.forOwn(ariaProperties, function(desc, name) {
 		switch (typeof desc) {
 			case 'object':
 				let propDesc = definition[name] || (definition[name] = {});
