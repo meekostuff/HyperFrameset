@@ -16,16 +16,16 @@ function normalize(doc, details) {
 
 	let baseURL = URLux.create(details.url);
 
-	_.forEach(DOM.findAll('style', doc.body), function(node) {
+	_.forEach(DOM.findAll('style', doc.body), (node) => {
 		if (node.hasAttribute('scoped')) return; // ignore
 		doc.head.appendChild(node); // NOTE no adoption
 	});
 	
-	_.forEach(DOM.findAll('style', doc), function(node) {
+	_.forEach(DOM.findAll('style', doc), (node) => {
 		// TODO the following rewrites url() property values but isn't robust
 		let text = node.textContent;
 		let replacements = 0;
-		text = text.replace(/\burl\(\s*(['"]?)([^\r\n]*)\1\s*\)/ig, function(match, quote, url) {
+		text = text.replace(/\burl\(\s*(['"]?)([^\r\n]*)\1\s*\)/ig, (match, quote, url) => {
 				let absURL = baseURL.resolve(url);
 				if (absURL === url) return match;
 				replacements++;
@@ -48,23 +48,23 @@ function resolveAll(doc, baseURL) {
 
 	return Thenfu.pipe(null, [
 
-	function () {
+	() => {
 		let selector = Object.keys(urlAttributes).join(', ');
 		return DOM.findAll(selector, doc);
 	},
 
-	function(nodeList) {
-		return Thenfu.reduce(null, nodeList, function(dummy, el) {
+	(nodeList) => {
+		return Thenfu.reduce(null, nodeList, (dummy, el) => {
 			let tag = DOM.getTagName(el);
 			let attrList = urlAttributes[tag];
-			_.forOwn(attrList, function(attrDesc, attrName) {
+			_.forOwn(attrList, (attrDesc, attrName) => {
 				if (!el.hasAttribute(attrName)) return;
 				attrDesc.resolve(el, baseURL);
 			});
 		});
 	},
 
-	function() {
+	() => {
 		return doc;
 	}
 
@@ -83,7 +83,7 @@ function nativeParser(html, details) {
 
 	return Thenfu.pipe(null, [
 		
-	function() {
+	() => {
 		let doc = (new DOMParser).parseFromString(html, 'text/html');
 		return normalize(doc, details);
 	}
@@ -113,9 +113,9 @@ function rebaseURL(url, baseURL) {
  */
 function rebase(doc, scopeURL) {
 	let urlAttributes = URLux.attributes;
-	_.forOwn(urlAttributes, function(attrList, tag) {
-		_.forEach(DOM.findAll(tag, doc), function(el) {
-			_.forOwn(attrList, function(attrDesc, attrName) {
+	_.forOwn(urlAttributes, (attrList, tag) => {
+		_.forEach(DOM.findAll(tag, doc), (el) => {
+			_.forOwn(attrList, (attrDesc, attrName) => {
 				let relURL = el.getAttribute(attrName);
 				if (relURL == null) return;
 				let url = rebaseURL(relURL, scopeURL);
@@ -134,7 +134,7 @@ function rebase(doc, scopeURL) {
  */
 function normalizeScopedStyles(doc, allowedScopeSelector) {
 	let scopedStyles = DOM.findAll('style[scoped]', doc.body);
-	_.forEach(scopedStyles, function(el, index) {
+	_.forEach(scopedStyles, (el, index) => {
 		let scope = el.parentNode;
 		if (!DOM.matches(scope, allowedScopeSelector)) {
 			console.warn(`Removing <style scoped>. Must be child of ${allowedScopeSelector}`);
@@ -150,7 +150,7 @@ function normalizeScopedStyles(doc, allowedScopeSelector) {
 		el.removeAttribute('scoped');
 		let sheet = el.sheet;
 		forRules(sheet, processRule, scope);
-		let cssText = Array.from(sheet.cssRules, function(rule) {
+		let cssText = Array.from(sheet.cssRules, (rule) => {
 				return rule.cssText; 
 			}).join('\n');
 		el.textContent = cssText;

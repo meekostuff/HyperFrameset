@@ -13,7 +13,7 @@ function intersects(a1, a2) {
 }
 
 function walkTree(root, skipRoot, callback) {
-	let walker = document.createNodeIterator(root, 1, function(el) {
+	let walker = document.createNodeIterator(root, 1, (el) => {
 		if (skipRoot && el === root) return NodeFilter.FILTER_SKIP;
 		return callback(el);
 	});
@@ -68,7 +68,7 @@ function getScopeDesc(scopeEl) {
 		childScopes: []
 	};
 
-	walkTree(scopeEl, true, function(el) {
+	walkTree(scopeEl, true, (el) => {
 		let isScope = el.hasAttribute('itemscope');
 		let propName = el.getAttribute('itemprop');
 		if (!(isScope || propName)) return NodeFilter.FILTER_SKIP;

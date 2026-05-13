@@ -53,7 +53,7 @@ let hazLangDefinition =
 	'>choose <template@name,match >eval@select >mtext@select >text@select ' +
 	'call@name apply param@name,select clone deepclone element@name attr@name';
 
-let hazLang = Array.from(_.words(hazLangDefinition), function(def) {
+let hazLang = Array.from(_.words(hazLangDefinition), (def) => {
 	def = def.split('@');
 	let tag = def[0];
 	let attrToElement = tag.charAt(0);
@@ -76,7 +76,7 @@ let hazLang = Array.from(_.words(hazLangDefinition), function(def) {
 
 let hazLangLookup = {};
 
-_.forEach(hazLang, function(directive) {
+_.forEach(hazLang, (directive) => {
 	let tag = directive.tag;
 	hazLangLookup[tag] = directive;
 });
@@ -101,7 +101,7 @@ function walkTree(root, skipRoot, callback) { // always "accept" element nodes
 function childNodesToFragment(el) {
 	let doc = el.ownerDocument;
 	let frag = doc.createDocumentFragment();
-	_.forEach(Array.from(el.childNodes), function(child) { frag.appendChild(child); });
+	_.forEach(Array.from(el.childNodes), (child) => { frag.appendChild(child); });
 	return frag;
 }
 
@@ -158,12 +158,12 @@ loadTemplate(template) {
 	let doc = template.ownerDocument;
 
 	// rewrite the template if necessary
-	walkTree(template, true, function(el) {
+	walkTree(template, true, (el) => {
 		let tag = DOM.getTagName(el);
 		if (tag.indexOf(hazPrefix) === 0) return;
 
 		// pre-process @expr:_html -> @haz:eval, etc
-		_.forEach(exprToHazPriority, function(attr) {
+		_.forEach(exprToHazPriority, (attr) => {
 			if (!el.hasAttribute(attr)) return;
 			let tag = exprToHazMap[attr];
 			let val = el.getAttribute(attr);
@@ -177,7 +177,7 @@ loadTemplate(template) {
 		}
 
 		// promote applicable hazard attrs to elements
-		_.forEach(hazLang, function(def) {
+		_.forEach(hazLang, (def) => {
 			if (!def.attrToElement) return;
 			let nsTag = hazPrefix + def.tag;
 			if (!el.hasAttribute(nsTag)) return;
@@ -191,7 +191,7 @@ loadTemplate(template) {
 			if (defaultAttr) directiveEl.setAttribute(defaultAttr, value);
 
 			// copy non-default hazard attrs
-			_.forEach(def.attrs, function(attr, i) {
+			_.forEach(def.attrs, (attr, i) => {
 				if (i === 0) return; // the defaultAttr
 				let nsAttr = hazPrefix + attr;
 				if (!el.hasAttribute(nsAttr)) return;
@@ -219,7 +219,7 @@ loadTemplate(template) {
 		});
 	});
 	
-	walkTree(template, true, function(el) {
+	walkTree(template, true, (el) => {
 		let tag = DOM.getTagName(el);
 		if (tag === hazPrefix + 'template') markTemplate(el);
 		if (tag === hazPrefix + 'choose') implyOtherwise(el);
@@ -228,13 +228,13 @@ loadTemplate(template) {
 	implyEntryTemplate(template);
 
 	// finally, preprocess all elements to extract hazardDetails
-	walkTree(template, true, function(el) {
+	walkTree(template, true, (el) => {
 		el.hazardDetails = getHazardDetails(el, processor.namespaces);
 	});
 	
 	function implyOtherwise(el) { // NOTE this slurps *any* non-<haz:when>, including <haz:otherwise>
 		let otherwise = el.ownerDocument.createElement(hazPrefix + 'otherwise');
-		_.forEach(Array.from(el.childNodes), function(node) {
+		_.forEach(Array.from(el.childNodes), (node) => {
 			let tag = DOM.getTagName(node);
 			if (tag === hazPrefix + 'when') return;
 			otherwise.appendChild(node);
@@ -248,7 +248,7 @@ loadTemplate(template) {
 
 	function implyEntryTemplate(el) { // NOTE this slurps *any* non-<haz:template>
 		let firstExplicitTemplate;
-		let contentNodes = _.filter(el.childNodes, function(node) {
+		let contentNodes = _.filter(el.childNodes, (node) => {
 			let tag = DOM.getTagName(node);
 			if (tag === hazPrefix + 'template') {
 				if (!firstExplicitTemplate) firstExplicitTemplate = node;
@@ -266,7 +266,7 @@ loadTemplate(template) {
 			console.warn('This Hazard Template cannot generate any content.');
 		}
 		let entryTemplate = el.ownerDocument.createElement(hazPrefix + 'template');
-		_.forEach(contentNodes, function(node) {
+		_.forEach(contentNodes, (node) => {
 			entryTemplate.appendChild(node);
 		}); 
 		// NOTE in IE10 el.insertBefore(node, refNode) throws if refNode is undefined
@@ -284,14 +284,14 @@ getEntryTemplate() {
 getNamedTemplate(name) {
 	let processor = this;
 	name = _.lc(name);
-	return _.find(processor.templates, function(template) {
+	return _.find(processor.templates, (template) => {
 		return _.lc(template.getAttribute('name')) === name;
 	});
 }
 
 getMatchingTemplate(element) {
 	let processor = this;
-	return _.find(processor.templates, function(template) {
+	return _.find(processor.templates, (template) => {
 		if (!template.hasAttribute('match')) return false;
 		let expression = template.getAttribute('match');
 		return processor.provider.matches(element, expression);
@@ -304,7 +304,7 @@ transform(provider, details) {
 	let doc = root.ownerDocument;
 	let frag = doc.createDocumentFragment();
 	return processor._transform(provider, details, frag)
-	.then(function() {
+	.then(() => {
 		return frag;
 	});
 }
@@ -321,7 +321,7 @@ _transform(provider, details, frag) {
 	processor.localVarsStack = [];
 
 	processor.variables = {
-		has: function(key) {
+		has: (key) => {
 			let result =
 				key in processor.localVars ||
 				key in processor.localParams ||
@@ -330,7 +330,7 @@ _transform(provider, details, frag) {
 				false;
 			return result;
 		},
-		get: function(key) {
+		get: (key) => {
 			let result =
 				key in processor.localVars && processor.localVars[key] ||
 				key in processor.localParams && processor.localParams[key] ||
@@ -339,7 +339,7 @@ _transform(provider, details, frag) {
 				undefined;
 			return result;
 		},
-		set: function(key, value, inParams, isGlobal) {
+		set: (key, value, inParams, isGlobal) => {
 			let mapName = isGlobal ?
 				( inParams ? 'globalParams' : 'globalVars' ) :
 				( inParams ? 'localParams' : 'localVars' );
@@ -348,7 +348,7 @@ _transform(provider, details, frag) {
 			if (mapName === 'globalParams' && key in processor.globalParams) return;
 			processor[mapName][key] = value;
 		},
-		push: function(params) {
+		push: (params) => {
 			processor.localParamsStack.push(processor.localParams);
 			processor.localVarsStack.push(processor.localVars);
 
@@ -356,14 +356,14 @@ _transform(provider, details, frag) {
 			processor.localParams = params;
 			processor.localVars = {};
 		},
-		pop: function() {
+		pop: () => {
 			processor.localParams = processor.localParamsStack.pop();		
 			processor.localVars = processor.localVarsStack.pop();		
 		}
 	}
 
 	return processor.transformChildNodes(processor.root, null, frag)
-	.then(function() {
+	.then(() => {
 		let template = processor.getEntryTemplate();
 		return processor.transformTemplate(template, null, null, frag);
 	});
@@ -374,7 +374,7 @@ transformTemplate(template, context, params, frag) {
 	processor.variables.push(params);
 
 	return processor.transformChildNodes(template, context, frag)
-	.then(function() { 
+	.then(() => { 
 		processor.variables.pop(); 
 		return frag;
 	});
@@ -383,7 +383,7 @@ transformTemplate(template, context, params, frag) {
 transformChildNodes(srcNode, context, frag) {
 	let processor = this;
 
-	return Thenfu.reduce(null, srcNode.childNodes, function(dummy, current) {
+	return Thenfu.reduce(null, srcNode.childNodes, (dummy, current) => {
 		return processor.transformNode(current, context, frag);
 	});
 }
@@ -481,7 +481,7 @@ transformHazardTree(el, context, frag) {
 		}
 		node = context.cloneNode(false);
 		frag.appendChild(node);
-		return Thenfu.reduce(null, context.childNodes, function(dummy, child) {
+		return Thenfu.reduce(null, context.childNodes, (dummy, child) => {
 			return processor.transformHazardTree(el, child, node);
 		});
 
@@ -518,7 +518,7 @@ transformHazardTree(el, context, frag) {
 
 		node = doc.createDocumentFragment();
 		return processor.transformChildNodes(el, context, node)
-		.then(function() {
+		.then(() => {
 			value = node.textContent;
 			frag.setAttribute(name, value);
 			return frag;
@@ -587,7 +587,7 @@ transformHazardTree(el, context, frag) {
  		// NOTE if no successful `when` then chooses *first* `otherwise` 		
 		let otherwise;
 		let when;
-		let found = _.some(el.childNodes, function(child) { // TODO .children??
+		let found = _.some(el.childNodes, (child) => { // TODO .children??
 			if (child.nodeType !== 1) return false;
 			let childDef = child.hazardDetails.definition;
 			if (!childDef) return false;
@@ -636,7 +636,7 @@ transformHazardTree(el, context, frag) {
 			return frag;
 		}
 
-		return Thenfu.reduce(null, subContexts, function(dummy, subContext) {
+		return Thenfu.reduce(null, subContexts, (dummy, subContext) => {
 			return processor.transformChildNodes(el, subContext, frag);
 		});
 
@@ -663,7 +663,7 @@ transformSingleElement(srcNode, context) {
 
 	let el = srcNode.cloneNode(false);
 
-	_.forEach(details.exprAttributes, function(desc) {
+	_.forEach(details.exprAttributes, (desc) => {
 		let value;
 		try {
 			value = (desc.namespaceURI === HAZARD_MEXPRESSION_URN) ?
@@ -704,8 +704,8 @@ function getExprAttributes(el, namespaces) {
 	
 	let exprNS = namespaces.lookupNamespace(HAZARD_EXPRESSION_URN);
 	let mexprNS = namespaces.lookupNamespace(HAZARD_MEXPRESSION_URN);
-	_.forEach(Array.from(el.attributes), function(attr) {
-		let ns = _.find([ exprNS, mexprNS ], function(ns) {
+	_.forEach(Array.from(el.attributes), (attr) => {
+		let ns = _.find([ exprNS, mexprNS ], (ns) => {
 			return (attr.name.indexOf(ns.prefix) === 0);
 		});
 		if (!ns) return;
@@ -760,12 +760,12 @@ function evalExpression(exprText, provider, context, variables, type) {
 	
 function interpretMExpression(mexprText) {
 	let expressions = [];
-	let mexpr = mexprText.replace(/\{\{((?:[^}]|\}(?=\}\})|\}(?!\}))*)\}\}/g, function(all, expr) {
+	let mexpr = mexprText.replace(/\{\{((?:[^}]|\}(?=\}\})|\}(?!\}))*)\}\}/g, (all, expr) => {
 		expressions.push(expr);
 		return '{{}}';
 	});
 
-	expressions = expressions.map(function(expr) { return interpretExpression(expr); });
+	expressions = expressions.map((expr) => { return interpretExpression(expr); });
 	return {
 		template: mexpr,
 		expressions: expressions
@@ -779,7 +779,7 @@ function interpretExpression(exprText) { // FIXME robustness
 	expression.selector = exprParts.shift();
 	expression.filters = [];
 
-	_.forEach(exprParts, function(filterSpec) {
+	_.forEach(exprParts, (filterSpec) => {
 		filterSpec = filterSpec.trim();
 		let text = filterSpec;
 		let m = text.match(/^([_a-zA-Z][_a-zA-Z0-9]*)\s*(:?)/);
@@ -816,7 +816,7 @@ function interpretExpression(exprText) { // FIXME robustness
 
 function processMExpression(mexpr, provider, context, variables) {
 	let i = 0;
-	return mexpr.template.replace(/\{\{\}\}/g, function(all) {
+	return mexpr.template.replace(/\{\{\}\}/g, (all) => {
 		return processExpression(mexpr.expressions[i++], provider, context, variables, 'text');
 	});
 }
@@ -827,7 +827,7 @@ function processExpression(expr, provider, context, variables, type) { // FIXME 
 		document; 
 	let value = provider.evaluate(expr.selector, context, variables);
 
-	_.every(expr.filters, function(filter) {
+	_.every(expr.filters, (filter) => {
 		if (value == null) value = '';
 		if (value.nodeType) {
 			if (value.nodeType === 1) value = value.textContent;

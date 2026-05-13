@@ -4,10 +4,10 @@ import Registry from './Registry.mjs';
 
 let decoders = new Registry({
 	writeOnce: true,
-	keyValidator: function(key) {
+	keyValidator: (key) => {
 		return typeof key === 'string' && /^[_a-zA-Z][_a-zA-Z0-9]*/.test(key);
 	},
-	valueValidator: function(constructor) {
+	valueValidator: (constructor) => {
 		return typeof constructor === 'function';
 	}
 });

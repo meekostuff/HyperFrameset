@@ -14,7 +14,7 @@ class CustomNamespace {
 constructor(options) {
 	if (!options) return; // WARN for cloning / inheritance
 	let style = options.style = _.lc(options.style);
-	let styleInfo = _.find(CustomNamespace.namespaceStyles, function(styleInfo) {
+	let styleInfo = _.find(CustomNamespace.namespaceStyles, (styleInfo) => {
 		return styleInfo.style === style;
 	});
 	if (!styleInfo) throw Error(`Unexpected namespace style: ${style}`);
@@ -52,7 +52,7 @@ lookupTagName(name) { return this.prefix + name; }
 lookupSelector(selector) {
 	let prefix = this.selectorPrefix;
 	let tags = selector.split(/\s*,\s*|\s+/);
-	return Array.from(tags, function(tag) { return prefix + tag; }).join(', ');
+	return Array.from(tags, (tag) => { return prefix + tag; }).join(', ');
 }
 
 }
@@ -70,7 +70,7 @@ CustomNamespace.namespaceStyles = [
 	}
 ];
 
-_.forOwn(CustomNamespace.namespaceStyles, function(styleInfo) {
+_.forOwn(CustomNamespace.namespaceStyles, (styleInfo) => {
 	styleInfo.configPrefix = styleInfo.configNamespace + styleInfo.separator;
 });
 
@@ -98,9 +98,9 @@ constructor(doc) {
 
 init(doc) {
 	let coll = this;
-	_.forEach(Array.from(doc.documentElement.attributes), function(attr) {
+	_.forEach(Array.from(doc.documentElement.attributes), (attr) => {
 		let fullName = _.lc(attr.name);
-		let styleInfo = _.find(CustomNamespace.namespaceStyles, function(styleInfo) {
+		let styleInfo = _.find(CustomNamespace.namespaceStyles, (styleInfo) => {
 			return (fullName.indexOf(styleInfo.configPrefix) === 0);
 		});
 		if (!styleInfo) return;
@@ -116,7 +116,7 @@ init(doc) {
 
 clone() {
 	let coll = new NamespaceCollection();
-	_.forEach(this.items, function(nsDef) { 
+	_.forEach(this.items, (nsDef) => { 
 		coll.items.push(nsDef.clone());
 	});
 	return coll;
@@ -124,7 +124,7 @@ clone() {
 
 add(nsDef) {
 	let coll = this;
-	let matchingNS = _.find(coll.items, function(def) {
+	let matchingNS = _.find(coll.items, (def) => {
 		if (_.lc(def.urn) === _.lc(nsDef.urn)) {
 			if (def.prefix !== nsDef.prefix) console.warn(`Attempted to add namespace with same urn as one already present: ${def.urn}`);
 			return true;
@@ -141,7 +141,7 @@ add(nsDef) {
 lookupNamespace(urn) {
 	let coll = this;
 	urn = _.lc(urn);
-	let nsDef = _.find(coll.items, function(def) {
+	let nsDef = _.find(coll.items, (def) => {
 		return (_.lc(def.urn) === urn);
 	});
 	return nsDef;
@@ -156,7 +156,7 @@ lookupPrefix(urn) {
 lookupNamespaceURI(prefix) {
 	let coll = this;
 	prefix = _.lc(prefix);
-	let nsDef = _.find(coll.items, function(def) {
+	let nsDef = _.find(coll.items, (def) => {
 		return (def.prefix === prefix);
 	});
 	return nsDef && nsDef.urn;

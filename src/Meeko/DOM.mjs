@@ -93,7 +93,7 @@ function getTagName(el) {
 function matches(element, selector, scope) {
 	if (!(element && element.nodeType === 1)) return false;
 	if (typeof selector === 'function') return selector(element, scope);
-	return scopeify(function(absSelector) {
+	return scopeify((absSelector) => {
 		return element.matches(absSelector);
 	}, selector, scope);
 }
@@ -113,7 +113,7 @@ function closest(element, selector, scope) {
 		}
 		return null;
 	}
-	return scopeify(function(absSelector) {
+	return scopeify((absSelector) => {
 
 		for (let el=element; el && el!==scope; el=el.parentNode) {
 			if (el.nodeType !== 1) continue;
@@ -172,7 +172,7 @@ function absolutizeSelector(selectorGroup, scope) { // WARN does not handle rela
 
 	// split on COMMA (,) that is not inside BRACKETS. Technically: not followed by a RHB ')' or ']' unless first followed by LHB '(' or '[' 
 	let selectors = selectorGroup.split(/,(?![^\(]*\)|[^\[]*\])/);
-	selectors = Array.from(selectors, function(s) {
+	selectors = Array.from(selectors, (s) => {
 		if (/^:scope\b/.test(s)) return s.replace(/^:scope\b/, scopeSelector);
 		else return `${scopeSelector} ${s}`;
 	});
@@ -205,7 +205,7 @@ function findAll(selector, node, scope, inclusive) {
 	if (!node) node = document;
 	if (!node.querySelectorAll) return [];
 	if (scope && !scope.nodeType) scope = node; // `true` but not the scope element
-	return scopeify(function(absSelector) {
+	return scopeify((absSelector) => {
 		let result = Array.from(node.querySelectorAll(absSelector));
 		if (inclusive && node.nodeType === 1 && node.matches(absSelector)) result.unshift(node);
 		return result;
@@ -224,7 +224,7 @@ function find(selector, node, scope, inclusive) {
 	if (!node) node = document;
 	if (!node.querySelector) return null;
 	if (scope && !scope.nodeType) scope = node; // `true` but not the scope element
-	return scopeify(function(absSelector) {
+	return scopeify((absSelector) => {
 		if (inclusive && node.nodeType === 1 && node.matches(absSelector)) return node;
 		return node.querySelector(absSelector);
 	}, selector, scope);
@@ -311,10 +311,10 @@ let managedEvents = [];
 function manageEvent(type) {
 	if (_.includes(managedEvents, type)) return;
 	managedEvents.push(type);
-	window.addEventListener(type, function(event) {
+	window.addEventListener(type, (event) => {
 		// NOTE stopPropagation() prevents custom default-handlers from running. DOMSprockets nullifies it.
-		event.stopPropagation = function() { console.warn('event.stopPropagation() is a no-op'); }
-		event.stopImmediatePropagation = function() { console.warn('event.stopImmediatePropagation() is a no-op'); }
+		event.stopPropagation = () => { console.warn('event.stopPropagation() is a no-op'); }
+		event.stopImmediatePropagation = () => { console.warn('event.stopImmediatePropagation() is a no-op'); }
 	}, true);
 }
 
@@ -333,12 +333,12 @@ function isVisible(element) {
  * @returns {Promise} Promise that resolves when visible
  */
 function whenVisible(element) {
-	return new Promise(function(resolve) {
+	return new Promise((resolve) => {
 		if (isVisible(element)) {
 			resolve();
 			return;
 		}
-		let observer = new MutationObserver(function() {
+		let observer = new MutationObserver(() => {
 			if (isVisible(element)) {
 				observer.disconnect();
 				resolve();
@@ -403,7 +403,7 @@ TODO: does this still work when there are errors loading stylesheets??
 function checkStyleSheets() {
 	// check that every <link rel="stylesheet" type="text/css" /> 
 	// has loaded
-	return _.every(findAll('link'), function(node) {
+	return _.every(findAll('link'), (node) => {
 		if (!node.rel || !/^stylesheet$/i.test(node.rel)) return true;
 		if (node.type && !/^text\/css$/i.test(node.type)) return true;
 		if (node.disabled) return true;
@@ -538,7 +538,7 @@ function domReady(fn) {
  * @private
  */
 function processQueue() {
-	_.forEach(queue, function(fn) { setTimeout(fn); });
+	_.forEach(queue, (fn) => { setTimeout(fn); });
 	queue.length = 0;
 }
 
@@ -548,7 +548,7 @@ let events = {
 	'load': window
 };
 
-if (!loaded) _.forOwn(events, function(node, type) { node.addEventListener(type, onLoaded, false); });
+if (!loaded) _.forOwn(events, (node, type) => { node.addEventListener(type, onLoaded, false); });
 
 return domReady;
 
@@ -560,7 +560,7 @@ return domReady;
  */
 function onLoaded(e) {
 	loaded = true;
-	_.forOwn(events, function(node, type) { node.removeEventListener(type, onLoaded, false); });
+	_.forOwn(events, (node, type) => { node.removeEventListener(type, onLoaded, false); });
 	processQueue();
 }
 

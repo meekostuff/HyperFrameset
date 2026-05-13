@@ -51,7 +51,7 @@ init(el) {
 		condition: finalCondition,
 		transforms: []
 	});
-	_.forEach(Array.from(el.childNodes), function(node) {
+	_.forEach(Array.from(el.childNodes), (node) => {
 		if (DOM.getTagName(node) === framesetDef.namespaces.lookupTagNameNS('transform', HYPERFRAMESET_URN)) {
 			el.removeChild(node);
 			bodyDef.transforms.push(new HTransformDefinition(node, framesetDef));
@@ -74,16 +74,16 @@ render(resource, details) {
 	let frag0 = doc;
 	if (details.mainSelector) frag0 = DOM.find(details.mainSelector, doc);
 
-	return Thenfu.reduce(frag0, bodyDef.transforms, function(fragment, transform) {
+	return Thenfu.reduce(frag0, bodyDef.transforms, (fragment, transform) => {
 		return transform.process(fragment, details);
 	})
-	.then(function(fragment) {
+	.then((fragment) => {
 		let el = bodyDef.element.cloneNode(false);
 		// crop to <body> if it exists
 		let htmlBody = DOM.find('body', fragment);
 		if (htmlBody) fragment = DOM.adoptContents(htmlBody, el.ownerDocument);
 		// remove all stylesheets
-		_.forEach(DOM.findAll('link[rel~=stylesheet], style', fragment), function(node) {
+		_.forEach(DOM.findAll('link[rel~=stylesheet], style', fragment), (node) => {
 			node.parentNode.removeChild(node);
 		});
 		DOM.insertNode('beforeend', el, fragment);

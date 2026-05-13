@@ -8,8 +8,6 @@
 
 import * as _ from './stuff.mjs';
 
-// FIXME record Task statistics
-
 const frameRate = 60; // FIXME make this a boot-option??
 const frameInterval = 1000 / frameRate;
 const frameExecutionRatio = 0.75; // FIXME another boot-option??
@@ -64,7 +62,7 @@ function delay(fn, timeout) {
 		return;
 	}
 
-	setTimeout(function() {
+	setTimeout(() => {
 		try { fn(); }
 		catch (error) { window.reportError(error); }
 		processTasks();
@@ -78,7 +76,7 @@ let frameStats = {};
  * Reset task execution statistics.
  */
 function resetStats() {
-	_.forEach([execStats, frameStats], function(stats) {
+	_.forEach([execStats, frameStats], (stats) => {
 		_.assign(stats, {
 			count: 0,
 			totalTime: 0,

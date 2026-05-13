@@ -50,11 +50,11 @@ function wait(fn) {
 
 function asapTest(test) {
 	asap(test.fn)
-	.then(function(done) {
+	.then((done) => {
 		if (done) test.resolve();
 		else deferTest(test);
 	},
-	function(error) {
+	(error) => {
 		test.reject(error);
 	});
 }
@@ -161,7 +161,7 @@ function pipe(startValue, fnList) {
  * @returns {Promise}
  */
 function reduce(accumulator, a, fn, context) {
-return new Promise(function(resolve, reject) {
+return new Promise((resolve, reject) => {
 	let length = a.length;
 	let i = 0;
 
@@ -186,7 +186,7 @@ return new Promise(function(resolve, reject) {
 
 			let currTime = Task.getTime(true); // NOTE *remaining* time
 			if (currTime <= 0) {
-				Task.asap(function() { process(acc); });
+				Task.asap(() => process(acc));
 				return;
 			}
 		}

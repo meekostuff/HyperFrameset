@@ -23,10 +23,10 @@ let namespace; // will be set by external call to registerFrameElements()
 
 let frameDefinitions = new Registry({
 	writeOnce: true,
-	keyValidator: function(key) {
+	keyValidator: (key) => {
 		return typeof key === 'string';
 	},
-	valueValidator: function(o) {
+	valueValidator: (o) => {
 		return o != null && typeof o === 'object';
 	}
 });
@@ -43,8 +43,8 @@ preload: function(request) {
 	let frame = this;
 	return Thenfu.pipe(request, [
 		
-	function(request) { return frame.definition.render(request, 'loading'); },
-	function(result) {
+	(request) => { return frame.definition.render(request, 'loading'); },
+	(result) => {
 		if (!result) return;
 		return frame.insert(result);
 	}
@@ -58,12 +58,12 @@ load: function(response) { // FIXME need a teardown method that releases child-f
 	// else a no-src frame
 	return Thenfu.pipe(response, [
 	
-	function(response) { 
+	(response) => { 
 		return frame.definition.render(response, 'loaded', {
 			mainSelector: frame.mainSelector
 			}); 
 	},
-	function(result) {
+	(result) => {
 		if (!result) return;
 		return frame.insert(result, frame.element.hasAttribute('replace'));
 	}
@@ -106,7 +106,7 @@ refresh: function() {
 	let element = this.element;
 	let src = frame.attr('src');
 
-	return Thenfu.asap().then(function() {
+	return Thenfu.asap().then(() => {
 
 		if (src == null) { // a non-src frame
 			return frame.load(null, { condition: 'loaded' });
@@ -125,11 +125,11 @@ refresh: function() {
 
 		return Thenfu.pipe(null, [ // FIXME how to handle `hash` if present??
 
-			function() { return frame.preload(request); },
-			function() { return httpProxy.load(nohash, request); },
-			function(resp) { response = resp; },
-			function() { return DOM.whenVisible(element); },
-			function() { 
+			() => { return frame.preload(request); },
+			() => { return httpProxy.load(nohash, request); },
+			(resp) => { response = resp; },
+			() => { return DOM.whenVisible(element); },
+			() => { 
 				// TODO there are probably better ways to monitor @src
 				if (frame.attr('src') !== src) return; // WARN abort since src has changed
 				return frame.load(response); 
@@ -179,7 +179,7 @@ observeAttributes: function() {
 	let attrList = [].splice.call(arguments, 0);
 	let frame = this;
 	let element = frame.element;
-	let observer = observeAttributes(element, function(attrName) {
+	let observer = observeAttributes(element, (attrName) => {
 		HFrame.attributeChanged.call(frame, attrName);
 	}, attrList);
 	frame.attributeObserver = observer;
@@ -192,8 +192,8 @@ isFrame: function(element) {
 });
 
 function observeAttributes(element, callback, attrList) {
-	let observer = new MutationObserver(function(mutations, observer) {
-		_.forEach(mutations, function(record) {
+	let observer = new MutationObserver((mutations, observer) => {
+		_.forEach(mutations, (record) => {
 			if (record.type !== 'attributes') return;
 			callback.call(record.target, record.attributeName);
 		});

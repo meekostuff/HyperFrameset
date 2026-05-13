@@ -22,7 +22,7 @@ init(el) {
 		mainSelector: el.getAttribute('main') // TODO consider using a hash in `@src`
     });
 	frameDef.bodies = [];
-	_.forEach(Array.from(el.childNodes), function(node) {
+	_.forEach(Array.from(el.childNodes), (node) => {
 		let tag = DOM.getTagName(node);
 		if (!tag) return;
 		if (_.includes(hfHeadTags, tag)) return; // ignore typical <head> elements
@@ -47,7 +47,7 @@ render(resource, condition, details) {
 		url: resource && resource.url,
 		mainSelector: frameDef.mainSelector,
 	});
-	let bodyDef = _.find(frameDef.bodies, function(body) { return body.condition === condition;});
+	let bodyDef = _.find(frameDef.bodies, (body) => { return body.condition === condition;});
 	if (!bodyDef) return; // FIXME what to do here??
 	return bodyDef.render(resource, details);
 }

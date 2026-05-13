@@ -45,7 +45,7 @@ _.assign(Binding.prototype, {
 		object.element = element;
 		binding.attachedCallback();
 
-		_.forEach(binding.handlers, function(handler) {
+		_.forEach(binding.handlers, (handler) => {
 			let listener = binding.addHandler(handler); // handler might be ignored ...
 			if (listener) binding.listeners.push(listener);// ... resulting in an undefined listener
 		});
@@ -110,7 +110,7 @@ _.assign(Binding.prototype, {
 		}
 
 		Binding.manageEvent(type);
-		let fn = function(event) {
+		let fn = (event) => {
 			if (fn.normalize) event = fn.normalize(event);
 			try {
 				return handleEvent.call(object, event, handler);
@@ -161,10 +161,10 @@ managedEvents: [],
 manageEvent: function(type) {
 	if (_.includes(this.managedEvents, type)) return;
 	this.managedEvents.push(type);
-	window.addEventListener(type, function(event) {
+	window.addEventListener(type, (event) => {
 		// NOTE stopPropagation() prevents custom default-handlers from running. DOMSprockets nullifies it.
-		event.stopPropagation = function() { console.debug('event.stopPropagation() is a no-op'); }
-		event.stopImmediatePropagation = function() { console.debug('event.stopImmediatePropagation() is a no-op'); }
+		event.stopPropagation = () => { console.debug('event.stopPropagation() is a no-op'); }
+		event.stopImmediatePropagation = () => { console.debug('event.stopImmediatePropagation() is a no-op'); }
 	}, true);
 }
 

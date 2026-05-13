@@ -41,7 +41,7 @@ init(doc, settings) {
 	let frameElts = DOM.findAll(
 		framesetDef.namespaces.lookupSelector('frame', HYPERFRAMESET_URN), 
 		doc.body);
-	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
+	_.forEach(frameElts, (el, index) => { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
 		// NOTE first rebase @src with scope: urls
 		let src = el.getAttribute('src');
 		if (src) {
@@ -60,7 +60,7 @@ init(doc, settings) {
 
 	// Add @id and @sourceurl to inline <script type="text/javascript">
 	let scripts = DOM.findAll('script', doc);
-	_.forEach(scripts, function(script, i) {
+	_.forEach(scripts, (script, i) => {
 		// ignore non-javascript scripts
 		if (script.type && !/^text\/javascript/.test(script.type)) return;
 		// ignore external scripts
@@ -79,14 +79,14 @@ init(doc, settings) {
 
 	// Move all <script for> in <head> to <body>
 	let firstChild = doc.body.firstChild;
-	_.forEach(DOM.findAll('script[for]', doc.head), function(script) {
+	_.forEach(DOM.findAll('script[for]', doc.head), (script) => {
 		doc.body.insertBefore(script, firstChild);
 		script.setAttribute('for', '');
 		console.info('Moved <script for> in frameset <head> to <body>');
 	});
 
 	// Move all non-@for, javascript <script> in <body> to <head>
-	_.forEach(DOM.findAll('script', doc.body), function(script) {
+	_.forEach(DOM.findAll('script', doc.body), (script) => {
 		// ignore non-javascript scripts
 		if (script.type && !/^text\/javascript/.test(script.type)) return;
 		// ignore @for scripts
@@ -113,7 +113,7 @@ preprocess() {
 	});
 
 	let scripts = DOM.findAll('script', body);
-	_.forEach(scripts, function(script, i) {
+	_.forEach(scripts, (script, i) => {
 		// Ignore non-javascript scripts
 		if (script.type && !/^text\/javascript/.test(script.type)) return;
 
@@ -182,7 +182,7 @@ preprocess() {
 		body);
 	let frameDefElts = [];
 	let frameRefElts = [];
-	_.forEach(frameElts, function(el, index) { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
+	_.forEach(frameElts, (el, index) => { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
 
 		// NOTE even if the frame is only a declaration (@def && @def !== @defid) it still has its content removed
 		let placeholder = el.cloneNode(false);
@@ -204,11 +204,11 @@ preprocess() {
 		}
 		frameDefElts.push(el);
 	});
-	_.forEach(frameDefElts, function(el) {
+	_.forEach(frameDefElts, (el) => {
 		let defId = el.getAttribute('defid');
 		framesetDef.frames[defId] = new HFrameDefinition(el, framesetDef);
 	});
-	_.forEach(frameRefElts, function(el) {
+	_.forEach(frameRefElts, (el) => {
 		let def = el.getAttribute('def');
 		let ref = framesetDef.frames[def];
 		if (!ref) {

@@ -29,8 +29,8 @@ set: function(name, value) {
         let oldValue = this.values[name];
         if (symmetricDifference(value, oldValue).size === 0) return;
         this.values[name] = value;
-        _.forEach(this.listeners[name], function(listener) {
-                Task.asap(function() { listener(value); });
+        _.forEach(this.listeners[name], (listener) => {
+                Task.asap(() => { listener(value); });
         });     
 },
 
@@ -38,7 +38,7 @@ listen: function(name, listener) {
         if (!this.has(name)) throw Error(`${name} is not a registered controller`);
         this.listeners[name].push(listener);
         let value = this.values[name];
-        Task.asap(function() { listener(value) });
+        Task.asap(() => { listener(value) });
 }
 
 };

@@ -21,11 +21,11 @@ const eventConfig = 'form@submit,reset,input,change,invalid input,textarea@input
 let eventTable = (function(config) {
 
 let table = {};
-_.forEach(config.split(/\s+/), function(combo) {
+_.forEach(config.split(/\s+/), (combo) => {
 	let m = combo.split('@');
 	let tags = m[0].split(',');
 	let events = m[1].split(',');
-	_.forEach(tags, function(tag) {
+	_.forEach(tags, (tag) => {
 		table[tag] = Array.from(events);
 	});
 });
@@ -39,13 +39,13 @@ let elements = {};
 let interfaces = {};
 
 function registerFormElements() {
-	_.forOwn(elements, function(ClassName, tag) {
+	_.forOwn(elements, (ClassName, tag) => {
 		let Interface = interfaces[ClassName];
 		sprockets.registerElement(tag, Interface);
 	});
 }
 
-_.forOwn(eventTable, function(events, tag) {
+_.forOwn(eventTable, (events, tag) => {
 
 let Tag = _.ucFirst(tag);
 let ClassName = `Configurable${Tag}`;
@@ -60,7 +60,7 @@ attached: function(handlers) {
 	let configID = _.words(element.getAttribute('config'))[0];
 	let options = configData.get(configID);
 	if (!options) return;
-	_.forEach(events, function(type) {
+	_.forEach(events, (type) => {
 		let ontype = `on${type}`;
 		let callback = options[ontype];
 		if (!callback) return;
@@ -96,7 +96,7 @@ attached: function(handlers) {
 	let events = _.words('submit reset change input');
 	let needClickWatcher = false;
 
-	_.forEach(events, function(type) {
+	_.forEach(events, (type) => {
 		let ontype = `on${type}`;
 		let callback = options[ontype];
 		if (!callback) return;
@@ -118,11 +118,11 @@ attached: function(handlers) {
 	});
 
 	if (needClickWatcher) {
-		document.addEventListener('click', function(e) { 
+		document.addEventListener('click', (e) => { 
 			if (DOM.closest(e.target, 'form')) return;
 			let type = e.target.type;
 			if (!(type === 'submit' || type === 'reset')) return;
-			Task.asap(function() {
+			Task.asap(() => {
 				let pseudoEvent = document.createEvent('CustomEvent');
 				// NOTE pseudoEvent.detail = e.target
 				pseudoEvent.initCustomEvent(type, true, true, e.target);

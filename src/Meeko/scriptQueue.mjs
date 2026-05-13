@@ -37,7 +37,7 @@ let testScript = document.createElement('script'),
 let scriptQueue = {
 
 push: function(node) {
-	return new Promise(function(resolve, reject) {
+	return new Promise((resolve, reject) => {
 		if (emptying) throw Error('Attempt to append script to scriptQueue while emptying');
 	
 	// TODO assert node is in document
@@ -110,7 +110,7 @@ push: function(node) {
 	function onError(e) {
 		removeListeners();
 		spliceItem(queue, current);
-		completeFu.reject(function() { throw Error('Script loading failed'); }); // FIXME throw NetworkError()
+		completeFu.reject(() => { throw Error('Script loading failed'); }); // FIXME throw NetworkError()
 	}
 
 	function addListeners() {
@@ -135,7 +135,7 @@ push: function(node) {
 },
 
 empty: function() {
-	return new Promise(function(resolve, reject) {
+	return new Promise((resolve, reject) => {
 	
 	emptying = true;
 	if (queue.length <= 0) {
@@ -143,8 +143,8 @@ empty: function() {
 		resolve();
 		return;
 	}
-	_.forEach(queue, function(value, i) {
-		let acceptCallback = function() {
+	_.forEach(queue, (value, i) => {
+		let acceptCallback = () => {
 			if (queue.length <= 0) {
 				emptying = false;
 				resolve();

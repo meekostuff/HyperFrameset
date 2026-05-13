@@ -18,7 +18,7 @@ constructor(options) {
 
 loadTemplate(template) {
 	let script;
-	_.forEach(Array.from(template.childNodes), function(node) {
+	_.forEach(Array.from(template.childNodes), (node) => {
 		switch (node.nodeType) {
 		case 1: // Element
 			switch (DOM.getTagName(node)) {

@@ -30,7 +30,7 @@ class HttpProxy {
 
 		if (Thenfu.isThenable(response)) entry.response = response.then(
 			this.#cloneResponse,
-			function (status) {
+			(status) => {
 				entry.invalid = true;
 				entry.response = null;
 			}

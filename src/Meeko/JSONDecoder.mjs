@@ -31,10 +31,10 @@ evaluate(query, context, variables, wantArray) {
 	pathParts = query.split('.');
 	
 	let resultList = [ context ];
-	_.forEach(pathParts, function(relPath, i) {
+	_.forEach(pathParts, (relPath, i) => {
 		let parents = resultList;
 		resultList = [];
-		_.forEach(parents, function(item) {
+		_.forEach(parents, (item) => {
 			let child = item[relPath];
 			if (child != null) {
 				if (Array.isArray(child)) [].push.apply(resultList, child);

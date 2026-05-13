@@ -42,10 +42,10 @@ evaluate(query, context, variables, wantArray) {
 	else nodes = [ context ];
 
 	let resultList = nodes;
-	_.forEach(pathParts, function(relPath, i) {
+	_.forEach(pathParts, (relPath, i) => {
 		let parents = resultList;
 		resultList = [];
-		_.forEach(parents, function(el) {
+		_.forEach(parents, (el) => {
 			let props = Microdata.getProperties(el);
 			if (!props) return;
 			let nodeList = props.namedItem(relPath);
@@ -55,7 +55,7 @@ evaluate(query, context, variables, wantArray) {
 	});
 
 	// now convert elements to values
-	resultList = Array.from(resultList, function(el) {
+	resultList = Array.from(resultList, (el) => {
 		let props = Microdata.getProperties(el);
 		if (props) return el;
 		return Microdata.getValue(el);

@@ -120,7 +120,7 @@ connectController: function() {
 	if (!name && !value) return;
 	panel.ariaToggle('hidden', true);
 	if (!name) return; // being controlled by an ancestor
-	controllers.listen(name, function(values) {
+	controllers.listen(name, (values) => {
 		panel.ariaToggle('hidden', !(_.includes(values, value)));
 	});
 }
@@ -178,7 +178,7 @@ connectController: function() {
 	if (!name && !value) return;
 	panel.ariaToggle('hidden', true);
 	if (!name) return; // being controlled by an ancestor
-	controllers.listen(name, function(values) {
+	controllers.listen(name, (values) => {
 		panel.ariaToggle('hidden', !(_.includes(values, value)));
 	});
 },
@@ -202,8 +202,8 @@ isLayout: true,
 
 owns: {
 	get: function() { 
-		return _.filter(this.element.children, function(el) { 
-			return DOM.matches(el, function(el) { return Panel.isPanel(el) || Layout.isLayout(el); });
+		return _.filter(this.element.children, (el) => { 
+			return DOM.matches(el, (el) => { return Panel.isPanel(el) || Layout.isLayout(el); });
 		}); 
 	}
 }
@@ -260,7 +260,7 @@ function normalizeChild(node) {
 	let element = this;
 	switch (node.nodeType) {
 	case 1: // hide non-layout elements
-		if (DOM.matches(node, function(el) { return Panel.isPanel(el) || Layout.isLayout(el); })) return;
+		if (DOM.matches(node, (el) => { return Panel.isPanel(el) || Layout.isLayout(el); })) return;
 		node.hidden = true;
 		return;
 	case 3: // hide text nodes by wrapping in <wbr hidden>
@@ -324,7 +324,7 @@ enteredDocument: function() {
 	Layout.enteredDocument.call(this);
 
 	let vAlign = this.attr('align'); // FIXME assert top/middle/bottom/baseline - also start/end (stretch?)
-	_.forEach(this.ariaGet('owns'), function(panel) {
+	_.forEach(this.ariaGet('owns'), (panel) => {
 		if (vAlign) panel.$.css('vertical-align', vAlign);
 	});
 },
@@ -349,7 +349,7 @@ activedescendant: {
 		let element = this.element;
 		let panels = this.ariaGet('owns');
 		if (item && !_.includes(panels, item)) throw Error('set activedescendant failed: item is not child of deck');
-		_.forEach(panels, function(child) {
+		_.forEach(panels, (child) => {
 			if (child === item) child.ariaToggle('hidden', false);
 			else child.ariaToggle('hidden', true);
 		});
@@ -387,9 +387,9 @@ connectController: function() {
 		deck.ariaSet('activedescendant', deck.ariaGet('owns')[0]);
 		return;
 	}
-	controllers.listen(name, function(values) {
+	controllers.listen(name, (values) => {
 		let panels = deck.ariaGet('owns');
-		let activePanel = _.find(panels, function(child) {
+		let activePanel = _.find(panels, (child) => {
 			let value = child.getAttribute('value');
 			if (!_.includes(values, value)) return false;
 			return true;
@@ -429,7 +429,7 @@ leftDocument: function() {
 refresh: function() { // TODO should this be static method?
 	let width = parseFloat(window.getComputedStyle(this.element, null).width);
 	let panels = this.ariaGet('owns');
-	let activePanel = _.find(panels, function(panel) {
+	let activePanel = _.find(panels, (panel) => {
 		let minWidth = window.getComputedStyle(panel, null).minWidth;
 		if (minWidth == null || minWidth === '' || minWidth === '0px') return true;
 		minWidth = parseFloat(minWidth); // FIXME minWidth should be "NNNpx" but need to test

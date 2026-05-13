@@ -43,7 +43,7 @@ matches(element, query) { // FIXME refactor common-code in matches / evaluate
 			return node.textContent;
 		case htmlAttr:
 			let frag = doc.createDocumentFragment();
-			_.forEach(node.childNodes, function(child) { 
+			_.forEach(node.childNodes, (child) => { 
 				frag.appendChild(doc.importNode(child, true)); // TODO does `child` really need to be cloned??
 			});
 			return frag;
@@ -67,7 +67,7 @@ evaluate(query, context, variables, wantArray) {
 		if (attr.charAt(0) === '@') attr = attr.substr(1);
 
 		if (!wantArray) result = [ result ];
-		result = Array.from(result, function(node) {
+		result = Array.from(result, (node) => {
 			return getAttr(node, attr);
 		});
 		if (!wantArray) result = result[0];
@@ -82,7 +82,7 @@ evaluate(query, context, variables, wantArray) {
 			return node.textContent;
 		case htmlAttr:
 			let frag = doc.createDocumentFragment();
-			_.forEach(node.childNodes, function(child) { 
+			_.forEach(node.childNodes, (child) => { 
 				frag.appendChild(doc.importNode(child, true)); // TODO does `child` really need to be cloned??
 			});
 			return frag;
@@ -105,11 +105,11 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 	if (selectorGroup === '') return wantArray ? [ context ] : context;
 	let nullResult = wantArray ? [] : null;
 	let selectors = selectorGroup.split(/,(?![^\(]*\)|[^\[]*\])/);
-	selectors = Array.from(selectors, function(s) { return s.trim(); });
+	selectors = Array.from(selectors, (s) => { return s.trim(); });
 
 	let invalidVarUse = false;
 	let contextVar;
-	_.forEach(selectors, function(s, i) {
+	_.forEach(selectors, (s, i) => {
 		let m = s.match(/\\?\$[_a-zA-Z][_a-zA-Z0-9]*\b/g);
 		if (!m) {
 			if (i > 0 && contextVar) {
@@ -118,7 +118,7 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 			}
 			return; // if no matches then m will be null not []
 		}
-		_.forEach(m, function(varRef, j) {
+		_.forEach(m, (varRef, j) => {
 			if (varRef.charAt(0) === '\\') return; // Ignore "\$"
 			let varName = varRef.substr(1);
 			let varPos = s.indexOf(varRef);
@@ -163,7 +163,7 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 	let isRoot = false;
 	if (context.nodeType === 9 || context.nodeType === 11) isRoot = true;
 
-	selectors = _.filter(selectors, function(s) {
+	selectors = _.filter(selectors, (s) => {
 			switch(s.charAt(0)) {
 			case '+': case '~': 
 				console.warn('Siblings of context-node cannot be selected in ' + selectorGroup);
@@ -175,7 +175,7 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 
 	if (selectors.length <= 0) return nullResult;
 
-	selectors = Array.from(selectors, function(s) {
+	selectors = Array.from(selectors, (s) => {
 			if (isRoot) return s;
 			let prefix = ':scope';
 			return (contextVar) ? 
