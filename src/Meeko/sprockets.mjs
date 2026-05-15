@@ -89,11 +89,6 @@ let create = function(prototype) {
 let evolve = function(baseDefn, ariaProperties) {
 	let prototype = Object.create(baseDefn.prototype);
 	let sub = create(prototype);
-	let baseProperties = baseDefn.prototype.__properties__ || {};
-	let subProperties = prototype.__properties__ = {};
-	_.forOwn(baseProperties, function(desc, name) {
-		subProperties[name] = Object.create(desc);
-	});
 	if (ariaProperties) extendAriaProperties(sub, ariaProperties);
 	return sub;
 }
@@ -102,11 +97,11 @@ let evolve = function(baseDefn, ariaProperties) {
  * Define properties on a sprocket prototype. Each entry in `ariaProperties` is handled
  * based on its type:
  *
- * - **object** entries are treated as ARIA property descriptors. The descriptor is merged
- *   (via `_.assign`) into `prototype.__properties__[name]`, allowing sub-definitions to
- *   partially override inherited descriptors. A trap getter/setter is installed on the
+ * - **object** entries are treated as ARIA property descriptors. The descriptor is stored
+ *   on `prototype.__properties__[name]`. A trap getter/setter is installed on the
  *   prototype that throws on direct property access, enforcing use of `ariaGet` / `ariaSet` /
- *   `ariaToggle` / `ariaCan` instead.
+ *   `ariaToggle` / `ariaCan` instead. Inherited descriptors are resolved at runtime via
+ *   prototype chain traversal — no copying from base to sub is needed.
  *
  * - **non-object** entries (functions, strings, booleans, etc.) are assigned directly to
  *   the prototype as regular properties or methods.
@@ -122,12 +117,12 @@ let evolve = function(baseDefn, ariaProperties) {
  */
 let extendAriaProperties = function(sprocket, ariaProperties) {
 	let prototype = sprocket.prototype;
-	let definition = prototype.__properties__ || (prototype.__properties__ = {});
+	let definition = null;
 	_.forOwn(ariaProperties, function(desc, name) {
 		switch (typeof desc) {
 			case 'object':
-				let propDesc = definition[name] || (definition[name] = {});
-				_.assign(propDesc, desc);
+				if (!definition) definition = prototype.__properties__ = {};
+				definition[name] = desc;
 				Object.defineProperty(prototype, name, {
 					get: function() { throw Error('Attempt to get an ARIA property'); },
 					set: function() { throw Error('Attempt to set an ARIA property'); }
@@ -577,6 +572,24 @@ sprockets.Base = create(basePrototype); // NOTE now we can extend basePrototype
 /* Extend BaseSprocket.prototype */
 let Base = sprockets.Base;
 
+/**
+ * Walk the prototype chain to find an ARIA property descriptor by name.
+ * Each prototype in the chain may have its own `__properties__` object.
+ * @param {Object} obj - The sprocket instance to start from.
+ * @param {string} name - The property name to look up.
+ * @returns {Object} The property descriptor.
+ * @throws {Error} If no descriptor is found in the chain.
+ */
+function lookupPropertyDescriptor(obj, name) {
+	let proto = obj;
+	while (proto) {
+		let props = Object.prototype.hasOwnProperty.call(proto, '__properties__') ? proto.__properties__ : null;
+		if (props && name in props) return props[name];
+		proto = Object.getPrototypeOf(proto);
+	}
+	throw Error(`Property not defined: ${name}`);
+}
+
 _.assign(Base.prototype, {
 
 find: function(selector, scope) { return DOM.find(selector, this.element, scope); },
@@ -709,16 +722,25 @@ aria: function(name, value) {
 	}
 },
 
+/**
+ * Check whether a named ARIA property can be toggled.
+ * @param {string} name - Property name.
+ * @returns {boolean} True if the property is boolean and its `can` guard (if any) permits toggling.
+ */
 ariaCan: function(name, value) {
-	let desc = this.__properties__[name];
-	if (!desc) throw Error(`Property not defined: ${name}`);
+	let desc = lookupPropertyDescriptor(this, name);
 	if (desc.type !== 'boolean' || desc.can && !desc.can.call(this)) return false;
 	return true;
 },
 
+/**
+ * Toggle a boolean ARIA property. Throws if the property is not boolean or its `can` guard fails.
+ * @param {string} name - Property name.
+ * @param {boolean} [value] - If provided, sets to this value; otherwise flips the current value.
+ * @returns {*} The previous value before toggling.
+ */
 ariaToggle: function(name, value) {
-	let desc = this.__properties__[name];
-	if (!desc) throw Error(`Property not defined: ${name}`);
+	let desc = lookupPropertyDescriptor(this, name);
 	if (desc.type !== 'boolean' || desc.can && !desc.can.call(this)) throw Error(`Property can not toggle: ${name}`);
 	let oldValue = desc.get.call(this);
 	
@@ -727,15 +749,26 @@ ariaToggle: function(name, value) {
 	return oldValue;
 },
 
+/**
+ * Get the value of a named ARIA property by invoking its descriptor's `get` function.
+ * Property descriptors are resolved by walking the prototype chain.
+ * @param {string} name - Property name.
+ * @returns {*} The property value.
+ */
 ariaGet: function(name) {
-	let desc = this.__properties__[name];
-	if (!desc) throw Error(`Property not defined: ${name}`);
+	let desc = lookupPropertyDescriptor(this, name);
 	return desc.get.call(this); // TODO type and error handling
 },
 
+/**
+ * Set the value of a named ARIA property by invoking its descriptor's `set` function.
+ * Property descriptors are resolved by walking the prototype chain.
+ * @param {string} name - Property name.
+ * @param {*} value - The value to set.
+ * @returns {*} The return value of the descriptor's `set` function.
+ */
 ariaSet: function(name, value) {
-	let desc = this.__properties__[name];
-	if (!desc) throw Error(`Property not defined: ${name}`);
+	let desc = lookupPropertyDescriptor(this, name);
 	return desc.set.call(this, value); // TODO type and error handling
 },
 

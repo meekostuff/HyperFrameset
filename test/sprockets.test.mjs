@@ -74,17 +74,17 @@ describe('__properties__ inheritance', () => {
     expect(sub.prototype.__properties__.foo.get()).toBe('base-get');
   });
 
-  test('sub can partially override inherited descriptor', () => {
+  test('sub can fully override inherited descriptor', () => {
     let base = evolve(sprockets.RoleType, {
       foo: { type: 'boolean', get() { return 'base'; }, set() {} }
     });
     let sub = evolve(base, {
-      foo: { get() { return 'sub'; } }
+      foo: { type: 'string', get() { return 'sub'; }, set() {} }
     });
     // get is overridden
     expect(sub.prototype.__properties__.foo.get()).toBe('sub');
-    // type is inherited
-    expect(sub.prototype.__properties__.foo.type).toBe('boolean');
+    // type is overridden
+    expect(sub.prototype.__properties__.foo.type).toBe('string');
   });
 
   test('overriding in sub does not mutate base __properties__', () => {
@@ -92,7 +92,7 @@ describe('__properties__ inheritance', () => {
       foo: { type: 'boolean', get() { return 'base'; }, set() {} }
     });
     let sub = evolve(base, {
-      foo: { get() { return 'sub'; } }
+      foo: { type: 'string', get() { return 'sub'; }, set() {} }
     });
     expect(base.prototype.__properties__.foo.get()).toBe('base');
   });
@@ -105,10 +105,9 @@ describe('__properties__ inheritance', () => {
       y: { type: 'boolean', get() { return 'b'; }, set() {} }
     });
     let c = evolve(b, {});
-    expect(c.prototype.__properties__.x).toBeDefined();
-    expect(c.prototype.__properties__.y).toBeDefined();
-    expect(c.prototype.__properties__.x.get()).toBe('a');
-    expect(c.prototype.__properties__.y.get()).toBe('b');
+    let obj = bind(c);
+    expect(obj.ariaGet('x')).toBe('a');
+    expect(obj.ariaGet('y')).toBe('b');
   });
 
 });
