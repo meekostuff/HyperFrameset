@@ -74,9 +74,7 @@ let start = function(options) {
  * @returns {constructor} The sprocket-definition.
  */
 let create = function(prototype) {
-	let constructor = function(element) {
-		return cast(element, constructor);
-	};
+	let constructor = function() {};
 	constructor.prototype = prototype;
 	return constructor;
 }

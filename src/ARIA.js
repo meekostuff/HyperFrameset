@@ -176,7 +176,7 @@ toggleColumnSortState: function(column) { // TODO shouldn't have hard-wired clas
 	let type = 'string';
 	let cols = this.getColumns();
 	let colEl = cols[column];
-	let col = new Base(colEl);
+	let col = sprockets.cast(colEl, Base);
 	if (col.hasClass('number')) type = 'number';
 	if (col.hasClass('string')) type = 'string';
 	let sortable = col.hasClass('sortable');
@@ -196,7 +196,7 @@ toggleColumnSortState: function(column) { // TODO shouldn't have hard-wired clas
 	for (let n=cols.length, i=0; i<n; i++) {
 		if (column != i) {
 			colEl = cols[i];
-			col = new Base(colEl);
+			col = sprockets.cast(colEl, Base);
 			col.removeClass('sorted');
 			col.removeClass('reversed');
 		}

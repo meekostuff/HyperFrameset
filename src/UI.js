@@ -78,12 +78,12 @@ getSelected: function() {
 setExpanded: function(state) {	
 	let listEl = this.getListElement();
 	if (!listEl) throw "";
-	List(listEl).setHidden(!state);
+	sprockets.cast(listEl, List).setHidden(!state);
 },
 getExpanded: function() {
 	let listEl = this.getListElement();
 	if (!listEl) throw "";
-	return List(listEl).getHidden();
+	return sprockets.cast(listEl, List).getHidden();
 }
 
 });
@@ -112,7 +112,7 @@ let Tree = sprockets.evolve(Box, {
 getListElement: TreeItem.prototype.getListElement,
 
 getItems: function() {
-	return List(this.getListElement()).getItems();
+	return sprockets.cast(this.getListElement(), List).getItems();
 },
 
 getSelectedItem: function() { // FIXME this only searches the top List, not the whole Tree
@@ -121,7 +121,7 @@ getSelectedItem: function() { // FIXME this only searches the top List, not the 
 	let n = items.length;
 	for (let i=0; i<n; i++) {
 		let node = items[i];
-		let binding = TreeItem(node);
+		let binding = sprockets.cast(node, TreeItem);
 		if (binding.getSelected()) return node;
 	}
 	return null;
@@ -134,7 +134,7 @@ selectItem: function(item) {
 	let n = items.length;
 	for (let i=0; i<n; i++) {
 		let node = items[i];
-		let binding = TreeItem(node);
+		let binding = sprockets.cast(node, TreeItem);
 		if (node === item) binding.setSelected(true);
 		if (node !== item) binding.setSelected(false);
 	}
@@ -247,7 +247,7 @@ setView: function(item) {
 	let panels = this.getPanels();
 	if (!_.includes(panels, item)) throw "setView failed: item is not child of SwitchBox";
 	_.forEach(panels, function(child) {
-		let binding = Panel(child);
+		let binding = sprockets.cast(child, Panel);
 		if (item == child) binding.setHidden(false);
 		else binding.setHidden(true);
 	}, this);
@@ -258,7 +258,7 @@ setViewByIndex: function(index) {
 	let panels = this.getPanels();
 	if (index >= panels.length) throw "setViewByIndex failed: index is not valid for SwitchBox";
 	_.forEach(panels, function(child, i) {
-		let binding = Panel(child);
+		let binding = sprockets.cast(child, Panel);
 		if (index == i) binding.setHidden(false);
 		else binding.setHidden(true);
 	}, this);
@@ -330,7 +330,7 @@ toggleColumnSortState: function(column) { // TODO shouldn't have hard-wired clas
 	let type = "string";
 	let cols = this.getColumns();
 	let colEl = cols[column];
-	let col = new Base(colEl);
+	let col = sprockets.cast(colEl, Base);
 	if (col.hasClass("number")) type = "number";
 	if (col.hasClass("string")) type = "string";
 	let sortable = col.hasClass("sortable");
@@ -350,7 +350,7 @@ toggleColumnSortState: function(column) { // TODO shouldn't have hard-wired clas
 	for (let n=cols.length, i=0; i<n; i++) {
 		if (column != i) {
 			colEl = cols[i];
-			col = new Base(colEl);
+			col = sprockets.cast(colEl, Base);
 			col.removeClass("sorted");
 			col.removeClass("reversed");
 		}
