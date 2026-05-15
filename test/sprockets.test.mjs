@@ -358,3 +358,68 @@ describe('consumer patterns: dynamic can guard', () => {
   });
 
 });
+
+describe('cast', () => {
+
+  test('cast returns the bound object for a matching sprocket', () => {
+    let Def = evolve(sprockets.RoleType, { role: 'widget' });
+    let el = document.createElement('div');
+    let binding = Binding.attachBinding(Def, el);
+    let result = sprockets.cast(el, Def);
+    expect(result).toBe(binding.object);
+  });
+
+  test('cast returns the bound object when cast to a base type', () => {
+    let Base = evolve(sprockets.RoleType, { role: 'base' });
+    let Sub = evolve(Base, { role: 'sub' });
+    let el = document.createElement('div');
+    let binding = Binding.attachBinding(Sub, el);
+    let result = sprockets.cast(el, Base);
+    expect(result).toBe(binding.object);
+  });
+
+  test('cast throws when element has no binding', () => {
+    let Def = evolve(sprockets.RoleType, {});
+    let el = document.createElement('div');
+    expect(() => sprockets.cast(el, Def)).toThrow();
+  });
+
+  test('cast throws when bound sprocket does not match requested type', () => {
+    let A = evolve(sprockets.RoleType, { role: 'a' });
+    let B = evolve(sprockets.RoleType, { role: 'b' });
+    let el = document.createElement('div');
+    Binding.attachBinding(A, el);
+    expect(() => sprockets.cast(el, B)).toThrow('not compatible');
+  });
+
+  test('cast with RoleType succeeds for any bound element', () => {
+    let Def = evolve(sprockets.RoleType, { role: 'anything' });
+    let el = document.createElement('div');
+    let binding = Binding.attachBinding(Def, el);
+    let result = sprockets.cast(el, sprockets.RoleType);
+    expect(result).toBe(binding.object);
+  });
+
+});
+
+describe('element.$', () => {
+
+  test('element.$ returns the bound sprocket object', () => {
+    let Def = evolve(sprockets.RoleType, { role: 'widget' });
+    let el = document.createElement('div');
+    document.body.appendChild(el);
+    let binding = Binding.attachBinding(Def, el);
+    expect(el.$).toBe(binding.object);
+    el.remove();
+  });
+
+  test('element.$ on unbound element lazily attaches via fallback rule', () => {
+    let el = document.createElement('div');
+    document.body.appendChild(el);
+    // Universal '*' rule means any element gets a RoleType binding
+    let obj = el.$;
+    expect(obj).toBeDefined();
+    el.remove();
+  });
+
+});
