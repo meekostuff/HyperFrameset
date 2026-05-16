@@ -9,7 +9,7 @@ test('registerElement before start does not throw', async ({ page }) => {
   await setup(page);
   const error = await page.evaluate(() => {
     try {
-      const def = window.sprockets.evolve(window.sprockets.RoleType, {});
+      const def = class extends window.sprockets.RoleType {};
       window.sprockets.registerElement('test-element', def);
       return null;
     } catch (e) { return e.message; }
@@ -20,7 +20,7 @@ test('registerElement before start does not throw', async ({ page }) => {
 test('registerElement after start throws', async ({ page }) => {
   await setup(page);
   const error = await page.evaluate(() => {
-    const def = window.sprockets.evolve(window.sprockets.RoleType, {});
+    const def = class extends window.sprockets.RoleType {};
     window.sprockets.registerElement('test-pre', def);
     window.sprockets.start();
     try {
@@ -35,7 +35,7 @@ test('start attaches bindings to matching elements already in DOM', async ({ pag
   await setup(page);
   const result = await page.evaluate(() => {
     window.__attached = false;
-    const def = window.sprockets.evolve(window.sprockets.RoleType, {});
+    const def = class extends window.sprockets.RoleType {};
     def.attached = function() { window.__attached = true; };
     window.sprockets.registerElement('test-existing', def);
     document.body.innerHTML += '<test-existing></test-existing>';
@@ -49,7 +49,7 @@ test('inserting a matching element triggers attach and enteredDocument', async (
   await setup(page);
   await page.evaluate(() => {
     window.__log = [];
-    const def = window.sprockets.evolve(window.sprockets.RoleType, {});
+    const def = class extends window.sprockets.RoleType {};
     def.attached = function() { window.__log.push('attached'); };
     def.enteredDocument = function() { window.__log.push('entered'); };
     window.sprockets.registerElement('test-insert', def);
@@ -72,7 +72,7 @@ test('removing a bound element triggers leftDocument', async ({ page }) => {
   await setup(page);
   await page.evaluate(() => {
     window.__log = [];
-    const def = window.sprockets.evolve(window.sprockets.RoleType, {});
+    const def = class extends window.sprockets.RoleType {};
     def.attached = function() { window.__log.push('attached'); };
     def.enteredDocument = function() { window.__log.push('entered'); };
     def.leftDocument = function() { window.__log.push('left'); };
@@ -100,7 +100,7 @@ test('event handler fires on bound element', async ({ page }) => {
   await setup(page);
   await page.evaluate(() => {
     window.__clicked = false;
-    const def = window.sprockets.evolve(window.sprockets.RoleType, {});
+    const def = class extends window.sprockets.RoleType {};
     def.handlers = [{ type: 'click', action() { window.__clicked = true; } }];
     window.sprockets.registerElement('test-click', def);
     window.sprockets.start();
@@ -124,7 +124,7 @@ test('is= attribute matches binding rule', async ({ page }) => {
   await setup(page);
   await page.evaluate(() => {
     window.__attached = false;
-    const def = window.sprockets.evolve(window.sprockets.RoleType, {});
+    const def = class extends window.sprockets.RoleType {};
     def.attached = function() { window.__attached = true; };
     window.sprockets.registerElement('test-is', def);
     window.sprockets.start();

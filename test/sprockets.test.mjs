@@ -2,11 +2,6 @@ import { describe, test, expect } from 'vitest';
 import sprockets from '../src/Meeko/sprockets.mjs';
 import Binding from '../src/Meeko/Binding.mjs';
 
-// Indirection over sprockets.evolve — swap this to test a new implementation
-function evolve(base, props) {
-  return sprockets.evolve(base, props);
-}
-
 // Helper: create a bound sprocket instance on a real DOM element
 function bind(definition, el) {
   if (!el) el = document.createElement('div');
@@ -14,98 +9,100 @@ function bind(definition, el) {
   return binding.object;
 }
 
-describe('evolve prototype chain', () => {
+describe('class extends prototype chain', () => {
 
   test('sub prototype inherits base methods', () => {
-    let base = evolve(sprockets.RoleType, { greet() { return 'hi'; } });
-    let sub = evolve(base, { wave() { return 'wave'; } });
-    let inst = Object.create(sub.prototype);
+    class Base extends sprockets.RoleType { greet() { return 'hi'; } }
+    class Sub extends Base { wave() { return 'wave'; } }
+    let inst = Object.create(Sub.prototype);
     expect(inst.greet()).toBe('hi');
     expect(inst.wave()).toBe('wave');
   });
 
   test('three-level chain inherits through all levels', () => {
-    let a = evolve(sprockets.RoleType, { a() { return 'a'; } });
-    let b = evolve(a, { b() { return 'b'; } });
-    let c = evolve(b, { c() { return 'c'; } });
-    let inst = Object.create(c.prototype);
+    class A extends sprockets.RoleType { a() { return 'a'; } }
+    class B extends A { b() { return 'b'; } }
+    class C extends B { c() { return 'c'; } }
+    let inst = Object.create(C.prototype);
     expect(inst.a()).toBe('a');
     expect(inst.b()).toBe('b');
     expect(inst.c()).toBe('c');
   });
 
   test('sub can override base method', () => {
-    let base = evolve(sprockets.RoleType, { greet() { return 'base'; } });
-    let sub = evolve(base, { greet() { return 'sub'; } });
-    let inst = Object.create(sub.prototype);
+    class Base extends sprockets.RoleType { greet() { return 'base'; } }
+    class Sub extends Base { greet() { return 'sub'; } }
+    let inst = Object.create(Sub.prototype);
     expect(inst.greet()).toBe('sub');
   });
 
   test('role property is inherited', () => {
-    let a = evolve(sprockets.RoleType, { role: 'widget' });
-    let b = evolve(a, {});
-    expect(Object.create(b.prototype).role).toBe('widget');
+    class A extends sprockets.RoleType {}
+    A.prototype.role = 'widget';
+    class B extends A {}
+    expect(Object.create(B.prototype).role).toBe('widget');
   });
 
   test('role property can be overridden', () => {
-    let a = evolve(sprockets.RoleType, { role: 'widget' });
-    let b = evolve(a, { role: 'button' });
-    expect(Object.create(b.prototype).role).toBe('button');
+    class A extends sprockets.RoleType {}
+    A.prototype.role = 'widget';
+    class B extends A {}
+    B.prototype.role = 'button';
+    expect(Object.create(B.prototype).role).toBe('button');
   });
 
 });
 
 describe('__properties__ inheritance', () => {
 
-  test('evolve creates __properties__ on sub prototype', () => {
-    let base = evolve(sprockets.RoleType, {
-      foo: { type: 'boolean', get() { return true; }, set() {} }
-    });
-    let sub = evolve(base, {});
-    expect(sub.prototype.__properties__).toBeDefined();
-    expect(sub.prototype.__properties__.foo).toBeDefined();
+  test('withAria creates __properties__ on prototype', () => {
+    class Base extends sprockets.RoleType {
+      static { sprockets.withAria(this, { foo: { type: 'boolean', get() { return true; }, set() {} } }); }
+    }
+    class Sub extends Base {}
+    expect(Base.prototype.__properties__).toBeDefined();
+    expect(Base.prototype.__properties__.foo).toBeDefined();
   });
 
-  test('sub inherits base ARIA property descriptors', () => {
-    let base = evolve(sprockets.RoleType, {
-      foo: { type: 'boolean', get() { return 'base-get'; }, set() {} }
-    });
-    let sub = evolve(base, {});
-    expect(sub.prototype.__properties__.foo.get()).toBe('base-get');
+  test('sub inherits base ARIA property descriptors via ariaGet', () => {
+    class Base extends sprockets.RoleType {
+      static { sprockets.withAria(this, { foo: { type: 'boolean', get() { return 'base-get'; }, set() {} } }); }
+    }
+    class Sub extends Base {}
+    let obj = bind(Sub);
+    expect(obj.ariaGet('foo')).toBe('base-get');
   });
 
   test('sub can fully override inherited descriptor', () => {
-    let base = evolve(sprockets.RoleType, {
-      foo: { type: 'boolean', get() { return 'base'; }, set() {} }
-    });
-    let sub = evolve(base, {
-      foo: { type: 'string', get() { return 'sub'; }, set() {} }
-    });
-    // get is overridden
-    expect(sub.prototype.__properties__.foo.get()).toBe('sub');
-    // type is overridden
-    expect(sub.prototype.__properties__.foo.type).toBe('string');
+    class Base extends sprockets.RoleType {
+      static { sprockets.withAria(this, { foo: { type: 'boolean', get() { return 'base'; }, set() {} } }); }
+    }
+    class Sub extends Base {
+      static { sprockets.withAria(this, { foo: { type: 'string', get() { return 'sub'; }, set() {} } }); }
+    }
+    expect(Sub.prototype.__properties__.foo.get()).toBe('sub');
+    expect(Sub.prototype.__properties__.foo.type).toBe('string');
   });
 
   test('overriding in sub does not mutate base __properties__', () => {
-    let base = evolve(sprockets.RoleType, {
-      foo: { type: 'boolean', get() { return 'base'; }, set() {} }
-    });
-    let sub = evolve(base, {
-      foo: { type: 'string', get() { return 'sub'; }, set() {} }
-    });
-    expect(base.prototype.__properties__.foo.get()).toBe('base');
+    class Base extends sprockets.RoleType {
+      static { sprockets.withAria(this, { foo: { type: 'boolean', get() { return 'base'; }, set() {} } }); }
+    }
+    class Sub extends Base {
+      static { sprockets.withAria(this, { foo: { type: 'string', get() { return 'sub'; }, set() {} } }); }
+    }
+    expect(Base.prototype.__properties__.foo.get()).toBe('base');
   });
 
   test('three-level __properties__ inheritance', () => {
-    let a = evolve(sprockets.RoleType, {
-      x: { type: 'boolean', get() { return 'a'; }, set() {} }
-    });
-    let b = evolve(a, {
-      y: { type: 'boolean', get() { return 'b'; }, set() {} }
-    });
-    let c = evolve(b, {});
-    let obj = bind(c);
+    class A extends sprockets.RoleType {
+      static { sprockets.withAria(this, { x: { type: 'boolean', get() { return 'a'; }, set() {} } }); }
+    }
+    class B extends A {
+      static { sprockets.withAria(this, { y: { type: 'boolean', get() { return 'b'; }, set() {} } }); }
+    }
+    class C extends B {}
+    let obj = bind(C);
     expect(obj.ariaGet('x')).toBe('a');
     expect(obj.ariaGet('y')).toBe('b');
   });
@@ -115,18 +112,18 @@ describe('__properties__ inheritance', () => {
 describe('trap getters', () => {
 
   test('direct property get throws', () => {
-    let def = evolve(sprockets.RoleType, {
-      foo: { type: 'boolean', get() { return true; }, set() {} }
-    });
-    let inst = Object.create(def.prototype);
+    class Def extends sprockets.RoleType {
+      static { sprockets.withAria(this, { foo: { type: 'boolean', get() { return true; }, set() {} } }); }
+    }
+    let inst = Object.create(Def.prototype);
     expect(() => inst.foo).toThrow('ARIA property');
   });
 
   test('direct property set throws', () => {
-    let def = evolve(sprockets.RoleType, {
-      foo: { type: 'boolean', get() { return true; }, set() {} }
-    });
-    let inst = Object.create(def.prototype);
+    class Def extends sprockets.RoleType {
+      static { sprockets.withAria(this, { foo: { type: 'boolean', get() { return true; }, set() {} } }); }
+    }
+    let inst = Object.create(Def.prototype);
     expect(() => { inst.foo = false; }).toThrow('ARIA property');
   });
 
@@ -135,33 +132,33 @@ describe('trap getters', () => {
 describe('ariaGet / ariaSet', () => {
 
   test('ariaGet dispatches to descriptor get', () => {
-    let def = evolve(sprockets.RoleType, {
-      foo: { type: 'boolean', get() { return this.aria('hidden'); }, set() {} }
-    });
-    let obj = bind(def);
-    expect(obj.ariaGet('foo')).toBe(false); // hidden defaults to false
+    class Def extends sprockets.RoleType {
+      static { sprockets.withAria(this, { foo: { type: 'boolean', get() { return this.aria('hidden'); }, set() {} } }); }
+    }
+    let obj = bind(Def);
+    expect(obj.ariaGet('foo')).toBe(false);
   });
 
   test('ariaSet dispatches to descriptor set', () => {
     let value;
-    let def = evolve(sprockets.RoleType, {
-      foo: { type: 'boolean', get() { return value; }, set(v) { value = v; } }
-    });
-    let obj = bind(def);
+    class Def extends sprockets.RoleType {
+      static { sprockets.withAria(this, { foo: { type: 'boolean', get() { return value; }, set(v) { value = v; } } }); }
+    }
+    let obj = bind(Def);
     obj.ariaSet('foo', 42);
     expect(value).toBe(42);
     expect(obj.ariaGet('foo')).toBe(42);
   });
 
   test('ariaGet throws for undefined property', () => {
-    let def = evolve(sprockets.RoleType, {});
-    let obj = bind(def);
+    class Def extends sprockets.RoleType {}
+    let obj = bind(Def);
     expect(() => obj.ariaGet('nonexistent')).toThrow('not defined');
   });
 
   test('ariaSet throws for undefined property', () => {
-    let def = evolve(sprockets.RoleType, {});
-    let obj = bind(def);
+    class Def extends sprockets.RoleType {}
+    let obj = bind(Def);
     expect(() => obj.ariaSet('nonexistent', 1)).toThrow('not defined');
   });
 
@@ -170,49 +167,49 @@ describe('ariaGet / ariaSet', () => {
 describe('ariaCan / ariaToggle', () => {
 
   test('ariaCan returns true for boolean property with no can guard', () => {
-    let def = evolve(sprockets.RoleType, {
-      foo: { type: 'boolean', get() { return false; }, set() {} }
-    });
-    let obj = bind(def);
+    class Def extends sprockets.RoleType {
+      static { sprockets.withAria(this, { foo: { type: 'boolean', get() { return false; }, set() {} } }); }
+    }
+    let obj = bind(Def);
     expect(obj.ariaCan('foo')).toBe(true);
   });
 
   test('ariaCan returns false for non-boolean property', () => {
-    let def = evolve(sprockets.RoleType, {
-      foo: { type: 'node', get() { return null; }, set() {} }
-    });
-    let obj = bind(def);
+    class Def extends sprockets.RoleType {
+      static { sprockets.withAria(this, { foo: { type: 'node', get() { return null; }, set() {} } }); }
+    }
+    let obj = bind(Def);
     expect(obj.ariaCan('foo')).toBe(false);
   });
 
   test('ariaCan respects can guard returning false', () => {
-    let def = evolve(sprockets.RoleType, {
-      foo: { type: 'boolean', can() { return false; }, get() { return false; }, set() {} }
-    });
-    let obj = bind(def);
+    class Def extends sprockets.RoleType {
+      static { sprockets.withAria(this, { foo: { type: 'boolean', can() { return false; }, get() { return false; }, set() {} } }); }
+    }
+    let obj = bind(Def);
     expect(obj.ariaCan('foo')).toBe(false);
   });
 
   test('ariaCan respects can guard returning true', () => {
-    let def = evolve(sprockets.RoleType, {
-      foo: { type: 'boolean', can() { return true; }, get() { return false; }, set() {} }
-    });
-    let obj = bind(def);
+    class Def extends sprockets.RoleType {
+      static { sprockets.withAria(this, { foo: { type: 'boolean', can() { return true; }, get() { return false; }, set() {} } }); }
+    }
+    let obj = bind(Def);
     expect(obj.ariaCan('foo')).toBe(true);
   });
 
   test('ariaCan throws for undefined property', () => {
-    let def = evolve(sprockets.RoleType, {});
-    let obj = bind(def);
+    class Def extends sprockets.RoleType {}
+    let obj = bind(Def);
     expect(() => obj.ariaCan('nonexistent')).toThrow('not defined');
   });
 
   test('ariaToggle flips boolean value', () => {
     let value = false;
-    let def = evolve(sprockets.RoleType, {
-      foo: { type: 'boolean', get() { return value; }, set(v) { value = v; } }
-    });
-    let obj = bind(def);
+    class Def extends sprockets.RoleType {
+      static { sprockets.withAria(this, { foo: { type: 'boolean', get() { return value; }, set(v) { value = v; } } }); }
+    }
+    let obj = bind(Def);
     let old = obj.ariaToggle('foo');
     expect(old).toBe(false);
     expect(value).toBe(true);
@@ -220,27 +217,27 @@ describe('ariaCan / ariaToggle', () => {
 
   test('ariaToggle sets explicit value', () => {
     let value = true;
-    let def = evolve(sprockets.RoleType, {
-      foo: { type: 'boolean', get() { return value; }, set(v) { value = v; } }
-    });
-    let obj = bind(def);
+    class Def extends sprockets.RoleType {
+      static { sprockets.withAria(this, { foo: { type: 'boolean', get() { return value; }, set(v) { value = v; } } }); }
+    }
+    let obj = bind(Def);
     obj.ariaToggle('foo', false);
     expect(value).toBe(false);
   });
 
   test('ariaToggle throws when can guard returns false', () => {
-    let def = evolve(sprockets.RoleType, {
-      foo: { type: 'boolean', can() { return false; }, get() { return false; }, set() {} }
-    });
-    let obj = bind(def);
+    class Def extends sprockets.RoleType {
+      static { sprockets.withAria(this, { foo: { type: 'boolean', can() { return false; }, get() { return false; }, set() {} } }); }
+    }
+    let obj = bind(Def);
     expect(() => obj.ariaToggle('foo')).toThrow('can not toggle');
   });
 
   test('ariaToggle throws for non-boolean property', () => {
-    let def = evolve(sprockets.RoleType, {
-      foo: { type: 'node', get() { return null; }, set() {} }
-    });
-    let obj = bind(def);
+    class Def extends sprockets.RoleType {
+      static { sprockets.withAria(this, { foo: { type: 'node', get() { return null; }, set() {} } }); }
+    }
+    let obj = bind(Def);
     expect(() => obj.ariaToggle('foo')).toThrow('can not toggle');
   });
 
@@ -278,14 +275,12 @@ describe('hidden property (from RoleType)', () => {
 describe('consumer patterns: owns', () => {
 
   test('owns getter returns children', () => {
-    let def = evolve(sprockets.RoleType, {
-      owns: {
-        get() { return Array.from(this.element.children); }
-      }
-    });
+    class Def extends sprockets.RoleType {
+      static { sprockets.withAria(this, { owns: { get() { return Array.from(this.element.children); } } }); }
+    }
     let el = document.createElement('div');
     el.innerHTML = '<span>a</span><span>b</span>';
-    let obj = bind(def, el);
+    let obj = bind(Def, el);
     let owned = obj.ariaGet('owns');
     expect(owned).toHaveLength(2);
     expect(owned[0].textContent).toBe('a');
@@ -297,19 +292,17 @@ describe('consumer patterns: activedescendant', () => {
 
   test('activedescendant set toggles hidden on children', () => {
     // Mimics Deck pattern from layoutElements
-    let OwnerDef = evolve(sprockets.RoleType, {
-      owns: {
-        get() { return Array.from(this.element.children); }
-      },
-      activedescendant: {
-        set(item) {
-          let panels = this.ariaGet('owns');
-          for (let child of panels) {
-            child.ariaToggle('hidden', child !== item);
+    class OwnerDef extends sprockets.RoleType {
+      static { sprockets.withAria(this, {
+        owns: { get() { return Array.from(this.element.children); } },
+        activedescendant: {
+          set(item) {
+            let panels = this.ariaGet('owns');
+            for (let child of panels) { child.ariaToggle('hidden', child !== item); }
           }
         }
-      }
-    });
+      }); }
+    }
 
     let container = document.createElement('div');
     let a = document.createElement('div');
@@ -318,7 +311,6 @@ describe('consumer patterns: activedescendant', () => {
     container.appendChild(b);
     document.body.appendChild(container);
 
-    // Bind RoleType on children so ariaToggle works via element.$
     Binding.attachBinding(sprockets.RoleType, a);
     Binding.enableBinding(a);
     Binding.attachBinding(sprockets.RoleType, b);
@@ -330,7 +322,6 @@ describe('consumer patterns: activedescendant', () => {
     expect(a.hasAttribute('hidden')).toBe(false);
     expect(b.hasAttribute('hidden')).toBe(true);
 
-    // Cleanup
     Binding.detachBinding(a);
     Binding.detachBinding(b);
     container.remove();
@@ -341,16 +332,13 @@ describe('consumer patterns: activedescendant', () => {
 describe('consumer patterns: dynamic can guard', () => {
 
   test('can guard receives this context', () => {
-    let def = evolve(sprockets.RoleType, {
-      foo: {
-        type: 'boolean',
-        can() { return this.element.hasAttribute('data-enabled'); },
-        get() { return false; },
-        set() {}
-      }
-    });
+    class Def extends sprockets.RoleType {
+      static { sprockets.withAria(this, {
+        foo: { type: 'boolean', can() { return this.element.hasAttribute('data-enabled'); }, get() { return false; }, set() {} }
+      }); }
+    }
     let el = document.createElement('div');
-    let obj = bind(def, el);
+    let obj = bind(Def, el);
     expect(obj.ariaCan('foo')).toBe(false);
     el.setAttribute('data-enabled', '');
     expect(obj.ariaCan('foo')).toBe(true);
@@ -361,7 +349,8 @@ describe('consumer patterns: dynamic can guard', () => {
 describe('cast', () => {
 
   test('cast returns the bound object for a matching sprocket', () => {
-    let Def = evolve(sprockets.RoleType, { role: 'widget' });
+    class Def extends sprockets.RoleType {}
+    Def.prototype.role = 'widget';
     let el = document.createElement('div');
     let binding = Binding.attachBinding(Def, el);
     let result = sprockets.cast(el, Def);
@@ -369,8 +358,10 @@ describe('cast', () => {
   });
 
   test('cast returns the bound object when cast to a base type', () => {
-    let Base = evolve(sprockets.RoleType, { role: 'base' });
-    let Sub = evolve(Base, { role: 'sub' });
+    class Base extends sprockets.RoleType {}
+    Base.prototype.role = 'base';
+    class Sub extends Base {}
+    Sub.prototype.role = 'sub';
     let el = document.createElement('div');
     let binding = Binding.attachBinding(Sub, el);
     let result = sprockets.cast(el, Base);
@@ -378,21 +369,24 @@ describe('cast', () => {
   });
 
   test('cast throws when element has no binding', () => {
-    let Def = evolve(sprockets.RoleType, {});
+    class Def extends sprockets.RoleType {}
     let el = document.createElement('div');
     expect(() => sprockets.cast(el, Def)).toThrow();
   });
 
   test('cast throws when bound sprocket does not match requested type', () => {
-    let A = evolve(sprockets.RoleType, { role: 'a' });
-    let B = evolve(sprockets.RoleType, { role: 'b' });
+    class A extends sprockets.RoleType {}
+    A.prototype.role = 'a';
+    class B extends sprockets.RoleType {}
+    B.prototype.role = 'b';
     let el = document.createElement('div');
     Binding.attachBinding(A, el);
     expect(() => sprockets.cast(el, B)).toThrow('not compatible');
   });
 
   test('cast with RoleType succeeds for any bound element', () => {
-    let Def = evolve(sprockets.RoleType, { role: 'anything' });
+    class Def extends sprockets.RoleType {}
+    Def.prototype.role = 'anything';
     let el = document.createElement('div');
     let binding = Binding.attachBinding(Def, el);
     let result = sprockets.cast(el, sprockets.RoleType);
@@ -404,7 +398,8 @@ describe('cast', () => {
 describe('element.$', () => {
 
   test('element.$ returns the bound sprocket object', () => {
-    let Def = evolve(sprockets.RoleType, { role: 'widget' });
+    class Def extends sprockets.RoleType {}
+    Def.prototype.role = 'widget';
     let el = document.createElement('div');
     document.body.appendChild(el);
     let binding = Binding.attachBinding(Def, el);
@@ -415,7 +410,6 @@ describe('element.$', () => {
   test('element.$ on unbound element lazily attaches via fallback rule', () => {
     let el = document.createElement('div');
     document.body.appendChild(el);
-    // Universal '*' rule means any element gets a RoleType binding
     let obj = el.$;
     expect(obj).toBeDefined();
     el.remove();
