@@ -50,31 +50,28 @@ _.forOwn(eventTable, (events, tag) => {
 let Tag = _.ucFirst(tag);
 let ClassName = `Configurable${Tag}`;
 
-let Interface = sprockets.evolve(sprockets.RoleType, {});
-_.assign(Interface, {
+let Interface = class extends sprockets.RoleType {
+	static attached(handlers) {
+		let object = this;
+		let element = object.element;
+		if (!element.hasAttribute('config')) return;
+		let configID = _.words(element.getAttribute('config'))[0];
+		let options = configData.get(configID);
+		if (!options) return;
+		_.forEach(events, (type) => {
+			let ontype = `on${type}`;
+			let callback = options[ontype];
+			if (!callback) return;
 
-attached: function(handlers) {
-	let object = this;
-	let element = object.element;
-	if (!element.hasAttribute('config')) return;
-	let configID = _.words(element.getAttribute('config'))[0];
-	let options = configData.get(configID);
-	if (!options) return;
-	_.forEach(events, (type) => {
-		let ontype = `on${type}`;
-		let callback = options[ontype];
-		if (!callback) return;
-
-		let fn = function() { callback.apply(object, arguments); };
-		object[ontype] = fn;
-		handlers.push({
-			type: type,
-			action: fn
+			let fn = function() { callback.apply(object, arguments); };
+			object[ontype] = fn;
+			handlers.push({
+				type: type,
+				action: fn
+			});
 		});
-	});
-}
-
-});
+	}
+};
 
 interfaces[ClassName] = Interface;
 elements[tag] = ClassName;
@@ -82,10 +79,9 @@ elements[tag] = ClassName;
 });
 
 // NOTE handlers are registered for "body@submit,reset,input,change" in HFrameset
-let ConfigurableBody = sprockets.evolve(sprockets.RoleType, {});
-_.assign(ConfigurableBody, {
+let ConfigurableBody = class extends sprockets.RoleType {
 
-attached: function(handlers) {
+static attached(handlers) {
 	let object = this;
 	let element = object.element;
 	if (!element.hasAttribute('config')) return;
@@ -133,7 +129,7 @@ attached: function(handlers) {
 	}
 }
 
-});
+};
 
 elements['body'] = 'ConfigurableBody';
 interfaces['ConfigurableBody'] = ConfigurableBody;

@@ -741,30 +741,29 @@ leftDocument: function() {
 } // end patch
 
 
-let HFrameset = (function() {
+class HFrameset extends HBase {
 
-let HFrameset = sprockets.evolve(HBase, {
+static
+{
+	sprockets.withAria(this,{role: 'frameset', isFrameset: true});
+}
 
-role: 'frameset',
-isFrameset: true,
-
-frameEntered: function(frame) {
+frameEntered(frame) {
 	this.frames.push(frame);
-},
+}
 
-frameLeft: function(frame) {
+frameLeft(frame) {
 	let index = this.frames.indexOf(frame);
 	this.frames.splice(index);
-},
+}
 
-render: function() {
-
+render() {
 	let frameset = this;
 	let definition = frameset.definition;
 	let dstBody = this.element;
 
 	let srcBody = definition.render();
-	
+
 	return Thenfu.pipe(null, [
 
 	function() {
@@ -774,14 +773,9 @@ render: function() {
 	}
 
 	]);
-
 }
 
-});
-
-_.assign(HFrameset, {
-
-attached: function(handlers) {
+static attached(handlers) {
 	HBase.attached.call(this, handlers);
 
 	let frameset = this;
@@ -791,23 +785,20 @@ attached: function(handlers) {
 	});
 
 	ConfigurableBody.attached.call(this, handlers); // FIXME
-}, 
+}
 
-enteredDocument: function() {
+static enteredDocument() {
 	let frameset = this;
 	framer.framesetEntered(frameset); // TODO remove `framer` dependency
 	frameset.render();
-},
+}
 
-leftDocument: function() { // FIXME should never be called??
+static leftDocument() { // FIXME should never be called??
 	let frameset = this;
 	framer.framesetLeft(frameset); // TODO remove `framer` dependency
 }
 
-});
-
-return HFrameset;
-})();
+}
 
 // FIXME Monkey-patch to allow all HyperFrameset sprockets to retarget requestnavigation events
 function retargetFramesetElements() {

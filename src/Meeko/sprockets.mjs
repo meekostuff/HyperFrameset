@@ -68,71 +68,55 @@ let start = function(options) {
 }
 
 /**
- * Private method to create a sprocket-definition with no base definition.
+ * Define ARIA property descriptors on a class (or sprocket constructor).
+ * Each entry is stored in `prototype.__properties__[name]` and a trap
+ * getter/setter is installed to enforce use of `ariaGet`/`ariaSet`/`ariaToggle`/`ariaCan`.
+ * Inherited descriptors are resolved at runtime via prototype chain traversal.
  *
- * @param prototype
- * @returns {constructor} The sprocket-definition.
+ * @param {Function} Class - The class or constructor whose prototype will be extended.
+ * @param {Object<string, Object>} properties - A map of property names to descriptors.
+ * @param {string} [properties.<name>.type] - The property type, e.g. `'boolean'` or `'node'`.
+ * @param {Function} [properties.<name>.get] - Getter called with `this` bound to the instance.
+ * @param {Function} [properties.<name>.set] - Setter called with `this` bound to the instance.
+ * @param {Function} [properties.<name>.can] - Optional guard for toggling.
  */
-let create = function(prototype) {
-	let constructor = function() {};
-	constructor.prototype = prototype;
-	return constructor;
+let withAria = function(Class, properties) {
+	let prototype = Class.prototype;
+	let definition = null;
+	_.forOwn(properties, function(desc, name) {
+		if (typeof desc === 'object') {
+			if (!definition) definition = prototype.__properties__ = {};
+			definition[name] = desc;
+			Object.defineProperty(prototype, name, {
+				get: function() { throw Error('Attempt to get an ARIA property'); },
+				set: function() { throw Error('Attempt to set an ARIA property'); }
+			});
+		} else {
+			prototype[name] = desc;
+		}
+	});
 }
 
 /**
+ * @deprecated Use ES class inheritance + withAria() instead.
  * Create a sprocket-definition which extends a base-definition.
- *
- * @param baseDefn The base-definition.
- * @param ariaProperties The new ariaProperties for the extended sprocket-definition.
- * @returns {constructor} The sprocket-definition.
  */
 let evolve = function(baseDefn, ariaProperties) {
 	let prototype = Object.create(baseDefn.prototype);
-	let sub = create(prototype);
-	if (ariaProperties) extendAriaProperties(sub, ariaProperties);
-	return sub;
-}
-
-/**
- * Define properties on a sprocket prototype. Each entry in `ariaProperties` is handled
- * based on its type:
- *
- * - **object** entries are treated as ARIA property descriptors. The descriptor is stored
- *   on `prototype.__properties__[name]`. A trap getter/setter is installed on the
- *   prototype that throws on direct property access, enforcing use of `ariaGet` / `ariaSet` /
- *   `ariaToggle` / `ariaCan` instead. Inherited descriptors are resolved at runtime via
- *   prototype chain traversal — no copying from base to sub is needed.
- *
- * - **non-object** entries (functions, strings, booleans, etc.) are assigned directly to
- *   the prototype as regular properties or methods.
- *
- * @param {Function} sprocket - The sprocket constructor whose prototype will be extended.
- * @param {Object<string, Object|*>} ariaProperties - A map of property names to definitions.
- * @param {string} [ariaProperties.<name>.type] - The property type, e.g. `'boolean'` or `'node'`.
- *   Used by `ariaCan` and `ariaToggle` to determine if toggling is supported.
- * @param {Function} [ariaProperties.<name>.get] - Getter called with `this` bound to the sprocket instance.
- * @param {Function} [ariaProperties.<name>.set] - Setter called with `this` bound to the sprocket instance.
- * @param {Function} [ariaProperties.<name>.can] - Optional guard returning whether the property
- *   can be toggled. Used by `ariaCan` and `ariaToggle`.
- */
-let extendAriaProperties = function(sprocket, ariaProperties) {
-	let prototype = sprocket.prototype;
-	let definition = null;
-	_.forOwn(ariaProperties, function(desc, name) {
-		switch (typeof desc) {
-			case 'object':
-				if (!definition) definition = prototype.__properties__ = {};
-				definition[name] = desc;
-				Object.defineProperty(prototype, name, {
-					get: function() { throw Error('Attempt to get an ARIA property'); },
-					set: function() { throw Error('Attempt to set an ARIA property'); }
-				});
-				break;
-			default:
+	let sub = function() {};
+	sub.prototype = prototype;
+	if (ariaProperties) {
+		let ariaDescs = {};
+		_.forOwn(ariaProperties, function(desc, name) {
+			if (typeof desc === 'object') {
+				ariaDescs[name] = desc;
+			} else {
 				prototype[name] = desc;
-				break;
-		}
-	});
+			}
+		});
+		if (Object.keys(ariaDescs).length) withAria(sub, ariaDescs);
+	}
+	return sub;
 }
 
 /**
@@ -558,19 +542,13 @@ let sprockets = {
 	registerComposite,
 	register,
 	evolve,
+	withAria,
 	cast,
 	find,
 	findAll,
 	matches,
 	closest
 };
-
-let basePrototype = {};
-sprockets.Base = create(basePrototype); // NOTE now we can extend basePrototype
-
-
-/* Extend BaseSprocket.prototype */
-let Base = sprockets.Base;
 
 /**
  * Walk the prototype chain to find an ARIA property descriptor by name.
@@ -590,41 +568,42 @@ function lookupPropertyDescriptor(obj, name) {
 	throw Error(`Property not defined: ${name}`);
 }
 
-_.assign(Base.prototype, {
+let ariaProperties = { // TODO this lookup is only for default values
+	hidden: false,
+	selected: false,
+	expanded: true
+};
 
-find: function(selector, scope) { return DOM.find(selector, this.element, scope); },
-findAll: function(selector, scope) { return DOM.findAll(selector, this.element, scope); },
-matches: function(selector, scope) { return DOM.matches(this.element, selector, scope); },
-closest: function(selector, scope) { return DOM.closest(this.element, selector, scope); },
+class Base {
 
-contains: function(otherNode) { return DOM.contains(this.element, otherNode); },
+find(selector, scope) { return DOM.find(selector, this.element, scope); }
+findAll(selector, scope) { return DOM.findAll(selector, this.element, scope); }
+matches(selector, scope) { return DOM.matches(this.element, selector, scope); }
+closest(selector, scope) { return DOM.closest(this.element, selector, scope); }
+contains(otherNode) { return DOM.contains(this.element, otherNode); }
 
-attr: function(name, value) {
+attr(name, value) {
 	let element = this.element;
 	if (typeof value === 'undefined') return element.getAttribute(name);
 	if (value == null) element.removeAttribute(name);
 	else element.setAttribute(name, value);
-},
-hasClass: function(token) {
+}
+hasClass(token) {
 	let element = this.element;
 	let text = element.getAttribute('class');
 	if (!text) return false;
 	return _.includes(_.words(text), token);
-},
-addClass: function(token) {
+}
+addClass(token) {
 	let element = this.element;
 	let text = element.getAttribute('class');
-	if (!text) {
-		element.setAttribute('class', token);
-		return;
-	}
+	if (!text) { element.setAttribute('class', token); return; }
 	if (_.includes(_.words(text), token)) return;
-	let n = text.length,
-		space = (n && text.charAt(n-1) !== ' ') ? ' ' : '';
+	let n = text.length, space = (n && text.charAt(n-1) !== ' ') ? ' ' : '';
 	text += space + token;
 	element.setAttribute('class', text);
-},
-removeClass: function(token) {
+}
+removeClass(token) {
 	let element = this.element;
 	let text = element.getAttribute('class');
 	if (!text) return;
@@ -633,74 +612,42 @@ removeClass: function(token) {
 	_.forEach(prev, function(str) { if (str !== token) next.push(str); });
 	if (prev.length === next.length) return;
 	element.setAttribute('class', next.join(' '));
-},
-toggleClass: function(token, force) {
+}
+toggleClass(token, force) {
 	let found = this.hasClass(token);
-	if (found) {
-		if (force) return true;
-		this.removeClass(token);
-		return false;
-	}
-	else {
-		if (force === false) return false;
-		this.addClass(token);
-		return true;
-	}
-},
-css: function(name, value) {
+	if (found) { if (force) return true; this.removeClass(token); return false; }
+	else { if (force === false) return false; this.addClass(token); return true; }
+}
+css(name, value) {
 	let element = this.element;
 	let isKebabCase = (name.indexOf('-') >= 0);
 	if (typeof value === 'undefined') return isKebabCase ? element.style.getPropertyValue(name) : element.style[name];
 	if (value == null || value === '') {
 		if (isKebabCase) element.style.removeProperty(name);
 		else element.style[name] = '';
-	}
-	else {
+	} else {
 		if (isKebabCase) element.style.setProperty(name, value);
 		else element.style[name] = value;
 	}
-},
+}
+trigger(type, params) { return DOM.dispatchEvent(this.element, type, params); }
 
-trigger: function(type, params) {
-	return DOM.dispatchEvent(this.element, type, params);
 }
 
+class ARIA extends Base {
 
-});
+role = 'roletype';
 
-let Element = window.Element || window.HTMLElement;
-
-Object.defineProperty(Element.prototype, '$', {
-	get: function() { return sprockets.cast(this, sprockets.Base); }
-});
-
-
-(function() {
-
-let ariaProperties = { // TODO this lookup is only for default values
-	hidden: false,
-	selected: false,
-	expanded: true
-};
-
-let Base = sprockets.Base;
-
-let ARIA = sprockets.evolve(Base, {
-
-role: 'roletype',
-
-aria: function(name, value) {
+aria(name, value) {
 	let element = this.element;
 	let defn = ariaProperties[name];
 	if (defn == null) throw Error(`No such aria property: ${name}`);
-
 	if (name === 'hidden') {
 		if (typeof value === 'undefined') return element.hasAttribute('hidden');
 		if (!value) element.removeAttribute('hidden');
 		else element.setAttribute('hidden', '');
 		return;
 	}
-	
 	let ariaName = `aria-${name}`;
 	let type = typeof defn;
 	if (typeof value === 'undefined') {
@@ -712,141 +659,81 @@ aria: function(name, value) {
 	}
 	if (value == null) element.removeAttribute(ariaName);
 	else switch(type) {
-		case 'string': default:
-			element.setAttribute(ariaName, value);
-			break;
+		case 'string': default: element.setAttribute(ariaName, value); break;
 		case 'boolean':
 			let bool = value === 'false' ? 'false' : value === false ? 'false' : 'true';
 			element.setAttribute(ariaName, bool);
 			break;
 	}
-},
-
-/**
- * Check whether a named ARIA property can be toggled.
- * @param {string} name - Property name.
- * @returns {boolean} True if the property is boolean and its `can` guard (if any) permits toggling.
- */
-ariaCan: function(name, value) {
+}
+ariaCan(name) {
 	let desc = lookupPropertyDescriptor(this, name);
 	if (desc.type !== 'boolean' || desc.can && !desc.can.call(this)) return false;
 	return true;
-},
-
-/**
- * Toggle a boolean ARIA property. Throws if the property is not boolean or its `can` guard fails.
- * @param {string} name - Property name.
- * @param {boolean} [value] - If provided, sets to this value; otherwise flips the current value.
- * @returns {*} The previous value before toggling.
- */
-ariaToggle: function(name, value) {
+}
+ariaToggle(name, value) {
 	let desc = lookupPropertyDescriptor(this, name);
 	if (desc.type !== 'boolean' || desc.can && !desc.can.call(this)) throw Error(`Property can not toggle: ${name}`);
 	let oldValue = desc.get.call(this);
-	
 	if (typeof value === 'undefined') desc.set.call(this, !oldValue);
 	else desc.set.call(this, !!value);
 	return oldValue;
-},
-
-/**
- * Get the value of a named ARIA property by invoking its descriptor's `get` function.
- * Property descriptors are resolved by walking the prototype chain.
- * @param {string} name - Property name.
- * @returns {*} The property value.
- */
-ariaGet: function(name) {
+}
+ariaGet(name) {
 	let desc = lookupPropertyDescriptor(this, name);
-	return desc.get.call(this); // TODO type and error handling
-},
-
-/**
- * Set the value of a named ARIA property by invoking its descriptor's `set` function.
- * Property descriptors are resolved by walking the prototype chain.
- * @param {string} name - Property name.
- * @param {*} value - The value to set.
- * @returns {*} The return value of the descriptor's `set` function.
- */
-ariaSet: function(name, value) {
+	return desc.get.call(this);
+}
+ariaSet(name, value) {
 	let desc = lookupPropertyDescriptor(this, name);
-	return desc.set.call(this, value); // TODO type and error handling
-},
+	return desc.set.call(this, value);
+}
+ariaFind(role) { return sprockets.find(this.element, role); }
+ariaFindAll(role) { return sprockets.findAll(this.element, role); }
+ariaMatches(role) { return sprockets.matches(this.element, role); }
+ariaClosest(role) { return sprockets.closest(this.element, role); }
 
-ariaFind: function(role) {
-	return sprockets.find(this.element, role);
-},
-
-ariaFindAll: function(role) {
-	return sprockets.findAll(this.element, role);
-},
-
-ariaMatches: function(role) {
-	return sprockets.matches(this.element, role);
-},
-
-ariaClosest: function(role) {
-	return sprockets.closest(this.element, role);
 }
 
-});
-
-let RoleType = sprockets.evolve(ARIA, {
-
-hidden: {
-	type: 'boolean',
-	can: function() { return true; },
-	get: function() { return this.aria('hidden'); },
-	set: function(value) { this.aria('hidden', !!value); }
+class RoleType extends ARIA {
+	static {
+		withAria(this, {
+		hidden: {
+			type: 'boolean',
+			can: function() { return true; },
+			get: function() { return this.aria('hidden'); },
+			set: function(value) { this.aria('hidden', !!value); }
+		}
+		});
+	}
 }
 
-});
-
+sprockets.Base = Base;
 sprockets.ARIA = ARIA;
 sprockets.RoleType = RoleType;
 sprockets.register('*', RoleType);
 
 let Element = window.Element || window.HTMLElement;
 
-_.defaults(Element.prototype, { // NOTE this assumes that the declared sprocket for every element is derived from ARIA
-
-aria: function(prop, value) {
-	return this.$.aria(prop, value);
-},
-
-ariaCan: function(prop) {
-	return this.$.ariaCan(prop);
-},
-
-ariaToggle: function(prop, value) {
-	return this.$.ariaToggle(prop, value);
-},
-
-ariaGet: function(prop) {
-	return this.$.ariaGet(prop);
-},
-
-ariaSet: function(prop, value) {
-	return this.$.ariaSet(prop, value);
-},
-
-ariaFind: function(role) {
-	return this.$.ariaFind(role);
-},
-
-ariaFindAll: function(role) {
-	return this.$.ariaFindAll(role);
-},
-
-ariaMatches: function(role) {
-	return this.$.ariaMatches(role);
-},
-
-ariaClosest: function(role) {
-	return this.$.ariaClosest(role);
-}
+Object.defineProperty(Element.prototype, '$', {
+	get: function() { return sprockets.cast(this, sprockets.Base); }
 });
 
 
-})();
+/* Extend BaseSprocket.prototype */
+
+
+_.defaults(Element.prototype, { // NOTE this assumes that the declared sprocket for every element is derived from ARIA
+
+aria: function(prop, value) { return this.$.aria(prop, value); },
+ariaCan: function(prop) { return this.$.ariaCan(prop); },
+ariaToggle: function(prop, value) { return this.$.ariaToggle(prop, value); },
+ariaGet: function(prop) { return this.$.ariaGet(prop); },
+ariaSet: function(prop, value) { return this.$.ariaSet(prop, value); },
+ariaFind: function(role) { return this.$.ariaFind(role); },
+ariaFindAll: function(role) { return this.$.ariaFindAll(role); },
+ariaMatches: function(role) { return this.$.ariaMatches(role); },
+ariaClosest: function(role) { return this.$.ariaClosest(role); }
+
+});
 
 export default sprockets;

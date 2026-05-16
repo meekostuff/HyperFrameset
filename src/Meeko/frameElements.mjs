@@ -31,15 +31,11 @@ let frameDefinitions = new Registry({
 	}
 });
 
-let HFrame = (function() {
+class HFrame extends Panel {
 
-let HFrame = sprockets.evolve(Panel, {
+static { sprockets.withAria(this, { role: 'frame', isFrame: true }); }
 
-role: 'frame',
-
-isFrame: true,
-
-preload: function(request) {
+preload(request) {
 	let frame = this;
 	return Thenfu.pipe(request, [
 		
@@ -50,9 +46,9 @@ preload: function(request) {
 	}
 	
 	]);
-},
+}
 
-load: function(response) { // FIXME need a teardown method that releases child-frames	
+load(response) { // FIXME need a teardown method that releases child-frames // FIXME need a teardown method that releases child-frames	
 	let frame = this;
 	if (response) frame.src = response.url;
 	// else a no-src frame
@@ -69,9 +65,9 @@ load: function(response) { // FIXME need a teardown method that releases child-f
 	}
 
 	]);
-},
+}
 
-insert: function(bodyElement, replace) { // FIXME need a teardown method that releases child-frames	
+insert(bodyElement, replace) { // FIXME need a teardown method that releases child-frames // FIXME need a teardown method that releases child-frames	
 	let frame = this;
 	let element = frame.element;
 	
@@ -99,9 +95,9 @@ insert: function(bodyElement, replace) { // FIXME need a teardown method that re
 		try { options.bodyEntered(frame, frame.bodyElement); } 
 		catch (err) { window.reportError(err); }
 	}
-},
+}
 
-refresh: function() {
+refresh() {
 	let frame = this;
 	let element = this.element;
 	let src = frame.attr('src');
@@ -140,7 +136,7 @@ refresh: function() {
 	});
 }
 
-});
+}
 
 _.assign(HFrame, {
 
@@ -203,8 +199,6 @@ function observeAttributes(element, callback, attrList) {
 	return observer;
 }
 
-return HFrame;	
-})();
 
 function registerFrameElements(ns) {
 
