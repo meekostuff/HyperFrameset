@@ -2,11 +2,11 @@ import * as _ from "./stuff.mjs";
 
 class BindingDefinition {
     constructor(desc) {
-        _.assign(this, desc);
-        if (!this.prototype) {
-            if (desc.prototype) this.prototype = desc.prototype;
-            else this.prototype = null;
+        for (let name of Object.getOwnPropertyNames(desc)) {
+            if (name === 'prototype' || name === 'length' || name === 'name') continue;
+            this[name] = desc[name];
         }
+        if (!this.prototype) this.prototype = desc.prototype || null;
         if (!this.handlers) this.handlers = [];
     }
 }
