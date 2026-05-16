@@ -97,27 +97,7 @@ let withAria = function(Class, properties) {
 	});
 }
 
-/**
- * @deprecated Use ES class inheritance + withAria() instead.
- * Create a sprocket-definition which extends a base-definition.
- */
-let evolve = function(baseDefn, ariaProperties) {
-	let prototype = Object.create(baseDefn.prototype);
-	let sub = function() {};
-	sub.prototype = prototype;
-	if (ariaProperties) {
-		let ariaDescs = {};
-		_.forOwn(ariaProperties, function(desc, name) {
-			if (typeof desc === 'object') {
-				ariaDescs[name] = desc;
-			} else {
-				prototype[name] = desc;
-			}
-		});
-		if (Object.keys(ariaDescs).length) withAria(sub, ariaDescs);
-	}
-	return sub;
-}
+
 
 /**
  * Register a sprocket definition for elements which have the specified tag-name.
@@ -541,7 +521,6 @@ let sprockets = {
 	registerComponent,
 	registerComposite,
 	register,
-	evolve,
 	withAria,
 	cast,
 	find,
