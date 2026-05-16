@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { framer } from '../src/Meeko/framer.mjs';
+import framer from '../src/Meeko/framer.mjs';
 
 describe('framer.mjs', () => {
 

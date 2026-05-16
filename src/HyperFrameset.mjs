@@ -29,7 +29,8 @@ import * as formElements from './Meeko/formElements.mjs';
 import * as layoutElements from './Meeko/layoutElements.mjs';
 import frameElements, { frameDefinitions, HFrame } from './Meeko/frameElements.mjs';
 import * as framesetDefinitions from './Meeko/framesetDefinitions.mjs';
-import framer, { HFrameset } from './Meeko/framer.mjs';
+import framer from './Meeko/framer.mjs';
+import HFrameset from './Meeko/HFrameset.mjs';
 
 (function() {
 

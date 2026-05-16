@@ -22,6 +22,7 @@ import layoutElements, { HBase } from './layoutElements.mjs';
 import frameElements, { frameDefinitions, HFrame } from './frameElements.mjs';
 import { HFramesetDefinition } from './framesetDefinitions.mjs';
 import { HYPERFRAMESET_URN } from './CustomNamespace.mjs';
+import HFrameset from './HFrameset.mjs';
 
 // FIXME DRY these @rel values with boot.js
 const FRAMESET_REL = 'frameset'; // NOTE http://lists.w3.org/Archives/Public/www-html/1996Dec/0143.html
@@ -741,41 +742,8 @@ leftDocument: function() {
 } // end patch
 
 
-class HFrameset extends HBase {
-
-static
-{
-	sprockets.withAria(this,{role: 'frameset', isFrameset: true});
-}
-
-frameEntered(frame) {
-	this.frames.push(frame);
-}
-
-frameLeft(frame) {
-	let index = this.frames.indexOf(frame);
-	this.frames.splice(index);
-}
-
-render() {
-	let frameset = this;
-	let definition = frameset.definition;
-	let dstBody = this.element;
-
-	let srcBody = definition.render();
-
-	return Thenfu.pipe(null, [
-
-	function() {
-		_.forEach(Array.from(srcBody.childNodes), function(node) {
-			sprockets.insertNode('beforeend', dstBody, node);
-		});
-	}
-
-	]);
-}
-
-static attached(handlers) {
+// FIXME Monkey-patch HFrameset lifecycle to integrate with framer
+HFrameset.attached = function(handlers) {
 	HBase.attached.call(this, handlers);
 
 	let frameset = this;
@@ -785,20 +753,18 @@ static attached(handlers) {
 	});
 
 	ConfigurableBody.attached.call(this, handlers); // FIXME
-}
+};
 
-static enteredDocument() {
+HFrameset.enteredDocument = function() {
 	let frameset = this;
 	framer.framesetEntered(frameset); // TODO remove `framer` dependency
 	frameset.render();
-}
+};
 
-static leftDocument() { // FIXME should never be called??
+HFrameset.leftDocument = function() { // FIXME should never be called??
 	let frameset = this;
 	framer.framesetLeft(frameset); // TODO remove `framer` dependency
-}
-
-}
+};
 
 // FIXME Monkey-patch to allow all HyperFrameset sprockets to retarget requestnavigation events
 function retargetFramesetElements() {
@@ -852,7 +818,3 @@ function registerFramesetElement() {
 
 
 export default framer;
-export {
-	framer,
-	HFrameset
-}
