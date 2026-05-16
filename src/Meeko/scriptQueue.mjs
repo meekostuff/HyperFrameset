@@ -28,18 +28,17 @@ let document = window.document;
 	
  FIXME scriptQueue.push should also accept functions
 */
-let queue = [],
-	emptying = false;
 
-let testScript = document.createElement('script'),
-	supportsSync = (testScript.async === true);
+class ScriptQueue {
 
-let scriptQueue = {
+#queue = [];
+#emptying = false;
 
-push: function(node) {
+push(node) {
+	let queue = this.#queue;
 	return new Promise((resolve, reject) => {
-		if (emptying) throw Error('Attempt to append script to scriptQueue while emptying');
-	
+		if (this.#emptying) throw Error('Attempt to append script to scriptQueue while emptying');
+
 	// TODO assert node is in document
 
 	// TODO this filtering may need reworking now we don't support older browsers
@@ -58,8 +57,8 @@ push: function(node) {
 	let script = document.createElement('script');
 
 	if (node.src) addListeners(); // WARN must use `node.src` because attrs not copied to `script` yet
-	
-	DOM.copyAttributes(script, node); 
+
+	DOM.copyAttributes(script, node);
 	script.text = node.text;
 
 	if (script.getAttribute('defer')) { // @defer is not appropriate. Implement as @async
@@ -67,21 +66,21 @@ push: function(node) {
 		script.setAttribute('async', '');
 		console.warn('@defer not supported on scripts');
 	}
-	if (supportsSync && script.src && !script.hasAttribute('async')) script.async = false;
+	if (script.src && !script.hasAttribute('async')) script.async = false;
 	script.type = 'text/javascript';
-	
+
 	// enabledFu resolves after script is inserted
 	let enabledFu = Promise.withResolvers();
-	
+
 	let prev = queue[queue.length - 1], prevScript = prev && prev.script;
 
 	let trigger; // trigger allows this script to be enabled, i.e. inserted
 	if (prev) {
-		if (prevScript.hasAttribute('async') || script.src && supportsSync && !script.hasAttribute('async')) trigger = prev.enabled;
+		if (prevScript.hasAttribute('async') || script.src && !script.hasAttribute('async')) trigger = prev.enabled;
 		else trigger = prev.complete;
 	}
 	else trigger = Thenfu.asap();
-	
+
 	trigger.then(enable, enable);
 
 	let completeFu = Promise.withResolvers();
@@ -94,13 +93,13 @@ push: function(node) {
 	// The following are hoisted
 	function enable() {
 		DOM.insertNode('replace', node, script);
-		enabledFu.resolve(); 
+		enabledFu.resolve();
 		if (!script.src) {
 			spliceItem(queue, current);
 			completeFu.resolve();
 		}
 	}
-	
+
 	function onLoad(e) {
 		removeListeners();
 		spliceItem(queue, current);
@@ -117,12 +116,12 @@ push: function(node) {
 		script.addEventListener('load', onLoad, false);
 		script.addEventListener('error', onError, false);
 	}
-	
+
 	function removeListeners() {
 		script.removeEventListener('load', onLoad, false);
 		script.removeEventListener('error', onError, false);
 	}
-	
+
 	function spliceItem(a, item) {
 		for (let n=a.length, i=0; i<n; i++) {
 			if (a[i] !== item) continue;
@@ -132,21 +131,22 @@ push: function(node) {
 	}
 
 });
-},
+}
 
-empty: function() {
+empty() {
+	let queue = this.#queue;
 	return new Promise((resolve, reject) => {
-	
-	emptying = true;
+
+	this.#emptying = true;
 	if (queue.length <= 0) {
-		emptying = false;
+		this.#emptying = false;
 		resolve();
 		return;
 	}
 	_.forEach(queue, (value, i) => {
 		let acceptCallback = () => {
 			if (queue.length <= 0) {
-				emptying = false;
+				this.#emptying = false;
 				resolve();
 			}
 		}
@@ -156,7 +156,6 @@ empty: function() {
 });
 }
 
-} // end scriptQueue
+} // end ScriptQueue
 
-export default scriptQueue;
-
+export default new ScriptQueue();
