@@ -217,3 +217,36 @@ describe('Binding', () => {
   });
 
 });
+
+describe('BindingDefinition picks up class static methods', () => {
+
+  test('static attached is called on bind', () => {
+    let called = false;
+    class Def {
+      static attached() { called = true; }
+    }
+
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+    Binding.attachBinding(Def, el);
+    expect(called).toBe(true);
+    Binding.detachBinding(el);
+    el.remove();
+  });
+
+  test('static enteredDocument is called on enable', () => {
+    let called = false;
+    class Def {
+      static enteredDocument() { called = true; }
+    }
+
+    const el = document.createElement('div');
+    document.body.appendChild(el);
+    Binding.attachBinding(Def, el);
+    Binding.enableBinding(el);
+    expect(called).toBe(true);
+    Binding.detachBinding(el);
+    el.remove();
+  });
+
+});
