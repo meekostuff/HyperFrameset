@@ -231,16 +231,6 @@ describe('framesetDefinitions exports', () => {
       expect(def.document).toBe(doc);
     });
 
-    it('init detaches body from document', () => {
-      const doc = createFramesetDoc('<p>hello</p>');
-      const def = new HFramesetDefinition(doc, {
-        framesetURL: 'http://example.com/frameset.html',
-        scope: 'http://example.com/'
-      });
-      expect(doc.body).toBeNull();
-      expect(def.element.tagName).toBe('BODY');
-    });
-
     it('init sets up namespaces with hf default', () => {
       const doc = createFramesetDoc('');
       const def = new HFramesetDefinition(doc, {

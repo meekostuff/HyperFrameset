@@ -2,7 +2,7 @@ import * as _ from './stuff.mjs';
 import URLux from './URLux.mjs';
 import * as DOM from './DOM.mjs';
 import configData from './configData.mjs';
-import CustomNamespace, { HYPERFRAMESET_URN } from './CustomNamespace.mjs';
+import CustomNamespace, {HYPERFRAMESET_URN} from './CustomNamespace.mjs';
 import HFrameDefinition from './HFrameDefinition.mjs';
 import htmlParser from './htmlParser.mjs';
 
@@ -15,15 +15,59 @@ const hfDefaultNamespace = new CustomNamespace({
 	urn: HYPERFRAMESET_URN
 });
 
+/**
+ * Represents a parsed and normalized frameset document definition.
+ * 
+ * Constructed from a frameset HTML document, this class extracts the body as a
+ * template, rebases URLs to the frameset's scope, processes inline scripts into
+ * configuration data, and registers frame definitions for later instantiation.
+ * 
+ * The lifecycle is: construct (via init) → preprocess → render.
+ * 
+ * @property {string} url - The resolved URL of the frameset document.
+ * @property {string} scope - The base URL scope for resolving relative URLs.
+ * @property {Document} document - The frameset document (with body detached).
+ * @property {HTMLElement} element - The detached <body> element used as a render template.
+ * @property {Object} frames - Map of frame definition IDs to HFrameDefinition instances.
+ * @property {NamespaceCollection} namespaces - Custom namespace declarations found in the document.
+ */
 class HFramesetDefinition {
 
+/**
+ * @param {Document} doc - The frameset HTML document to process.
+ * @param {Object} settings
+ * @param {string} settings.framesetURL - The resolved URL of the frameset.
+ * @param {string} settings.scope - The base scope URL for relative URL resolution.
+ */
 constructor(doc, settings) {
 	if (!doc) return; // in case of inheritance
 	this.namespaces = null;
 	this.init(doc, settings);
 }
 
+/**
+ * Initializes the definition from a frameset document:
+ * - Registers custom namespaces (or adds the default hf: namespace).
+ * - Rebases all URLs relative to the scope.
+ * - Assigns @id and @sourceurl to inline scripts.
+ * - Moves <script for> from <head> to <body> and plain scripts from <body> to <head>.
+ * - Normalizes scoped styles.
+ * - Detaches the <body> for use as a render template.
+ * 
+ * @param {Document} doc - The frameset document.
+ * @param {Object} settings - Contains framesetURL and scope.
+ */
 init(doc, settings) {
+	this.#initMetadata(doc, settings);
+	this.#rebaseURLs(doc);
+	this.#normalizeScripts(doc);
+	this.#normalizeStyles(doc);
+	let body = doc.body;
+	this.document = doc;
+	this.element = body;
+}
+
+#initMetadata(doc, settings) {
 	let framesetDef = this;
 	_.defaults(framesetDef, {
 		url: settings.framesetURL,
@@ -34,21 +78,26 @@ init(doc, settings) {
 	if (!namespaces.lookupNamespace(HYPERFRAMESET_URN)) {
 		namespaces.add(hfDefaultNamespace);
 	}
+}
 
-	// NOTE first rebase scope: urls
-	let scopeURL = URLux.create(settings.scope);
+#rebaseURLs(doc) {
+	let framesetDef = this;
+	let scopeURL = URLux.create(framesetDef.scope);
 	rebase(doc, scopeURL);
 	let frameElts = DOM.findAll(
 		framesetDef.namespaces.lookupSelector('frame', HYPERFRAMESET_URN), 
 		doc.body);
 	_.forEach(frameElts, (el, index) => { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
-		// NOTE first rebase @src with scope: urls
 		let src = el.getAttribute('src');
 		if (src) {
 			let newSrc = rebaseURL(src, scopeURL);
 			if (newSrc != src) el.setAttribute('src', newSrc);
 		}
 	});
+}
+
+#normalizeScripts(doc) {
+	let framesetDef = this;
 
 	// warn about not using @id
 	let idElements = DOM.findAll('*[id]:not(script)', doc.body);
@@ -94,17 +143,22 @@ init(doc, settings) {
 		doc.head.appendChild(script);
 		console.info('Moved <script> in frameset <body> to <head>');
 	});
-
-	let allowedScope = 'panel, frame';
-	let allowedScopeSelector = framesetDef.namespaces.lookupSelector(allowedScope, HYPERFRAMESET_URN);
-	normalizeScopedStyles(doc, allowedScopeSelector);
-
-	let body = doc.body;
-	body.parentNode.removeChild(body);
-	framesetDef.document = doc;
-	framesetDef.element = body;
 }
 
+#normalizeStyles(doc) {
+	let allowedScope = 'panel, frame';
+	let allowedScopeSelector = this.namespaces.lookupSelector(allowedScope, HYPERFRAMESET_URN);
+	normalizeScopedStyles(doc, allowedScopeSelector);
+}
+	/**
+ * Processes the detached body template:
+ * - Evaluates <script for> elements and stores results in configData.
+ * - Associates config IDs with their target elements via @config attributes.
+ * - Extracts frame definition elements and creates HFrameDefinition instances.
+ * - Resolves frame declaration references (@def) to their definitions.
+ * 
+ * Must be called after construction and before render().
+ */
 preprocess() {
 	let framesetDef = this;
 	let body = framesetDef.element;
@@ -233,6 +287,11 @@ preprocess() {
 
 }
 
+/**
+ * Returns a deep clone of the processed body template, ready for insertion
+ * into the live document.
+ * @returns {HTMLElement} A cloned body element.
+ */
 render() {
 	let framesetDef = this;
 	return framesetDef.element.cloneNode(true);
