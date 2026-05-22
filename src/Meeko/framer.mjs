@@ -1,6 +1,6 @@
 /*!
  * HyperFrameset framer
- * Copyright 2009-2016 Sean Hogan (http://meekostuff.net/)
+ * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
  * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
  */
 
@@ -43,6 +43,12 @@ config(options) {
 	_.assign(this.options, options);
 }
 
+/**
+ * Content-first entry point. Use when the landing page is a content document
+ * that references an external frameset. The content is captured, the frameset
+ * is fetched and applied to the live document, then the captured content is
+ * loaded into the appropriate frame.
+ */
 start(startOptions) {
 	let framer = this;
 	if (framer.started) throw Error('Already started');
@@ -50,54 +56,63 @@ start(startOptions) {
 
 	framer.started = true;
 	Thenfu.asap(startOptions.contentDocument)
-	.then(function(doc) { // FIXME potential race condition between document finished loading and frameset rendering
+	.then((doc) => { // FIXME potential race condition between document finished loading and frameset rendering
 		return httpProxy.add({ url: document.URL, type: 'document', document: doc });
 	});
 
 	return Thenfu.pipe(null, [
 
-	function() { // sanity check
-		return Thenfu.wait(function() { return !!document.body; });
+	() => { // sanity check
+		return Thenfu.wait(() => !!document.body);
 	},
 
-	function() { // lookup or detect frameset.URL
+	() => { // lookup or detect frameset.URL
 		let framerConfig;
 		framerConfig = framer.lookup(document.URL);
 		if (framerConfig) return framerConfig;
 		return startOptions.contentDocument
-			.then(function(doc) { return framer.detect(doc); });
+			.then((doc) => framer.detect(doc));
 	},
 
-	function(framerConfig) { // initiate fetch of frameset.URL
+	(framerConfig) => { // initiate fetch of frameset.URL
 		if (!framerConfig) throw Error('No frameset could be determined for this page');
 		framer.scope = framerConfig.scope; // FIXME shouldn't set this until loadFramesetDefinition() returns success
 		let framesetURL = URLux.create(framerConfig.framesetURL);
 		if (framesetURL.hash) console.info(`Ignoring hash component of frameset URL: ${framesetURL.hash}`);
 		framer.framesetURL = framerConfig.framesetURL = framesetURL.nohash;
 		return httpProxy.load(framer.framesetURL, { responseType: 'document' })
-		.then(function(response) {
-			return new HFramesetDefinition(response.document, framerConfig);
-		});
+		.then((response) => new HFramesetDefinition(response.document, framerConfig));
 	},
 
-	function(definition) {
+	/** @param {HFramesetDefinition} definition */
+	(definition) => {
 		return Thenfu.pipe(definition, [
-		function() {
+		() => {
 			framer.definition = definition;
 			return Framer.#prepareFrameset(document, definition);
 		},
-		function() { return definition.preprocess(); },
-		function() { return Framer.#prerenderFrameset(document, definition); }
+		() => definition.preprocess(),
+		() => Framer.#prerenderFrameset(document, definition)
 		]);
 	},
 
-	function() {
-		window.addEventListener('click', function(e) {
+	() => framer.#activate()
+
+	]);
+}
+
+/** Shared post-boot pipeline: registers events, frames, sprockets, and starts history. */
+#activate() {
+	let framer = this;
+	return Thenfu.pipe(null, [
+
+	() => {
+		window.addEventListener('click', (e) => {
 			if (e.defaultPrevented) return;
 			let acceptDefault = framer.onClick(e);
 			if (acceptDefault === false) e.preventDefault();
 		}, false); // onClick generates requestnavigation event
-		window.addEventListener('submit', function(e) {
+		window.addEventListener('submit', (e) => {
 			if (e.defaultPrevented) return;
 			let acceptDefault = framer.onSubmit(e);
 			if (acceptDefault === false) e.preventDefault();
@@ -115,26 +130,24 @@ start(startOptions) {
 		return sprockets.start({ manual: true }); // FIXME should be a promise
 	},
 
-	function() { // TODO ideally frameset rendering wouldn't start until after this step
+	() => { // TODO ideally frameset rendering wouldn't start until after this step
 		return framer.framesetReady.promise
-		.then(function() {
+		.then(() => {
 			let changeset = framer.currentChangeset;
 			// FIXME what if no changeset is returned
 			return historyManager.start(changeset, '', document.URL,
-				function(state) { }, // FIXME need some sort of rendering status
-				function(state) { return framer.onPopState(state.getData()); }
+				(state) => { }, // FIXME need some sort of rendering status
+				(state) => framer.onPopState(state.getData())
 			);
 		});
 	},
 
-	function() { // FIXME this should wait until at least the landing document has been rendered in one frame
+	() => { // FIXME this should wait until at least the landing document has been rendered in one frame
 		Framer.#notify({ module: 'frameset', type: 'enteredState', stage: 'after', url: document.URL });
 	},
 
 	// TODO it would be nice if <body> wasn't populated until stylesheets were loaded
-	function() {
-		return Thenfu.wait(function() { return DOM.checkStyleSheets(); });
-	}
+	() => Thenfu.wait(() => DOM.checkStyleSheets())
 
 	]);
 }
@@ -219,7 +232,7 @@ onSubmit(e) { // return false means success
 }
 
 triggerRequestNavigation(url, details) {
-	Thenfu.defer(function() {
+	Thenfu.defer(() => {
 		let event = document.createEvent('CustomEvent');
 		event.initCustomEvent('requestnavigation', true, true, details.url);
 		let acceptDefault = details.element.dispatchEvent(event);
@@ -277,7 +290,7 @@ load(url, changeset, changeState) { // FIXME doesn't support replaceState
 	let mustNotify = changeState || changeState === 0;
 	let target = changeset.target;
 	let frames = [];
-	recurseFrames(frameset, function(frame) {
+	recurseFrames(frameset, (frame) => {
 		if (frame.targetname !== target) return;
 		frames.push(frame);
 		return true;
@@ -290,19 +303,19 @@ load(url, changeset, changeState) { // FIXME doesn't support replaceState
 	let response;
 
 	return Thenfu.pipe(null, [
-	function() {
+	() => {
 		if (mustNotify) return Framer.#notify({ module: 'frameset', type: 'leftState', stage: 'before', url: document.URL });
 	},
-	function() { _.forEach(frames, function(frame) { frame.attr('src', fullURL); }); },
-	function() { return httpProxy.load(nohash, request).then(function(resp) { response = resp; }); },
-	function() { if (changeState) return historyManager.pushState(changeset, '', url, function(state) {}); },
-	function() {
+	() => { _.forEach(frames, (frame) => { frame.attr('src', fullURL); }); },
+	() => httpProxy.load(nohash, request).then((resp) => { response = resp; }),
+	() => { if (changeState) return historyManager.pushState(changeset, '', url, (state) => {}); },
+	() => {
 		if (mustNotify) return Framer.#notify({ module: 'frameset', type: 'enteredState', stage: 'after', url: url });
 	}
 	]);
 
 	function recurseFrames(parentFrame, fn) {
-		_.forEach(parentFrame.frames, function(frame) {
+		_.forEach(parentFrame.frames, (frame) => {
 			let found = fn(frame);
 			if (!found) recurseFrames(frame, fn);
 		});
@@ -349,7 +362,7 @@ inferChangeset(url, partial) {
 
 static #encode(form) {
 	let data = [];
-	_.forEach(form.elements, function(el) {
+	_.forEach(form.elements, (el) => {
 		if (!el.name) return;
 		data.push(el.name + '=' + encodeURIComponent(el.value));
 	});
@@ -363,16 +376,16 @@ static #prepareFrameset(dstDoc, definition) {
 	let selfMarker;
 
 	return Thenfu.pipe(null, [
-	function() {
+	() => {
 		let dstHead = dstDoc.head;
-		_.forEach(DOM.findAll('link[rel|=stylesheet]', dstHead), function(node) { dstHead.removeChild(node); });
+		_.forEach(DOM.findAll('link[rel|=stylesheet]', dstHead), (node) => { dstHead.removeChild(node); });
 	},
-	function() {
+	() => {
 		let dstBody = dstDoc.body;
 		let node;
 		while (node = dstBody.firstChild) dstBody.removeChild(node);
 	},
-	function() {
+	() => {
 		selfMarker = Framer.#getSelfMarker(dstDoc);
 		if (selfMarker) return;
 		selfMarker = dstDoc.createElement('link');
@@ -380,17 +393,17 @@ static #prepareFrameset(dstDoc, definition) {
 		selfMarker.href = dstDoc.URL;
 		dstDoc.head.insertBefore(selfMarker, dstDoc.head.firstChild);
 	},
-	function() {
+	() => {
 		let framesetMarker = dstDoc.createElement('link');
 		framesetMarker.rel = FRAMESET_REL;
 		framesetMarker.href = definition.src;
 		dstDoc.head.insertBefore(framesetMarker, selfMarker);
 	},
-	function() {
+	() => {
 		Framer.#mergeElement(dstDoc.documentElement, srcDoc.documentElement);
 		Framer.#mergeElement(dstDoc.head, srcDoc.head);
 		Framer.#mergeHead(dstDoc, srcDoc.head, true);
-		_.forEach(DOM.findAll('script', dstDoc.head), function(script) { scriptQueue.push(script); });
+		_.forEach(DOM.findAll('script', dstDoc.head), (script) => { scriptQueue.push(script); });
 		return scriptQueue.empty();
 	}
 	]);
@@ -398,7 +411,7 @@ static #prepareFrameset(dstDoc, definition) {
 
 static #prerenderFrameset(dstDoc, definition) {
 	let srcBody = definition.element;
-	let dstBody = document.body;
+	let dstBody = dstDoc.body;
 	Framer.#mergeElement(dstBody, srcBody);
 }
 
@@ -424,7 +437,7 @@ static #mergeHead(dstDoc, srcHead, isFrameset) {
 
 	Framer.#separateHead(dstDoc, isFrameset);
 
-	_.forEach(Array.from(srcHead.childNodes), function(srcNode) {
+	_.forEach(Array.from(srcHead.childNodes), (srcNode) => {
 		if (srcNode.nodeType != 1) return;
 		switch (DOM.getTagName(srcNode)) {
 		default: break;
@@ -449,6 +462,7 @@ static #mergeHead(dstDoc, srcHead, isFrameset) {
 }
 
 static #mergeElement(dst, src) {
+	if (dst === src) return;
 	DOM.removeAttributes(dst);
 	DOM.copyAttributes(dst, src);
 	dst.removeAttribute('style'); // FIXME is this appropriate?
@@ -512,15 +526,15 @@ static #notify(msg) {
 	default: throw Error(msg.module + ' is invalid module');
 	}
 	if (typeof listener == 'function') {
-		let promise = Thenfu.defer(function() { listener(msg); });
-		promise['catch'](function(err) { throw Error(err); });
+		let promise = Thenfu.defer(() => { listener(msg); });
+		promise['catch']((err) => { throw Error(err); });
 		return promise;
 	}
 	return Thenfu.asap();
 }
 
 static #registerFrames(framesetDef) {
-	_.forOwn(framesetDef.frames, function(o, key) { frameDefinitions.set(key, o); });
+	_.forOwn(framesetDef.frames, (o, key) => { frameDefinitions.set(key, o); });
 }
 
 static #registerFramesetElement() {
@@ -534,6 +548,24 @@ static #registerFramesetElement() {
 } // end class Framer
 
 let framer = new Framer();
+
+// FIXME Monkey-patch HFrameset lifecycle to integrate with framer
+HFrameset.attached = function(handlers) {
+	HBase.attached.call(this, handlers);
+	let frameset = this;
+	frameset.definition = framer.definition; // TODO remove `framer` dependency
+	_.defaults(frameset, { frames: [] });
+	ConfigurableBody.attached.call(this, handlers); // FIXME
+};
+HFrameset.enteredDocument = function() {
+	let frameset = this;
+	framer.framesetEntered(frameset); // TODO remove `framer` dependency
+	frameset.render();
+};
+HFrameset.leftDocument = function() { // FIXME should never be called??
+	let frameset = this;
+	framer.framesetLeft(frameset); // TODO remove `framer` dependency
+};
 
 // FIXME Monkey-patch to allow creation of tree of frames
 function interceptFrameElements() {
@@ -554,24 +586,6 @@ leftDocument: function() { framer.frameLeft(this); HFrame._leftDocument.call(thi
 });
 
 } // end patch
-
-// FIXME Monkey-patch HFrameset lifecycle to integrate with framer
-HFrameset.attached = function(handlers) {
-	HBase.attached.call(this, handlers);
-	let frameset = this;
-	frameset.definition = framer.definition; // TODO remove `framer` dependency
-	_.defaults(frameset, { frames: [] });
-	ConfigurableBody.attached.call(this, handlers); // FIXME
-};
-HFrameset.enteredDocument = function() {
-	let frameset = this;
-	framer.framesetEntered(frameset); // TODO remove `framer` dependency
-	frameset.render();
-};
-HFrameset.leftDocument = function() { // FIXME should never be called??
-	let frameset = this;
-	framer.framesetLeft(frameset); // TODO remove `framer` dependency
-};
 
 // FIXME Monkey-patch to allow all HyperFrameset sprockets to retarget requestnavigation events
 function retargetFramesetElements() {
