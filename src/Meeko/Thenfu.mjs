@@ -82,14 +82,7 @@ return wait;
  */
 function asap(value) {
 	let resolver = Promise.withResolvers();
-	if (Task.getTime(true) > 0) {
-		// Frame time available - execute immediately
-		settle(resolver, value);
-	}
-	else {
-		// No frame time - defer everything
-		Task.asap(() => settle(resolver, value));
-	}
+	Task.asap(() => settle(resolver, value));
 	return resolver.promise;
 }
 
@@ -169,28 +162,23 @@ return new Promise((resolve, reject) => {
 	return;
 
 	function process(acc) {
-		while (i < length) {
-			if (isThenable(acc)) {
-					acc.then(process, reject);
-					return;
-			}
-			try {
-				acc = fn.call(context, acc, a[i], i, a);
-				i++;
-			}
-			catch (error) {
-				reject(error);
-				return;
-			}
-			if (i >= length) break;
-
-			let currTime = Task.getTime(true); // NOTE *remaining* time
-			if (currTime <= 0) {
-				Task.asap(() => process(acc));
-				return;
-			}
+		if (i >= length) {
+			resolve(acc);
+			return;
 		}
-		resolve(acc);
+		if (isThenable(acc)) {
+				acc.then(process, reject);
+				return;
+		}
+		try {
+			acc = fn.call(context, acc, a[i], i, a);
+			i++;
+		}
+		catch (error) {
+			reject(error);
+			return;
+		}
+		Task.asap(() => process(acc));
 	}
 });
 }

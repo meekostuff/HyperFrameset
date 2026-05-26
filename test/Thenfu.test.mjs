@@ -205,7 +205,7 @@ describe('Thenfu static methods', () => {
     
     // Poll until frame time is low, then force Task.asap to consume remaining time
     Task.asap(() => {});
-    while (Task.getTime(true) >= 0) {}
+    while (Task.getTime() > 0) {}
     
     Thenfu.asap(() => 'result').then(() => order.push('asap'));
     queueMicrotask(() => order.push('microtask'));

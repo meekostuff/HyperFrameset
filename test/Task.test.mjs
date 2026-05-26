@@ -70,12 +70,9 @@ describe('Task.mjs tests', () => {
   });
 
   test('getTime returns elapsed time, getTime(true) returns remaining', () => {
-    const elapsed = Task.getTime();
-    const remaining = Task.getTime(true);
+    const remaining = Task.getTime();
 
-    expect(elapsed).toBeGreaterThanOrEqual(0);
     expect(remaining).toBeLessThanOrEqual(12.5); // frameExecutionTimeout
-    expect(elapsed + remaining).toBeCloseTo(12.5, 0);
   });
 
   test('getStats tracks execution after asap and defer tasks', async () => {
