@@ -4,6 +4,8 @@ import { playwright } from '@vitest/browser-playwright';
 export default defineConfig({
   test: {
     include: ['test/**/*.test.mjs'],
+    sequence: { sequential: true },
+    fileParallelism: false,
     
     // Browser testing configuration
     browser: {
