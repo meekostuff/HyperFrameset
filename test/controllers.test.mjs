@@ -1,6 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import controllers from '../src/Meeko/controllers.mjs';
 
+const nextFrame = () => new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
 describe('controllers', () => {
 
   it('create registers a controller', () => {
@@ -49,12 +51,12 @@ describe('controllers', () => {
     controllers.set('test6', ['a', 'b']);
     const listener = vi.fn();
     controllers.listen('test6', listener);
-    // wait for initial listener call
-    await new Promise(r => requestAnimationFrame(r));
+    await nextFrame();
+    expect(listener).toHaveBeenCalledWith(['a', 'b']);
     listener.mockClear();
     // set same value again
     controllers.set('test6', ['a', 'b']);
-    await new Promise(r => requestAnimationFrame(r));
+    await nextFrame();
     expect(listener).not.toHaveBeenCalled();
   });
 
@@ -63,10 +65,10 @@ describe('controllers', () => {
     controllers.set('test7', ['a']);
     const listener = vi.fn();
     controllers.listen('test7', listener);
-    await new Promise(r => requestAnimationFrame(r));
+    await nextFrame();
     listener.mockClear();
     controllers.set('test7', ['b']);
-    await new Promise(r => requestAnimationFrame(r));
+    await nextFrame();
     expect(listener).toHaveBeenCalledWith(['b']);
   });
 
@@ -75,7 +77,7 @@ describe('controllers', () => {
     controllers.set('test8', ['x']);
     const listener = vi.fn();
     controllers.listen('test8', listener);
-    await new Promise(r => requestAnimationFrame(r));
+    await nextFrame();
     expect(listener).toHaveBeenCalledWith(['x']);
   });
 
