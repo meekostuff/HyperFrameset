@@ -70,17 +70,21 @@ config(options) {
 }
 
 /**
- * Content-first entry point. Use when the landing page is a content document
- * that references an external frameset. The content is captured, the frameset
- * is fetched and applied to the live document, then the captured content is
- * loaded into the appropriate frame.
+ * Main entry point. If startOptions.contentDocument is provided, operates in
+ * content-first mode: the content is captured, the frameset is fetched and
+ * applied to the live document, then the captured content is loaded into the
+ * appropriate frame. Otherwise, delegates to frameset-first mode where the
+ * landing page IS the frameset document.
  */
 start(startOptions) {
 	let framer = this;
 	if (framer.started) throw Error('Already started');
-	if (!startOptions || !startOptions.contentDocument) throw Error('No contentDocument passed to start()');
-
 	framer.started = true;
+	if (!startOptions || !startOptions.contentDocument) {
+		console.info("No contentDocument passed to start(). Assuming landing-page is the frameset.")
+		return framer.#startAsFrameset(startOptions);
+	}
+
 	Thenfu.asap(startOptions.contentDocument)
 	.then((doc) => { // FIXME potential race condition between document finished loading and frameset rendering
 		return httpProxy.add({ url: document.URL, type: 'document', document: doc });
@@ -133,10 +137,8 @@ start(startOptions) {
  * The live document is cloned and processed as the frameset definition, then frames
  * load their content via their @src attributes.
  */
-startAsFrameset(startOptions) {
+#startAsFrameset(startOptions) {
 	let framer = this;
-	if (framer.started) throw Error('Already started');
-	framer.started = true;
 
 	let framesetURL = URLux.create(document.URL);
 	framer.framesetURL = framesetURL.nohash;
