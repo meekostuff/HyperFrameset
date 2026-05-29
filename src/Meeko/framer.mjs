@@ -33,10 +33,36 @@ let document = window.document;
 
 class Framer {
 
+/**
+ * Configuration callbacks and lifecycle hooks.
+ * @property {function(string): (Object|string|false|null)} [lookup] - Given a page URL, returns frameset config ({framesetURL, scope}), a framesetURL string, or falsy if unknown.
+ * @property {function(Document): (Object|string|false|null)} [detect] - Given the landing page document, returns frameset config ({framesetURL, scope}), a framesetURL string, or falsy if unknown.
+ * @property {{before?: Function, after?: Function}} [entering] - Lifecycle hooks called when navigating into a new state.
+ * @property {{before?: Function, after?: Function}} [leaving] - Lifecycle hooks called when leaving the current state (not currently invoked).
+ * @property {Function} [ready] - Called when the frameset is fully rendered and active.
+ */
 options = {};
+
+/** @type {?HFrameset} The active frameset sprocket instance bound to document.body. */
 frameset = null;
+
+/** @type {boolean} Whether start() or startAsFrameset() has been called. */
 started = false;
+
+/** @type {{promise: Promise, resolve: Function, reject: Function}} Resolves when the frameset sprocket enters the document. */
 framesetReady = Promise.withResolvers();
+
+/** @type {?string} Base URL scope for resolving relative URLs within the frameset. */
+scope = null;
+
+/** @type {?string} Resolved URL of the frameset document (without hash). */
+framesetURL = null;
+
+/** @type {?HFramesetDefinition} Parsed frameset definition used for rendering. */
+definition = null;
+
+/** @type {?Object} Current navigation state: {url, target}. */
+currentChangeset = null;
 
 config(options) {
 	if (!options) return;
