@@ -127,6 +127,36 @@ start(startOptions) {
 	]);
 }
 
+/**
+ * Frameset-first entry point. Use when the landing page IS the frameset document.
+ * Unlike start(), no external frameset is fetched and no content document is captured.
+ * The live document is cloned and processed as the frameset definition, then frames
+ * load their content via their @src attributes.
+ */
+startAsFrameset(startOptions) {
+	let framer = this;
+	if (framer.started) throw Error('Already started');
+	framer.started = true;
+
+	let framesetURL = URLux.create(document.URL);
+	framer.framesetURL = framesetURL.nohash;
+	framer.scope = framesetURL.base;
+
+	let settings = { framesetURL: framer.framesetURL, scope: framer.scope };
+	let definition = new HFramesetDefinition(document, settings);
+
+	framer.definition = definition;
+
+	return Thenfu.pipe(null, [
+
+		() => Thenfu.wait(() => !!document.body),
+
+		() => definition.preprocess(),
+
+		() => framer.#activate()
+	]);
+}
+
 /** Shared post-boot pipeline: registers events, frames, sprockets, and starts history. */
 #activate() {
 	let framer = this;
@@ -576,10 +606,13 @@ static #registerFramesetElement() {
 let framer = new Framer();
 
 // FIXME Monkey-patch HFrameset lifecycle to integrate with framer
+// TODO HFrameset.definition should be looked up from a registry in HFrameset's own attached(),
+// following the same pattern as HFrame (which looks up frameDefinitions by @def attribute).
+// This would remove the hidden dependency on framer injecting the property.
 HFrameset.attached = function(handlers) {
 	HBase.attached.call(this, handlers);
 	let frameset = this;
-	frameset.definition = framer.definition; // TODO remove `framer` dependency
+	frameset.definition = framer.definition; // TODO remove `framer` dependency — use a frameset definition registry instead
 	_.defaults(frameset, { frames: [] });
 	ConfigurableBody.attached.call(this, handlers); // FIXME
 };

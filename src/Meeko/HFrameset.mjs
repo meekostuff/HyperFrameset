@@ -24,10 +24,15 @@ frameLeft(frame) {
 	this.frames.splice(index, 1);
 }
 
+// TODO `this.definition` is injected by a monkey-patch in framer.mjs.
+// It should be declared as a field and looked up from a registry in attached(),
+// consistent with how HFrame resolves its definition.
 render() {
 	let frameset = this;
 	let definition = frameset.definition;
 	let dstBody = this.element;
+
+	if (definition.element === dstBody) return;
 
 	let srcBody = definition.render();
 
