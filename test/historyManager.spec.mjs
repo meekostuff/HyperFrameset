@@ -100,3 +100,12 @@ test('popstate restores previous state', async ({ page }) => {
   const popData = await page.evaluate(() => window.__popResult);
   expect(popData).toEqual({ page: 'home' });
 });
+
+test('location.replace preserves document.referrer on target page', async ({ page }) => {
+  await page.goto('/test/fixtures/test-replace-source.html');
+  await page.evaluate(() => location.replace('/test/fixtures/test-replace-target.html'));
+  await page.waitForFunction(() => window.__ready, { timeout: 5000 });
+
+  const referrer = await page.evaluate(() => document.referrer);
+  expect(referrer).toContain('/test/fixtures/test-replace-source.html');
+});
