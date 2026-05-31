@@ -140,6 +140,8 @@ start(startOptions) {
 #startAsFrameset(startOptions) {
 	let framer = this;
 
+	let startURL = startOptions && startOptions.start_url;
+
 	let framesetURL = URLux.create(document.URL);
 	framer.framesetURL = framesetURL.nohash;
 	framer.scope = framesetURL.base;
@@ -152,6 +154,10 @@ start(startOptions) {
 	return Thenfu.pipe(null, [
 
 		() => Thenfu.wait(() => !!document.body),
+
+		() => { // Restore the user-requested URL so downstream lookup sees the content URL
+			if (startURL) history.replaceState(null, '', startURL);
+		},
 
 		() => definition.preprocess(),
 
