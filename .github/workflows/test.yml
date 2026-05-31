@@ -14,3 +14,4 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps ${{ matrix.browser }}
       - run: npm run test:${{ matrix.browser == 'webkit' && 'safari' || matrix.browser == 'chromium' && 'chrome' || matrix.browser }}
+      - run: npm run test:e2e:${{ matrix.browser == 'webkit' && 'safari' || matrix.browser == 'chromium' && 'chrome' || matrix.browser }}
