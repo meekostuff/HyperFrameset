@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html custom-hf="HyperFrameset">
+<head>
+<style>
+nav { background: #eee; padding: 0.5em; }
+main { padding: 0.5em; }
+</style>
+<script type="module">
+import '../../src/HyperFrameset.mjs';
+
+Meeko.framer.config({
+	lookup: function(url) { return 'hf_main'; }
+});
+
+// Read start_url from query string for test flexibility
+let params = new URLSearchParams(location.search);
+let startURL = params.get('start_url');
+
+Meeko.framer.start(startURL ? { start_url: startURL } : undefined);
+</script>
+</head>
+<body>
+<nav>
+<hf-frame targetname="hf_nav" src="scope:./multiframe-nav.html" main="nav">
+	<hf-body condition="loaded">
+		<hf-transform type="main">
+		</hf-transform>
+	</hf-body>
+</hf-frame>
+</nav>
+
+<main>
+<hf-frame targetname="hf_main" main="main">
+	<hf-body condition="loaded">
+		<hf-transform type="main">
+		</hf-transform>
+	</hf-body>
+	<hf-body condition="loading">
+		<p>Loading...</p>
+	</hf-body>
+</hf-frame>
+</main>
+</body>
+</html>
