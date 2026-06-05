@@ -226,24 +226,47 @@
     }
     const frameRate = 60;
     const frameInterval = 1e3 / frameRate;
-    const frameExecutionRatio = .75;
-    const frameExecutionTimeout = frameInterval * frameExecutionRatio;
-    let performance = window.performance && window.performance.now ? window.performance : Date.now ? Date : {
-        now: function() {
-            return (new Date).getTime();
-        }
-    };
-    let schedule = window.requestAnimationFrame;
+    const safetyMargin = 1;
     let asapQueue = [];
     let deferQueue = [];
     let scheduled = false;
     let processing = false;
-    function asap$1(fn) {
-        asapQueue.push(fn);
+    let deadline = null;
+    let channel = new MessageChannel;
+    channel.port1.onmessage = processTasks;
+    function requestProcessing() {
         if (processing) return;
         if (scheduled) return;
-        schedule(processTasks);
         scheduled = true;
+        if (getTime() > safetyMargin) {
+            channel.port2.postMessage(null);
+            return;
+        }
+        let ricId, rafId;
+        if (window.requestIdleCallback) ricId = window.requestIdleCallback(onIdle);
+        rafId = window.requestAnimationFrame(onFrame);
+        function onIdle(idleDeadline) {
+            window.cancelAnimationFrame(rafId);
+            deadline = idleDeadline;
+            channel.port2.postMessage(null);
+        }
+        function onFrame(timestamp) {
+            if (ricId) window.cancelIdleCallback(ricId);
+            deadline = {
+                didTimeout: false,
+                timeRemaining() {
+                    return Math.max(0, frameInterval - (performance.now() - timestamp));
+                }
+            };
+            channel.port2.postMessage(null);
+        }
+    }
+    function getTime() {
+        return deadline ? deadline.timeRemaining() : 0;
+    }
+    function asap$1(fn) {
+        asapQueue.push(fn);
+        requestProcessing();
     }
     function defer$1(fn) {
         if (processing) {
@@ -257,14 +280,7 @@
             defer$1(fn);
             return;
         }
-        setTimeout(() => {
-            try {
-                fn();
-            } catch (error) {
-                window.reportError(error);
-            }
-            processTasks();
-        }, timeout);
+        setTimeout(() => asap$1(fn), timeout);
     }
     let execStats = {};
     let frameStats = {};
@@ -296,18 +312,11 @@
             frame: frame
         };
     }
-    let lastStartTime = performance.now();
-    function getTime(bRemaining) {
-        let delta = performance.now() - lastStartTime;
-        if (!bRemaining) return delta;
-        return frameExecutionTimeout - delta;
-    }
     let idle = true;
     function processTasks() {
-        let startTime = performance.now();
-        if (!idle) updateStats(frameStats, startTime - lastStartTime);
-        lastStartTime = startTime;
+        if (processing) return;
         processing = true;
+        if (!idle) updateStats(frameStats, getTime());
         let fn;
         let currTime;
         while (asapQueue.length) {
@@ -319,17 +328,16 @@
                 window.reportError(error);
             }
             currTime = getTime();
-            if (currTime >= frameExecutionTimeout) break;
+            if (currTime <= safetyMargin) break;
         }
-        scheduled = false;
         processing = false;
+        scheduled = false;
         if (currTime) updateStats(execStats, currTime);
         asapQueue = asapQueue.concat(deferQueue);
         deferQueue = [];
         if (asapQueue.length) {
-            schedule(processTasks);
-            scheduled = true;
             idle = false;
+            requestProcessing();
         } else idle = true;
     }
     var Task = {
@@ -379,11 +387,7 @@
     }();
     function asap(value) {
         let resolver = Promise.withResolvers();
-        if (Task.getTime(true) > 0) {
-            settle(resolver, value);
-        } else {
-            Task.asap(() => settle(resolver, value));
-        }
+        Task.asap(() => settle(resolver, value));
         return resolver.promise;
     }
     function defer(value) {
@@ -426,26 +430,22 @@
             Task.asap(() => process(accumulator));
             return;
             function process(acc) {
-                while (i < length) {
-                    if (isThenable(acc)) {
-                        acc.then(process, reject);
-                        return;
-                    }
-                    try {
-                        acc = fn.call(context, acc, a[i], i, a);
-                        i++;
-                    } catch (error) {
-                        reject(error);
-                        return;
-                    }
-                    if (i >= length) break;
-                    let currTime = Task.getTime(true);
-                    if (currTime <= 0) {
-                        Task.asap(() => process(acc));
-                        return;
-                    }
+                if (i >= length) {
+                    resolve(acc);
+                    return;
                 }
-                resolve(acc);
+                if (isThenable(acc)) {
+                    acc.then(process, reject);
+                    return;
+                }
+                try {
+                    acc = fn.call(context, acc, a[i], i, a);
+                    i++;
+                } catch (error) {
+                    reject(error);
+                    return;
+                }
+                Task.asap(() => process(acc));
             }
         });
     }
@@ -917,12 +917,13 @@
 	 * Copyright 2009-2016 Sean Hogan (http://meekostuff.net/)
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */    let document$9 = window.document;
-    let queue = [], emptying = false;
-    let testScript = document$9.createElement("script"), supportsSync = testScript.async === true;
-    let scriptQueue = {
-        push: function(node) {
+    class ScriptQueue {
+        #queue=[];
+        #emptying=false;
+        push(node) {
+            let queue = this.#queue;
             return new Promise((resolve, reject) => {
-                if (emptying) throw Error("Attempt to append script to scriptQueue while emptying");
+                if (this.#emptying) throw Error("Attempt to append script to scriptQueue while emptying");
                 if (!node.type || /^text\/javascript$/i.test(node.type)) {
                     console.info(`Attempt to queue already executed script ${node.src}`);
                     resolve();
@@ -942,13 +943,13 @@
                     script.setAttribute("async", "");
                     console.warn("@defer not supported on scripts");
                 }
-                if (supportsSync && script.src && !script.hasAttribute("async")) script.async = false;
+                if (script.src && !script.hasAttribute("async")) script.async = false;
                 script.type = "text/javascript";
                 let enabledFu = Promise.withResolvers();
                 let prev = queue[queue.length - 1], prevScript = prev && prev.script;
                 let trigger;
                 if (prev) {
-                    if (prevScript.hasAttribute("async") || script.src && supportsSync && !script.hasAttribute("async")) trigger = prev.enabled; else trigger = prev.complete;
+                    if (prevScript.hasAttribute("async") || script.src && !script.hasAttribute("async")) trigger = prev.enabled; else trigger = prev.complete;
                 } else trigger = Thenfu.asap();
                 trigger.then(enable, enable);
                 let completeFu = Promise.withResolvers();
@@ -996,19 +997,20 @@
                     }
                 }
             });
-        },
-        empty: function() {
+        }
+        empty() {
+            let queue = this.#queue;
             return new Promise((resolve, reject) => {
-                emptying = true;
+                this.#emptying = true;
                 if (queue.length <= 0) {
-                    emptying = false;
+                    this.#emptying = false;
                     resolve();
                     return;
                 }
                 forEach(queue, (value, i) => {
                     let acceptCallback = () => {
                         if (queue.length <= 0) {
-                            emptying = false;
+                            this.#emptying = false;
                             resolve();
                         }
                     };
@@ -1016,7 +1018,8 @@
                 });
             });
         }
-    };
+    }
+    var scriptQueue = new ScriptQueue;
     class BindingDefinition {
         constructor(desc) {
             for (let name of Object.getOwnPropertyNames(desc)) {
@@ -1028,164 +1031,10 @@
         }
     }
     /*!
-	 Binding
-	 (c) Sean Hogan, 2008,2012,2013,2014,2016
+	 Handler - event matching and XBL handler conversion
+	 (c) Sean Hogan, 2008-2026
 	 Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
-	*/    let document$8 = window.document;
-    class Binding {
-        constructor(definition) {
-            let binding = this;
-            binding.definition = definition;
-            binding.object = Object.create(definition.prototype);
-            binding.handlers = definition.handlers ? Array.from(definition.handlers) : [];
-            binding.listeners = [];
-            binding.inDocument = null;
-        }
-    }
-    assign(Binding.prototype, {
-        attach: function(element) {
-            let binding = this;
-            let definition = binding.definition;
-            let object = binding.object;
-            object.element = element;
-            binding.attachedCallback();
-            forEach(binding.handlers, handler => {
-                let listener = binding.addHandler(handler);
-                if (listener) binding.listeners.push(listener);
-            });
-        },
-        attachedCallback: function() {
-            let binding = this;
-            let definition = binding.definition;
-            let object = binding.object;
-            binding.inDocument = false;
-            if (definition.attached) definition.attached.call(object, binding.handlers);
-        },
-        enteredDocumentCallback: function() {
-            let binding = this;
-            let definition = binding.definition;
-            let object = binding.object;
-            binding.inDocument = true;
-            if (definition.enteredDocument) definition.enteredDocument.call(object);
-        },
-        leftDocumentCallback: function() {
-            let binding = this;
-            let definition = binding.definition;
-            let object = binding.object;
-            binding.inDocument = false;
-            if (definition.leftDocument) definition.leftDocument.call(object);
-        },
-        detach: function() {
-            let binding = this;
-            let definition = binding.definition;
-            let object = binding.object;
-            forEach(binding.listeners, binding.removeListener, binding);
-            binding.listeners.length = 0;
-            binding.detachedCallback();
-        },
-        detachedCallback: function() {
-            let binding = this;
-            let definition = binding.definition;
-            let object = binding.object;
-            binding.inDocument = null;
-            if (definition.detached) definition.detached.call(object);
-        },
-        addHandler: function(handler) {
-            let binding = this;
-            let object = binding.object;
-            let element = object.element;
-            let type = handler.type;
-            let capture = handler.eventPhase === 1;
-            if (capture) {
-                console.warn("Capture phase for events not supported");
-                return;
-            }
-            Binding.manageEvent(type);
-            let fn = event => {
-                if (fn.normalize) event = fn.normalize(event);
-                try {
-                    return handleEvent.call(object, event, handler);
-                } catch (error) {
-                    window.reportError(error);
-                    throw error;
-                }
-            };
-            fn.type = type;
-            fn.capture = capture;
-            element.addEventListener(type, fn, capture);
-            return fn;
-        },
-        removeListener: function(fn) {
-            let binding = this;
-            let object = binding.object;
-            let element = object.element;
-            let type = fn.type;
-            let capture = fn.capture;
-            element.removeEventListener(type, fn, capture);
-        }
-    });
-    assign(Binding, {
-        getInterface: function(element) {
-            let nodeData = getData(element);
-            if (nodeData && nodeData.object) return nodeData;
-        },
-        enteredDocumentCallback: function(element) {
-            let binding = Binding.getInterface(element);
-            if (!binding) return;
-            binding.enteredDocumentCallback();
-        },
-        leftDocumentCallback: function(element) {
-            let binding = Binding.getInterface(element);
-            if (!binding) return;
-            binding.leftDocumentCallback();
-        },
-        managedEvents: [],
-        manageEvent: function(type) {
-            if (includes(this.managedEvents, type)) return;
-            this.managedEvents.push(type);
-            window.addEventListener(type, event => {
-                event.stopPropagation = () => {
-                    console.debug("event.stopPropagation() is a no-op");
-                };
-                event.stopImmediatePropagation = () => {
-                    console.debug("event.stopImmediatePropagation() is a no-op");
-                };
-            }, true);
-        }
-    });
-    function handleEvent(event, handler) {
-        let bindingImplementation = this;
-        let target = event.target;
-        let current = bindingImplementation.element;
-        if (!hasData(current)) throw Error("Handler called on non-bound element");
-        if (!matchesEvent(handler, event, true)) return;
-        let delegator = current;
-        if (handler.delegator) {
-            let el = closest$1(target, handler.delegator, current);
-            if (!el) return;
-            delegator = el;
-        }
-        switch (handler.eventPhase) {
-          case 1:
-            throw Error("Capture phase for events not supported");
-
-          case 2:
-            if (delegator !== target) return;
-            break;
-
-          case 3:
-            if (delegator === target) return;
-            break;
-
-          default:
-            break;
-        }
-        if (handler.action) {
-            let result = handler.action.call(bindingImplementation, event, delegator);
-            if (result === false) event.preventDefault();
-        }
-    }
-    let convertXBLHandler = function(config) {
+	*/    let convertXBLHandler = function(config) {
         let handler = {};
         handler.type = config.event;
         if (null == config.event) console.warn("Invalid handler: event property undeclared");
@@ -1403,36 +1252,185 @@
         }
         return true;
     };
-    function attachBinding(definition, element) {
-        let binding;
-        if (hasData(element)) {
-            binding = getData(element);
-            if (binding.definition !== definition) throw Error("Mismatch between definition and binding already present");
-            console.warn("Binding definition applied when binding already present");
+    /*!
+	 Binding
+	 (c) Sean Hogan, 2008-2026
+	 Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	*/    let document$8 = window.document;
+    class Binding {
+        constructor(definition) {
+            let binding = this;
+            binding.definition = definition;
+            binding.object = Object.create(definition.prototype);
+            binding.handlers = definition.handlers ? Array.from(definition.handlers) : [];
+            binding.listeners = [];
+            binding.inDocument = null;
+        }
+        attach(element) {
+            let binding = this;
+            let definition = binding.definition;
+            let object = binding.object;
+            object.element = element;
+            binding.attachedCallback();
+            forEach(binding.handlers, handler => {
+                let listener = binding.addHandler(handler);
+                if (listener) binding.listeners.push(listener);
+            });
+        }
+        attachedCallback() {
+            let binding = this;
+            let definition = binding.definition;
+            let object = binding.object;
+            binding.inDocument = false;
+            if (definition.attached) definition.attached.call(object, binding.handlers);
+        }
+        enteredDocumentCallback() {
+            let binding = this;
+            let definition = binding.definition;
+            let object = binding.object;
+            binding.inDocument = true;
+            if (definition.enteredDocument) definition.enteredDocument.call(object);
+        }
+        leftDocumentCallback() {
+            let binding = this;
+            let definition = binding.definition;
+            let object = binding.object;
+            binding.inDocument = false;
+            if (definition.leftDocument) definition.leftDocument.call(object);
+        }
+        detach() {
+            let binding = this;
+            let definition = binding.definition;
+            let object = binding.object;
+            forEach(binding.listeners, binding.removeListener, binding);
+            binding.listeners.length = 0;
+            binding.detachedCallback();
+        }
+        detachedCallback() {
+            let binding = this;
+            let definition = binding.definition;
+            let object = binding.object;
+            binding.inDocument = null;
+            if (definition.detached) definition.detached.call(object);
+        }
+        addHandler(handler) {
+            let binding = this;
+            let object = binding.object;
+            let element = object.element;
+            let type = handler.type;
+            let capture = handler.eventPhase === 1;
+            if (capture) {
+                console.warn("Capture phase for events not supported");
+                return;
+            }
+            Binding.manageEvent(type);
+            let fn = event => {
+                if (fn.normalize) event = fn.normalize(event);
+                try {
+                    return handleEvent.call(object, event, handler);
+                } catch (error) {
+                    window.reportError(error);
+                    throw error;
+                }
+            };
+            fn.type = type;
+            fn.capture = capture;
+            element.addEventListener(type, fn, capture);
+            return fn;
+        }
+        removeListener(fn) {
+            let binding = this;
+            let object = binding.object;
+            let element = object.element;
+            let type = fn.type;
+            let capture = fn.capture;
+            element.removeEventListener(type, fn, capture);
+        }
+        static managedEvents=[];
+        static getInterface(element) {
+            let nodeData = getData(element);
+            if (nodeData && nodeData.object) return nodeData;
+        }
+        static enteredDocumentCallback(element) {
+            let binding = Binding.getInterface(element);
+            if (!binding) return;
+            binding.enteredDocumentCallback();
+        }
+        static leftDocumentCallback(element) {
+            let binding = Binding.getInterface(element);
+            if (!binding) return;
+            binding.leftDocumentCallback();
+        }
+        static manageEvent(type) {
+            if (includes(this.managedEvents, type)) return;
+            this.managedEvents.push(type);
+            window.addEventListener(type, event => {
+                event.stopPropagation = () => {
+                    console.debug("event.stopPropagation() is a no-op");
+                };
+                event.stopImmediatePropagation = () => {
+                    console.debug("event.stopImmediatePropagation() is a no-op");
+                };
+            }, true);
+        }
+        static attachBinding(definition, element) {
+            let binding;
+            if (hasData(element)) {
+                binding = getData(element);
+                if (binding.definition !== definition) throw Error("Mismatch between definition and binding already present");
+                console.warn("Binding definition applied when binding already present");
+                return binding;
+            }
+            binding = new Binding(definition);
+            setData(element, binding);
+            binding.attach(element);
             return binding;
         }
-        binding = new Binding(definition);
-        setData(element, binding);
-        binding.attach(element);
-        return binding;
+        static enableBinding(element) {
+            if (!hasData(element)) throw Error("No binding attached to element");
+            let binding = getData(element);
+            if (!binding.inDocument) binding.enteredDocumentCallback();
+        }
+        static detachBinding(element) {
+            if (!hasData(element)) throw Error("No binding attached to element");
+            let binding = getData(element);
+            if (binding.inDocument) binding.leftDocumentCallback();
+            binding.detach();
+            setData(element, null);
+        }
     }
-    function enableBinding(element) {
-        if (!hasData(element)) throw Error("No binding attached to element");
-        let binding = getData(element);
-        if (!binding.inDocument) binding.enteredDocumentCallback();
+    function handleEvent(event, handler) {
+        let bindingImplementation = this;
+        let target = event.target;
+        let current = bindingImplementation.element;
+        if (!hasData(current)) throw Error("Handler called on non-bound element");
+        if (!matchesEvent(handler, event, true)) return;
+        let delegator = current;
+        if (handler.delegator) {
+            let el = closest$1(target, handler.delegator, current);
+            if (!el) return;
+            delegator = el;
+        }
+        switch (handler.eventPhase) {
+          case 1:
+            throw Error("Capture phase for events not supported");
+
+          case 2:
+            if (delegator !== target) return;
+            break;
+
+          case 3:
+            if (delegator === target) return;
+            break;
+
+          default:
+            break;
+        }
+        if (handler.action) {
+            let result = handler.action.call(bindingImplementation, event, delegator);
+            if (result === false) event.preventDefault();
+        }
     }
-    function detachBinding(element) {
-        if (!hasData(element)) throw Error("No binding attached to element");
-        let binding = getData(element);
-        if (binding.inDocument) binding.leftDocumentCallback();
-        binding.detach();
-        setData(element, null);
-    }
-    assign(Binding, {
-        attachBinding: attachBinding,
-        enableBinding: enableBinding,
-        detachBinding: detachBinding
-    });
     /*!
 	 Sprocket
 	 (c) Sean Hogan, 2008,2012,2013,2014,2016,2019
@@ -1479,23 +1477,6 @@
                 prototype[name] = desc;
             }
         });
-    };
-    let evolve = function(baseDefn, ariaProperties) {
-        let prototype = Object.create(baseDefn.prototype);
-        let sub = function() {};
-        sub.prototype = prototype;
-        if (ariaProperties) {
-            let ariaDescs = {};
-            forOwn(ariaProperties, function(desc, name) {
-                if (typeof desc === "object") {
-                    ariaDescs[name] = desc;
-                } else {
-                    prototype[name] = desc;
-                }
-            });
-            if (Object.keys(ariaDescs).length) withAria(sub, ariaDescs);
-        }
-        return sub;
     };
     let registerElement = function(tagName, definition) {
         if (started) throw Error("sprockets management already started");
@@ -1826,7 +1807,6 @@
         registerComponent: registerComponent,
         registerComposite: registerComposite,
         register: register,
-        evolve: evolve,
         withAria: withAria,
         cast: cast,
         find: find$1,
@@ -4568,6 +4548,15 @@
             this.init(doc, settings);
         }
         init(doc, settings) {
+            this.#initMetadata(doc, settings);
+            this.#rebaseURLs(doc);
+            this.#normalizeScripts(doc);
+            this.#normalizeStyles(doc);
+            let body = doc.body;
+            this.document = doc;
+            this.element = body;
+        }
+        #initMetadata(doc, settings) {
             let framesetDef = this;
             defaults(framesetDef, {
                 url: settings.framesetURL,
@@ -4577,7 +4566,10 @@
             if (!namespaces.lookupNamespace(HYPERFRAMESET_URN)) {
                 namespaces.add(hfDefaultNamespace);
             }
-            let scopeURL = URLux.create(settings.scope);
+        }
+        #rebaseURLs(doc) {
+            let framesetDef = this;
+            let scopeURL = URLux.create(framesetDef.scope);
             rebase(doc, scopeURL);
             let frameElts = findAll$1(framesetDef.namespaces.lookupSelector("frame", HYPERFRAMESET_URN), doc.body);
             forEach(frameElts, (el, index) => {
@@ -4587,6 +4579,9 @@
                     if (newSrc != src) el.setAttribute("src", newSrc);
                 }
             });
+        }
+        #normalizeScripts(doc) {
+            let framesetDef = this;
             let idElements = findAll$1("*[id]:not(script)", doc.body);
             if (idElements.length) {
                 let firstId = idElements[0].getAttribute("id");
@@ -4617,13 +4612,11 @@
                 doc.head.appendChild(script);
                 console.info("Moved <script> in frameset <body> to <head>");
             });
+        }
+        #normalizeStyles(doc) {
             let allowedScope = "panel, frame";
-            let allowedScopeSelector = framesetDef.namespaces.lookupSelector(allowedScope, HYPERFRAMESET_URN);
+            let allowedScopeSelector = this.namespaces.lookupSelector(allowedScope, HYPERFRAMESET_URN);
             normalizeScopedStyles(doc, allowedScopeSelector);
-            let body = doc.body;
-            body.parentNode.removeChild(body);
-            framesetDef.document = doc;
-            framesetDef.element = body;
         }
         preprocess() {
             let framesetDef = this;
@@ -4737,49 +4730,75 @@
         HTransformDefinition: HTransformDefinition
     });
     /*!
-	 * HyperFrameset framer
+	 * HFrameset
 	 * Copyright 2009-2016 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    class HFrameset extends HBase {
+        static {
+            sprockets.withAria(this, {
+                role: "frameset",
+                isFrameset: true
+            });
+        }
+        frameEntered(frame) {
+            this.frames.push(frame);
+        }
+        frameLeft(frame) {
+            let index = this.frames.indexOf(frame);
+            this.frames.splice(index, 1);
+        }
+        render() {
+            let frameset = this;
+            let definition = frameset.definition;
+            let dstBody = this.element;
+            if (definition.element === dstBody) return;
+            let srcBody = definition.render();
+            return Thenfu.pipe(null, [ function() {
+                forEach(Array.from(srcBody.childNodes), function(node) {
+                    sprockets.insertNode("beforeend", dstBody, node);
+                });
+            } ]);
+        }
+    }
+    /*!
+	 * HyperFrameset framer
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */    const FRAMESET_REL = "frameset";
     const SELF_REL = "self";
     let document = window.document;
-    let framer = {};
-    defaults(framer, {
-        options: {},
-        config: function(options) {
-            let framer = this;
+    class Framer {
+        options={};
+        frameset=null;
+        started=false;
+        framesetReady=Promise.withResolvers();
+        scope=null;
+        framesetURL=null;
+        definition=null;
+        currentChangeset=null;
+        config(options) {
             if (!options) return;
-            assign(framer.options, options);
+            assign(this.options, options);
         }
-    });
-    let framesetReady = Promise.withResolvers();
-    defaults(framer, {
-        frameset: null,
-        started: false,
-        start: function(startOptions) {
+        start(startOptions) {
             let framer = this;
             if (framer.started) throw Error("Already started");
-            if (!startOptions || !startOptions.contentDocument) throw Error("No contentDocument passed to start()");
             framer.started = true;
-            Thenfu.asap(startOptions.contentDocument).then(function(doc) {
-                return httpProxy.add({
-                    url: document.URL,
-                    type: "document",
-                    document: doc
-                });
-            });
-            return Thenfu.pipe(null, [ function() {
-                return Thenfu.wait(function() {
-                    return !!document.body;
-                });
-            }, function() {
+            if (!startOptions || !startOptions.contentDocument) {
+                console.info("No contentDocument passed to start(). Assuming landing-page is the frameset.");
+                return framer.#startAsFrameset(startOptions);
+            }
+            Thenfu.asap(startOptions.contentDocument).then(doc => httpProxy.add({
+                url: document.URL,
+                type: "document",
+                document: doc
+            }));
+            return Thenfu.pipe(null, [ () => Thenfu.wait(() => !!document.body), () => {
                 let framerConfig;
                 framerConfig = framer.lookup(document.URL);
                 if (framerConfig) return framerConfig;
-                return startOptions.contentDocument.then(function(doc) {
-                    return framer.detect(doc);
-                });
-            }, function(framerConfig) {
+                return startOptions.contentDocument.then(doc => framer.detect(doc));
+            }, framerConfig => {
                 if (!framerConfig) throw Error("No frameset could be determined for this page");
                 framer.scope = framerConfig.scope;
                 let framesetURL = URLux.create(framerConfig.framesetURL);
@@ -4787,181 +4806,76 @@
                 framer.framesetURL = framerConfig.framesetURL = framesetURL.nohash;
                 return httpProxy.load(framer.framesetURL, {
                     responseType: "document"
-                }).then(function(response) {
-                    let framesetDoc = response.document;
-                    return new HFramesetDefinition(framesetDoc, framerConfig);
-                });
-            }, function(definition) {
-                return Thenfu.pipe(definition, [ function() {
-                    framer.definition = definition;
-                    return prepareFrameset(document, definition);
-                }, function() {
-                    return definition.preprocess();
-                }, function() {
-                    return prerenderFrameset(document, definition);
-                } ]);
-            }, function() {
-                window.addEventListener("click", function(e) {
+                }).then(response => new HFramesetDefinition(response.document, framerConfig));
+            }, definition => Thenfu.pipe(definition, [ () => {
+                framer.definition = definition;
+                return Framer.#prepareFrameset(document, definition);
+            }, () => definition.preprocess(), () => Framer.#prerenderFrameset(document, definition) ]), () => framer.#activate() ]);
+        }
+        #startAsFrameset(startOptions) {
+            let framer = this;
+            let startURL = startOptions && startOptions.start_url;
+            let framesetURL = URLux.create(document.URL);
+            framer.framesetURL = framesetURL.nohash;
+            framer.scope = framesetURL.base;
+            let settings = {
+                framesetURL: framer.framesetURL,
+                scope: framer.scope
+            };
+            let definition = new HFramesetDefinition(document, settings);
+            framer.definition = definition;
+            return Thenfu.pipe(null, [ () => Thenfu.wait(() => !!document.body), () => {
+                if (startURL) history.replaceState(null, "", startURL);
+            }, () => definition.preprocess(), () => framer.#activate() ]);
+        }
+        #activate() {
+            let framer = this;
+            return Thenfu.pipe(null, [ () => {
+                window.addEventListener("click", e => {
                     if (e.defaultPrevented) return;
                     let acceptDefault = framer.onClick(e);
                     if (acceptDefault === false) e.preventDefault();
                 }, false);
-                window.addEventListener("submit", function(e) {
+                window.addEventListener("submit", e => {
                     if (e.defaultPrevented) return;
                     let acceptDefault = framer.onSubmit(e);
                     if (acceptDefault === false) e.preventDefault();
                 }, false);
-                registerFrames(framer.definition);
+                Framer.#registerFrames(framer.definition);
                 interceptFrameElements();
                 retargetFramesetElements();
                 let namespace = framer.definition.namespaces.lookupNamespace(HYPERFRAMESET_URN);
                 layoutElements.register(namespace);
                 frameElements.register(namespace);
-                registerFramesetElement();
+                Framer.#registerFramesetElement();
                 formElements.register();
                 return sprockets.start({
                     manual: true
                 });
-            }, function() {
-                return framesetReady.promise.then(function() {
-                    let changeset = framer.currentChangeset;
-                    return historyManager.start(changeset, "", document.URL, function(state) {}, function(state) {
-                        return framer.onPopState(state.getData());
-                    });
-                });
-            }, function() {
-                notify({
+            }, () => framer.framesetReady.promise.then(() => {
+                let changeset = framer.currentChangeset;
+                return historyManager.start(changeset, "", document.URL, state => {}, state => framer.onPopState(state.getData()));
+            }), () => {
+                Framer.#notify({
                     module: "frameset",
                     type: "enteredState",
                     stage: "after",
                     url: document.URL
                 });
-            }, function() {
-                return Thenfu.wait(function() {
-                    return checkStyleSheets();
-                });
-            } ]);
+            }, () => Thenfu.wait(() => checkStyleSheets()) ]);
         }
-    });
-    let prepareFrameset = function(dstDoc, definition) {
-        if (getFramesetMarker(dstDoc)) throw Error("The HFrameset has already been applied");
-        let srcDoc = cloneDocument(definition.document);
-        let selfMarker;
-        return Thenfu.pipe(null, [ function() {
-            let dstHead = dstDoc.head;
-            forEach(findAll$1("link[rel|=stylesheet]", dstHead), function(node) {
-                dstHead.removeChild(node);
-            });
-        }, function() {
-            let dstBody = dstDoc.body;
-            let node;
-            while (node = dstBody.firstChild) dstBody.removeChild(node);
-        }, function() {
-            selfMarker = getSelfMarker(dstDoc);
-            if (selfMarker) return;
-            selfMarker = dstDoc.createElement("link");
-            selfMarker.rel = SELF_REL;
-            selfMarker.href = dstDoc.URL;
-            dstDoc.head.insertBefore(selfMarker, dstDoc.head.firstChild);
-        }, function() {
-            let framesetMarker = dstDoc.createElement("link");
-            framesetMarker.rel = FRAMESET_REL;
-            framesetMarker.href = definition.src;
-            dstDoc.head.insertBefore(framesetMarker, selfMarker);
-        }, function() {
-            mergeElement(dstDoc.documentElement, srcDoc.documentElement);
-            mergeElement(dstDoc.head, srcDoc.head);
-            mergeHead(dstDoc, srcDoc.head, true);
-            forEach(findAll$1("script", dstDoc.head), function(script) {
-                scriptQueue.push(script);
-            });
-            return scriptQueue.empty();
-        } ]);
-    };
-    let prerenderFrameset = function(dstDoc, definition) {
-        let srcBody = definition.element;
-        let dstBody = document.body;
-        mergeElement(dstBody, srcBody);
-    };
-    function separateHead(dstDoc, isFrameset) {
-        let dstHead = dstDoc.head;
-        let framesetMarker = getFramesetMarker(dstDoc);
-        if (!framesetMarker) throw Error(`No ${FRAMESET_REL} marker found. `);
-        let selfMarker = getSelfMarker(dstDoc);
-        if (isFrameset) forEach(siblings("after", framesetMarker, "before", selfMarker), remove); else forEach(siblings("after", selfMarker), remove);
-        function remove(node) {
-            if (getTagName(node) == "script" && (!node.type || node.type.match(/^text\/javascript/i))) return;
-            dstHead.removeChild(node);
-        }
-    }
-    function mergeHead(dstDoc, srcHead, isFrameset) {
-        let baseURL = URLux.create(dstDoc.URL);
-        let dstHead = dstDoc.head;
-        let framesetMarker = getFramesetMarker();
-        if (!framesetMarker) throw Error(`No ${FRAMESET_REL} marker found. `);
-        let selfMarker = getSelfMarker();
-        separateHead(dstDoc, isFrameset);
-        forEach(Array.from(srcHead.childNodes), function(srcNode) {
-            if (srcNode.nodeType != 1) return;
-            switch (getTagName(srcNode)) {
-              default:
-                break;
-
-              case "title":
-                if (isFrameset) return;
-                if (!srcNode.innerHTML) return;
-                break;
-
-              case "link":
-                break;
-
-              case "meta":
-                if (srcNode.httpEquiv) return;
-                break;
-
-              case "style":
-                break;
-
-              case "script":
-                if (!isFrameset) return;
-                if (!srcNode.type || /^text\/javascript$/i.test(srcNode.type)) srcNode.type = "text/javascript?disabled";
-                break;
-            }
-            if (isFrameset) insertNode$1("beforebegin", selfMarker, srcNode); else insertNode$1("beforeend", dstHead, srcNode);
-            if (getTagName(srcNode) == "link") srcNode.href = srcNode.getAttribute("href");
-        });
-    }
-    function mergeElement(dst, src) {
-        removeAttributes(dst);
-        copyAttributes(dst, src);
-        dst.removeAttribute("style");
-    }
-    function getFramesetMarker(doc) {
-        if (!doc) doc = document;
-        let marker = find$2(`link[rel~=${FRAMESET_REL}]`, doc.head);
-        return marker;
-    }
-    function getSelfMarker(doc) {
-        if (!doc) doc = document;
-        let marker = find$2(`link[rel~=${SELF_REL}]`, doc.head);
-        return marker;
-    }
-    defaults(framer, {
-        framesetEntered: function(frameset) {
-            let framer = this;
-            framer.frameset = frameset;
+        framesetEntered(frameset) {
+            this.frameset = frameset;
             let url = document.URL;
-            framer.currentChangeset = frameset.lookup(url, {
+            this.currentChangeset = frameset.lookup(url, {
                 referrer: document.referrer
             });
-            framesetReady.resolve();
-        },
-        framesetLeft: function(frameset) {
-            let framer = this;
-            delete framer.frameset;
-        },
-        frameEntered: function(frame) {
-            let namespaces = framer.definition.namespaces;
+            this.framesetReady.resolve();
+        }
+        framesetLeft(frameset) {
+            delete this.frameset;
+        }
+        frameEntered(frame) {
             let parentFrame;
             let parentElement = closest$1(frame.element.parentNode, HFrame.isFrame);
             if (parentElement) parentFrame = parentElement.$; else {
@@ -4970,17 +4884,16 @@
             }
             parentFrame.frameEntered(frame);
             frame.parentFrame = parentFrame;
-            if (frame.targetname === framer.currentChangeset.target) {
-                frame.attr("src", framer.currentChangeset.url);
+            if (frame.targetname === this.currentChangeset.target) {
+                frame.attr("src", this.currentChangeset.url);
             }
-        },
-        frameLeft: function(frame) {
+        }
+        frameLeft(frame) {
             let parentFrame = frame.parentFrame;
             delete frame.parentFrame;
             parentFrame.frameLeft(frame);
-        },
-        onClick: function(e) {
-            let framer = this;
+        }
+        onClick(e) {
             if (e.button != 0) return;
             if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
             let linkElement = closest$1(e.target, "a, [link]");
@@ -4999,11 +4912,10 @@
                 url: url,
                 element: hyperlink
             };
-            framer.triggerRequestNavigation(details.url, details);
+            this.triggerRequestNavigation(details.url, details);
             return false;
-        },
-        onSubmit: function(e) {
-            let framer = this;
+        }
+        onSubmit(e) {
             let form = e.target;
             if (form.target) return;
             let baseURL = URLux.create(document.URL);
@@ -5015,26 +4927,18 @@
             switch (method) {
               case "get":
                 let oURL = URLux.create(action);
-                let query = encode(form);
+                let query = Framer.#encode(form);
                 details.url = oURL.nosearch + (oURL.search || "?") + query + oURL.hash;
                 break;
 
               default:
                 return;
             }
-            framer.triggerRequestNavigation(details.url, details);
+            this.triggerRequestNavigation(details.url, details);
             return false;
-            function encode(form) {
-                let data = [];
-                forEach(form.elements, function(el) {
-                    if (!el.name) return;
-                    data.push(el.name + "=" + encodeURIComponent(el.value));
-                });
-                return data.join("&");
-            }
-        },
-        triggerRequestNavigation: function(url, details) {
-            Thenfu.defer(function() {
+        }
+        triggerRequestNavigation(url, details) {
+            Thenfu.defer(() => {
                 let event = document.createEvent("CustomEvent");
                 event.initCustomEvent("requestnavigation", true, true, details.url);
                 let acceptDefault = details.element.dispatchEvent(event);
@@ -5042,15 +4946,15 @@
                     location.assign(details.url);
                 }
             });
-        },
-        onRequestNavigation: function(e, frame) {
-            let framer = this;
+        }
+        onRequestNavigation(e, frame) {
             if (!frame) throw Error("Invalid frame / frameset in onRequestNavigation");
             let url = e.detail;
             let details = {
                 url: url,
                 element: e.target
             };
+            let framer = this;
             if (!frame.isFrameset) {
                 if (requestNavigation(frame, url, details)) return false;
                 return;
@@ -5065,9 +4969,7 @@
             }
             let frameset = frame;
             let framesetScope = framer.lookup(url);
-            if (!framesetScope || !framer.compareFramesetScope(framesetScope)) {
-                return;
-            }
+            if (!framesetScope || !framer.compareFramesetScope(framesetScope)) return;
             if (requestNavigation(frameset, url, details)) return false;
             return;
             function requestNavigation(frame, url, details) {
@@ -5077,22 +4979,20 @@
                 framer.load(url, changeset, frame.isFrameset);
                 return true;
             }
-        },
-        onPageLink: function(url, details) {
-            let framer = this;
+        }
+        onPageLink(url, details) {
             console.warn("Ignoring on-same-page links for now.");
-        },
-        navigate: function(url, changeset) {
-            let framer = this;
-            return framer.load(url, changeset, true);
-        },
-        load: function(url, changeset, changeState) {
+        }
+        navigate(url, changeset) {
+            return this.load(url, changeset, true);
+        }
+        load(url, changeset, changeState) {
             let framer = this;
             let frameset = framer.frameset;
             let mustNotify = changeState || changeState === 0;
             let target = changeset.target;
             let frames = [];
-            recurseFrames(frameset, function(frame) {
+            recurseFrames(frameset, frame => {
                 if (frame.targetname !== target) return;
                 frames.push(frame);
                 return true;
@@ -5106,25 +5006,23 @@
                 responseType: "document"
             };
             let response;
-            return Thenfu.pipe(null, [ function() {
-                if (mustNotify) return notify({
+            return Thenfu.pipe(null, [ () => {
+                if (mustNotify) return Framer.#notify({
                     module: "frameset",
                     type: "leftState",
                     stage: "before",
                     url: document.URL
                 });
-            }, function() {
-                forEach(frames, function(frame) {
+            }, () => {
+                forEach(frames, frame => {
                     frame.attr("src", fullURL);
                 });
-            }, function() {
-                return httpProxy.load(nohash, request).then(function(resp) {
-                    response = resp;
-                });
-            }, function() {
-                if (changeState) return historyManager.pushState(changeset, "", url, function(state) {});
-            }, function() {
-                if (mustNotify) return notify({
+            }, () => httpProxy.load(nohash, request).then(resp => {
+                response = resp;
+            }), () => {
+                if (changeState) return historyManager.pushState(changeset, "", url, state => {});
+            }, () => {
+                if (mustNotify) return Framer.#notify({
                     module: "frameset",
                     type: "enteredState",
                     stage: "after",
@@ -5132,125 +5030,253 @@
                 });
             } ]);
             function recurseFrames(parentFrame, fn) {
-                forEach(parentFrame.frames, function(frame) {
+                forEach(parentFrame.frames, frame => {
                     let found = fn(frame);
                     if (!found) recurseFrames(frame, fn);
                 });
             }
-        },
-        onPopState: function(changeset) {
-            let framer = this;
-            let frameset = framer.frameset;
-            let frames = [];
+        }
+        onPopState(changeset) {
             let url = changeset.url;
             if (url !== document.URL) {
                 console.warn("Popped state URL does not match address-bar URL.");
             }
-            framer.load(url, changeset, 0);
+            this.load(url, changeset, 0);
         }
-    });
-    defaults(framer, {
-        lookup: function(docURL) {
-            let framer = this;
-            if (!framer.options.lookup) return;
-            let result = framer.options.lookup(docURL);
+        lookup(docURL) {
+            if (!this.options.lookup) return;
+            let result = this.options.lookup(docURL);
             if (result == null || result === false) return false;
-            if (typeof result === "string") result = implyFramesetScope(result, docURL);
+            if (typeof result === "string") result = Framer.#implyFramesetScope(result, docURL);
             if (typeof result !== "object" || !result.scope || !result.framesetURL) throw Error("Unexpected result from frameset lookup");
             return result;
-        },
-        detect: function(srcDoc) {
-            let framer = this;
-            if (!framer.options.detect) return;
-            let result = framer.options.detect(srcDoc);
+        }
+        detect(srcDoc) {
+            if (!this.options.detect) return;
+            let result = this.options.detect(srcDoc);
             if (result == null || result === false) return false;
-            if (typeof result === "string") result = implyFramesetScope(result, document.URL);
+            if (typeof result === "string") result = Framer.#implyFramesetScope(result, document.URL);
             if (typeof result !== "object" || !result.scope || !result.framesetURL) throw Error("Unexpected result from frameset detect");
             return result;
-        },
-        compareFramesetScope: function(settings) {
-            let framer = this;
-            if (framer.framesetURL !== settings.framesetURL) return false;
-            if (framer.scope !== settings.scope) return false;
-            return true;
-        },
-        inferChangeset: inferChangeset
-    });
-    function implyFramesetScope(framesetSrc, docSrc) {
-        let docURL = URLux.create(docSrc);
-        let docSiteURL = URLux.create(docURL.origin);
-        framesetSrc = docSiteURL.resolve(framesetSrc);
-        let scope = implyScope(framesetSrc, docSrc);
-        return {
-            scope: scope,
-            framesetURL: framesetSrc
-        };
-    }
-    function implyScope(framesetSrc, docSrc) {
-        let docURL = URLux.create(docSrc);
-        let framesetURL = URLux.create(framesetSrc);
-        let scope = docURL.base;
-        let framesetBase = framesetURL.base;
-        if (scope.indexOf(framesetBase) >= 0) scope = framesetBase;
-        return scope;
-    }
-    function inferChangeset(url, partial) {
-        let inferred = {
-            url: url
-        };
-        switch (typeof partial) {
-          case "string":
-            inferred.target = partial;
-            break;
-
-          case "object":
-          default:
-            throw Error("Invalid changeset returned from lookup()");
-            break;
         }
-        return inferred;
-    }
-    let notify = function(msg) {
-        let module;
-        switch (msg.module) {
-          case "frameset":
-            module = framer.frameset.options;
-            break;
+        compareFramesetScope(settings) {
+            if (this.framesetURL !== settings.framesetURL) return false;
+            if (this.scope !== settings.scope) return false;
+            return true;
+        }
+        inferChangeset(url, partial) {
+            return Framer.#inferChangeset(url, partial);
+        }
+        static #encode(form) {
+            let data = [];
+            forEach(form.elements, el => {
+                if (!el.name) return;
+                data.push(el.name + "=" + encodeURIComponent(el.value));
+            });
+            return data.join("&");
+        }
+        static #prepareFrameset(dstDoc, definition) {
+            if (Framer.#getFramesetMarker(dstDoc)) throw Error("The HFrameset has already been applied");
+            let srcDoc = cloneDocument(definition.document);
+            let selfMarker;
+            return Thenfu.pipe(null, [ () => {
+                let dstHead = dstDoc.head;
+                forEach(findAll$1("link[rel|=stylesheet]", dstHead), node => {
+                    dstHead.removeChild(node);
+                });
+            }, () => {
+                let dstBody = dstDoc.body;
+                let node;
+                while (node = dstBody.firstChild) dstBody.removeChild(node);
+            }, () => {
+                selfMarker = Framer.#getSelfMarker(dstDoc);
+                if (selfMarker) return;
+                selfMarker = dstDoc.createElement("link");
+                selfMarker.rel = SELF_REL;
+                selfMarker.href = dstDoc.URL;
+                dstDoc.head.insertBefore(selfMarker, dstDoc.head.firstChild);
+            }, () => {
+                let framesetMarker = dstDoc.createElement("link");
+                framesetMarker.rel = FRAMESET_REL;
+                framesetMarker.href = definition.src;
+                dstDoc.head.insertBefore(framesetMarker, selfMarker);
+            }, () => {
+                Framer.#mergeElement(dstDoc.documentElement, srcDoc.documentElement);
+                Framer.#mergeElement(dstDoc.head, srcDoc.head);
+                Framer.#mergeHead(dstDoc, srcDoc.head, true);
+                forEach(findAll$1("script", dstDoc.head), script => {
+                    scriptQueue.push(script);
+                });
+                return scriptQueue.empty();
+            } ]);
+        }
+        static #prerenderFrameset(dstDoc, definition) {
+            let srcBody = definition.element;
+            let dstBody = dstDoc.body;
+            Framer.#mergeElement(dstBody, srcBody);
+        }
+        static #separateHead(dstDoc, isFrameset) {
+            let dstHead = dstDoc.head;
+            let framesetMarker = Framer.#getFramesetMarker(dstDoc);
+            if (!framesetMarker) throw Error(`No ${FRAMESET_REL} marker found. `);
+            let selfMarker = Framer.#getSelfMarker(dstDoc);
+            if (isFrameset) forEach(siblings("after", framesetMarker, "before", selfMarker), remove); else forEach(siblings("after", selfMarker), remove);
+            function remove(node) {
+                if (getTagName(node) == "script" && (!node.type || node.type.match(/^text\/javascript/i))) return;
+                dstHead.removeChild(node);
+            }
+        }
+        static #mergeHead(dstDoc, srcHead, isFrameset) {
+            let baseURL = URLux.create(dstDoc.URL);
+            let dstHead = dstDoc.head;
+            let framesetMarker = Framer.#getFramesetMarker();
+            if (!framesetMarker) throw Error(`No ${FRAMESET_REL} marker found. `);
+            let selfMarker = Framer.#getSelfMarker();
+            Framer.#separateHead(dstDoc, isFrameset);
+            forEach(Array.from(srcHead.childNodes), srcNode => {
+                if (srcNode.nodeType != 1) return;
+                switch (getTagName(srcNode)) {
+                  default:
+                    break;
 
-          default:
+                  case "title":
+                    if (isFrameset) return;
+                    if (!srcNode.innerHTML) return;
+                    break;
+
+                  case "link":
+                    break;
+
+                  case "meta":
+                    if (srcNode.httpEquiv) return;
+                    break;
+
+                  case "style":
+                    break;
+
+                  case "script":
+                    if (!isFrameset) return;
+                    if (!srcNode.type || /^text\/javascript$/i.test(srcNode.type)) srcNode.type = "text/javascript?disabled";
+                    break;
+                }
+                if (isFrameset) insertNode$1("beforebegin", selfMarker, srcNode); else insertNode$1("beforeend", dstHead, srcNode);
+                if (getTagName(srcNode) == "link") srcNode.href = srcNode.getAttribute("href");
+            });
+        }
+        static #mergeElement(dst, src) {
+            if (dst === src) return;
+            removeAttributes(dst);
+            copyAttributes(dst, src);
+            dst.removeAttribute("style");
+        }
+        static #getFramesetMarker(doc) {
+            if (!doc) doc = document;
+            return find$2(`link[rel~=${FRAMESET_REL}]`, doc.head);
+        }
+        static #getSelfMarker(doc) {
+            if (!doc) doc = document;
+            return find$2(`link[rel~=${SELF_REL}]`, doc.head);
+        }
+        static #implyFramesetScope(framesetSrc, docSrc) {
+            let docURL = URLux.create(docSrc);
+            let docSiteURL = URLux.create(docURL.origin);
+            framesetSrc = docSiteURL.resolve(framesetSrc);
+            let scope = Framer.#implyScope(framesetSrc, docSrc);
+            return {
+                scope: scope,
+                framesetURL: framesetSrc
+            };
+        }
+        static #implyScope(framesetSrc, docSrc) {
+            let docURL = URLux.create(docSrc);
+            let framesetURL = URLux.create(framesetSrc);
+            let scope = docURL.base;
+            let framesetBase = framesetURL.base;
+            if (scope.indexOf(framesetBase) >= 0) scope = framesetBase;
+            return scope;
+        }
+        static #inferChangeset(url, partial) {
+            let inferred = {
+                url: url
+            };
+            switch (typeof partial) {
+              case "string":
+                inferred.target = partial;
+                break;
+
+              default:
+                throw Error("Invalid changeset returned from lookup()");
+            }
+            return inferred;
+        }
+        static #notify(msg) {
+            let module;
+            switch (msg.module) {
+              case "frameset":
+                module = framer.frameset.options;
+                break;
+
+              default:
+                return Thenfu.asap();
+            }
+            let handler = module[msg.type];
+            if (!handler) return Thenfu.asap();
+            let listener;
+            if (handler[msg.stage]) listener = handler[msg.stage]; else switch (msg.module) {
+              case "frame":
+                listener = msg.type == "bodyLeft" ? msg.stage == "before" ? handler : null : msg.type == "bodyEntered" ? msg.stage == "after" ? handler : null : null;
+                break;
+
+              case "frameset":
+                listener = msg.type == "leftState" ? msg.stage == "before" ? handler : null : msg.type == "enteredState" ? msg.stage == "after" ? handler : null : null;
+                break;
+
+              default:
+                throw Error(msg.module + " is invalid module");
+            }
+            if (typeof listener == "function") {
+                let promise = Thenfu.defer(() => {
+                    listener(msg);
+                });
+                promise["catch"](err => {
+                    throw Error(err);
+                });
+                return promise;
+            }
             return Thenfu.asap();
         }
-        let handler = module[msg.type];
-        if (!handler) return Thenfu.asap();
-        let listener;
-        if (handler[msg.stage]) listener = handler[msg.stage]; else switch (msg.module) {
-          case "frame":
-            listener = msg.type == "bodyLeft" ? msg.stage == "before" ? handler : null : msg.type == "bodyEntered" ? msg.stage == "after" ? handler : null : null;
-            break;
-
-          case "frameset":
-            listener = msg.type == "leftState" ? msg.stage == "before" ? handler : null : msg.type == "enteredState" ? msg.stage == "after" ? handler : null : null;
-            break;
-
-          default:
-            throw Error(msg.module + " is invalid module");
-            break;
+        static #registerFrames(framesetDef) {
+            forOwn(framesetDef.frames, (o, key) => {
+                frameDefinitions.set(key, o);
+            });
         }
-        if (typeof listener == "function") {
-            let promise = Thenfu.defer(function() {
-                listener(msg);
-            });
-            promise["catch"](function(err) {
-                throw Error(err);
-            });
-            return promise;
-        } else return Thenfu.asap();
-    };
-    function registerFrames(framesetDef) {
-        forOwn(framesetDef.frames, function(o, key) {
-            frameDefinitions.set(key, o);
-        });
+        static #registerFramesetElement() {
+            sprockets.registerElement("body", HFrameset);
+            let cssText = [ "html, body { margin: 0; padding: 0; }", "html { width: 100%; height: 100%; }" ];
+            let style = document.createElement("style");
+            style.textContent = cssText.join("\n");
+            document.head.insertBefore(style, document.head.firstChild);
+        }
     }
+    let framer = new Framer;
+    HFrameset.attached = function(handlers) {
+        HBase.attached.call(this, handlers);
+        let frameset = this;
+        frameset.definition = framer.definition;
+        defaults(frameset, {
+            frames: []
+        });
+        ConfigurableBody.attached.call(this, handlers);
+    };
+    HFrameset.enteredDocument = function() {
+        let frameset = this;
+        framer.framesetEntered(frameset);
+        frameset.render();
+    };
+    HFrameset.leftDocument = function() {
+        let frameset = this;
+        framer.framesetLeft(frameset);
+    };
     function interceptFrameElements() {
         assign(HFrame.prototype, {
             frameEntered: function(frame) {
@@ -5279,50 +5305,6 @@
             }
         });
     }
-    class HFrameset extends HBase {
-        static {
-            sprockets.withAria(this, {
-                role: "frameset",
-                isFrameset: true
-            });
-        }
-        frameEntered(frame) {
-            this.frames.push(frame);
-        }
-        frameLeft(frame) {
-            let index = this.frames.indexOf(frame);
-            this.frames.splice(index);
-        }
-        render() {
-            let frameset = this;
-            let definition = frameset.definition;
-            let dstBody = this.element;
-            let srcBody = definition.render();
-            return Thenfu.pipe(null, [ function() {
-                forEach(Array.from(srcBody.childNodes), function(node) {
-                    sprockets.insertNode("beforeend", dstBody, node);
-                });
-            } ]);
-        }
-        static attached(handlers) {
-            HBase.attached.call(this, handlers);
-            let frameset = this;
-            frameset.definition = framer.definition;
-            defaults(frameset, {
-                frames: []
-            });
-            ConfigurableBody.attached.call(this, handlers);
-        }
-        static enteredDocument() {
-            let frameset = this;
-            framer.framesetEntered(frameset);
-            frameset.render();
-        }
-        static leftDocument() {
-            let frameset = this;
-            framer.framesetLeft(frameset);
-        }
-    }
     function retargetFramesetElements() {
         assign(HBase.prototype, {
             lookup: function(url, details) {
@@ -5350,13 +5332,6 @@
                 }
             });
         };
-    }
-    function registerFramesetElement() {
-        sprockets.registerElement("body", HFrameset);
-        let cssText = [ "html, body { margin: 0; padding: 0; }", "html { width: 100%; height: 100%; }" ];
-        let style = document.createElement("style");
-        style.textContent = cssText;
-        document.head.insertBefore(style, document.head.firstChild);
     }
     (function() {
         let stuff = assign({}, _);
