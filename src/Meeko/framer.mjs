@@ -193,6 +193,10 @@ start(startOptions) {
 		// Parse frameset definition (extract frame configs, transforms, etc.)
 		() => definition.preprocess(),
 
+		// Insert frameset/self markers so content-specific head elements can be managed
+		// Order: [frameset marker] [frameset elements] [self marker] [content elements]
+		() => Framer.#insertMarkers(document.URL, framer.framesetURL, true),
+
 		// Register elements, start sprockets, initialize history
 		() => framer.#activate()
 	]);
@@ -672,7 +676,6 @@ static #prepareFrameset(dstDoc, definition) {
 	if (Framer.#getFramesetMarker(dstDoc)) throw Error('The HFrameset has already been applied');
 
 	let srcDoc = DOM.cloneDocument(definition.document);
-	let selfMarker;
 
 	return Thenfu.pipe(null, [
 	// Strip existing stylesheets from the live document head
@@ -686,22 +689,8 @@ static #prepareFrameset(dstDoc, definition) {
 		let node;
 		while (node = dstBody.firstChild) dstBody.removeChild(node);
 	},
-	// Ensure a <link rel="self"> marker exists (records the original content page URL)
-	() => {
-		selfMarker = Framer.#getSelfMarker(dstDoc);
-		if (selfMarker) return;
-		selfMarker = dstDoc.createElement('link');
-		selfMarker.rel = SELF_REL;
-		selfMarker.href = dstDoc.URL;
-		dstDoc.head.insertBefore(selfMarker, dstDoc.head.firstChild);
-	},
-	// Insert a <link rel="frameset"> marker before the self marker (records the frameset URL)
-	() => {
-		let framesetMarker = dstDoc.createElement('link');
-		framesetMarker.rel = FRAMESET_REL;
-		framesetMarker.href = definition.src;
-		dstDoc.head.insertBefore(framesetMarker, selfMarker);
-	},
+	// Ensure self/frameset markers are in place
+	() => Framer.#insertMarkers(dstDoc.URL, definition.src, false),
 	// Merge frameset attributes and head elements into the live document, then execute scripts
 	() => {
 		Framer.#mergeElement(dstDoc.documentElement, srcDoc.documentElement);
@@ -835,6 +824,45 @@ static #getFramesetMarker(doc) {
 static #getSelfMarker(doc) {
 	if (!doc) doc = document;
 	return DOM.find(`link[rel~=${SELF_REL}]`, doc.head);
+}
+
+/**
+ * Insert frameset/self marker links into the document head.
+ * Establishes the head partitioning: [frameset marker] [frameset elements] [self marker] [content elements].
+ *
+ * In content-first mode (isFrameset=false): the self marker goes first (at the top),
+ * frameset marker is inserted before it. Frameset elements will be merged between them later.
+ *
+ * In frameset-first mode (isFrameset=true): the frameset marker goes first (before existing content),
+ * self marker goes last (after existing frameset content).
+ *
+ * Reuses an existing self marker if boot.js already created one.
+ *
+ * @param {string} selfURL - The URL for the self marker (content page URL).
+ * @param {string} framesetURL - The URL for the frameset marker.
+ * @param {boolean} isFrameset - true if the landing page is the frameset document.
+ */
+static #insertMarkers(selfURL, framesetURL, isFrameset) {
+	let head = document.head;
+
+	let framesetMarker = document.createElement('link');
+	framesetMarker.rel = FRAMESET_REL;
+	framesetMarker.href = framesetURL;
+
+	let selfMarker = Framer.#getSelfMarker();
+	if (!selfMarker) {
+		selfMarker = document.createElement('link');
+		selfMarker.rel = SELF_REL;
+		selfMarker.href = selfURL;
+	}
+
+	if (isFrameset) {
+		head.insertBefore(framesetMarker, head.firstChild);
+		head.appendChild(selfMarker);
+	} else {
+		head.insertBefore(selfMarker, head.firstChild);
+		head.insertBefore(framesetMarker, selfMarker);
+	}
 }
 
 /**
