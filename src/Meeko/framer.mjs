@@ -173,7 +173,7 @@ start(startOptions) {
 
 	let framesetURL = URLux.create(document.URL);
 	framer.framesetURL = framesetURL.nohash;
-	framer.scope = framesetURL.base;
+	framer.scope = Framer.#deriveScope(startOptions && startOptions.scope, startURL, framesetURL);
 
 	let settings = { framesetURL: framer.framesetURL, scope: framer.scope };
 	let definition = new HFramesetDefinition(document, settings);
@@ -200,6 +200,28 @@ start(startOptions) {
 		// Register elements, start sprockets, initialize history
 		() => framer.#activate()
 	]);
+}
+
+/**
+ * Derive the scope for frameset-first mode.
+ *
+ * If scope is provided, uses it directly.
+ * Otherwise infers from start_url's base directory (if start_url is provided)
+ * or falls back to the frameset URL's base directory.
+ *
+ * @param {string|null} scope - Explicit scope override.
+ * @param {string|null} startURL - Start URL to derive scope from.
+ * @param {URLux} framesetURL - The parsed frameset URL.
+ * @returns {string} The resolved scope URL.
+ * @throws {Error} If start_url is not within the resolved scope.
+ */
+static #deriveScope(scope, startURL, framesetURL) {
+	let resolvedStartURL = startURL ? URLux.create(framesetURL.resolve(startURL)).nohash : null;
+	scope = scope || (resolvedStartURL ? URLux.create(resolvedStartURL).base : framesetURL.base);
+	if (resolvedStartURL && resolvedStartURL.indexOf(scope) !== 0) {
+		throw Error('start_url is not within scope: ' + resolvedStartURL);
+	}
+	return scope;
 }
 
 /**
@@ -587,7 +609,10 @@ onPopState(changeset) {
  * @throws {Error} If options.lookup returns an invalid result.
  */
 lookup(docURL) {
-	if (!this.options.lookup) return;
+	if (!this.options.lookup) {
+		if (docURL.indexOf(this.scope) === 0) return { scope: this.scope, framesetURL: this.framesetURL };
+		return false;
+	}
 	let result = this.options.lookup(docURL);
 	if (result == null || result === false) return false;
 	if (typeof result === 'string') result = Framer.#implyFramesetScope(result, docURL);
