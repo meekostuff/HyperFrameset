@@ -108,11 +108,13 @@ start(startOptions) {
 
 	return Thenfu.pipe(null, [
 
-	() => { // sanity check
+	// Wait for document.body to exist
+	() => {
 		return Thenfu.wait(() => !!document.body);
 	},
 
-	() => { // lookup or detect frameset.URL
+	// Resolve frameset URL via lookup (by URL) or detect (by inspecting content document)
+	() => {
 		let framerConfig;
 		framerConfig = framer.lookup(document.URL);
 		if (framerConfig) return framerConfig;
@@ -120,7 +122,8 @@ start(startOptions) {
 			.then((doc) => framer.detect(doc));
 	},
 
-	(framerConfig) => { // initiate fetch of frameset.URL
+	// Fetch the frameset document and create a definition from it
+	(framerConfig) => {
 		if (!framerConfig) throw Error('No frameset could be determined for this page');
 		framer.scope = framerConfig.scope; // FIXME shouldn't set this until loadFramesetDefinition() returns success
 		let framesetURL = URLux.create(framerConfig.framesetURL);
@@ -130,6 +133,7 @@ start(startOptions) {
 		.then((response) => new HFramesetDefinition(response.document, framerConfig));
 	},
 
+	// Prepare the live document, preprocess the definition, and pre-render the frameset body
 	/** @param {HFramesetDefinition} definition */
 	(definition) => {
 		return Thenfu.pipe(definition, [
@@ -142,6 +146,7 @@ start(startOptions) {
 		]);
 	},
 
+	// Register elements, start sprockets, initialize history
 	() => framer.#activate()
 
 	]);
@@ -177,14 +182,18 @@ start(startOptions) {
 
 	return Thenfu.pipe(null, [
 
+		// Wait for document.body to exist
 		() => Thenfu.wait(() => !!document.body),
 
-		() => { // Restore the user-requested URL so downstream lookup sees the content URL
+		// Replace the address bar URL with start_url so downstream code sees the content URL
+		() => {
 			if (startURL) history.replaceState(null, '', startURL);
 		},
 
+		// Parse frameset definition (extract frame configs, transforms, etc.)
 		() => definition.preprocess(),
 
+		// Register elements, start sprockets, initialize history
 		() => framer.#activate()
 	]);
 }
@@ -202,6 +211,7 @@ start(startOptions) {
 	let framer = this;
 	return Thenfu.pipe(null, [
 
+	// Register global event listeners, frame definitions, sprocket elements, and start DOM monitoring
 	() => {
 		window.addEventListener('click', (e) => {
 			if (e.defaultPrevented) return;
@@ -226,6 +236,7 @@ start(startOptions) {
 		return sprockets.start({ manual: true }); // FIXME should be a promise
 	},
 
+	// Wait for the frameset sprocket to enter the document, then start history management
 	() => { // TODO ideally frameset rendering wouldn't start until after this step
 		return framer.framesetReady.promise
 		.then(() => {
@@ -238,10 +249,12 @@ start(startOptions) {
 		});
 	},
 
+	// Fire the enteredState lifecycle notification
 	() => { // FIXME this should wait until at least the landing document has been rendered in one frame
 		Framer.#notify({ module: 'frameset', type: 'enteredState', stage: 'after', url: document.URL });
 	},
 
+	// Wait for all stylesheets to finish loading before considering the frameset ready
 	// TODO it would be nice if <body> wasn't populated until stylesheets were loaded
 	() => Thenfu.wait(() => DOM.checkStyleSheets())
 
@@ -519,12 +532,17 @@ load(url, changeset, changeState) { // FIXME doesn't support replaceState
 	let response;
 
 	return Thenfu.pipe(null, [
+	// Notify lifecycle: leaving current state
 	() => {
 		if (mustNotify) return Framer.#notify({ module: 'frameset', type: 'leftState', stage: 'before', url: document.URL });
 	},
+	// Set @src on matching frames to trigger their refresh/load cycle
 	() => { _.forEach(frames, (frame) => { frame.attr('src', fullURL); }); },
+	// Fetch the document via httpProxy
 	() => httpProxy.load(nohash, request).then((resp) => { response = resp; }),
+	// Push new history state (skipped for popstate-triggered loads)
 	() => { if (changeState) return historyManager.pushState(changeset, '', url, (state) => {}); },
+	// Notify lifecycle: entered new state
 	() => {
 		if (mustNotify) return Framer.#notify({ module: 'frameset', type: 'enteredState', stage: 'after', url: url });
 	}
@@ -657,15 +675,18 @@ static #prepareFrameset(dstDoc, definition) {
 	let selfMarker;
 
 	return Thenfu.pipe(null, [
+	// Strip existing stylesheets from the live document head
 	() => {
 		let dstHead = dstDoc.head;
 		_.forEach(DOM.findAll('link[rel|=stylesheet]', dstHead), (node) => { dstHead.removeChild(node); });
 	},
+	// Clear the live document body
 	() => {
 		let dstBody = dstDoc.body;
 		let node;
 		while (node = dstBody.firstChild) dstBody.removeChild(node);
 	},
+	// Ensure a <link rel="self"> marker exists (records the original content page URL)
 	() => {
 		selfMarker = Framer.#getSelfMarker(dstDoc);
 		if (selfMarker) return;
@@ -674,12 +695,14 @@ static #prepareFrameset(dstDoc, definition) {
 		selfMarker.href = dstDoc.URL;
 		dstDoc.head.insertBefore(selfMarker, dstDoc.head.firstChild);
 	},
+	// Insert a <link rel="frameset"> marker before the self marker (records the frameset URL)
 	() => {
 		let framesetMarker = dstDoc.createElement('link');
 		framesetMarker.rel = FRAMESET_REL;
 		framesetMarker.href = definition.src;
 		dstDoc.head.insertBefore(framesetMarker, selfMarker);
 	},
+	// Merge frameset attributes and head elements into the live document, then execute scripts
 	() => {
 		Framer.#mergeElement(dstDoc.documentElement, srcDoc.documentElement);
 		Framer.#mergeElement(dstDoc.head, srcDoc.head);
