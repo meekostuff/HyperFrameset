@@ -120,5 +120,3 @@ dateFormat.i18n = {
 };
 
 export default dateFormat;
-
-

@@ -1,3 +1,8 @@
+/*!
+ * HyperFrameset
+ * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+ * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+ */
 import dateFormat from './Meeko/dateFormat.mjs';
 import * as _ from './Meeko/stuff.mjs';
 import Registry from './Meeko/Registry.mjs';

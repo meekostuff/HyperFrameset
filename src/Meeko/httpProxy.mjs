@@ -1,3 +1,8 @@
+/*!
+ * httpProxy
+ * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+ * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+ */
 import * as _ from './stuff.mjs';
 import URLux from './URLux.mjs';
 import * as DOM from './DOM.mjs';
