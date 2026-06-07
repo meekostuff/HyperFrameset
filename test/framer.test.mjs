@@ -58,9 +58,18 @@ describe('framer.mjs', () => {
   });
 
   describe('lookup', () => {
-    it('returns undefined when no lookup option configured', () => {
+    it('returns scope match when no lookup option configured and URL is within scope', () => {
       framer.options = {};
-      expect(framer.lookup('http://example.com/')).toBeUndefined();
+      framer.scope = 'http://example.com/';
+      framer.framesetURL = 'http://example.com/frameset.html';
+      let result = framer.lookup('http://example.com/page.html');
+      expect(result).toEqual({ scope: 'http://example.com/', framesetURL: 'http://example.com/frameset.html' });
+    });
+
+    it('returns false when no lookup option configured and URL is outside scope', () => {
+      framer.options = {};
+      framer.scope = 'http://example.com/app/';
+      expect(framer.lookup('http://other.com/page.html')).toBe(false);
     });
 
     it('returns false when lookup returns null', () => {
