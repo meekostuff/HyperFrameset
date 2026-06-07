@@ -3,41 +3,19 @@
  * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
  * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
  */
-import SimpleTaskQueue from './SimpleTaskQueue.mjs';
 import HistoryState from './HistoryState.mjs';
 
 /**
- * Wrapper around the browser History API providing locking around state updates
- * and throttling of popstate events via an internal task queue.
- * 
+ * Lightweight wrapper around the Navigation API.
+ * Maintains the same interface as the legacy history.pushState-based implementation.
+ *
  * Must be started with start() before use. Cannot be restarted.
- * All state-changing methods are serialized through the task queue to prevent
- * concurrent history modifications.
  */
 class HistoryManager {
 
-#taskQueue = new SimpleTaskQueue();
 #currentState;
 #popStateHandler;
 #started = false;
-
-constructor() {
-	if (history.replaceState) window.addEventListener('popstate', (e) => {
-		if (e.stopImmediatePropagation) e.stopImmediatePropagation();
-		else e.stopPropagation();
-
-		let newSettings = e.state;
-		if (!HistoryState.isValid(newSettings)) {
-			console.warn('Ignoring invalid PopStateEvent');
-			return;
-		}
-		this.#taskQueue.reset(() => {
-			this.#currentState = new HistoryState(newSettings);
-			if (!this.#popStateHandler) return;
-			return this.#popStateHandler(this.#currentState);
-		});
-	}, true);
-}
 
 /**
  * Get the current history state.
@@ -49,26 +27,38 @@ getState() {
 
 /**
  * Initialize the history manager. Can only be called once.
- * Replaces the current history entry and registers a popstate listener.
+ * Replaces the current navigation entry and registers a traverse listener.
  * @param {*} data - Application data to store in state
  * @param {string} title - Page title
  * @param {string} url - URL for the history entry
  * @param {Function} onNewState - Called with the new HistoryState on initialization
- * @param {Function} onPopState - Called with the restored HistoryState on popstate events
+ * @param {Function} onPopState - Called with the restored HistoryState on traverse events
  * @returns {Promise}
  */
-start(data, title, url, onNewState, onPopState) { // FIXME this should call onPopState if history.state is defined
-	return this.#taskQueue.now(() => {
-		if (this.#started) throw Error('historyManager has already started');
-		this.#started = true;
-		this.#popStateHandler = onPopState;
-		let newState = HistoryState.create(data, title, url);
-		if (history.replaceState) {
-			history.replaceState(newState.settings, title, url);
+start(data, title, url, onNewState, onPopState) {
+	if (this.#started) throw Error('historyManager has already started');
+	this.#started = true;
+	this.#popStateHandler = onPopState;
+
+	navigation.addEventListener('navigate', (e) => {
+		if (!e.canIntercept) return;
+		if (e.navigationType === 'traverse') {
+			e.intercept({
+				handler: () => {
+					let state = navigation.currentEntry.getState();
+					if (!HistoryState.isValid(state)) return;
+					this.#currentState = new HistoryState(state);
+					if (this.#popStateHandler) this.#popStateHandler(this.#currentState);
+				}
+			});
 		}
-		this.#currentState = newState;
-		return onNewState(newState);
 	});
+
+	let newState = HistoryState.create(data, title, url);
+	history.replaceState(null, '', url);
+	navigation.updateCurrentEntry({ state: newState.settings });
+	this.#currentState = newState;
+	return Promise.resolve(onNewState(this.#currentState));
 }
 
 /**
@@ -81,15 +71,14 @@ start(data, title, url, onNewState, onPopState) { // FIXME this should call onPo
  * @returns {Promise}
  */
 newState(data, title, url, useReplace, callback) {
-	return this.#taskQueue.now(() => {
-		let newState = HistoryState.create(data, title, url);
-		if (history.replaceState) {
-			if (useReplace) history.replaceState(newState.settings, title, url);
-			else history.pushState(newState.settings, title, url);
-		}
-		this.#currentState = newState;
-		if (callback) return callback(newState);
-	});
+	let newState = HistoryState.create(data, title, url);
+	if (useReplace) history.replaceState(null, '', url);
+	else history.pushState(null, '', url);
+
+	navigation.updateCurrentEntry({ state: newState.settings });
+	this.#currentState = newState;
+	if (callback) return Promise.resolve(callback(this.#currentState));
+	return Promise.resolve();
 }
 
 /**
