@@ -220,7 +220,7 @@ describe('normalizeScopedStyles', () => {
     );
   }
 
-  test('moves scoped style to head with prefixed selectors', () => {
+  test('moves scoped style to head with @scope wrapper', () => {
     let doc = makeDoc(
       '<div class="allowed"><style scoped>.foo { color: red; }</style><p>content</p></div>'
     );
@@ -228,9 +228,10 @@ describe('normalizeScopedStyles', () => {
     // style should be in head now
     expect(doc.head.querySelectorAll('style').length).toBe(1);
     expect(doc.body.querySelectorAll('style').length).toBe(0);
-    // selector should be prefixed with scope id
+    // should be wrapped in @scope with scopeid attribute selector
     let cssText = doc.head.querySelector('style').textContent;
-    expect(cssText).toContain('#');
+    expect(cssText).toContain('@scope');
+    expect(cssText).toContain('scopeid');
     expect(cssText).toContain('.foo');
   });
 
@@ -243,6 +244,15 @@ describe('normalizeScopedStyles', () => {
     expect(scope.hasAttribute('scopeid')).toBe(true);
   });
 
+  test('does not set id on scope element', () => {
+    let doc = makeDoc(
+      '<div class="allowed"><style scoped>.x { color: blue; }</style></div>'
+    );
+    normalizeScopedStyles(doc, '.allowed');
+    let scope = doc.body.querySelector('.allowed');
+    expect(scope.hasAttribute('id')).toBe(false);
+  });
+
   test('preserves existing id on scope element', () => {
     let doc = makeDoc(
       '<div class="allowed" id="myid"><style scoped>.x { color: blue; }</style></div>'
@@ -250,18 +260,7 @@ describe('normalizeScopedStyles', () => {
     normalizeScopedStyles(doc, '.allowed');
     let scope = doc.body.querySelector('.allowed');
     expect(scope.getAttribute('id')).toBe('myid');
-    // scopeid is set but id stays as original
     expect(scope.hasAttribute('scopeid')).toBe(true);
-  });
-
-  test('assigns id from scopeid when no existing id', () => {
-    let doc = makeDoc(
-      '<div class="allowed"><style scoped>.x { color: blue; }</style></div>'
-    );
-    normalizeScopedStyles(doc, '.allowed');
-    let scope = doc.body.querySelector('.allowed');
-    let scopeId = scope.getAttribute('scopeid');
-    expect(scope.getAttribute('id')).toBe(scopeId);
   });
 
   test('removes scoped attribute from style element', () => {
@@ -293,17 +292,15 @@ describe('normalizeScopedStyles', () => {
     expect(scopes[0].getAttribute('scopeid')).not.toBe(scopes[1].getAttribute('scopeid'));
   });
 
-  test('prefixes comma-separated selectors', () => {
+  test('wraps comma-separated selectors in @scope', () => {
     let doc = makeDoc(
       '<div class="allowed"><style scoped>.a, .b { color: red; }</style></div>'
     );
     normalizeScopedStyles(doc, '.allowed');
     let cssText = doc.head.querySelector('style').textContent;
     let scopeId = doc.body.querySelector('.allowed').getAttribute('scopeid');
-    // both selectors should be prefixed
-    let prefix = `#${scopeId}`;
-    let prefixCount = (cssText.match(new RegExp(`#${scopeId}`, 'g')) || []).length;
-    expect(prefixCount).toBeGreaterThanOrEqual(2);
+    expect(cssText).toContain(`@scope ([scopeid="${scopeId}"])`);
+    expect(cssText).toContain('.a, .b');
   });
 
   test('does nothing when no scoped styles exist', () => {
@@ -384,4 +381,22 @@ describe('browser assumptions: style.sheet in parsed documents', () => {
     expect(sheet).not.toBeNull();
     expect(sheet.cssRules.length).toBe(1);
   });
+});
+
+describe('browser assumptions: CSS @scope', () => {
+
+  test('@scope is supported', () => {
+    expect(CSS.supports('selector(:scope)')).toBe(true);
+  });
+
+  test('@scope rule scopes styles to a subtree', () => {
+    let doc = document.implementation.createHTMLDocument('');
+    let style = doc.createElement('style');
+    style.textContent = '@scope (#target) { .inner { color: red; } }';
+    doc.head.appendChild(style);
+    let sheet = style.sheet;
+    expect(sheet.cssRules.length).toBe(1);
+    expect(sheet.cssRules[0].cssText).toContain('@scope');
+  });
+
 });

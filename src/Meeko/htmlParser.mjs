@@ -131,86 +131,29 @@ function rebase(doc, scopeURL) {
 }
 
 /**
- * Process `<style scoped>` elements: prefix their CSS selectors with a generated
- * scope ID, remove the `scoped` attribute, and move them to `<head>`.
+ * Process `<style scoped>` elements: wrap their CSS in an @scope rule targeting
+ * a generated scope ID, remove the `scoped` attribute, and move them to `<head>`.
  * Styles whose parent doesn't match allowedScopeSelector are removed entirely.
  * @param {Document} doc - The document containing scoped styles.
  * @param {string} allowedScopeSelector - CSS selector for valid parent elements.
  */
 function normalizeScopedStyles(doc, allowedScopeSelector) {
-	let scopedStyles = DOM.findAll('style[scoped]', doc.body);
-	_.forEach(scopedStyles, (el, index) => {
+	let scopedStyles = doc.body.querySelectorAll('style[scoped]');
+	scopedStyles.forEach((el, index) => {
 		let scope = el.parentNode;
-		if (!DOM.matches(scope, allowedScopeSelector)) {
+		if (!scope.matches(allowedScopeSelector)) {
 			console.warn(`Removing <style scoped>. Must be child of ${allowedScopeSelector}`);
-			scope.removeChild(el);
+			el.remove();
 			return;
 		}
-		
+
 		let scopeId = `__scope_${index}__`;
 		scope.setAttribute('scopeid', scopeId);
-		if (scope.hasAttribute('id')) scopeId = scope.getAttribute('id');
-		else scope.setAttribute('id', scopeId);
 
 		el.removeAttribute('scoped');
-		let sheet = el.sheet;
-		forRules(sheet, processRule, scope);
-		let cssText = Array.from(sheet.cssRules, (rule) => {
-				return rule.cssText; 
-			}).join('\n');
-		el.textContent = cssText;
-		DOM.insertNode('beforeend', doc.head, el);
-		return;
+		el.textContent = `@scope ([scopeid="${scopeId}"]) {\n${el.textContent}\n}`;
+		doc.head.appendChild(el);
 	});
-}
-
-/**
- * Prefix a CSS rule's selectors with a scope ID. Handles style rules,
- * media/supports rules (recursively), and removes unsupported rule types.
- * Called via forRules() with `this` bound to the scope element.
- * @param {CSSRule} rule
- * @param {number} id - Rule index within parentRule.
- * @param {CSSStyleSheet|CSSGroupingRule} parentRule
- */
-function processRule(rule, id, parentRule) {
-	let scope = this;
-	switch (rule.type) {
-	case 1: // CSSRule.STYLE_RULE
-		// prefix each selector in selector-chain with scopePrefix
-		// selector-chain is split on COMMA (,) that is not inside BRACKETS. Technically: not followed by a RHB ')' unless first followed by LHB '(' 
-		let scopeId = scope.getAttribute('scopeid');
-		let scopePrefix = `#${scopeId} `;
-		let selectorText = scopePrefix + rule.selectorText.replace(/,(?![^(]*\))/g, `, ${scopePrefix}`);
-		let cssText = rule.cssText.replace(rule.selectorText, '');
-		cssText = `${selectorText} ${cssText}`;
-		parentRule.deleteRule(id);
-		parentRule.insertRule(cssText, id);
-		break;
-
-	case 11: // CSSRule.COUNTER_STYLE_RULE
-		break;
-
-	case 4: // CSSRule.MEDIA_RULE
-	case 12: // CSSRule.SUPPORTS_RULE
-		forRules(rule, processRule, scope);
-		break;
-	
-	default:
-		console.warn('Deleting invalid rule for <style scoped>: \n' + rule.cssText);
-		parentRule.deleteRule(id);
-		break;
-	}
-}
-
-/**
- * Iterate CSS rules in reverse order, invoking callback for each.
- * @param {CSSStyleSheet|CSSGroupingRule} parentRule
- * @param {Function} callback - Called with (rule, index, parentRule).
- * @param {*} context - Bound as `this` in callback.
- */
-function forRules(parentRule, callback, context) {
-	let ruleList = parentRule.cssRules;
-	for (let i=ruleList.length-1; i>=0; i--) callback.call(context, ruleList[i], i, parentRule);
 }
 
 export default {
