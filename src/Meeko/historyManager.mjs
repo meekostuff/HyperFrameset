@@ -55,7 +55,7 @@ start(data, title, url, onNewState, onPopState) {
 	});
 
 	let newState = HistoryState.create(data, title, url);
-	history.replaceState(null, '', url);
+	if (url !== document.URL) history.replaceState(null, '', url);
 	navigation.updateCurrentEntry({ state: newState.settings });
 	this.#currentState = newState;
 	return Promise.resolve(onNewState(this.#currentState));

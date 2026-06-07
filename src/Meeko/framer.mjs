@@ -162,6 +162,9 @@ start(startOptions) {
  * history.replaceState so that downstream lookup sees the content URL
  * rather than the frameset URL.
  *
+ * @limitation Frameset-first mode only supports GET navigation. Apps that
+ * need to handle POST form submissions must use content-first mode instead.
+ *
  * @param {Object} [startOptions] - Startup configuration.
  * @param {string} [startOptions.start_url] - URL to replace in the address bar, representing the initial content page.
  * @returns {Promise} Resolves when the frameset is fully active.
