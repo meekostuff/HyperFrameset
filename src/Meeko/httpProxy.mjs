@@ -1,3 +1,4 @@
+
 /*!
  * httpProxy
  * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
@@ -124,11 +125,9 @@ class HttpProxy {
 			case 'get':
 				const response = this.#cacheLookup(info);
 				if (response) return Thenfu.asap(response);
-				return this.#doRequest(info)
-					.then((response) => {
-						this.#cacheAdd(info, response);
-						return response;
-					});
+				let pending = this.#doRequest(info);
+				this.#cacheAdd(info, pending);
+				return pending;
 			default:
 				let METHOD = _.uc(method);
 				throw Error(`${METHOD} not supported`);

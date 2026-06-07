@@ -565,6 +565,7 @@ load(url, changeset, changeState) { // FIXME doesn't support replaceState
 	// Set @src on matching frames to trigger their refresh/load cycle
 	() => { _.forEach(frames, (frame) => { frame.attr('src', fullURL); }); },
 	// Fetch the document via httpProxy
+	// NOTE .load() is just to sync pushState
 	() => httpProxy.load(nohash, request).then((resp) => { response = resp; }),
 	// Push new history state (skipped for popstate-triggered loads)
 	() => { if (changeState) return historyManager.pushState(changeset, '', url, (state) => {}); },
