@@ -139,3 +139,29 @@ test('load throws for unsupported responseType', async ({ page }) => {
   });
   expect(error).toContain('not supported');
 });
+
+test('concurrent loads of the same URL share one network request', async ({ page }) => {
+  let fetchCount = 0;
+  await page.route('http://mock.test/concurrent.html', route => {
+    fetchCount++;
+    route.fulfill({
+      contentType: 'text/html',
+      body: '<!DOCTYPE html><html><head></head><body><p>concurrent</p></body></html>',
+    });
+  });
+
+  await setup(page);
+
+  const results = await page.evaluate(() => {
+    let p1 = window.httpProxy.load('http://mock.test/concurrent.html');
+    let p2 = window.httpProxy.load('http://mock.test/concurrent.html');
+    return Promise.all([p1, p2]).then(([r1, r2]) => ({
+      text1: r1.document.querySelector('p').textContent,
+      text2: r2.document.querySelector('p').textContent,
+    }));
+  });
+
+  expect(results.text1).toBe('concurrent');
+  expect(results.text2).toBe('concurrent');
+  expect(fetchCount).toBe(1);
+});
