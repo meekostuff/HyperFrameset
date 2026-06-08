@@ -15,7 +15,6 @@ import sprockets from './Meeko/sprockets.mjs';
 import controllers from './Meeko/controllers.mjs';
 import htmlParser from './Meeko/htmlParser.mjs';
 import httpProxy from './Meeko/httpProxy.mjs';
-import historyManager from './Meeko/historyManager.mjs';
 import CustomNamespace from './Meeko/CustomNamespace.mjs';
 import filters from './Meeko/filters.mjs';
 import './Meeko/builtin-filters.mjs';
@@ -46,7 +45,7 @@ import HFrameset from './Meeko/HFrameset.mjs';
     _.assign(this.Meeko, {
         stuff, Registry, Task, Thenfu, URLux, DOM, scriptQueue,
         sprockets,
-        htmlParser, httpProxy, historyManager,
+        htmlParser, httpProxy,
         CustomNamespace,
         filters, decoders, processors,
         configData, controllers,

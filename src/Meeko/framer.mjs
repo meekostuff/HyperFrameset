@@ -15,7 +15,7 @@ import URLux from './URLux.mjs';
 import * as DOM from './DOM.mjs';
 import scriptQueue from './scriptQueue.mjs';
 import httpProxy from './httpProxy.mjs';
-import historyManager from './historyManager.mjs';
+import HistoryState from './HistoryState.mjs';
 import sprockets from './sprockets.mjs';
 import formElements, { ConfigurableBody } from './formElements.mjs';
 import layoutElements, { HBase } from './layoutElements.mjs';
@@ -270,11 +270,29 @@ static #deriveScope(scope, startURL, framesetURL) {
 		return framer.framesetReady.promise
 		.then(() => {
 			let changeset = framer.currentChangeset;
-			// FIXME what if no changeset is returned
-			return historyManager.start(changeset, '', document.URL,
-				(state) => { }, // FIXME need some sort of rendering status
-				(state) => framer.onPopState(state.getData())
-			);
+			if (changeset) {
+				let state = HistoryState.create(changeset, '', document.URL);
+				navigation.updateCurrentEntry({ state: state.settings });
+			}
+			navigation.addEventListener('navigate', (e) => {
+				if (!e.canIntercept) return;
+				// WARN: We intercept all traversals unconditionally
+				//   because e.destination.getState() is unreliable in WebKit,
+				//   so we can't validate before intercepting.
+				//   HyperFrameset assumes it owns all history entries in the document.
+				if (e.navigationType === 'traverse') {
+					e.intercept({
+						handler: () => {
+							let settings = navigation.currentEntry.getState();
+							if (!HistoryState.isValid(settings)) return;
+							let state = new HistoryState(settings);
+							framer.onPopState(state.getData());
+						}
+					});
+				}
+				// TODO intercept 'reload' to support re-rendering POST response pages
+				//   without a real network request. Requires storing POST body in entry state.
+			});
 		});
 	},
 
@@ -571,7 +589,13 @@ load(url, changeset, changeState) { // FIXME doesn't support replaceState
 	// NOTE .load() is just to sync pushState
 	() => httpProxy.load(nohash, request).then((resp) => { response = resp; }),
 	// Push new history state (skipped for popstate-triggered loads)
-	() => { if (changeState) return historyManager.pushState(changeset, '', url, (state) => {}); },
+	() => {
+		if (changeState) {
+			let state = HistoryState.create(changeset, '', url);
+			history.pushState(null, '', url);
+			navigation.updateCurrentEntry({ state: state.settings });
+		}
+	},
 	// Notify lifecycle: entered new state
 	() => {
 		if (mustNotify) return Framer.#notify({ module: 'frameset', type: 'enteredState', stage: 'after', url: url });
