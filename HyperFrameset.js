@@ -1,6 +1,18 @@
 (function() {
     "use strict";
-    let dateFormat = function() {
+    /*!
+	 * Date Format 1.2.3
+	 * (c) 2007-2009 Steven Levithan <stevenlevithan.com>
+	 * MIT license
+	 *
+	 * Includes enhancements by Scott Trenda <scott.trenda.net>
+	 * and Kris Kowal <cixar.com/~kris.kowal/>
+	 *
+	 * Accepts a date, a mask, or a date and a mask.
+	 * Returns a formatted version of the given date.
+	 * The date defaults to the current date/time.
+	 * The mask defaults to dateFormat.masks.default.
+	 */    let dateFormat = function() {
         let token = /d{1,4}|m{1,4}|yy(?:yy)?|([HhMsTt])\1?|[LloSZ]|"[^"]*"|'[^']*'/g, timezone = /\b(?:[PMCEA][SDP]T|(?:Pacific|Mountain|Central|Eastern|Atlantic) (?:Standard|Daylight|Prevailing) Time|(?:GMT|UTC)(?:[-+]\d{4})?)\b/g, timezoneClip = /[^-+\dA-Z]/g, pad = function(val, len) {
             val = String(val);
             len = len || 2;
@@ -188,7 +200,11 @@
         ucFirst: ucFirst,
         words: words
     });
-    class Registry extends Map {
+    /*!
+	 * Registry
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    class Registry extends Map {
         #writeOnce;
         #keyValidator;
         #valueValidator;
@@ -224,7 +240,11 @@
             return this.set(key, value);
         }
     }
-    const frameRate = 60;
+    /*!
+	 * Task
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    const frameRate = 60;
     const frameInterval = 1e3 / frameRate;
     const safetyMargin = 1;
     let asapQueue = [];
@@ -348,7 +368,11 @@
         getStats: getStats,
         resetStats: resetStats
     };
-    function isThenable(value) {
+    /*!
+	 * Thenfu
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    function isThenable(value) {
         return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function";
     }
     function tryFn(fn, ...params) {
@@ -460,7 +484,11 @@
         reduce: reduce,
         settle: settle
     };
-    const document$b = window.document;
+    /*!
+	 * URLux
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    const document$b = window.document;
     class URLux extends URL {
         constructor(href, base) {
             super(href, base);
@@ -1020,7 +1048,11 @@
         }
     }
     var scriptQueue = new ScriptQueue;
-    class BindingDefinition {
+    /*!
+	 * BindingDefinition
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    class BindingDefinition {
         constructor(desc) {
             for (let name of Object.getOwnPropertyNames(desc)) {
                 if (name === "prototype" || name === "length" || name === "name") continue;
@@ -2031,7 +2063,11 @@
             return this.$.ariaClosest(role);
         }
     });
-    let controllers = {
+    /*!
+	 * controllers
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    let controllers = {
         values: {},
         listeners: {},
         create: function(name) {
@@ -2069,7 +2105,11 @@
     function symmetricDifference(a1, a2) {
         return new Set(a1).symmetricDifference(new Set(a2));
     }
-    function normalize(doc, details) {
+    /*!
+	 * htmlParser
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    function normalize(doc, details) {
         let baseURL = URLux.create(details.url);
         forEach(findAll$1("style", doc.body), node => {
             if (node.hasAttribute("scoped")) return;
@@ -2127,56 +2167,20 @@
         });
     }
     function normalizeScopedStyles$1(doc, allowedScopeSelector) {
-        let scopedStyles = findAll$1("style[scoped]", doc.body);
-        forEach(scopedStyles, (el, index) => {
+        let scopedStyles = doc.body.querySelectorAll("style[scoped]");
+        scopedStyles.forEach((el, index) => {
             let scope = el.parentNode;
-            if (!matches$2(scope, allowedScopeSelector)) {
+            if (!scope.matches(allowedScopeSelector)) {
                 console.warn(`Removing <style scoped>. Must be child of ${allowedScopeSelector}`);
-                scope.removeChild(el);
+                el.remove();
                 return;
             }
             let scopeId = `__scope_${index}__`;
             scope.setAttribute("scopeid", scopeId);
-            if (scope.hasAttribute("id")) scopeId = scope.getAttribute("id"); else scope.setAttribute("id", scopeId);
             el.removeAttribute("scoped");
-            let sheet = el.sheet;
-            forRules(sheet, processRule, scope);
-            let cssText = Array.from(sheet.cssRules, rule => rule.cssText).join("\n");
-            el.textContent = cssText;
-            insertNode$1("beforeend", doc.head, el);
-            return;
+            el.textContent = `@scope ([scopeid="${scopeId}"]) {\n${el.textContent}\n}`;
+            doc.head.appendChild(el);
         });
-    }
-    function processRule(rule, id, parentRule) {
-        let scope = this;
-        switch (rule.type) {
-          case 1:
-            let scopeId = scope.getAttribute("scopeid");
-            let scopePrefix = `#${scopeId} `;
-            let selectorText = scopePrefix + rule.selectorText.replace(/,(?![^(]*\))/g, `, ${scopePrefix}`);
-            let cssText = rule.cssText.replace(rule.selectorText, "");
-            cssText = `${selectorText} ${cssText}`;
-            parentRule.deleteRule(id);
-            parentRule.insertRule(cssText, id);
-            break;
-
-          case 11:
-            break;
-
-          case 4:
-          case 12:
-            forRules(rule, processRule, scope);
-            break;
-
-          default:
-            console.warn("Deleting invalid rule for <style scoped>: \n" + rule.cssText);
-            parentRule.deleteRule(id);
-            break;
-        }
-    }
-    function forRules(parentRule, callback, context) {
-        let ruleList = parentRule.cssRules;
-        for (let i = ruleList.length - 1; i >= 0; i--) callback.call(context, ruleList[i], i, parentRule);
     }
     var htmlParser = {
         parse: nativeParser,
@@ -2257,10 +2261,9 @@
               case "get":
                 const response = this.#cacheLookup(info);
                 if (response) return Thenfu.asap(response);
-                return this.#doRequest(info).then(response => {
-                    this.#cacheAdd(info, response);
-                    return response;
-                });
+                let pending = this.#doRequest(info);
+                this.#cacheAdd(info, pending);
+                return pending;
 
               default:
                 let METHOD = uc(method);
@@ -2336,131 +2339,11 @@
         }
     }
     var httpProxy = new HttpProxy;
-    class SimpleTaskQueue {
-        #queue=[];
-        #maxSize;
-        #processing=false;
-        constructor(maxSize = 1) {
-            this.#maxSize = maxSize;
-        }
-        #bump() {
-            if (this.#processing) return;
-            this.#processing = true;
-            this.#process();
-        }
-        #process() {
-            if (this.#queue.length <= 0) {
-                this.#processing = false;
-                return;
-            }
-            let task = this.#queue.shift();
-            let promise = Thenfu.defer(task.fn);
-            promise.then(() => this.#process(), () => this.#process());
-            promise.then(task.resolve, task.reject);
-        }
-        now(fn, fail) {
-            return this.whenever(fn, fail, 0);
-        }
-        reset(fn) {
-            this.#queue.length = 0;
-            return this.whenever(fn, null, 1);
-        }
-        whenever(fn, fail, max) {
-            if (max == null) max = this.#maxSize;
-            return new Promise((resolve, reject) => {
-                if (this.#queue.length > max || this.#queue.length === max && this.#processing) {
-                    if (fail) Thenfu.defer(fail).then(resolve, reject); else reject(() => {
-                        throw Error("No `fail` callback passed to whenever()");
-                    });
-                    return;
-                }
-                this.#queue.push({
-                    fn: fn,
-                    resolve: resolve,
-                    reject: reject
-                });
-                this.#bump();
-            });
-        }
-    }
-    class HistoryState {
-        static #STATE_TAG="HyperFrameset";
-        constructor(settings) {
-            if (!HistoryState.isValid(settings)) throw Error("Invalid settings for new HistoryState");
-            this.settings = settings;
-        }
-        static isValid(settings) {
-            return settings != null && settings[HistoryState.#STATE_TAG] === true;
-        }
-        static create(data, title, url) {
-            let settings = {
-                title: title,
-                url: url,
-                timeStamp: Date.now(),
-                data: data
-            };
-            settings[HistoryState.#STATE_TAG] = true;
-            return new HistoryState(settings);
-        }
-        getData() {
-            return this.settings.data;
-        }
-    }
-    class HistoryManager {
-        #taskQueue=new SimpleTaskQueue;
-        #currentState;
-        #popStateHandler;
-        #started=false;
-        constructor() {
-            if (history.replaceState) window.addEventListener("popstate", e => {
-                if (e.stopImmediatePropagation) e.stopImmediatePropagation(); else e.stopPropagation();
-                let newSettings = e.state;
-                if (!HistoryState.isValid(newSettings)) {
-                    console.warn("Ignoring invalid PopStateEvent");
-                    return;
-                }
-                this.#taskQueue.reset(() => {
-                    this.#currentState = new HistoryState(newSettings);
-                    if (!this.#popStateHandler) return;
-                    return this.#popStateHandler(this.#currentState);
-                });
-            }, true);
-        }
-        getState() {
-            return this.#currentState;
-        }
-        start(data, title, url, onNewState, onPopState) {
-            return this.#taskQueue.now(() => {
-                if (this.#started) throw Error("historyManager has already started");
-                this.#started = true;
-                this.#popStateHandler = onPopState;
-                let newState = HistoryState.create(data, title, url);
-                if (history.replaceState) {
-                    history.replaceState(newState.settings, title, url);
-                }
-                this.#currentState = newState;
-                return onNewState(newState);
-            });
-        }
-        newState(data, title, url, useReplace, callback) {
-            return this.#taskQueue.now(() => {
-                let newState = HistoryState.create(data, title, url);
-                if (history.replaceState) {
-                    if (useReplace) history.replaceState(newState.settings, title, url); else history.pushState(newState.settings, title, url);
-                }
-                this.#currentState = newState;
-                if (callback) return callback(newState);
-            });
-        }
-        replaceState(data, title, url, callback) {
-            return this.newState(data, title, url, true, callback);
-        }
-        pushState(data, title, url, callback) {
-            return this.newState(data, title, url, false, callback);
-        }
-    }
-    var historyManager = new HistoryManager;
-    class CustomNamespace {
+    /*!
+	 * CustomNamespace
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    class CustomNamespace {
         constructor(options) {
             if (!options) return;
             let style = options.style = lc(options.style);
@@ -2575,7 +2458,11 @@
         }
     }
     const HYPERFRAMESET_URN = "hyperframeset";
-    let filters = new Registry({
+    /*!
+	 * filters
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    let filters = new Registry({
         writeOnce: true,
         keyValidator: key => /^[_a-zA-Z][_a-zA-Z0-9]*$/.test(key),
         valueValidator: fn => typeof fn === "function"
@@ -2588,7 +2475,11 @@
             return fn.apply(undefined, args);
         }
     });
-    filters.register("lowercase", (value, text) => value.toLowerCase());
+    /*!
+	 * builtin-filters
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    filters.register("lowercase", (value, text) => value.toLowerCase());
     filters.register("uppercase", (value, text) => value.toUpperCase());
     filters.register("if", (value, yep) => !!value ? yep : value);
     filters.register("unless", (value, nope) => !value ? nope : value);
@@ -2617,7 +2508,11 @@
     });
     filters.register("replace", (value, pattern, text) => value.replace(pattern, text));
     filters.register("date", (value, format, utc) => dateFormat(value, format, utc));
-    let decoders = new Registry({
+    /*!
+	 * decoders
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    let decoders = new Registry({
         writeOnce: true,
         keyValidator: key => typeof key === "string" && /^[_a-zA-Z][_a-zA-Z0-9]*/.test(key),
         valueValidator: constructor => typeof constructor === "function"
@@ -2628,7 +2523,11 @@
             return new constructor(options, namespaces);
         }
     });
-    const textAttr$1 = "_text";
+    /*!
+	 * CSSDecoder
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    const textAttr$1 = "_text";
     const htmlAttr$1 = "_html";
     const CSS_CONTEXT_VARIABLE = "_";
     class CSSDecoder {
@@ -2914,7 +2813,11 @@
         getProperties: getProperties,
         getValue: getValue
     });
-    let document$5 = window.document;
+    /*!
+	 * MicrodataDecoder
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    let document$5 = window.document;
     class MicrodataDecoder {
         constructor(options, namespaces) {}
         init(node) {
@@ -2961,7 +2864,11 @@
             return resultList[0];
         }
     }
-    class JSONDecoder {
+    /*!
+	 * JSONDecoder
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    class JSONDecoder {
         constructor(options, namespaces) {}
         init(object) {
             if (typeof object !== "object" || object === null) throw Error("JSONDecoder cannot handle non-object");
@@ -2994,7 +2901,11 @@
             return value;
         }
     }
-    decoders.register("css", CSSDecoder);
+    /*!
+	 * builtin-decoders
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    decoders.register("css", CSSDecoder);
     decoders.register("microdata", MicrodataDecoder);
     decoders.register("json", JSONDecoder);
     /*!
@@ -3787,7 +3698,11 @@
 	 */    processors.register("main", MainProcessor);
     processors.register("script", ScriptProcessor);
     processors.register("hazard", HazardProcessor);
-    let configData = new Registry({
+    /*!
+	 * configData
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    let configData = new Registry({
         writeOnce: true,
         keyValidator: key => typeof key === "string",
         valueValidator: o => o != null && typeof o === "object"
@@ -4381,7 +4296,11 @@
     let frameElements = {
         register: registerFrameElements
     };
-    class HTransformDefinition {
+    /*!
+	 * HTransformDefinition
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    class HTransformDefinition {
         constructor(el, framesetDef) {
             if (!el) return;
             this.framesetDefinition = framesetDef;
@@ -4423,7 +4342,11 @@
             return output;
         }
     }
-    const conditions = words("uninitialized loading loaded error");
+    /*!
+	 * HBodyDefinition
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    const conditions = words("uninitialized loading loaded error");
     const conditionAliases = {
         blank: "uninitialized",
         waiting: "loading",
@@ -4493,7 +4416,11 @@
             });
         }
     }
-    const hfHeadTags = words("title meta link style script");
+    /*!
+	 * HFrameDefinition
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    const hfHeadTags = words("title meta link style script");
     class HFrameDefinition {
         constructor(el, framesetDef) {
             if (!el) return;
@@ -4535,7 +4462,11 @@
             return bodyDef.render(resource, details);
         }
     }
-    const {rebase: rebase, rebaseURL: rebaseURL, normalizeScopedStyles: normalizeScopedStyles} = htmlParser;
+    /*!
+	 * HFramesetDefinition
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    const {rebase: rebase, rebaseURL: rebaseURL, normalizeScopedStyles: normalizeScopedStyles} = htmlParser;
     const hfDefaultNamespace = new CustomNamespace({
         name: "hf",
         style: "vendor",
@@ -4730,6 +4661,33 @@
         HTransformDefinition: HTransformDefinition
     });
     /*!
+	 * HistoryState
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    class HistoryState {
+        static #STATE_TAG="HyperFrameset";
+        constructor(settings) {
+            if (!HistoryState.isValid(settings)) throw Error("Invalid settings for new HistoryState");
+            this.settings = settings;
+        }
+        static isValid(settings) {
+            return settings != null && settings[HistoryState.#STATE_TAG] === true;
+        }
+        static create(data, title, url) {
+            let settings = {
+                title: title,
+                url: url,
+                timeStamp: Date.now(),
+                data: data
+            };
+            settings[HistoryState.#STATE_TAG] = true;
+            return new HistoryState(settings);
+        }
+        getData() {
+            return this.settings.data;
+        }
+    }
+    /*!
 	 * HFrameset
 	 * Copyright 2009-2016 Sean Hogan (http://meekostuff.net/)
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
@@ -4817,7 +4775,7 @@
             let startURL = startOptions && startOptions.start_url;
             let framesetURL = URLux.create(document.URL);
             framer.framesetURL = framesetURL.nohash;
-            framer.scope = framesetURL.base;
+            framer.scope = Framer.#deriveScope(startOptions && startOptions.scope, startURL, framesetURL);
             let settings = {
                 framesetURL: framer.framesetURL,
                 scope: framer.scope
@@ -4826,7 +4784,15 @@
             framer.definition = definition;
             return Thenfu.pipe(null, [ () => Thenfu.wait(() => !!document.body), () => {
                 if (startURL) history.replaceState(null, "", startURL);
-            }, () => definition.preprocess(), () => framer.#activate() ]);
+            }, () => definition.preprocess(), () => Framer.#insertMarkers(document.URL, framer.framesetURL, true), () => framer.#activate() ]);
+        }
+        static #deriveScope(scope, startURL, framesetURL) {
+            let resolvedStartURL = startURL ? URLux.create(framesetURL.resolve(startURL)).nohash : null;
+            scope = scope || (resolvedStartURL ? URLux.create(resolvedStartURL).base : framesetURL.base);
+            if (resolvedStartURL && resolvedStartURL.indexOf(scope) !== 0) {
+                throw Error("start_url is not within scope: " + resolvedStartURL);
+            }
+            return scope;
         }
         #activate() {
             let framer = this;
@@ -4854,7 +4820,25 @@
                 });
             }, () => framer.framesetReady.promise.then(() => {
                 let changeset = framer.currentChangeset;
-                return historyManager.start(changeset, "", document.URL, state => {}, state => framer.onPopState(state.getData()));
+                if (changeset) {
+                    let state = HistoryState.create(changeset, "", document.URL);
+                    navigation.updateCurrentEntry({
+                        state: state.settings
+                    });
+                }
+                navigation.addEventListener("navigate", e => {
+                    if (!e.canIntercept) return;
+                    if (e.navigationType === "traverse") {
+                        e.intercept({
+                            handler: () => {
+                                let settings = navigation.currentEntry.getState();
+                                if (!HistoryState.isValid(settings)) return;
+                                let state = new HistoryState(settings);
+                                framer.onPopState(state.getData());
+                            }
+                        });
+                    }
+                });
             }), () => {
                 Framer.#notify({
                     module: "frameset",
@@ -4956,7 +4940,7 @@
             };
             let framer = this;
             if (!frame.isFrameset) {
-                if (requestNavigation(frame, url, details)) return false;
+                if (framer.requestNavigation(frame, url, details)) return false;
                 return;
             }
             let baseURL = URLux.create(document.URL);
@@ -4970,15 +4954,14 @@
             let frameset = frame;
             let framesetScope = framer.lookup(url);
             if (!framesetScope || !framer.compareFramesetScope(framesetScope)) return;
-            if (requestNavigation(frameset, url, details)) return false;
-            return;
-            function requestNavigation(frame, url, details) {
-                let changeset = frame.lookup(url, details);
-                if (changeset === "" || changeset === true) return true;
-                if (changeset == null || changeset === false) return false;
-                framer.load(url, changeset, frame.isFrameset);
-                return true;
-            }
+            if (framer.requestNavigation(frameset, url, details)) return false;
+        }
+        requestNavigation(frame, url, details) {
+            let changeset = frame.lookup(url, details);
+            if (changeset === "" || changeset === true) return true;
+            if (changeset == null || changeset === false) return false;
+            this.load(url, changeset, frame.isFrameset);
+            return true;
         }
         onPageLink(url, details) {
             console.warn("Ignoring on-same-page links for now.");
@@ -5020,7 +5003,13 @@
             }, () => httpProxy.load(nohash, request).then(resp => {
                 response = resp;
             }), () => {
-                if (changeState) return historyManager.pushState(changeset, "", url, state => {});
+                if (changeState) {
+                    let state = HistoryState.create(changeset, "", url);
+                    history.pushState(null, "", url);
+                    navigation.updateCurrentEntry({
+                        state: state.settings
+                    });
+                }
             }, () => {
                 if (mustNotify) return Framer.#notify({
                     module: "frameset",
@@ -5044,7 +5033,13 @@
             this.load(url, changeset, 0);
         }
         lookup(docURL) {
-            if (!this.options.lookup) return;
+            if (!this.options.lookup) {
+                if (docURL.indexOf(this.scope) === 0) return {
+                    scope: this.scope,
+                    framesetURL: this.framesetURL
+                };
+                return false;
+            }
             let result = this.options.lookup(docURL);
             if (result == null || result === false) return false;
             if (typeof result === "string") result = Framer.#implyFramesetScope(result, docURL);
@@ -5078,7 +5073,6 @@
         static #prepareFrameset(dstDoc, definition) {
             if (Framer.#getFramesetMarker(dstDoc)) throw Error("The HFrameset has already been applied");
             let srcDoc = cloneDocument(definition.document);
-            let selfMarker;
             return Thenfu.pipe(null, [ () => {
                 let dstHead = dstDoc.head;
                 forEach(findAll$1("link[rel|=stylesheet]", dstHead), node => {
@@ -5088,19 +5082,7 @@
                 let dstBody = dstDoc.body;
                 let node;
                 while (node = dstBody.firstChild) dstBody.removeChild(node);
-            }, () => {
-                selfMarker = Framer.#getSelfMarker(dstDoc);
-                if (selfMarker) return;
-                selfMarker = dstDoc.createElement("link");
-                selfMarker.rel = SELF_REL;
-                selfMarker.href = dstDoc.URL;
-                dstDoc.head.insertBefore(selfMarker, dstDoc.head.firstChild);
-            }, () => {
-                let framesetMarker = dstDoc.createElement("link");
-                framesetMarker.rel = FRAMESET_REL;
-                framesetMarker.href = definition.src;
-                dstDoc.head.insertBefore(framesetMarker, selfMarker);
-            }, () => {
+            }, () => Framer.#insertMarkers(dstDoc.URL, definition.src, false), () => {
                 Framer.#mergeElement(dstDoc.documentElement, srcDoc.documentElement);
                 Framer.#mergeElement(dstDoc.head, srcDoc.head);
                 Framer.#mergeHead(dstDoc, srcDoc.head, true);
@@ -5176,6 +5158,25 @@
         static #getSelfMarker(doc) {
             if (!doc) doc = document;
             return find$2(`link[rel~=${SELF_REL}]`, doc.head);
+        }
+        static #insertMarkers(selfURL, framesetURL, isFrameset) {
+            let head = document.head;
+            let framesetMarker = document.createElement("link");
+            framesetMarker.rel = FRAMESET_REL;
+            framesetMarker.href = framesetURL;
+            let selfMarker = Framer.#getSelfMarker();
+            if (!selfMarker) {
+                selfMarker = document.createElement("link");
+                selfMarker.rel = SELF_REL;
+                selfMarker.href = selfURL;
+            }
+            if (isFrameset) {
+                head.insertBefore(framesetMarker, head.firstChild);
+                head.appendChild(selfMarker);
+            } else {
+                head.insertBefore(selfMarker, head.firstChild);
+                head.insertBefore(framesetMarker, selfMarker);
+            }
         }
         static #implyFramesetScope(framesetSrc, docSrc) {
             let docURL = URLux.create(docSrc);
@@ -5333,7 +5334,11 @@
             });
         };
     }
-    (function() {
+    /*!
+	 * HyperFrameset
+	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    (function() {
         let stuff = assign({}, _);
         stuff.dateFormat = dateFormat;
         if (!this.Meeko) this.Meeko = {};
@@ -5348,7 +5353,6 @@
             sprockets: sprockets,
             htmlParser: htmlParser,
             httpProxy: httpProxy,
-            historyManager: historyManager,
             CustomNamespace: CustomNamespace,
             filters: filters,
             decoders: decoders,
