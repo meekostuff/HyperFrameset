@@ -17,7 +17,6 @@ import scriptQueue from './scriptQueue.mjs';
 import httpProxy from './httpProxy.mjs';
 import HistoryState from './HistoryState.mjs';
 import sprockets from './sprockets.mjs';
-import formElements, { ConfigurableBody } from './formElements.mjs';
 import layoutElements, { HBase } from './layoutElements.mjs';
 import frameElements, { frameDefinitions, HFrame } from './frameElements.mjs';
 import { HFramesetDefinition } from './framesetDefinitions.mjs';
@@ -260,7 +259,6 @@ static #deriveScope(scope, startURL, framesetURL) {
 		layoutElements.register(namespace);
 		frameElements.register(namespace);
 		Framer.#registerFramesetElement();
-		formElements.register();
 
 		return sprockets.start({ manual: true }); // FIXME should be a promise
 	},
@@ -1050,7 +1048,6 @@ HFrameset.attached = function(handlers) {
 	let frameset = this;
 	frameset.definition = framer.definition; // TODO remove `framer` dependency — use a frameset definition registry instead
 	_.defaults(frameset, { frames: [] });
-	ConfigurableBody.attached.call(this, handlers); // FIXME
 };
 HFrameset.enteredDocument = function() {
 	let frameset = this;

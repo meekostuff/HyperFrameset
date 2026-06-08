@@ -29,7 +29,6 @@ import ScriptProcessor from './Meeko/ScriptProcessor.mjs';
 import HazardProcessor from './Meeko/HazardProcessor.mjs';
 import './Meeko/builtin-processors.mjs';
 import configData from './Meeko/configData.mjs';
-import * as formElements from './Meeko/formElements.mjs';
 import * as layoutElements from './Meeko/layoutElements.mjs';
 import frameElements, { frameDefinitions, HFrame } from './Meeko/frameElements.mjs';
 import * as framesetDefinitions from './Meeko/framesetDefinitions.mjs';
@@ -56,7 +55,6 @@ import HFrameset from './Meeko/HFrameset.mjs';
         HFrame, HFrameset
     });
 
-    _.assign(this.Meeko, formElements);
     _.assign(this.Meeko, layoutElements);
     _.assign(this.Meeko, framesetDefinitions);
 
