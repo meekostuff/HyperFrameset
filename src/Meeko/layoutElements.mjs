@@ -10,10 +10,6 @@ import configData from './configData.mjs';
 import sprockets from './sprockets.mjs';
 import controllers from './controllers.mjs';
 
-let document = window.document;
-
-let namespace; // will be set by external call to registerFramesetElements()
-
 /*
  * HyperFrameset sprockets
  */
@@ -236,37 +232,38 @@ class ResponsiveDeck extends Deck {
 
 function registerLayoutElements(ns) {
 
-namespace = ns; // TODO assert ns instanceof CustomNamespace
+	sprockets.registerStyle('*[hidden]', 'display: none !important;'); // TODO maybe not !important
 
-sprockets.registerElement(namespace.lookupSelector('layer'), Layer);
-sprockets.registerElement(namespace.lookupSelector('popup'), Popup);
-sprockets.registerElement(namespace.lookupSelector('panel'), Panel);
-sprockets.registerElement(namespace.lookupSelector('vlayout'), VLayout);
-sprockets.registerElement(namespace.lookupSelector('hlayout'), HLayout);
-sprockets.registerElement(namespace.lookupSelector('deck'), Deck);
-sprockets.registerElement(namespace.lookupSelector('rdeck'), ResponsiveDeck);
+	let boxSizingCSS = 'box-sizing: border-box;'; // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
+	let layoutResetCSS = 'display: block; width: 0; height: 0; text-align: left; margin: 0; padding: 0;'; // FIXME text-align: start
+	let layoutSizeCSS = 'width: 100%; height: 100%;'; // FIXME should be 0,0 before manual calculations
 
-let cssText = [
-'*[hidden] { display: none !important; }', // TODO maybe not !important
-namespace.lookupSelector('layer, popup, hlayout, vlayout, deck, rdeck, panel, body') + ' { box-sizing: border-box; }', // TODO http://css-tricks.com/inheriting-box-sizing-probably-slightly-better-best-practice/
-namespace.lookupSelector('layer') + ' { display: block; position: fixed; top: 0; left: 0; width: 0; height: 0; }',
-namespace.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { display: block; width: 0; height: 0; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
-namespace.lookupSelector('hlayout, vlayout, deck, rdeck') + ' { width: 100%; height: 100%; }', // FIXME should be 0,0 before manual calculations
-namespace.lookupSelector('panel') + ' { display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }', // FIXME text-align: start
-namespace.lookupSelector('body') + ' { display: block; width: auto; height: auto; margin: 0; }',
-namespace.lookupSelector('popup') + ' { display: block; position: relative; width: 0; height: 0; }',
-namespace.lookupSelector('popup') + ' > * { position: absolute; top: 0; left: 0; }', // TODO or change 'body' styling above
-namespace.lookupSelector('vlayout') + ' { display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch; }',
-namespace.lookupSelector('hlayout') + ' { display: flex; flex-direction: row; justify-content: space-between; align-items: stretch; }',
-namespace.lookupSelector('deck') + ' > * { width: 100%; height: 100%; }',
-namespace.lookupSelector('rdeck') + ' > * { width: 0; height: 0; }',
-].join('\n');
+	registerElement(ns, 'layer', Layer, `${boxSizingCSS} display: block; position: fixed; top: 0; left: 0; width: 0; height: 0;`);
+	registerElement(ns, 'popup', Popup, `${boxSizingCSS} display: block; position: relative; width: 0; height: 0;`, 'position: absolute; top: 0; left: 0;'); // TODO or change 'body' styling above
+	registerElement(ns, 'panel', Panel, `${boxSizingCSS} display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0;`); // FIXME text-align: start
+	registerElement(ns, 'vlayout', VLayout, `${boxSizingCSS} ${layoutResetCSS} ${layoutSizeCSS} display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch;`);
+	registerElement(ns, 'hlayout', HLayout, `${boxSizingCSS} ${layoutResetCSS} ${layoutSizeCSS} display: flex; flex-direction: row; justify-content: space-between; align-items: stretch;`);
+	registerElement(ns, 'deck', Deck, `${boxSizingCSS} ${layoutResetCSS} ${layoutSizeCSS}`, 'width: 100%; height: 100%;');
+	registerElement(ns, 'rdeck', ResponsiveDeck, `${boxSizingCSS} ${layoutResetCSS} ${layoutSizeCSS}`, 'width: 0; height: 0;');
 
-let style = document.createElement('style');
-style.textContent = cssText;
-document.head.insertBefore(style, document.head.firstChild);
+	sprockets.registerStyle(ns.lookupSelector('body'), `${boxSizingCSS} display: block; width: auto; height: auto; margin: 0;`);
 
-} // END registerLayoutElements()
+}
+
+/**
+ * Register a layout element with its sprocket class and optional CSS.
+ *
+ * @param {CustomNamespace} ns - The namespace for resolving element selectors.
+ * @param {string} tagName - The element name (e.g. 'panel', 'vlayout').
+ * @param {Function} SprocketClass - The sprocket class to register.
+ * @param {string} [cssText] - Optional CSS declarations for the element.
+ * @param {string} [childCssText] - Optional CSS declarations for direct children.
+ */
+function registerElement(ns, tagName, SprocketClass, cssText, childCssText) {
+	let selector = ns.lookupSelector(tagName);
+	sprockets.registerElement(selector, SprocketClass, cssText);
+	if (childCssText) sprockets.registerStyle(selector + ' > *', childCssText);
+}
 
 let layoutElements = {
 
