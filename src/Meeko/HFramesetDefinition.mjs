@@ -28,15 +28,26 @@ const hfDefaultNamespace = new CustomNamespace({
  * configuration data, and registers frame definitions for later instantiation.
  * 
  * The lifecycle is: construct (via init) → preprocess → render.
- * 
- * @property {string} url - The resolved URL of the frameset document.
- * @property {string} scope - The base URL scope for resolving relative URLs.
- * @property {Document} document - The frameset document (with body detached).
- * @property {HTMLElement} element - The detached <body> element used as a render template.
- * @property {Object} frames - Map of frame definition IDs to HFrameDefinition instances.
- * @property {NamespaceCollection} namespaces - Custom namespace declarations found in the document.
  */
 class HFramesetDefinition {
+
+/** @type {string} The resolved URL of the frameset document. */
+url;
+
+/** @type {string} The base URL scope for resolving relative URLs. */
+scope;
+
+/** @type {NamespaceCollection} Custom namespace declarations found in the document. */
+namespaces;
+
+/** @type {Document} The frameset document (with body detached). */
+document;
+
+/** @type {HTMLElement} The detached <body> element used as a render template. */
+element;
+
+/** @type {Object<string, HFrameDefinition>} Map of frame definition IDs to HFrameDefinition instances. Indexed by @defid (which may be auto-generated) */
+frames = {};
 
 /**
  * @param {Document} doc - The frameset HTML document to process.
@@ -73,24 +84,22 @@ init(doc, settings) {
 }
 
 #initMetadata(doc, settings) {
-	let framesetDef = this;
-	_.defaults(framesetDef, {
+	_.defaults(this, {
 		url: settings.framesetURL,
 		scope: settings.scope
 	});
 
-	let namespaces = framesetDef.namespaces = CustomNamespace.getNamespaces(doc);
+	let namespaces = this.namespaces = CustomNamespace.getNamespaces(doc);
 	if (!namespaces.lookupNamespace(HYPERFRAMESET_URN)) {
 		namespaces.add(hfDefaultNamespace);
 	}
 }
 
 #rebaseURLs(doc) {
-	let framesetDef = this;
-	let scopeURL = URLux.create(framesetDef.scope);
+	let scopeURL = URLux.create(this.scope);
 	rebase(doc, scopeURL);
 	let frameElts = DOM.findAll(
-		framesetDef.namespaces.lookupSelector('frame', HYPERFRAMESET_URN), 
+		this.namespaces.lookupSelector('frame', HYPERFRAMESET_URN),
 		doc.body);
 	_.forEach(frameElts, (el, index) => { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
 		let src = el.getAttribute('src');
@@ -102,8 +111,6 @@ init(doc, settings) {
 }
 
 #normalizeScripts(doc) {
-	let framesetDef = this;
-
 	// warn about not using @id
 	let idElements = DOM.findAll('*[id]:not(script)', doc.body);
 	if (idElements.length) {
@@ -125,7 +132,7 @@ init(doc, settings) {
 		let sourceURL;
 		if (script.hasAttribute('sourceurl')) sourceURL = script.getAttribute('sourceurl');
 		else {
-			sourceURL = `${framesetDef.url}__${id}`; // FIXME this should be configurable
+			sourceURL = `${this.url}__${id}`; // FIXME this should be configurable
 			script.setAttribute('sourceurl', sourceURL);
 		}
 		script.text += `\n//# sourceURL=${sourceURL}`;
@@ -165,11 +172,7 @@ init(doc, settings) {
  * Must be called after construction and before render().
  */
 preprocess() {
-	let framesetDef = this;
-	let body = framesetDef.element;
-	_.defaults(framesetDef, {
-		frames: {} // all hyperframe definitions. Indexed by @defid (which may be auto-generated)
-	});
+	let body = this.element;
 
 	let scripts = DOM.findAll('script', body);
 	_.forEach(scripts, (script, i) => {
@@ -189,7 +192,7 @@ preprocess() {
 		// TODO probably don't need this as handled by init()
 		if (!script.hasAttribute('for')) {
 			console.warn('Frameset <body> may not contain non-@for scripts:\n' +
-					framesetDef.url + '#' + script.id);
+					this.url + '#' + script.id);
 			script.parentNode.removeChild(script); 
 			return;
 		}
@@ -229,7 +232,7 @@ preprocess() {
 		}
 		catch(err) { 
 			console.warn('Error evaluating inline script in frameset:\n' +
-				framesetDef.url + '#' + script.id);
+				this.url + '#' + script.id);
 			window.reportError(err);
 		}
 
@@ -237,7 +240,7 @@ preprocess() {
 	});
 
 	let frameElts = DOM.findAll(
-		framesetDef.namespaces.lookupSelector('frame', HYPERFRAMESET_URN), 
+		this.namespaces.lookupSelector('frame', HYPERFRAMESET_URN),
 		body);
 	let frameDefElts = [];
 	let frameRefElts = [];
@@ -265,11 +268,11 @@ preprocess() {
 	});
 	_.forEach(frameDefElts, (el) => {
 		let defId = el.getAttribute('defid');
-		framesetDef.frames[defId] = new HFrameDefinition(el, framesetDef);
+		this.frames[defId] = new HFrameDefinition(el, this);
 	});
 	_.forEach(frameRefElts, (el) => {
 		let def = el.getAttribute('def');
-		let ref = framesetDef.frames[def];
+		let ref = this.frames[def];
 		if (!ref) {
 			console.warn('Frame declaration references non-existant frame definition: ' + def);
 			return;
@@ -298,8 +301,7 @@ preprocess() {
  * @returns {HTMLElement} A cloned body element.
  */
 render() {
-	let framesetDef = this;
-	return framesetDef.element.cloneNode(true);
+	return this.element.cloneNode(true);
 }
 
 }
