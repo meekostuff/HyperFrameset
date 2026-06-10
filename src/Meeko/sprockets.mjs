@@ -97,17 +97,34 @@ let withAria = function(Class, properties) {
 	});
 }
 
+let sharedStyleElement;
 
+/**
+ * Append a CSS rule to the shared document stylesheet.
+ * Creates the shared `<style>` element on first call.
+ *
+ * @param {string} selector - The CSS selector.
+ * @param {string} cssText - CSS declarations (without braces).
+ */
+let registerStyle = function(selector, cssText) {
+	if (!sharedStyleElement) {
+		sharedStyleElement = document.createElement('style');
+		document.head.insertBefore(sharedStyleElement, document.head.firstChild);
+	}
+	sharedStyleElement.textContent += `${selector} { ${cssText} }\n`;
+}
 
 /**
  * Register a sprocket definition for elements which have the specified tag-name.
  *   TODO: Should this be a private method?
  *
- * @param tagName
- * @param definition
+ * @param {string} tagName - The custom element tag name.
+ * @param {object} definition - The sprocket definition (class or descriptor).
+ * @param {string} [cssText] - Optional CSS text to register via the shared stylesheet.
  * @returns {BindingRule}
  */
-let registerElement = function(tagName, definition) { // FIXME test tagName
+let registerElement = function(tagName, definition, cssText) { // FIXME test tagName
+	if (cssText) registerStyle(tagName, cssText);
 	if (started) throw Error('sprockets management already started');
 	if (definition.rules) console.warn('registerElement() does not support rules. Try registerComposite()');
 	let bindingDefn = new BindingDefinition(definition);
@@ -517,6 +534,7 @@ let sprockets = {
 	start,
 	insertNode,
 	removeNode,
+	registerStyle,
 	registerElement,
 	registerComponent,
 	registerComposite,
