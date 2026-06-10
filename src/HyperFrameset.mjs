@@ -30,10 +30,9 @@ import HazardProcessor from './Meeko/HazardProcessor.mjs';
 import './Meeko/builtin-processors.mjs';
 import configData from './Meeko/configData.mjs';
 import * as layoutElements from './Meeko/layoutElements.mjs';
-import frameElements, { frameDefinitions, HFrame } from './Meeko/frameElements.mjs';
+import transcluder, { transcludeDefinitions } from './Meeko/transcluder.mjs';
 import * as framesetDefinitions from './Meeko/framesetDefinitions.mjs';
-import framer from './Meeko/framer.mjs';
-import HFrameset from './Meeko/HFrameset.mjs';
+import framer, { HFrameset, HFrame } from './Meeko/framer.mjs';
 
 (function() {
 
@@ -48,7 +47,7 @@ import HFrameset from './Meeko/HFrameset.mjs';
         CustomNamespace,
         filters, decoders, processors,
         configData, controllers,
-        frameElements, frameDefinitions,
+        transcluder, transcludeDefinitions,
         framer,
         CSSDecoder, MicrodataDecoder, Microdata, JSONDecoder,
         MainProcessor, ScriptProcessor, HazardProcessor,

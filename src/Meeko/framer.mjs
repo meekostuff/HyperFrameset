@@ -17,11 +17,11 @@ import scriptQueue from './scriptQueue.mjs';
 import httpProxy from './httpProxy.mjs';
 import HistoryState from './HistoryState.mjs';
 import sprockets from './sprockets.mjs';
-import layoutElements, { HBase } from './layoutElements.mjs';
-import frameElements, { frameDefinitions, HFrame } from './frameElements.mjs';
-import { HFramesetDefinition } from './framesetDefinitions.mjs';
-import { HYPERFRAMESET_URN } from './CustomNamespace.mjs';
-import HFrameset from './HFrameset.mjs';
+import configData from './configData.mjs';
+import layoutElements, {HBase} from './layoutElements.mjs';
+import transcluder, {HTransclude, transcludeDefinitions } from './transcluder.mjs';
+import {HFramesetDefinition} from './framesetDefinitions.mjs';
+import {HYPERFRAMESET_URN} from './CustomNamespace.mjs';
 
 // FIXME DRY these @rel values with boot.js
 const FRAMESET_REL = 'frameset'; // NOTE http://lists.w3.org/Archives/Public/www-html/1996Dec/0143.html
@@ -253,11 +253,10 @@ static #deriveScope(scope, startURL, framesetURL) {
 		}, false);
 
 		Framer.#registerFrames(framer.definition);
-		interceptFrameElements();
-		retargetFramesetElements();
 		let namespace = framer.definition.namespaces.lookupNamespace(HYPERFRAMESET_URN);
 		layoutElements.register(namespace);
-		frameElements.register(namespace);
+		transcluder.registerElement(namespace, 'transclude', HTransclude);
+		transcluder.registerElement(namespace, 'frame', HFrame);
 		Framer.#registerFramesetElement();
 
 		return sprockets.start({ manual: true }); // FIXME should be a promise
@@ -318,6 +317,10 @@ framesetEntered(frameset) {
 	this.frameset = frameset;
 	let url = document.URL;
 	this.currentChangeset = frameset.lookup(url, { referrer: document.referrer });
+	if (!this.currentChangeset && this.options.lookup) {
+		let target = this.options.lookup(url);
+		if (target) this.currentChangeset = Framer.#inferChangeset(url, target);
+	}
 	this.framesetReady.resolve();
 }
 
@@ -1015,12 +1018,12 @@ static #notify(msg) {
 
 /**
  * Register all frame definitions from the frameset definition into the
- * global frameDefinitions registry, keyed by their definition name.
+ * global transcludeDefinitions registry, keyed by their definition name.
  *
  * @param {HFramesetDefinition} framesetDef - The frameset definition containing frame configs.
  */
 static #registerFrames(framesetDef) {
-	_.forOwn(framesetDef.frames, (o, key) => { frameDefinitions.set(key, o); });
+	_.forOwn(framesetDef.frames, (o, key) => { transcludeDefinitions.set(key, o); });
 }
 
 /**
@@ -1039,77 +1042,137 @@ static #registerFramesetElement() {
 
 let framer = new Framer();
 
-// FIXME Monkey-patch HFrameset lifecycle to integrate with framer
-// TODO HFrameset.definition should be looked up from a registry in HFrameset's own attached(),
-// following the same pattern as HFrame (which looks up frameDefinitions by @def attribute).
-// This would remove the hidden dependency on framer injecting the property.
-HFrameset.attached = function(handlers) {
+/**
+ * HFrameset sprocket — bound to <body>. Renders the frameset layout,
+ * maintains the frame tree, reads lookup from <body><script for> config,
+ * and integrates with the framer singleton.
+ */
+class HFrameset extends HBase {
+
+static { sprockets.withAria(this, { role: 'frameset', isFrameset: true }); }
+
+static attached(handlers) {
 	HBase.attached.call(this, handlers);
 	let frameset = this;
-	frameset.definition = framer.definition; // TODO remove `framer` dependency — use a frameset definition registry instead
+	frameset.definition = framer.definition;
 	_.defaults(frameset, { frames: [] });
-};
-HFrameset.enteredDocument = function() {
+
+	// Read lookup from body's <script for> config if present
+	let element = frameset.element;
+	if (element.hasAttribute('config')) {
+		let configID = _.words(element.getAttribute('config'))[0];
+		let bodyConfig = configData.get(configID);
+		if (bodyConfig && bodyConfig.lookup) {
+			frameset.lookupTarget = bodyConfig.lookup;
+		}
+	}
+
+	// Register requestnavigation handler if lookup is available
+	if (frameset.lookupTarget) {
+		handlers.push({
+			type: 'requestnavigation',
+			action: function(e) {
+				if (e.defaultPrevented) return;
+				let acceptDefault = framer.onRequestNavigation(e, this);
+				if (acceptDefault === false) e.preventDefault();
+			}
+		});
+	}
+}
+
+static enteredDocument() {
 	let frameset = this;
-	framer.framesetEntered(frameset); // TODO remove `framer` dependency
+	framer.framesetEntered(frameset);
 	frameset.render();
-};
-HFrameset.leftDocument = function() { // FIXME should never be called??
-	let frameset = this;
-	framer.framesetLeft(frameset); // TODO remove `framer` dependency
-};
+}
 
-// FIXME Monkey-patch to allow creation of tree of frames
-function interceptFrameElements() {
+static leftDocument() {
+	framer.framesetLeft(this);
+}
 
-_.assign(HFrame.prototype, {
-frameEntered: function(frame) { this.frames.push(frame); },
-frameLeft: function(frame) { let index = this.frames.indexOf(frame); this.frames.splice(index); }
-});
+frameEntered(frame) {
+	this.frames.push(frame);
+}
 
-HFrame._attached = HFrame.attached;
-HFrame._enteredDocument = HFrame.enteredDocument;
-HFrame._leftDocument = HFrame.leftDocument;
+frameLeft(frame) {
+	let index = this.frames.indexOf(frame);
+	this.frames.splice(index, 1);
+}
 
-_.assign(HFrame, {
-attached: function(handlers) { this.frames = []; HFrame._attached.call(this, handlers); },
-enteredDocument: function() { framer.frameEntered(this); HFrame._enteredDocument.call(this); },
-leftDocument: function() { framer.frameLeft(this); HFrame._leftDocument.call(this); }
-});
-
-} // end patch
-
-// FIXME Monkey-patch to allow all HyperFrameset sprockets to retarget requestnavigation events
-function retargetFramesetElements() {
-
-_.assign(HBase.prototype, {
-lookup: function(url, details) {
-	let link = this;
-	let options = link.options;
-	if (!options || !options.lookup) return false;
-	let partial = options.lookup(url, details);
+lookup(url, details) {
+	if (!this.lookupTarget) return false;
+	let partial = this.lookupTarget(url, details);
 	if (partial === '' || partial === true) return true;
 	if (partial == null || partial === false) return false;
 	return framer.inferChangeset(url, partial);
 }
-});
 
-HBase._attached = HBase.attached;
-HBase.attached = function(handlers) {
-	HBase._attached.call(this, handlers);
-	let object = this;
-	let options = object.options;
-	if (!options.lookup) return;
-	handlers.push({
-		type: 'requestnavigation',
-		action: function(e) {
-			if (e.defaultPrevented) return;
-			let acceptDefault = framer.onRequestNavigation(e, this);
-			if (acceptDefault === false) e.preventDefault();
+render() {
+	let frameset = this;
+	let definition = frameset.definition;
+	let dstBody = frameset.element;
+
+	if (definition.element === dstBody) return;
+
+	let srcBody = definition.render();
+
+	return Thenfu.pipe(null, [
+	function() {
+		_.forEach(Array.from(srcBody.childNodes), function(node) {
+			sprockets.insertNode('beforeend', dstBody, node);
+		});
+	}
+	]);
+}
+
+}
+
+/**
+ * HFrame extends HTransclude with routing awareness: frame-tree participation,
+ * targetname-based navigation, and framer lifecycle integration.
+ */
+class HFrame extends HTransclude {
+
+	frameEntered(frame) { this.frames.push(frame); }
+	frameLeft(frame) { let index = this.frames.indexOf(frame); this.frames.splice(index, 1); }
+
+	lookup(url, details) {
+		let options = this.options;
+		if (!options || !options.lookup) return false;
+		let partial = options.lookup(url, details);
+		if (partial === '' || partial === true) return true;
+		if (partial == null || partial === false) return false;
+		return framer.inferChangeset(url, partial);
+	}
+
+	static attached(handlers) {
+		HTransclude.attached.call(this, handlers);
+		this.frames = [];
+		let options = this.options;
+		if (options && options.lookup) {
+			handlers.push({
+				type: 'requestnavigation',
+				action: function(e) {
+					if (e.defaultPrevented) return;
+					let acceptDefault = framer.onRequestNavigation(e, this);
+					if (acceptDefault === false) e.preventDefault();
+				}
+			});
 		}
-	});
-};
+	}
 
-} // end retarget
+	static enteredDocument() {
+		framer.frameEntered(this);
+		HTransclude.enteredDocument.call(this);
+	}
 
+	static leftDocument() {
+		framer.frameLeft(this);
+		HTransclude.leftDocument.call(this);
+	}
+
+	static isFrame(element) { return HTransclude.isFrame(element); }
+}
+
+export { HFrameset, HFrame };
 export default framer;
