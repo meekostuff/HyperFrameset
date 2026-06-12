@@ -172,73 +172,82 @@ init(doc, settings) {
  * Must be called after construction and before render().
  */
 preprocess() {
+	this.#preprocessScripts();
+	this.#preprocessFrames();
+}
+
+#preprocessScripts() {
 	let body = this.element;
-
 	let scripts = DOM.findAll('script', body);
-	_.forEach(scripts, (script, i) => {
-		// Ignore non-javascript scripts
-		if (script.type && !/^text\/javascript/.test(script.type)) return;
+	_.forEach(scripts, (script, i) => { this.#preprocessScript(script, i); });
+}
 
-		// TODO probably don't need this as handled by init()
-		if (script.hasAttribute('src')) { // external javascript in <body> is invalid
-			console.warn('Frameset <body> may not contain external scripts: \n' +
-				script.cloneNode(false).outerHTML);
-			script.parentNode.removeChild(script);
-			return;
-		}
+#preprocessScript(script, i) {
+	// Ignore non-javascript scripts
+	if (script.type && !/^text\/javascript/.test(script.type)) return;
 
-		let sourceURL = script.getAttribute('sourceurl');
+	// TODO probably don't need this as handled by init()
+	if (script.hasAttribute('src')) { // external javascript in <body> is invalid
+		console.warn('Frameset <body> may not contain external scripts: \n' +
+			script.cloneNode(false).outerHTML);
+		script.parentNode.removeChild(script);
+		return;
+	}
 
-		// TODO probably don't need this as handled by init()
-		if (!script.hasAttribute('for')) {
-			console.warn('Frameset <body> may not contain non-@for scripts:\n' +
-					this.url + '#' + script.id);
-			script.parentNode.removeChild(script); 
-			return;
-		}
+	let sourceURL = script.getAttribute('sourceurl');
 
-		// TODO should this be handled by init() ??
-		if (script.getAttribute('for') !== '') {
-			console.warn('<script> may only contain EMPTY @for: \n' +
-				script.cloneNode(false).outerHTML);
-			script.parentNode.removeChild(script);
-			return;
-		}
-
-		let scriptFor = script;
-		while (scriptFor = scriptFor.previousSibling) {
-			if (scriptFor.nodeType !== 1) continue;
-			let tag = DOM.getTagName(scriptFor);
-			if (tag !== 'script' && tag !== 'style') break;
-		}
-		if (!scriptFor) scriptFor = script.parentNode;
-		
-		// FIXME @config shouldn't be hard-wired here
-		let configID = scriptFor.hasAttribute('config') ?
-			scriptFor.getAttribute('config') :
-			'';
-		// TODO we can add more than one @config to an element but only first is used
-		configID = configID ?
-			configID.replace(/\s*$/, ' ' + sourceURL) :
-			sourceURL;
-		scriptFor.setAttribute('config', configID);
-
-		let fnText = 'return (' + script.text + '\n);';
-
-		try {
-			let fn = Function(fnText);
-			let object = fn();
-			configData.set(sourceURL, object);
-		}
-		catch(err) { 
-			console.warn('Error evaluating inline script in frameset:\n' +
+	// TODO probably don't need this as handled by init()
+	if (!script.hasAttribute('for')) {
+		console.warn('Frameset <body> may not contain non-@for scripts:\n' +
 				this.url + '#' + script.id);
-			window.reportError(err);
-		}
+		script.parentNode.removeChild(script); 
+		return;
+	}
 
-		script.parentNode.removeChild(script); // physical <script> no longer needed
-	});
+	// TODO should this be handled by init() ??
+	if (script.getAttribute('for') !== '') {
+		console.warn('<script> may only contain EMPTY @for: \n' +
+			script.cloneNode(false).outerHTML);
+		script.parentNode.removeChild(script);
+		return;
+	}
 
+	let scriptFor = script;
+	while (scriptFor = scriptFor.previousSibling) {
+		if (scriptFor.nodeType !== 1) continue;
+		let tag = DOM.getTagName(scriptFor);
+		if (tag !== 'script' && tag !== 'style') break;
+	}
+	if (!scriptFor) scriptFor = script.parentNode;
+	
+	// FIXME @config shouldn't be hard-wired here
+	let configID = scriptFor.hasAttribute('config') ?
+		scriptFor.getAttribute('config') :
+		'';
+	// TODO we can add more than one @config to an element but only first is used
+	configID = configID ?
+		configID.replace(/\s*$/, ' ' + sourceURL) :
+		sourceURL;
+	scriptFor.setAttribute('config', configID);
+
+	let fnText = 'return (' + script.text + '\n);';
+
+	try {
+		let fn = Function(fnText);
+		let object = fn();
+		configData.set(sourceURL, object);
+	}
+	catch(err) { 
+		console.warn('Error evaluating inline script in frameset:\n' +
+			this.url + '#' + script.id);
+		window.reportError(err);
+	}
+
+	script.parentNode.removeChild(script); // physical <script> no longer needed
+}
+
+#preprocessFrames() {
+	let body = this.element;
 	let frameElts = DOM.findAll(
 		this.namespaces.lookupSelector('frame', HYPERFRAMESET_URN),
 		body);
@@ -292,7 +301,6 @@ preprocess() {
 		}
 		el.setAttribute('id', scopeId);
 	});
-
 }
 
 /**
