@@ -184,8 +184,15 @@ start(startOptions) {
 
 	return Thenfu.pipe(null, [
 
-		// Wait for document.body to exist
+		// Wait for document.body, then optionally hide it until preprocessing is done
 		() => Thenfu.wait(() => !!document.body),
+		() => { if (startOptions && startOptions.hide) document.body.hidden = true; },
+
+		// Wait for DOM to be fully parsed
+		() => new Promise(resolve => {
+			if (document.readyState !== 'loading') resolve();
+			else document.addEventListener('DOMContentLoaded', resolve, { once: true });
+		}),
 
 		// Replace the address bar URL with start_url so downstream code sees the content URL
 		() => {
@@ -200,7 +207,10 @@ start(startOptions) {
 		() => Framer.#insertMarkers(document.URL, framer.framesetURL, true),
 
 		// Register elements, start sprockets, initialize history
-		() => framer.#activate()
+		() => framer.#activate(),
+
+		// Reveal the body now that the frameset is ready
+		() => { if (startOptions && startOptions.hide) document.body.hidden = false; }
 	]);
 }
 
