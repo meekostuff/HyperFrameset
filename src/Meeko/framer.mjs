@@ -17,7 +17,7 @@ import scriptQueue from './scriptQueue.mjs';
 import httpProxy from './httpProxy.mjs';
 import HistoryState from './HistoryState.mjs';
 import sprockets from './sprockets.mjs';
-import configData from './configData.mjs';
+import { getElementConfig } from './configData.mjs';
 import layoutElements, {HBase} from './layoutElements.mjs';
 import transcluder, {HTransclude, transcludeDefinitions } from './transcluder.mjs';
 import {HFramesetDefinition} from './framesetDefinitions.mjs';
@@ -1069,12 +1069,9 @@ static attached(handlers) {
 
 	// Read lookup from body's <script for> config if present
 	let element = frameset.element;
-	if (element.hasAttribute('config')) {
-		let configID = _.words(element.getAttribute('config'))[0];
-		let bodyConfig = configData.get(configID);
-		if (bodyConfig && bodyConfig.lookup) {
-			frameset.lookupTarget = bodyConfig.lookup;
-		}
+	let bodyConfig = getElementConfig(element);
+	if (bodyConfig && bodyConfig.lookup) {
+		frameset.lookupTarget = bodyConfig.lookup;
 	}
 
 	// Register requestnavigation handler if lookup is available

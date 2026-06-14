@@ -6,7 +6,7 @@
 
 import * as _ from './stuff.mjs';
 import * as DOM from './DOM.mjs';
-import configData from './configData.mjs';
+import { getElementConfig } from './configData.mjs';
 import sprockets from './sprockets.mjs';
 import controllers from './controllers.mjs';
 
@@ -23,9 +23,7 @@ class HBase extends sprockets.RoleType {
 		let object = this;
 		object.options = {};
 		let element = object.element;
-		if (!element.hasAttribute('config')) return;
-		let configID = _.words(element.getAttribute('config'))[0];
-		object.options = configData.get(configID);
+		object.options = getElementConfig(element) || {};
 	}
 }
 

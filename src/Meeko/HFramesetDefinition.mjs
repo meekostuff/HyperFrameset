@@ -6,7 +6,7 @@
 import * as _ from './stuff.mjs';
 import URLux from './URLux.mjs';
 import * as DOM from './DOM.mjs';
-import configData from './configData.mjs';
+import configData, {getScriptFor, setElementConfig} from './configData.mjs';
 import CustomNamespace, {HYPERFRAMESET_URN} from './CustomNamespace.mjs';
 import HFrameDefinition from './HFrameDefinition.mjs';
 import htmlParser from './htmlParser.mjs';
@@ -126,16 +126,7 @@ init(doc, settings) {
 		if (script.type && !/^text\/javascript/.test(script.type)) return;
 		// ignore external scripts
 		if (script.hasAttribute('src')) return;
-		let id = script.id;
-		// TODO generating ID always has a chance of duplicating IDs
-		if (!id) id = script.id = `script[${i}]`; // FIXME doc that i is zero-indexed
-		let sourceURL;
-		if (script.hasAttribute('sourceurl')) sourceURL = script.getAttribute('sourceurl');
-		else {
-			sourceURL = `${this.url}__${id}`; // FIXME this should be configurable
-			script.setAttribute('sourceurl', sourceURL);
-		}
-		script.text += `\n//# sourceURL=${sourceURL}`;
+		this.#normalizeScript(script, i);
 	});
 
 	// Move all <script for> in <head> to <body>
@@ -155,6 +146,19 @@ init(doc, settings) {
 		doc.head.appendChild(script);
 		console.info('Moved <script> in frameset <body> to <head>');
 	});
+}
+
+#normalizeScript(script, i) {
+	let id = script.id;
+	// TODO generating ID always has a chance of duplicating IDs
+	if (!id) id = script.id = `script[${i}]`; // FIXME doc that i is zero-indexed
+	let sourceURL;
+	if (script.hasAttribute('sourceurl')) sourceURL = script.getAttribute('sourceurl');
+	else {
+		sourceURL = `${this.url}__${id}`; // FIXME this should be configurable
+		script.setAttribute('sourceurl', sourceURL);
+	}
+	script.text += `\n//# sourceURL=${sourceURL}`;
 }
 
 #normalizeStyles(doc) {
@@ -212,23 +216,8 @@ preprocess() {
 		return;
 	}
 
-	let scriptFor = script;
-	while (scriptFor = scriptFor.previousSibling) {
-		if (scriptFor.nodeType !== 1) continue;
-		let tag = DOM.getTagName(scriptFor);
-		if (tag !== 'script' && tag !== 'style') break;
-	}
-	if (!scriptFor) scriptFor = script.parentNode;
-	
-	// FIXME @config shouldn't be hard-wired here
-	let configID = scriptFor.hasAttribute('config') ?
-		scriptFor.getAttribute('config') :
-		'';
-	// TODO we can add more than one @config to an element but only first is used
-	configID = configID ?
-		configID.replace(/\s*$/, ' ' + sourceURL) :
-		sourceURL;
-	scriptFor.setAttribute('config', configID);
+	let scriptFor = getScriptFor(script);
+	setElementConfig(scriptFor, sourceURL);
 
 	let fnText = 'return (' + script.text + '\n);';
 
