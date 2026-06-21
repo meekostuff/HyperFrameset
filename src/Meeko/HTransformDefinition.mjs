@@ -4,7 +4,6 @@
  * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
  */
 import * as _ from './stuff.mjs';
-import { getElementConfig } from './configData.mjs';
 import decoders from './decoders.mjs';
 import processors from './processors.mjs';
 
@@ -30,7 +29,7 @@ init(el) {
 	let node;
 	while (node = el.firstChild) frag.appendChild(node); // NOTE no adoption
 
-	let options = getElementConfig(el);
+	let options = el.behavior;
 	let processor = transform.processor = processors.create(transform.type, options, framesetDef.namespaces);
 	processor.loadTemplate(frag);
 }

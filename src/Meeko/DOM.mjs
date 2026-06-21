@@ -301,23 +301,6 @@ function dispatchEvent(target, type, params) { // NOTE every JS initiated event 
 	return target.dispatchEvent(event);
 }
 
-/** @type {Array<string>} List of managed event types */
-let managedEvents = [];
-
-/**
- * Set up event management for specified event type
- * @param {string} type - Event type to manage
- */
-function manageEvent(type) {
-	if (_.includes(managedEvents, type)) return;
-	managedEvents.push(type);
-	window.addEventListener(type, (event) => {
-		// NOTE stopPropagation() prevents custom default-handlers from running. DOMSprockets nullifies it.
-		event.stopPropagation = () => { console.warn('event.stopPropagation() is a no-op'); }
-		event.stopImmediatePropagation = () => { console.warn('event.stopImmediatePropagation() is a no-op'); }
-	}, true);
-}
-
 /**
  * Check if element is visible (not hidden)
  * @param {Element} element - Element to check
@@ -572,7 +555,7 @@ export {
 	getTagName,
 	contains, matches,
 	findId, find, findAll, closest, siblings,
-	dispatchEvent, manageEvent,
+	dispatchEvent,
 	adoptContents,
 	isVisible, whenVisible,
 	insertNode,

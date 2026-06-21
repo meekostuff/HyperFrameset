@@ -16,9 +16,8 @@ import * as DOM from './DOM.mjs';
 import scriptQueue from './scriptQueue.mjs';
 import httpProxy from './httpProxy.mjs';
 import HistoryState from './HistoryState.mjs';
-import sprockets from './sprockets.mjs';
-import { getElementConfig } from './configData.mjs';
-import layoutElements, {HBase} from './layoutElements.mjs';
+import { install, instance } from './behaviors.mjs';
+import layoutElements from './layoutElements.mjs';
 import transcluder, {HTransclude, transcludeDefinitions } from './transcluder.mjs';
 import {HFramesetDefinition} from './framesetDefinitions.mjs';
 import {HYPERFRAMESET_URN} from './CustomNamespace.mjs';
@@ -95,6 +94,7 @@ start(startOptions) {
 	let framer = this;
 	if (framer.started) throw Error('Already started');
 	framer.started = true;
+	framer.behaviors = install({ globalName: 'behaviors', attr: 'config', container: document.body, autoProcess: false });
 	if (!startOptions || !startOptions.contentDocument) {
 		console.info("No contentDocument passed to start(). Assuming landing-page is the frameset.")
 		return framer.#startAsFrameset(startOptions);
@@ -129,7 +129,7 @@ start(startOptions) {
 		if (framesetURL.hash) console.info(`Ignoring hash component of frameset URL: ${framesetURL.hash}`);
 		framer.framesetURL = framerConfig.framesetURL = framesetURL.nohash;
 		return httpProxy.load(framer.framesetURL, { responseType: 'document' })
-		.then((response) => new HFramesetDefinition(response.document, framerConfig));
+		.then((response) => new HFramesetDefinition(response.document, { ...framerConfig, behaviors: framer.behaviors }));
 	},
 
 	// Prepare the live document, preprocess the definition, and pre-render the frameset body
@@ -177,7 +177,7 @@ start(startOptions) {
 	framer.framesetURL = framesetURL.nohash;
 	framer.scope = Framer.#deriveScope(startOptions && startOptions.scope, startURL, framesetURL);
 
-	let settings = { framesetURL: framer.framesetURL, scope: framer.scope };
+	let settings = { framesetURL: framer.framesetURL, scope: framer.scope, behaviors: framer.behaviors };
 	let definition = new HFramesetDefinition(document, settings);
 
 	framer.definition = definition;
@@ -263,13 +263,12 @@ static #deriveScope(scope, startURL, framesetURL) {
 		}, false);
 
 		Framer.#registerFrames(framer.definition);
+		Framer.#registerFramesetElement();
 		let namespace = framer.definition.namespaces.lookupNamespace(HYPERFRAMESET_URN);
 		layoutElements.register(namespace);
 		transcluder.registerElement(namespace, 'transclude', HTransclude);
 		transcluder.registerElement(namespace, 'frame', HFrame);
-		Framer.#registerFramesetElement();
-
-		return sprockets.start({ manual: true }); // FIXME should be a promise
+		this.framesetReady.resolve();
 	},
 
 	// Wait for the frameset sprocket to enter the document, then start history management
@@ -326,12 +325,14 @@ static #deriveScope(scope, startURL, framesetURL) {
 framesetEntered(frameset) {
 	this.frameset = frameset;
 	let url = document.URL;
+	if (url === this.framesetURL) return; // frameset-first with no start_url — no changeset
 	this.currentChangeset = frameset.lookup(url, { referrer: document.referrer });
+	console.debug('framesetEntered: lookup returned', this.currentChangeset, 'for', url);
 	if (!this.currentChangeset && this.options.lookup) {
 		let target = this.options.lookup(url);
 		if (target) this.currentChangeset = Framer.#inferChangeset(url, target);
+		console.debug('framesetEntered: options.lookup returned', this.currentChangeset);
 	}
-	this.framesetReady.resolve();
 }
 
 /**
@@ -345,38 +346,18 @@ framesetLeft(frameset) { // WARN this should never happen
 }
 
 /**
- * Called when an HFrame sprocket enters the document. Establishes the parent-child
- * frame relationship and, if this frame's targetname matches the current changeset's
- * target, sets its @src attribute to trigger content loading.
+ * Called when an HFrame connects to the document.
+ * If this frame's targetname matches the current changeset, sets its @src.
  *
- * @param {Object} frame - The HFrame sprocket instance that entered the document.
+ * @param {HFrame} frame - The HFrame element that connected.
  */
 frameEntered(frame) {
-	let parentFrame;
-	let parentElement = DOM.closest(frame.element.parentNode, HFrame.isFrame);
-	if (parentElement) parentFrame = parentElement.$;
-	else {
-		parentElement = document.body;
-		parentFrame = parentElement.$;
+	let targetName = frame.getAttribute('targetname');
+	console.debug('frameEntered:', targetName, 'currentChangeset:', this.currentChangeset);
+	if (this.currentChangeset && targetName === this.currentChangeset.target) {
+		frame.setAttribute('src', this.currentChangeset.url);
+		console.debug('frameEntered: set src to', frame.getAttribute('src'));
 	}
-	parentFrame.frameEntered(frame);
-	frame.parentFrame = parentFrame;
-
-	if (frame.targetname === this.currentChangeset.target) { // FIXME should only be used at startup
-		frame.attr('src', this.currentChangeset.url);
-	}
-}
-
-/**
- * Called when an HFrame sprocket leaves the document. Removes the frame from
- * its parent's frame list.
- *
- * @param {Object} frame - The HFrame sprocket instance that left the document.
- */
-frameLeft(frame) {
-	let parentFrame = frame.parentFrame;
-	delete frame.parentFrame;
-	parentFrame.frameLeft(frame);
 }
 
 /**
@@ -573,15 +554,10 @@ navigate(url, changeset) { // FIXME doesn't support replaceState
  */
 load(url, changeset, changeState) { // FIXME doesn't support replaceState
 	let framer = this;
-	let frameset = framer.frameset;
 	let mustNotify = changeState || changeState === 0;
 	let target = changeset.target;
-	let frames = [];
-	recurseFrames(frameset, (frame) => {
-		if (frame.targetname !== target) return;
-		frames.push(frame);
-		return true;
-	});
+	let frames = document.body.querySelectorAll(`[targetname="${target}"]`);
+	frames = Array.from(frames).filter(el => el instanceof HFrame);
 
 	let fullURL = URLux.create(url);
 	let hash = fullURL.hash;
@@ -595,7 +571,7 @@ load(url, changeset, changeState) { // FIXME doesn't support replaceState
 		if (mustNotify) return Framer.#notify({ module: 'frameset', type: 'leftState', stage: 'before', url: document.URL });
 	},
 	// Set @src on matching frames to trigger their refresh/load cycle
-	() => { _.forEach(frames, (frame) => { frame.attr('src', fullURL); }); },
+	() => { _.forEach(frames, (frame) => { frame.setAttribute('src', fullURL); }); },
 	// Fetch the document via httpProxy
 	// NOTE .load() is just to sync pushState
 	() => httpProxy.load(nohash, request).then((resp) => { response = resp; }),
@@ -612,13 +588,6 @@ load(url, changeset, changeState) { // FIXME doesn't support replaceState
 		if (mustNotify) return Framer.#notify({ module: 'frameset', type: 'enteredState', stage: 'after', url: url });
 	}
 	]);
-
-	function recurseFrames(parentFrame, fn) {
-		_.forEach(parentFrame.frames, (frame) => {
-			let found = fn(frame);
-			if (!found) recurseFrames(frame, fn);
-		});
-	}
 }
 
 /**
@@ -1000,7 +969,7 @@ static #inferChangeset(url, partial) {
 static #notify(msg) {
 	let module;
 	switch (msg.module) {
-	case 'frameset': module = framer.frameset.options; break;
+	case 'frameset': module = framer.frameset.behavior; break;
 	default: return Thenfu.asap();
 	}
 	let handler = module[msg.type];
@@ -1037,15 +1006,16 @@ static #registerFrames(framesetDef) {
 }
 
 /**
- * Register the HFrameset sprocket for the <body> element and inject
- * base CSS reset styles (margin/padding reset, full-height html).
+ * Register the HFrameset element on <body> and inject base CSS reset styles.
  */
 static #registerFramesetElement() {
-	sprockets.registerElement('body', HFrameset);
 	let cssText = ['html, body { margin: 0; padding: 0; }', 'html { width: 100%; height: 100%; }'];
 	let style = document.createElement('style');
 	style.textContent = cssText.join('\n');
 	document.head.insertBefore(style, document.head.firstChild);
+
+	let frameset = new HFrameset(document.body);
+	frameset.connectedCallback();
 }
 
 } // end class Framer
@@ -1053,71 +1023,44 @@ static #registerFramesetElement() {
 let framer = new Framer();
 
 /**
- * HFrameset sprocket — bound to <body>. Renders the frameset layout,
- * maintains the frame tree, reads lookup from <body><script for> config,
- * and integrates with the framer singleton.
+ * HFrameset — manages the frameset layout on <body>.
+ * Not registered via customElements.define (body can't be a custom element).
+ * Lifecycle methods are called manually by the framer.
  */
-class HFrameset extends HBase {
+class HFrameset {
 
-static { sprockets.withAria(this, { role: 'frameset', isFrameset: true }); }
-
-static attached(handlers) {
-	HBase.attached.call(this, handlers);
-	let frameset = this;
-	frameset.definition = framer.definition;
-	_.defaults(frameset, { frames: [] });
-
-	// Read lookup from body's <script for> config if present
-	let element = frameset.element;
-	let bodyConfig = getElementConfig(element);
-	if (bodyConfig && bodyConfig.lookup) {
-		frameset.lookupTarget = bodyConfig.lookup;
-	}
-
-	// Register requestnavigation handler if lookup is available
-	if (frameset.lookupTarget) {
-		handlers.push({
-			type: 'requestnavigation',
-			action: function(e) {
-				if (e.defaultPrevented) return;
-				let acceptDefault = framer.onRequestNavigation(e, this);
-				if (acceptDefault === false) e.preventDefault();
-			}
-		});
-	}
+constructor(body) {
+	this.element = body;
+	this.behavior = this.element.behavior;
+	this.isFrameset = true;
+	this.definition = framer.definition;
 }
 
-static enteredDocument() {
-	let frameset = this;
-	framer.framesetEntered(frameset);
-	frameset.render();
-}
+connectedCallback() {
+	// Listen for requestnavigation if lookup is available
+	this.element.addEventListener('requestnavigation', (e) => {
+		if (e.defaultPrevented) return;
+		// Read page-author's lookup from behavior (script[for] on body)
+		if(!this.element.behavior.lookup) return;
 
-static leftDocument() {
-	framer.framesetLeft(this);
-}
+		let acceptDefault = framer.onRequestNavigation(e, this);
+		if (acceptDefault === false) e.preventDefault();
+	});
 
-frameEntered(frame) {
-	this.frames.push(frame);
-}
-
-frameLeft(frame) {
-	let index = this.frames.indexOf(frame);
-	this.frames.splice(index, 1);
+	framer.framesetEntered(this);
+	this.render();
 }
 
 lookup(url, details) {
-	if (!this.lookupTarget) return false;
-	let partial = this.lookupTarget(url, details);
+	let partial = this.element.behavior.lookup(url, details);
 	if (partial === '' || partial === true) return true;
 	if (partial == null || partial === false) return false;
 	return framer.inferChangeset(url, partial);
 }
 
 render() {
-	let frameset = this;
-	let definition = frameset.definition;
-	let dstBody = frameset.element;
+	let definition = this.definition;
+	let dstBody = this.element;
 
 	if (definition.element === dstBody) return;
 
@@ -1126,7 +1069,7 @@ render() {
 	return Thenfu.pipe(null, [
 	function() {
 		_.forEach(Array.from(srcBody.childNodes), function(node) {
-			sprockets.insertNode('beforeend', dstBody, node);
+			dstBody.appendChild(node);
 		});
 	}
 	]);
@@ -1140,42 +1083,29 @@ render() {
  */
 class HFrame extends HTransclude {
 
-	frameEntered(frame) { this.frames.push(frame); }
-	frameLeft(frame) { let index = this.frames.indexOf(frame); this.frames.splice(index, 1); }
+	connectedCallback() {
+		this.addEventListener('requestnavigation', (e) => {
+			if (e.defaultPrevented) return;
+			if (this.behavior.lookup) {
+				let acceptDefault = framer.onRequestNavigation(e, this);
+				if (acceptDefault === false) e.preventDefault();
+			}
+		});
+		framer.frameEntered(this);
+		super.connectedCallback();
+	}
+
+	disconnectedCallback() {
+		super.disconnectedCallback();
+	}
 
 	lookup(url, details) {
-		let options = this.options;
-		if (!options || !options.lookup) return false;
-		let partial = options.lookup(url, details);
+		let element = this;
+		if (!element.behavior.lookup) return false;
+		let partial = element.behavior.lookup(url, details);
 		if (partial === '' || partial === true) return true;
 		if (partial == null || partial === false) return false;
 		return framer.inferChangeset(url, partial);
-	}
-
-	static attached(handlers) {
-		HTransclude.attached.call(this, handlers);
-		this.frames = [];
-		let options = this.options;
-		if (options && options.lookup) {
-			handlers.push({
-				type: 'requestnavigation',
-				action: function(e) {
-					if (e.defaultPrevented) return;
-					let acceptDefault = framer.onRequestNavigation(e, this);
-					if (acceptDefault === false) e.preventDefault();
-				}
-			});
-		}
-	}
-
-	static enteredDocument() {
-		framer.frameEntered(this);
-		HTransclude.enteredDocument.call(this);
-	}
-
-	static leftDocument() {
-		framer.frameLeft(this);
-		HTransclude.leftDocument.call(this);
 	}
 
 	static isFrame(element) { return HTransclude.isFrame(element); }

@@ -6,6 +6,9 @@ import {
   HTransformDefinition
 } from '../src/Meeko/framesetDefinitions.mjs';
 import CustomNamespace from '../src/Meeko/CustomNamespace.mjs';
+import { install } from '../src/Meeko/behaviors.mjs';
+
+const behaviors = install({ attr: 'config', autoProcess: false });
 
 function makeNamespaces() {
   let ns = new CustomNamespace({ name: 'hf', style: 'vendor', urn: 'hyperframeset' });
@@ -221,7 +224,7 @@ describe('framesetDefinitions exports', () => {
   describe('HFramesetDefinition', () => {
     it('init parses a minimal frameset document', () => {
       const doc = createFramesetDoc('<main>content</main>');
-      const def = new HFramesetDefinition(doc, {
+      const def = new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
@@ -233,7 +236,7 @@ describe('framesetDefinitions exports', () => {
 
     it('init sets up namespaces with hf default', () => {
       const doc = createFramesetDoc('');
-      const def = new HFramesetDefinition(doc, {
+      const def = new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
@@ -243,7 +246,7 @@ describe('framesetDefinitions exports', () => {
 
     it('init rebases scope: URLs in known attributes', () => {
       const doc = createFramesetDoc('<a href="scope:page.html">link</a>');
-      new HFramesetDefinition(doc, {
+      new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/app/'
       });
@@ -256,7 +259,7 @@ describe('framesetDefinitions exports', () => {
       const script = doc.createElement('script');
       script.text = '({})';
       doc.head.appendChild(script);
-      const def = new HFramesetDefinition(doc, {
+      const def = new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
@@ -272,7 +275,7 @@ describe('framesetDefinitions exports', () => {
       const doc = createFramesetDoc(
         '<hf-frame defid="main_frame"><hf-body condition="loading">Loading</hf-body></hf-frame>'
       );
-      const def = new HFramesetDefinition(doc, {
+      const def = new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
@@ -283,7 +286,7 @@ describe('framesetDefinitions exports', () => {
 
     it('preprocess auto-generates defid when missing', () => {
       const doc = createFramesetDoc('<hf-frame></hf-frame>');
-      const def = new HFramesetDefinition(doc, {
+      const def = new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
@@ -296,7 +299,7 @@ describe('framesetDefinitions exports', () => {
       const doc = createFramesetDoc(
         '<hf-frame defid="nav"></hf-frame><hf-frame defid="main"></hf-frame>'
       );
-      const def = new HFramesetDefinition(doc, {
+      const def = new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
@@ -307,7 +310,7 @@ describe('framesetDefinitions exports', () => {
 
     it('render returns a clone of the frameset body', () => {
       const doc = createFramesetDoc('<header>Header</header><main>Main</main>');
-      const def = new HFramesetDefinition(doc, {
+      const def = new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
@@ -324,7 +327,7 @@ describe('framesetDefinitions exports', () => {
           '<hf-body condition="loaded"></hf-body>' +
         '</hf-frame>'
       );
-      const def = new HFramesetDefinition(doc, {
+      const def = new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
@@ -349,7 +352,7 @@ describe('framesetDefinitions exports', () => {
     it('warns about @id usage in frameset body', () => {
       const doc = createFramesetDoc('<div id="bad">content</div>');
       const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      new HFramesetDefinition(doc, {
+      new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
@@ -363,7 +366,7 @@ describe('framesetDefinitions exports', () => {
       script.type = 'text/x-template';
       script.text = '<div>template</div>';
       doc.head.appendChild(script);
-      new HFramesetDefinition(doc, {
+      new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
@@ -376,7 +379,7 @@ describe('framesetDefinitions exports', () => {
       const script = doc.createElement('script');
       script.setAttribute('src', 'external.js');
       doc.head.appendChild(script);
-      new HFramesetDefinition(doc, {
+      new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
@@ -389,7 +392,7 @@ describe('framesetDefinitions exports', () => {
       script.setAttribute('sourceurl', 'custom://my-source');
       script.text = '({})';
       doc.head.appendChild(script);
-      new HFramesetDefinition(doc, {
+      new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
@@ -404,7 +407,7 @@ describe('framesetDefinitions exports', () => {
       script.text = '({})';
       doc.head.appendChild(script);
       const spy = vi.spyOn(console, 'info').mockImplementation(() => {});
-      const def = new HFramesetDefinition(doc, {
+      const def = new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
@@ -418,7 +421,7 @@ describe('framesetDefinitions exports', () => {
     it('moves non-@for scripts from body to head', () => {
       const doc = createFramesetDoc('<script>var x = 1;</script>');
       const spy = vi.spyOn(console, 'info').mockImplementation(() => {});
-      const def = new HFramesetDefinition(doc, {
+      const def = new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
@@ -437,7 +440,7 @@ describe('framesetDefinitions exports', () => {
         '<script for="" src="external.js"></script><p>content</p>'
       );
       const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const def = new HFramesetDefinition(doc, {
+      const def = new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
@@ -451,7 +454,7 @@ describe('framesetDefinitions exports', () => {
       // Create a script that survives init (has @for but non-empty value)
       const doc = createFramesetDoc('<p>content</p>');
       const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const def = new HFramesetDefinition(doc, {
+      const def = new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
@@ -468,7 +471,7 @@ describe('framesetDefinitions exports', () => {
     it('warns and removes scripts with non-empty @for', () => {
       const doc = createFramesetDoc('<p>content</p>');
       const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const def = new HFramesetDefinition(doc, {
+      const def = new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
@@ -487,7 +490,7 @@ describe('framesetDefinitions exports', () => {
         '<div><script for="">({ myOption: true })</script></div>'
       );
       const spy = vi.spyOn(console, 'info').mockImplementation(() => {});
-      const def = new HFramesetDefinition(doc, {
+      const def = new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
@@ -504,18 +507,16 @@ describe('framesetDefinitions exports', () => {
       const doc = createFramesetDoc(
         '<div><script for="">this is not valid JS object {{{</script></div>'
       );
-      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {});
-      const errorSpy = vi.spyOn(window, 'reportError').mockImplementation(() => {});
-      const def = new HFramesetDefinition(doc, {
+      let errorFired = false;
+      const handler = () => { errorFired = true; };
+      window.addEventListener('error', handler);
+      const def = new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
       def.preprocess();
-      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('Error evaluating inline script'));
-      warnSpy.mockRestore();
-      infoSpy.mockRestore();
-      errorSpy.mockRestore();
+      window.removeEventListener('error', handler);
+      expect(errorFired).toBe(true);
     });
 
     it('frame @def referencing non-existent definition warns', () => {
@@ -523,7 +524,7 @@ describe('framesetDefinitions exports', () => {
         '<hf-frame def="nonexistent"></hf-frame>'
       );
       const spy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      const def = new HFramesetDefinition(doc, {
+      const def = new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
@@ -537,7 +538,7 @@ describe('framesetDefinitions exports', () => {
         '<hf-frame defid="shared" def="shared"><hf-body condition="loading">Loading</hf-body></hf-frame>' +
         '<hf-frame def="shared"></hf-frame>'
       );
-      const def = new HFramesetDefinition(doc, {
+      const def = new HFramesetDefinition(doc, { behaviors,
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });

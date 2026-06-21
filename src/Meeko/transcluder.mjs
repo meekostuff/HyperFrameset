@@ -10,194 +10,138 @@ import URLux from './URLux.mjs';
 import * as DOM from './DOM.mjs';
 import httpProxy from './httpProxy.mjs';
 import Registry from './Registry.mjs';
-import sprockets from './sprockets.mjs';
+import { instance } from './behaviors.mjs';
 import { Panel } from './layoutElements.mjs';
 
 let transcludeDefinitions = new Registry({
 	writeOnce: true,
-	keyValidator: (key) => {
-		return typeof key === 'string';
-	},
-	valueValidator: (o) => {
-		return o != null && typeof o === 'object';
-	}
+	keyValidator: (key) => typeof key === 'string',
+	valueValidator: (o) => o != null && typeof o === 'object'
 });
 
 class HTransclude extends Panel {
 
-static { sprockets.withAria(this, { role: 'frame', isFrame: true }); }
+static observedAttributes = ["src"];
+
+connectedCallback() {
+	let def = this.getAttribute('def');
+	this.definition = transcludeDefinitions.get(def);
+	this.bodyElement = null;
+	this.targetname = this.getAttribute('targetname');
+	this.src = this.getAttribute('src');
+	this.mainSelector = this.getAttribute('main');
+	this._connected = true;
+	console.debug('HTransclude connected:', this.targetname, 'src:', this.src);
+	this.refresh();
+}
+
+disconnectedCallback() {
+	this._connected = false;
+}
+
+attributeChangedCallback(name, oldValue, newValue) {
+	if (!this._connected) return;
+	if (name === 'src') this.refresh();
+}
+
+get options() {
+	let behaviors = instance();
+	return behaviors.getInstance(this);
+}
 
 preload(request) {
-	let frame = this;
 	return Thenfu.pipe(request, [
-
-	(request) => { return frame.definition.render(request, 'loading'); },
-	(result) => {
-		if (!result) return;
-		return frame.insert(result);
-	}
-
+		(request) => this.definition.render(request, 'loading'),
+		(result) => { if (result) return this.insert(result); }
 	]);
 }
 
-load(response) { // FIXME need a teardown method that releases child-frames
-	let frame = this;
-	if (response) frame.src = response.url;
-	// else a no-src frame
+load(response) {
+	if (response) this.src = response.url;
 	return Thenfu.pipe(response, [
-
-	(response) => {
-		return frame.definition.render(response, 'loaded', {
-			mainSelector: frame.mainSelector
-			});
-	},
-	(result) => {
-		if (!result) return;
-		return frame.insert(result, frame.element.hasAttribute('replace'));
-	}
-
+		(response) => this.definition.render(response, 'loaded', { mainSelector: this.mainSelector }),
+		(result) => { if (result) return this.insert(result, this.hasAttribute('replace')); }
 	]);
 }
 
 insert(bodyElement, replace) {
-	let frame = this;
-	let element = frame.element;
+	let options = this.options;
 
-	let options = frame.options;
-
-	// FIXME .bodyElement will probably become .bodies[] for transition animations.
-	if (frame.bodyElement) {
+	if (this.bodyElement) {
 		if (options && options.bodyLeft) {
-			try { options.bodyLeft(frame, frame.bodyElement); }
+			try { options.bodyLeft(this, this.bodyElement); }
 			catch (err) { window.reportError(err); }
 		}
-		sprockets.removeNode(frame.bodyElement);
+		this.bodyElement.remove();
 	}
 
 	if (replace) {
-		let frag = DOM.adoptContents(bodyElement, element.ownerDocument);
-		sprockets.insertNode('replace', element, frag);
+		let frag = DOM.adoptContents(bodyElement, this.ownerDocument);
+		let parent = this.parentNode;
+		let next = this.nextSibling;
+		this.remove();
+		if (next) parent.insertBefore(frag, next);
+		else parent.appendChild(frag);
 		return;
 	}
 
-	sprockets.insertNode('beforeend', frame.element, bodyElement);
-	frame.bodyElement = bodyElement;
+	this.appendChild(bodyElement);
+	this.bodyElement = bodyElement;
 
 	if (options && options.bodyEntered) {
-		try { options.bodyEntered(frame, frame.bodyElement); }
+		try { options.bodyEntered(this, this.bodyElement); }
 		catch (err) { window.reportError(err); }
 	}
 }
 
 refresh() {
-	let frame = this;
-	let element = this.element;
-	let src = frame.attr('src');
+	let src = this.getAttribute('src');
 
 	return Thenfu.asap().then(() => {
 
-		if (src == null) { // a non-src frame
-			return frame.load(null, { condition: 'loaded' });
+		if (src == null) {
+			return this.load(null);
 		}
 
-		if (src === '') {
-			return; // FIXME frame.load(null, { condition: 'uninitialized' })
-		}
+		if (src === '') return;
 
 		let fullURL = URLux.create(src);
 		let nohash = fullURL.nohash;
-		let hash = fullURL.hash;
 
-		let request = { method: 'get', url: nohash, responseType: 'document'};
+		let request = { method: 'get', url: nohash, responseType: 'document' };
 		let response;
 
-		return Thenfu.pipe(null, [ // FIXME how to handle `hash` if present??
-
-			() => { return frame.preload(request); },
-			() => { return httpProxy.load(nohash, request); },
+		return Thenfu.pipe(null, [
+			() => this.preload(request),
+			() => httpProxy.load(nohash, request),
 			(resp) => { response = resp; },
-			() => { return DOM.whenVisible(element); },
+			() => DOM.whenVisible(this),
 			() => {
-				// TODO there are probably better ways to monitor @src
-				if (frame.attr('src') !== src) return; // WARN abort since src has changed
-				return frame.load(response);
+				if (this.getAttribute('src') !== src) return; // abort if src changed
+				return this.load(response);
 			}
-
 		]);
-
 	});
 }
 
-static attached(handlers) {
-	Panel.attached.call(this, handlers);
+static isFrame(element) { return element instanceof HTransclude; }
 
-	let frame = this;
-	let def = frame.attr('def');
-	frame.definition = transcludeDefinitions.get(def); // FIXME assert transcludeDefinitions.has(def)
-	_.defaults(frame, {
-		bodyElement: null,
-		targetname: frame.attr('targetname'),
-		src: frame.attr('src'),
-		mainSelector: frame.attr('main') // TODO consider using a hash in `@src`
-	});
-
-	HTransclude.observeAttributes.call(this, 'src');
-}
-
-static enteredDocument() {
-	Panel.enteredDocument.call(this);
-	this.refresh();
-}
-
-static leftDocument() {
-	Panel.leftDocument.call(this);
-	this.attributeObserver.disconnect();
-}
-
-static attributeChanged(attrName) {
-	if (attrName === 'src') this.refresh();
-}
-
-static observeAttributes() {
-	let attrList = [].splice.call(arguments, 0);
-	let frame = this;
-	let element = frame.element;
-	let observer = observeAttributes(element, (attrName) => {
-		HTransclude.attributeChanged.call(frame, attrName);
-	}, attrList);
-	frame.attributeObserver = observer;
-}
-
-static isFrame(element) {
-	return !!element.$.isFrame;
-}
-
-}
-
-function observeAttributes(element, callback, attrList) {
-	let observer = new MutationObserver((mutations, observer) => {
-		_.forEach(mutations, (record) => {
-			if (record.type !== 'attributes') return;
-			callback.call(record.target, record.attributeName);
-		});
-	});
-	observer.observe(element, { attributes: true, attributeFilter: attrList, subtree: false });
-
-	return observer;
 }
 
 /**
- * Register a transclusion element with the given namespace, element name, and sprocket class.
- *
- * @param {CustomNamespace} ns - The namespace for resolving element selectors.
- * @param {string} name - The element name to register (e.g. 'frame' or 'transclude').
- * @param {Function} SprocketClass - The sprocket class to register (HTransclude or a subclass).
+ * Register a transclusion custom element with the detected namespace.
+ * @param {CustomNamespace} ns - The namespace for resolving tag names.
+ * @param {string} name - The element name (e.g. 'frame' or 'transclude').
+ * @param {Function} Cls - The custom element class.
  */
-function registerElement(ns, name, SprocketClass) {
+function registerElement(ns, name, Cls) {
+	let tagName = ns.lookupTagName(name);
+	customElements.define(tagName, Cls);
 
-	let selector = ns.lookupSelector(name);
-	let cssText = 'box-sizing: border-box; display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0;';
-	sprockets.registerElement(selector, SprocketClass, cssText);
+	let cssText = `${tagName} { box-sizing: border-box; display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }`;
+	let style = document.createElement('style');
+	style.textContent = cssText;
+	document.head.insertBefore(style, document.head.firstChild);
 }
 
 let transcluder = {

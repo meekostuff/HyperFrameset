@@ -6,7 +6,6 @@
 import * as _ from './stuff.mjs';
 import URLux from './URLux.mjs';
 import * as DOM from './DOM.mjs';
-import configData, {getScriptFor, setElementConfig} from './configData.mjs';
 import CustomNamespace, {HYPERFRAMESET_URN} from './CustomNamespace.mjs';
 import HFrameDefinition from './HFrameDefinition.mjs';
 import htmlParser from './htmlParser.mjs';
@@ -52,11 +51,14 @@ frames = {};
 /**
  * @param {Document} doc - The frameset HTML document to process.
  * @param {Object} settings
+ * @param {BehaviorRegistry} settings.behaviors - The installed behaviors instance (required).
  * @param {string} settings.framesetURL - The resolved URL of the frameset.
  * @param {string} settings.scope - The base scope URL for relative URL resolution.
  */
 constructor(doc, settings) {
 	if (!doc) return; // in case of inheritance
+	if (!settings?.behaviors) throw Error('HFramesetDefinition requires settings.behaviors');
+	this.behaviors = settings.behaviors;
 	this.namespaces = null;
 	this.init(doc, settings);
 }
@@ -126,6 +128,8 @@ init(doc, settings) {
 		if (script.type && !/^text\/javascript/.test(script.type)) return;
 		// ignore external scripts
 		if (script.hasAttribute('src')) return;
+		// ignore @for scripts (behaviors handles sourceURL)
+		if (script.hasAttribute('for')) return;
 		this.#normalizeScript(script, i);
 	});
 
@@ -182,57 +186,32 @@ preprocess() {
 
 #preprocessScripts() {
 	let body = this.element;
+
+	// Validate: warn and remove any scripts that shouldn't be in body
 	let scripts = DOM.findAll('script', body);
-	_.forEach(scripts, (script, i) => { this.#preprocessScript(script, i); });
-}
-
-#preprocessScript(script, i) {
-	// Ignore non-javascript scripts
-	if (script.type && !/^text\/javascript/.test(script.type)) return;
-
-	// TODO probably don't need this as handled by init()
-	if (script.hasAttribute('src')) { // external javascript in <body> is invalid
-		console.warn('Frameset <body> may not contain external scripts: \n' +
-			script.cloneNode(false).outerHTML);
-		script.parentNode.removeChild(script);
-		return;
-	}
-
-	let sourceURL = script.getAttribute('sourceurl');
-
-	// TODO probably don't need this as handled by init()
-	if (!script.hasAttribute('for')) {
-		console.warn('Frameset <body> may not contain non-@for scripts:\n' +
+	_.forEach(scripts, (script) => {
+		if (script.type && !/^text\/javascript/.test(script.type)) return;
+		if (script.hasAttribute('src')) {
+			console.warn('Frameset <body> may not contain external scripts: \n' +
+				script.cloneNode(false).outerHTML);
+			script.parentNode.removeChild(script);
+			return;
+		}
+		if (!script.hasAttribute('for')) {
+			console.warn('Frameset <body> may not contain non-@for scripts:\n' +
 				this.url + '#' + script.id);
-		script.parentNode.removeChild(script); 
-		return;
-	}
+			script.parentNode.removeChild(script);
+			return;
+		}
+		if (script.getAttribute('for') !== '') {
+			console.warn('<script> may only contain EMPTY @for: \n' +
+				script.cloneNode(false).outerHTML);
+			script.parentNode.removeChild(script);
+			return;
+		}
+	});
 
-	// TODO should this be handled by init() ??
-	if (script.getAttribute('for') !== '') {
-		console.warn('<script> may only contain EMPTY @for: \n' +
-			script.cloneNode(false).outerHTML);
-		script.parentNode.removeChild(script);
-		return;
-	}
-
-	let scriptFor = getScriptFor(script);
-	setElementConfig(scriptFor, sourceURL);
-
-	let fnText = 'return (' + script.text + '\n);';
-
-	try {
-		let fn = Function(fnText);
-		let object = fn();
-		configData.set(sourceURL, object);
-	}
-	catch(err) { 
-		console.warn('Error evaluating inline script in frameset:\n' +
-			this.url + '#' + script.id);
-		window.reportError(err);
-	}
-
-	script.parentNode.removeChild(script); // physical <script> no longer needed
+	this.behaviors.processScripts(body);
 }
 
 #preprocessFrames() {

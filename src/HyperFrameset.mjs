@@ -11,7 +11,6 @@ import Thenfu from './Meeko/Thenfu.mjs';
 import URLux from './Meeko/URLux.mjs';
 import * as DOM from './Meeko/DOM.mjs';
 import scriptQueue from './Meeko/scriptQueue.mjs';
-import sprockets from './Meeko/sprockets.mjs';
 import controllers from './Meeko/controllers.mjs';
 import htmlParser from './Meeko/htmlParser.mjs';
 import httpProxy from './Meeko/httpProxy.mjs';
@@ -28,7 +27,6 @@ import MainProcessor from './Meeko/MainProcessor.mjs';
 import ScriptProcessor from './Meeko/ScriptProcessor.mjs';
 import HazardProcessor from './Meeko/HazardProcessor.mjs';
 import './Meeko/builtin-processors.mjs';
-import configData from './Meeko/configData.mjs';
 import * as layoutElements from './Meeko/layoutElements.mjs';
 import transcluder, { transcludeDefinitions } from './Meeko/transcluder.mjs';
 import * as framesetDefinitions from './Meeko/framesetDefinitions.mjs';
@@ -42,11 +40,10 @@ import framer, { HFrameset, HFrame } from './Meeko/framer.mjs';
     if (!this.Meeko) this.Meeko = {};
     _.assign(this.Meeko, {
         stuff, Registry, Task, Thenfu, URLux, DOM, scriptQueue,
-        sprockets,
         htmlParser, httpProxy,
         CustomNamespace,
         filters, decoders, processors,
-        configData, controllers,
+        controllers,
         transcluder, transcludeDefinitions,
         framer,
         CSSDecoder, MicrodataDecoder, Microdata, JSONDecoder,
