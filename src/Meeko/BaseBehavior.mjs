@@ -7,6 +7,10 @@ import * as DOM from './DOM.mjs';
 
 class BaseBehavior {
 
+constructor(element) {
+	if (element) this.element = element;
+}
+
 find(selector, scope) { return DOM.find(selector, this.element, scope); }
 findAll(selector, scope) { return DOM.findAll(selector, this.element, scope); }
 matches(selector, scope) { return DOM.matches(this.element, selector, scope); }
