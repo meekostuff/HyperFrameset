@@ -1,13 +1,15 @@
-const express = require('express');
-const path = require('path');
-const fs = require('fs');
+import express from 'express';
+import ejs from 'ejs';
+import { fileURLToPath } from 'url';
+
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const app = express();
 
 const TEMPLATE_EXT = 'ehtml';
 const DOCUMENT_ROOT = __dirname;
 
 app.set('view engine', TEMPLATE_EXT);
-app.engine(TEMPLATE_EXT, require('ejs').renderFile);
+app.engine(TEMPLATE_EXT, ejs.renderFile);
 app.set('views', DOCUMENT_ROOT);
 app.use(express.urlencoded({ extended: true }));
 

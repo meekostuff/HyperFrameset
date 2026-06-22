@@ -21,10 +21,9 @@ closest(selector, scope) { return DOM.closest(this.element, selector, scope); }
 contains(otherNode) { return DOM.contains(this.element, otherNode); }
 
 attr(name, value) {
-	let element = this.element;
-	if (typeof value === 'undefined') return element.getAttribute(name);
-	if (value == null) element.removeAttribute(name);
-	else element.setAttribute(name, value);
+	if (typeof value === 'undefined') return this.element.getAttribute(name);
+	if (value == null) this.element.removeAttribute(name);
+	else this.element.setAttribute(name, value);
 }
 hasClass(token) { return this.element.classList.contains(token); }
 addClass(...tokens) { this.element.classList.add(...tokens); }
