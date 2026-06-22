@@ -5,7 +5,6 @@
  */
 
 import * as _ from './stuff.mjs';
-import * as DOM from './DOM.mjs';
 import Thenfu from './Thenfu.mjs';
 import filters from './filters.mjs';
 import CustomNamespace from './CustomNamespace.mjs';
@@ -81,6 +80,12 @@ _.forEach(hazLang, (directive) => {
 	hazLangLookup[tag] = directive;
 });
 
+/**
+ * Walk all element nodes in a tree using a NodeIterator.
+ * @param {Node} root - Root node to walk.
+ * @param {boolean} skipRoot - If true, skip the root element itself.
+ * @param {function(Element)} callback - Called for each element.
+ */
 function walkTree(root, skipRoot, callback) { // always "accept" element nodes
 	let walker = document.createNodeIterator(
 			root,
@@ -98,6 +103,11 @@ function walkTree(root, skipRoot, callback) { // always "accept" element nodes
 	}
 }
 
+/**
+ * Move all child nodes of an element into a new DocumentFragment.
+ * @param {Element} el - Source element.
+ * @returns {DocumentFragment}
+ */
 function childNodesToFragment(el) {
 	let doc = el.ownerDocument;
 	let frag = doc.createDocumentFragment();
@@ -105,6 +115,12 @@ function childNodesToFragment(el) {
 	return frag;
 }
 
+/**
+ * Parse an HTML string into a DocumentFragment.
+ * @param {string} html - HTML string to parse.
+ * @param {Document} [doc] - Document to create elements in.
+ * @returns {DocumentFragment}
+ */
 function htmlToFragment(html, doc) {
 	if (!doc) doc = document;
 	let div = doc.createElement('div');
@@ -129,6 +145,12 @@ constructor(options, namespaces) {
 		namespaces.add(mexprDefaultNS);
 }
 
+/**
+ * Load and preprocess a template fragment for later transformation.
+ * Rewrites expression attributes into hazard elements, implies otherwise/entry templates,
+ * and extracts hazardDetails for each element.
+ * @param {DocumentFragment} template - The template fragment to process.
+ */
 loadTemplate(template) {
 	let processor = this;
 	processor.root = template; // FIXME assert template is Fragment
@@ -159,7 +181,7 @@ loadTemplate(template) {
 
 	// rewrite the template if necessary
 	walkTree(template, true, (el) => {
-		let tag = DOM.getTagName(el);
+		let tag = el.localName;
 		if (tag.indexOf(hazPrefix) === 0) return;
 
 		// pre-process @expr:_html -> @haz:eval, etc
@@ -220,7 +242,7 @@ loadTemplate(template) {
 	});
 	
 	walkTree(template, true, (el) => {
-		let tag = DOM.getTagName(el);
+		let tag = el.localName;
 		if (tag === hazPrefix + 'template') markTemplate(el);
 		if (tag === hazPrefix + 'choose') implyOtherwise(el);
 	});
@@ -235,7 +257,7 @@ loadTemplate(template) {
 	function implyOtherwise(el) { // NOTE this slurps *any* non-<haz:when>, including <haz:otherwise>
 		let otherwise = el.ownerDocument.createElement(hazPrefix + 'otherwise');
 		_.forEach(Array.from(el.childNodes), (node) => {
-			let tag = DOM.getTagName(node);
+			let tag = node.localName;
 			if (tag === hazPrefix + 'when') return;
 			otherwise.appendChild(node);
 		});
@@ -249,15 +271,15 @@ loadTemplate(template) {
 	function implyEntryTemplate(el) { // NOTE this slurps *any* non-<haz:template>
 		let firstExplicitTemplate;
 		let contentNodes = _.filter(el.childNodes, (node) => {
-			let tag = DOM.getTagName(node);
+			if (node.nodeType === 3) return (/\S/).test(node.nodeValue);
+			if (node.nodeType !== 1) return false;
+			let tag = node.localName;
 			if (tag === hazPrefix + 'template') {
 				if (!firstExplicitTemplate) firstExplicitTemplate = node;
 				return false;
 			}
 			if (tag === hazPrefix + 'let') return false;
 			if (tag === hazPrefix + 'param') return false;
-			if (node.nodeType === 3 && !(/\S/).test(node.nodeValue)) return false;
-			if (node.nodeType !== 1) return false;
 			return true;
 		});
 
@@ -277,10 +299,16 @@ loadTemplate(template) {
 
 }
 
+/** @returns {Element} The first (entry) template element. */
 getEntryTemplate() {
 	return this.templates[0];
 }
 
+/**
+ * Find a template by name attribute.
+ * @param {string} name - Template name to match.
+ * @returns {Element|undefined} Matching template element.
+ */
 getNamedTemplate(name) {
 	let processor = this;
 	name = _.lc(name);
@@ -289,6 +317,11 @@ getNamedTemplate(name) {
 	});
 }
 
+/**
+ * Find a template whose @match expression matches the given element.
+ * @param {Element} element - Element to test against template match expressions.
+ * @returns {Element|undefined} First matching template element.
+ */
 getMatchingTemplate(element) {
 	let processor = this;
 	return _.find(processor.templates, (template) => {
@@ -298,6 +331,12 @@ getMatchingTemplate(element) {
 	});	
 }
 
+/**
+ * Transform the loaded template against a data provider.
+ * @param {Object} provider - Data provider with evaluate() and matches() methods.
+ * @param {Object} details - Transform details (passed as global params).
+ * @returns {Promise<DocumentFragment>} Resolves with the transformed output fragment.
+ */
 transform(provider, details) {
 	let processor = this;
 	let root = processor.root;
@@ -369,6 +408,14 @@ _transform(provider, details, frag) {
 	});
 }
 
+/**
+ * Transform a specific template element within a context.
+ * @param {Element} template - Template element to transform.
+ * @param {Node} context - Data context node.
+ * @param {Object} params - Parameters to push onto the variable stack.
+ * @param {DocumentFragment} frag - Output fragment to append results to.
+ * @returns {Promise<DocumentFragment>}
+ */
 transformTemplate(template, context, params, frag) {
 	let processor = this;
 	processor.variables.push(params);
@@ -380,6 +427,13 @@ transformTemplate(template, context, params, frag) {
 	});
 }
 
+/**
+ * Transform all child nodes of a source node sequentially.
+ * @param {Node} srcNode - Source node whose children to transform.
+ * @param {Node} context - Data context node.
+ * @param {DocumentFragment} frag - Output fragment.
+ * @returns {Promise}
+ */
 transformChildNodes(srcNode, context, frag) {
 	let processor = this;
 
@@ -388,6 +442,13 @@ transformChildNodes(srcNode, context, frag) {
 	});
 }
 
+/**
+ * Transform a single node: clone non-elements, dispatch elements to hazard or tree transform.
+ * @param {Node} srcNode - Source node to transform.
+ * @param {Node} context - Data context node.
+ * @param {DocumentFragment} frag - Output fragment.
+ * @returns {Promise|undefined}
+ */
 transformNode(srcNode, context, frag) {
 	let processor = this;
 
@@ -407,6 +468,13 @@ transformNode(srcNode, context, frag) {
 	}
 }
 
+/**
+ * Transform a hazard directive element (haz:if, haz:for-each, haz:choose, etc.).
+ * @param {Element} el - Hazard element to process.
+ * @param {Node} context - Data context node.
+ * @param {DocumentFragment} frag - Output fragment.
+ * @returns {Promise|undefined}
+ */
 transformHazardTree(el, context, frag) {
 	let processor = this;
 	let doc = el.ownerDocument;
@@ -644,6 +712,13 @@ transformHazardTree(el, context, frag) {
 			
 }
 
+/**
+ * Transform a non-hazard element: clone it, evaluate expression attributes, then recurse into children.
+ * @param {Element} srcNode - Source element to transform.
+ * @param {Node} context - Data context node.
+ * @param {DocumentFragment} frag - Output fragment.
+ * @returns {Promise}
+ */
 transformTree(srcNode, context, frag) { // srcNode is Element
 	let processor = this;
 	
@@ -657,6 +732,12 @@ transformTree(srcNode, context, frag) { // srcNode is Element
 	return processor.transformChildNodes(srcNode, context, nodeAsFrag);
 }
 
+/**
+ * Clone an element (shallow) and evaluate its expression attributes.
+ * @param {Element} srcNode - Source element to clone and evaluate.
+ * @param {Node} context - Data context node.
+ * @returns {Element} Cloned element with evaluated attributes.
+ */
 transformSingleElement(srcNode, context) {
 	let processor = this;
 	let details = srcNode.hazardDetails;
@@ -683,9 +764,16 @@ transformSingleElement(srcNode, context) {
 
 }
 
+/**
+ * Extract hazard directive details from an element (tag definition and expression attributes).
+ * @param {Element} el - Element to inspect.
+ * @param {NamespaceCollection} namespaces - Namespace definitions.
+ * @returns {Object} Details with .definition and .exprAttributes.
+ */
 function getHazardDetails(el, namespaces) {
+	console.assert(el.nodeType === 1);
 	let details = {};
-	let tag = DOM.getTagName(el);
+	let tag = el.localName;
 	let hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
 	let isHazElement = tag.indexOf(hazPrefix) === 0;
 
@@ -699,6 +787,12 @@ function getHazardDetails(el, namespaces) {
 	return details;
 }
 
+/**
+ * Extract and remove expression/mexpression attributes from an element.
+ * @param {Element} el - Element to extract from.
+ * @param {NamespaceCollection} namespaces - Namespace definitions.
+ * @returns {Array<Object>} Array of expression attribute descriptors.
+ */
 function getExprAttributes(el, namespaces) {
 	let attrs = [];
 	
@@ -735,6 +829,13 @@ function getExprAttributes(el, namespaces) {
 }
 
 
+/**
+ * Set or remove an attribute based on value type.
+ * Boolean false/null/undefined removes; boolean true sets empty; otherwise sets as string.
+ * @param {Element} el - Target element.
+ * @param {string} attrName - Attribute name.
+ * @param {*} value - Value to set.
+ */
 function setAttribute(el, attrName, value) {
 	let type = typeof value;
 	if (type === 'undefined' || type === 'boolean' || value == null) {
@@ -746,18 +847,40 @@ function setAttribute(el, attrName, value) {
 	}
 }
 
+/**
+ * Parse and evaluate a mustache-style expression string.
+ * @param {string} mexprText - Mustache expression text (e.g. "Hello {{.name}}").
+ * @param {Object} provider - Data provider with evaluate/matches methods.
+ * @param {Node} context - Context node for evaluation.
+ * @param {Object} variables - Variable bindings.
+ * @returns {string} Evaluated result.
+ */
 function evalMExpression(mexprText, provider, context, variables) {
 	let mexpr = interpretMExpression(mexprText);
 	let result = processMExpression(mexpr, provider, context, variables);
 	return result;
 }
 
+/**
+ * Parse and evaluate a single expression string.
+ * @param {string} exprText - Expression text (e.g. ".title //> uppercase").
+ * @param {Object} provider - Data provider with evaluate/matches methods.
+ * @param {Node} context - Context node for evaluation.
+ * @param {Object} variables - Variable bindings.
+ * @param {string} type - Result type ('text' or 'node').
+ * @returns {*} Evaluated result.
+ */
 function evalExpression(exprText, provider, context, variables, type) {
 	let expr = interpretExpression(exprText);
 	let result = processExpression(expr, provider, context, variables, type);
 	return result;
 }
 	
+/**
+ * Parse a mustache-style expression into a template and expression list.
+ * @param {string} mexprText - Text containing {{expression}} placeholders.
+ * @returns {{template: string, expressions: Array<Object>}} Parsed representation.
+ */
 function interpretMExpression(mexprText) {
 	let expressions = [];
 	let mexpr = mexprText.replace(/\{\{((?:[^}]|\}(?=\}\})|\}(?!\}))*)\}\}/g, (all, expr) => {
@@ -772,6 +895,11 @@ function interpretMExpression(mexprText) {
 	};
 }
 
+/**
+ * Parse a single expression into a selector and filter chain.
+ * @param {string} exprText - Expression text (selector optionally followed by //> filter calls).
+ * @returns {{text: string, selector: string, filters: Array<Object>}} Parsed expression.
+ */
 function interpretExpression(exprText) { // FIXME robustness
 	let expression = {};
 	expression.text = exprText;
@@ -814,6 +942,14 @@ function interpretExpression(exprText) { // FIXME robustness
 }
 
 
+/**
+ * Evaluate a parsed mustache expression by replacing placeholders with evaluated values.
+ * @param {Object} mexpr - Parsed mustache expression from interpretMExpression.
+ * @param {Object} provider - Data provider.
+ * @param {Node} context - Context node.
+ * @param {Object} variables - Variable bindings.
+ * @returns {string} Fully evaluated string.
+ */
 function processMExpression(mexpr, provider, context, variables) {
 	let i = 0;
 	return mexpr.template.replace(/\{\{\}\}/g, (all) => {
@@ -821,6 +957,15 @@ function processMExpression(mexpr, provider, context, variables) {
 	});
 }
 
+/**
+ * Evaluate a parsed expression: resolve selector, apply filter chain, cast to type.
+ * @param {Object} expr - Parsed expression from interpretExpression.
+ * @param {Object} provider - Data provider with evaluate method.
+ * @param {Node} context - Context node for selector evaluation.
+ * @param {Object} variables - Variable bindings.
+ * @param {string} type - Result type ('text' or 'node').
+ * @returns {*} Evaluated and cast result.
+ */
 function processExpression(expr, provider, context, variables, type) { // FIXME robustness
 	let doc = (context && context.nodeType) ? // TODO which document
 		(context.nodeType === 9 ? context : context.ownerDocument) : 
