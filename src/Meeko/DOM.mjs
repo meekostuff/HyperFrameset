@@ -348,52 +348,22 @@ function adoptContents(parentNode, doc) {
 	return frag;
 }
 	
-/* 
-NOTE:  for more details on how checkStyleSheets() works cross-browser see 
-http://aaronheckmann.blogspot.com/2010/01/writing-jquery-plugin-manager-part-1.html
-TODO: does this still work when there are errors loading stylesheets??
-*/
-// TODO would be nice if this didn't need to be polled
-// TODO should be able to use <link>.onload, see
-// http://stackoverflow.com/a/13610128/108354
-// https://developer.mozilla.org/en-US/docs/Web/HTML/Element/link
 /**
- * Check if all stylesheets have loaded
- * @returns {boolean} True if all stylesheets are loaded
+ * Returns a promise that resolves when all current stylesheets have loaded.
+ * WARN does not handle stylesheets added after this is called,
+ *   but that would also be the case for stylesheets added after the promise resolves.
+ * @returns {Promise}
  */
-function checkStyleSheets() {
-	// check that every <link rel="stylesheet" type="text/css" /> 
-	// has loaded
-	return _.every(findAll('link'), (node) => {
-		if (!node.rel || !/^stylesheet$/i.test(node.rel)) return true;
-		if (node.type && !/^text\/css$/i.test(node.type)) return true;
-		if (node.disabled) return true;
-		
-		// handle IE
-		if (node.readyState) return readyStateLookup[node.readyState];
-
-		let sheet = node.sheet;
-
-		// handle webkit
-		if (!sheet) return false;
-
-		try {
-			// Firefox should throw if not loaded or cross-domain
-			let rules = sheet.rules || sheet.cssRules;
-			return true;
-		} 
-		catch (error) {
-			// handle Firefox cross-domain
-			switch(error.name) {
-			case 'NS_ERROR_DOM_SECURITY_ERR': case 'SecurityError':
-				return true;
-			case 'NS_ERROR_DOM_INVALID_ACCESS_ERR': case 'InvalidAccessError':
-				return false;
-			default:
-				return true;
-			}
-		} 
+function cssReady() {
+	let links = document.querySelectorAll('link[rel="stylesheet"]');
+	let promises = Array.from(links, (link) => {
+		if (link.sheet || link.disabled) return Promise.resolve();
+		return new Promise((resolve) => {
+			link.addEventListener('load', resolve, { once: true });
+			link.addEventListener('error', resolve, { once: true });
+		});
 	});
+	return Promise.all(promises);
 }
 
 /**
@@ -449,16 +419,6 @@ function createHTMLDocument(title, srcDoc) {
 function cloneDocument(srcDoc) {
 	return srcDoc.cloneNode(true);
 }
-
-/** @constant {Object} Lookup table for document ready states */
-let readyStateLookup = { // used in checkStyleSheets()
-	'uninitialized': false,
-	'loading': false,
-	'interactive': false,
-	'loaded': true,
-	'complete': true
-}
-
 export {
 	getTagName,
 	contains, matches,
@@ -468,7 +428,7 @@ export {
 	adoptContents,
 	isVisible, whenVisible,
 	insertNode,
-	checkStyleSheets,
+	cssReady,
 	copyAttributes, removeAttributes, // attrs
 	createDocument, createHTMLDocument, cloneDocument, // documents
 }

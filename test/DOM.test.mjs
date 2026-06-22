@@ -403,3 +403,39 @@ describe('DOM.createEvent', () => {
     expect(() => DOM.createEvent({ detail: 'x' })).toThrow('invalid event type');
   });
 });
+
+describe('DOM.cssReady', () => {
+
+  test('resolves immediately when no stylesheets exist', async () => {
+    await DOM.cssReady();
+  });
+
+  test('resolves when stylesheet is already loaded', async () => {
+    let link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'data:text/css,body{}';
+    document.head.appendChild(link);
+    await new Promise(r => link.addEventListener('load', r, { once: true }));
+    await DOM.cssReady();
+    link.remove();
+  });
+
+  test('waits for stylesheet to load', async () => {
+    let link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'data:text/css,div{}';
+    document.head.appendChild(link);
+    await DOM.cssReady();
+    link.remove();
+  });
+
+  test('ignores disabled stylesheets', async () => {
+    let link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = 'data:text/css,span{}';
+    link.disabled = true;
+    document.head.appendChild(link);
+    await DOM.cssReady();
+    link.remove();
+  });
+});

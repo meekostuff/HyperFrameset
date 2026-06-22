@@ -309,7 +309,7 @@ static #deriveScope(scope, startURL, framesetURL) {
 
 	// Wait for all stylesheets to finish loading before considering the frameset ready
 	// TODO it would be nice if <body> wasn't populated until stylesheets were loaded
-	() => Thenfu.wait(() => DOM.checkStyleSheets())
+	() => DOM.cssReady()
 
 	]);
 }
