@@ -15,9 +15,6 @@
  * @requires ParentNode (prepend, append, replaceChildren)
  */
 
-import * as _ from './stuff.mjs';
-import Thenfu from './Thenfu.mjs';
-
 /** @constant {string} Vendor prefix for internal properties */
 const vendorPrefix = 'meeko'; // FIXME DRY with other instances of `vendorPrefix`
 
@@ -189,45 +186,6 @@ function find(selector, node, scope, inclusive) {
 		if (inclusive && node.nodeType === 1 && node.matches(absSelector)) return node;
 		return node.querySelector(absSelector);
 	}, selector, scope);
-}
-
-/**
- * Get sibling elements relative to reference node
- * @param {string} conf - Configuration: 'starting', 'after', 'ending', 'before'
- * @param {Element} refNode - Reference node
- * @param {string} [conf2] - Second configuration for range
- * @param {Element} [refNode2] - Second reference node for range
- * @returns {Array<Element>} Array of sibling elements
- */
-function siblings(conf, refNode, conf2, refNode2) {
-	
-	conf = _.lc(conf);
-	if (conf2) {
-		conf2 = _.lc(conf2);
-		if (conf === 'ending' || conf === 'before') throw Error('siblings() startNode looks like stopNode');
-		if (conf2 === 'starting' || conf2 === 'after') throw Error('siblings() stopNode looks like startNode');
-		if (!refNode2 || refNode2.parentNode !== refNode.parentNode) throw Error('siblings() startNode and stopNode are not siblings');
-	}
-	
-	let nodeList = [];
-	if (!refNode || !refNode.parentNode) return nodeList;
-	let node, stopNode, first = refNode.parentNode.firstChild;
-
-	switch (conf) {
-	case 'starting': node = refNode; break;
-	case 'after': node = refNode.nextSibling; break;
-	case 'ending': node = first; stopNode = refNode.nextSibling; break;
-	case 'before': node = first; stopNode = refNode; break;
-	default: throw Error(`${conf} is not a valid configuration in siblings()`);
-	}
-	if (conf2) switch (conf2) {
-	case 'ending': stopNode = refNode2.nextSibling; break;
-	case 'before': stopNode = refNode2; break;
-	}
-	
-	if (!node) return nodeList; // FIXME is this an error??
-	for (;node && node!==stopNode; node=node.nextSibling) nodeList.push(node);
-	return nodeList;
 }
 
 /**
@@ -412,7 +370,7 @@ function cloneDocument(srcDoc) {
 }
 export {
 	contains, matches,
-	findId, find, findAll, closest, siblings,
+	findId, find, findAll, closest,
 	createEvent,
 	dispatchEvent,
 	adoptContents,

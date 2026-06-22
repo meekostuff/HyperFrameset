@@ -244,56 +244,6 @@ describe('DOM.mjs', () => {
     div.remove();
   });
 
-  test('siblings starting returns node and following siblings', () => {
-    const parent = document.createElement('div');
-    parent.innerHTML = '<span>a</span><span>b</span><span>c</span>';
-    const second = parent.children[1];
-    const result = DOM.siblings('starting', second);
-    expect(result).toHaveLength(2);
-    expect(result[0].textContent).toBe('b');
-    expect(result[1].textContent).toBe('c');
-  });
-
-  test('siblings after returns following siblings only', () => {
-    const parent = document.createElement('div');
-    parent.innerHTML = '<span>a</span><span>b</span><span>c</span>';
-    const first = parent.children[0];
-    const result = DOM.siblings('after', first);
-    expect(result).toHaveLength(2);
-    expect(result[0].textContent).toBe('b');
-  });
-
-  test('siblings before returns preceding siblings', () => {
-    const parent = document.createElement('div');
-    parent.innerHTML = '<span>a</span><span>b</span><span>c</span>';
-    const last = parent.children[2];
-    const result = DOM.siblings('before', last);
-    expect(result).toHaveLength(2);
-    expect(result[0].textContent).toBe('a');
-    expect(result[1].textContent).toBe('b');
-  });
-
-  test('siblings ending returns node and preceding siblings', () => {
-    const parent = document.createElement('div');
-    parent.innerHTML = '<span>a</span><span>b</span><span>c</span>';
-    const second = parent.children[1];
-    const result = DOM.siblings('ending', second);
-    expect(result).toHaveLength(2);
-    expect(result[0].textContent).toBe('a');
-    expect(result[1].textContent).toBe('b');
-  });
-
-  test('siblings with two refs returns range between them', () => {
-    const parent = document.createElement('div');
-    parent.innerHTML = '<span>a</span><span>b</span><span>c</span><span>d</span>';
-    const first = parent.children[0];
-    const third = parent.children[2];
-    const result = DOM.siblings('starting', first, 'before', third);
-    expect(result).toHaveLength(2);
-    expect(result[0].textContent).toBe('a');
-    expect(result[1].textContent).toBe('b');
-  });
-
   test('dispatchEvent fires custom event', () => {
     const div = document.createElement('div');
     let received = false;

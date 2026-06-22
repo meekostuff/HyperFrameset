@@ -11,10 +11,13 @@ constructor(element) {
 	if (element) this.element = element;
 }
 
+/** WARN scope must be an element (or empty), not a behavior **/
 find(selector, scope) { return DOM.find(selector, this.element, scope); }
 findAll(selector, scope) { return DOM.findAll(selector, this.element, scope); }
 matches(selector, scope) { return DOM.matches(this.element, selector, scope); }
 closest(selector, scope) { return DOM.closest(this.element, selector, scope); }
+
+/** WARN otherNode must be an element, not a behavior **/
 contains(otherNode) { return DOM.contains(this.element, otherNode); }
 
 attr(name, value) {

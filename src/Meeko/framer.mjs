@@ -766,11 +766,23 @@ static #separateHead(dstDoc, isFrameset) {
 	let framesetMarker = Framer.#getFramesetMarker(dstDoc);
 	if (!framesetMarker) throw Error(`No ${FRAMESET_REL} marker found. `);
 	let selfMarker = Framer.#getSelfMarker(dstDoc);
-	if (isFrameset) _.forEach(DOM.siblings('after', framesetMarker, 'before', selfMarker), remove);
-	else _.forEach(DOM.siblings('after', selfMarker), remove);
-	function remove(node) {
-		if (node.localName === 'script' && (!node.type || node.type.match(/^text\/javascript/i))) return;
-		dstHead.removeChild(node);
+	if (isFrameset) Framer.#removeBetween(framesetMarker, selfMarker);
+	else Framer.#removeBetween(selfMarker);
+}
+
+/**
+ * Remove sibling nodes between two boundaries, skipping inline script elements.
+ * @param {Node} exclusiveStart - Start node (not removed); removal begins at its nextSibling.
+ * @param {Node} [exclusiveEnd] - Optional end node (not removed); removal stops before it.
+ */
+static #removeBetween(exclusiveStart, exclusiveEnd) {
+	let node = exclusiveStart.nextSibling;
+	while (node && node !== exclusiveEnd) {
+		let next = node.nextSibling;
+		if (!(node.localName === 'script' && (!node.type || /^text\/javascript/i.test(node.type)))) {
+			node.remove();
+		}
+		node = next;
 	}
 }
 
