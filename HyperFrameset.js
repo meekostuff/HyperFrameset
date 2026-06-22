@@ -587,19 +587,6 @@
         node[nodeIdProperty] = nodeId;
         return nodeId;
     }
-    const nodeData$1 = new WeakMap;
-    function setData(node, data) {
-        nodeData$1.set(node, data);
-    }
-    function hasData(node) {
-        return nodeData$1.has(node);
-    }
-    function getData(node) {
-        return nodeData$1.get(node);
-    }
-    function getTagName(el) {
-        return el && el.nodeType === 1 ? lc(el.tagName) : "";
-    }
     function matches$1(element, selector, scope) {
         if (!(element && element.nodeType === 1)) return false;
         if (typeof selector === "function") return selector(element, scope);
@@ -678,67 +665,26 @@
             return node.querySelector(absSelector);
         }, selector, scope);
     }
-    function siblings(conf, refNode, conf2, refNode2) {
-        conf = lc(conf);
-        if (conf2) {
-            conf2 = lc(conf2);
-            if (conf === "ending" || conf === "before") throw Error("siblings() startNode looks like stopNode");
-            if (conf2 === "starting" || conf2 === "after") throw Error("siblings() stopNode looks like startNode");
-            if (!refNode2 || refNode2.parentNode !== refNode.parentNode) throw Error("siblings() startNode and stopNode are not siblings");
-        }
-        let nodeList = [];
-        if (!refNode || !refNode.parentNode) return nodeList;
-        let node, stopNode, first = refNode.parentNode.firstChild;
-        switch (conf) {
-          case "starting":
-            node = refNode;
-            break;
-
-          case "after":
-            node = refNode.nextSibling;
-            break;
-
-          case "ending":
-            node = first;
-            stopNode = refNode.nextSibling;
-            break;
-
-          case "before":
-            node = first;
-            stopNode = refNode;
-            break;
-
-          default:
-            throw Error(`${conf} is not a valid configuration in siblings()`);
-        }
-        if (conf2) switch (conf2) {
-          case "ending":
-            stopNode = refNode2.nextSibling;
-            break;
-
-          case "before":
-            stopNode = refNode2;
-            break;
-        }
-        if (!node) return nodeList;
-        for (;node && node !== stopNode; node = node.nextSibling) nodeList.push(node);
-        return nodeList;
-    }
     function contains(node, otherNode) {
         return node.contains(otherNode);
     }
-    function dispatchEvent(target, type, params) {
+    function createEvent(type, params) {
         if (typeof type === "object") {
             params = type;
             type = params.type;
         }
-        if (typeof type !== "string") throw Error("trigger() called with invalid event type");
+        if (typeof type !== "string") throw Error("createEvent() called with invalid event type");
+        let {bubbles: bubbles = true, cancelable: cancelable = true, detail: detail, type: _type, ...extra} = params || {};
         let event = new CustomEvent(type, {
-            bubbles: params && "bubbles" in params ? !!params.bubbles : true,
-            cancelable: params && "cancelable" in params ? !!params.cancelable : true,
-            detail: params && params.detail
+            bubbles: bubbles,
+            cancelable: cancelable,
+            detail: detail
         });
-        if (params) defaults(event, params);
+        Object.assign(event, extra);
+        return event;
+    }
+    function dispatchEvent(target, type, params) {
+        let event = createEvent(type, params);
         return target.dispatchEvent(event);
     }
     function isVisible(element) {
@@ -804,32 +750,20 @@
         while (node = parentNode.firstChild) frag.appendChild(doc.adoptNode(node));
         return frag;
     }
-    function checkStyleSheets() {
-        return every(findAll("link"), node => {
-            if (!node.rel || !/^stylesheet$/i.test(node.rel)) return true;
-            if (node.type && !/^text\/css$/i.test(node.type)) return true;
-            if (node.disabled) return true;
-            if (node.readyState) return readyStateLookup[node.readyState];
-            let sheet = node.sheet;
-            if (!sheet) return false;
-            try {
-                let rules = sheet.rules || sheet.cssRules;
-                return true;
-            } catch (error) {
-                switch (error.name) {
-                  case "NS_ERROR_DOM_SECURITY_ERR":
-                  case "SecurityError":
-                    return true;
-
-                  case "NS_ERROR_DOM_INVALID_ACCESS_ERR":
-                  case "InvalidAccessError":
-                    return false;
-
-                  default:
-                    return true;
-                }
-            }
+    function cssReady() {
+        let links = document$6.querySelectorAll('link[rel="stylesheet"]');
+        let promises = Array.from(links, link => {
+            if (link.sheet || link.disabled) return Promise.resolve();
+            return new Promise(resolve => {
+                link.addEventListener("load", resolve, {
+                    once: true
+                });
+                link.addEventListener("error", resolve, {
+                    once: true
+                });
+            });
         });
+        return Promise.all(promises);
     }
     function copyAttributes(node, srcNode) {
         for (const {name: name, value: value} of srcNode.attributes) node.setAttribute(name, value);
@@ -853,77 +787,25 @@
     function cloneDocument(srcDoc) {
         return srcDoc.cloneNode(true);
     }
-    function scrollToId(id) {
-        if (id) {
-            let el = findId(id);
-            if (el) el.scrollIntoView(true);
-        } else window.scroll(0, 0);
-    }
-    let readyStateLookup = {
-        uninitialized: false,
-        loading: false,
-        interactive: false,
-        loaded: true,
-        complete: true
-    };
-    let domReady = function() {
-        let readyState = document$6.readyState;
-        let loaded = readyState ? readyStateLookup[readyState] : true;
-        let queue = [];
-        function domReady(fn) {
-            if (typeof fn !== "function") return;
-            queue.push(fn);
-            if (loaded) processQueue();
-        }
-        function processQueue() {
-            forEach(queue, fn => {
-                setTimeout(fn);
-            });
-            queue.length = 0;
-        }
-        let events = {
-            DOMContentLoaded: document$6,
-            load: window
-        };
-        if (!loaded) forOwn(events, (node, type) => {
-            node.addEventListener(type, onLoaded, false);
-        });
-        return domReady;
-        function onLoaded(e) {
-            loaded = true;
-            forOwn(events, (node, type) => {
-                node.removeEventListener(type, onLoaded, false);
-            });
-            processQueue();
-        }
-    }();
     var DOM = Object.freeze({
         __proto__: null,
         adoptContents: adoptContents,
-        checkStyleSheets: checkStyleSheets,
         cloneDocument: cloneDocument,
         closest: closest,
         contains: contains,
         copyAttributes: copyAttributes,
         createDocument: createDocument,
+        createEvent: createEvent,
         createHTMLDocument: createHTMLDocument,
+        cssReady: cssReady,
         dispatchEvent: dispatchEvent,
         find: find$1,
         findAll: findAll,
         findId: findId,
-        getData: getData,
-        getTagName: getTagName,
-        hasData: hasData,
         insertNode: insertNode,
         isVisible: isVisible,
         matches: matches$1,
-        ready: domReady,
         removeAttributes: removeAttributes,
-        scrollToId: scrollToId,
-        setData: setData,
-        siblings: siblings,
-        uniqueId: uniqueId,
-        uniqueIdAttr: nodeIdProperty,
         whenVisible: whenVisible
     });
     /*!
@@ -1105,7 +987,8 @@
             let selector = Object.keys(urlAttributes).join(", ");
             return findAll(selector, doc);
         }, nodeList => Thenfu.reduce(null, nodeList, (dummy, el) => {
-            let tag = getTagName(el);
+            let tag = el.localName;
+            if (!tag) return;
             let attrList = urlAttributes[tag];
             forOwn(attrList, (attrDesc, attrName) => {
                 if (!el.hasAttribute(attrName)) return;
@@ -1664,12 +1547,6 @@
             return find$1(finalSelector, context, !isRoot, !isRoot);
         }
     }
-    function markElement(context) {
-        if (context.hasAttribute(nodeIdProperty)) return context.getAttribute(nodeIdProperty);
-        let uid = uniqueId(context);
-        context.setAttribute(nodeIdProperty, uid);
-        return uid;
-    }
     /*!
 	 * Microdata
 	 * HTML Microdata parsing and querying
@@ -1929,7 +1806,7 @@
             forEach(Array.from(template.childNodes), node => {
                 switch (node.nodeType) {
                   case 1:
-                    switch (getTagName(node)) {
+                    switch (node.localName) {
                       case "script":
                         if (script) console.warn('Ignoring secondary <script> in "script" transform template'); else script = node;
                         return;
@@ -2085,7 +1962,7 @@
             exprToHazMap[exprTextAttr] = hazTextTag;
             let doc = template.ownerDocument;
             walkTree(template, true, el => {
-                let tag = getTagName(el);
+                let tag = el.localName;
                 if (tag.indexOf(hazPrefix) === 0) return;
                 forEach(exprToHazPriority, attr => {
                     if (!el.hasAttribute(attr)) return;
@@ -2137,7 +2014,7 @@
                 });
             });
             walkTree(template, true, el => {
-                let tag = getTagName(el);
+                let tag = el.localName;
                 if (tag === hazPrefix + "template") markTemplate(el);
                 if (tag === hazPrefix + "choose") implyOtherwise(el);
             });
@@ -2148,7 +2025,7 @@
             function implyOtherwise(el) {
                 let otherwise = el.ownerDocument.createElement(hazPrefix + "otherwise");
                 forEach(Array.from(el.childNodes), node => {
-                    let tag = getTagName(node);
+                    let tag = node.localName;
                     if (tag === hazPrefix + "when") return;
                     otherwise.appendChild(node);
                 });
@@ -2160,15 +2037,15 @@
             function implyEntryTemplate(el) {
                 let firstExplicitTemplate;
                 let contentNodes = filter(el.childNodes, node => {
-                    let tag = getTagName(node);
+                    if (node.nodeType === 3) return /\S/.test(node.nodeValue);
+                    if (node.nodeType !== 1) return false;
+                    let tag = node.localName;
                     if (tag === hazPrefix + "template") {
                         if (!firstExplicitTemplate) firstExplicitTemplate = node;
                         return false;
                     }
                     if (tag === hazPrefix + "let") return false;
                     if (tag === hazPrefix + "param") return false;
-                    if (node.nodeType === 3 && !/\S/.test(node.nodeValue)) return false;
-                    if (node.nodeType !== 1) return false;
                     return true;
                 });
                 if (contentNodes.length <= 0) {
@@ -2497,8 +2374,9 @@
         }
     }
     function getHazardDetails(el, namespaces) {
+        console.assert(el.nodeType === 1);
         let details = {};
-        let tag = getTagName(el);
+        let tag = el.localName;
         let hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
         let isHazElement = tag.indexOf(hazPrefix) === 0;
         if (isHazElement) {
@@ -3048,6 +2926,9 @@
 	 * Copyright 2026 Sean Hogan (http://meekostuff.net/)
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */    class BaseBehavior {
+        constructor(element) {
+            if (element) this.element = element;
+        }
         find(selector, scope) {
             return find$1(selector, this.element, scope);
         }
@@ -3064,48 +2945,20 @@
             return contains(this.element, otherNode);
         }
         attr(name, value) {
-            let element = this.element;
-            if (typeof value === "undefined") return element.getAttribute(name);
-            if (value == null) element.removeAttribute(name); else element.setAttribute(name, value);
+            if (typeof value === "undefined") return this.element.getAttribute(name);
+            if (value == null) this.element.removeAttribute(name); else this.element.setAttribute(name, value);
         }
         hasClass(token) {
-            let element = this.element;
-            let text = element.getAttribute("class");
-            if (!text) return false;
-            return text.split(/\s+/).includes(token);
+            return this.element.classList.contains(token);
         }
-        addClass(token) {
-            let element = this.element;
-            let text = element.getAttribute("class");
-            if (!text) {
-                element.setAttribute("class", token);
-                return;
-            }
-            if (text.split(/\s+/).includes(token)) return;
-            let n = text.length, space = n && text.charAt(n - 1) !== " " ? " " : "";
-            text += space + token;
-            element.setAttribute("class", text);
+        addClass(...tokens) {
+            this.element.classList.add(...tokens);
         }
-        removeClass(token) {
-            let element = this.element;
-            let text = element.getAttribute("class");
-            if (!text) return;
-            let prev = text.split(/\s+/);
-            let next = prev.filter(str => str !== token);
-            if (prev.length === next.length) return;
-            element.setAttribute("class", next.join(" "));
+        removeClass(...tokens) {
+            this.element.classList.remove(...tokens);
         }
         toggleClass(token, force) {
-            let found = this.hasClass(token);
-            if (found) {
-                if (force) return true;
-                this.removeClass(token);
-                return false;
-            } else {
-                if (force === false) return false;
-                this.addClass(token);
-                return true;
-            }
+            return this.element.classList.toggle(token, force);
         }
         css(name, value) {
             let element = this.element;
@@ -3374,8 +3227,8 @@
                 condition: finalCondition,
                 transforms: []
             });
-            forEach(Array.from(el.childNodes), node => {
-                if (getTagName(node) === framesetDef.namespaces.lookupTagNameNS("transform", HYPERFRAMESET_URN)) {
+            forEach(Array.from(el.children), node => {
+                if (node.localName === framesetDef.namespaces.lookupTagNameNS("transform", HYPERFRAMESET_URN)) {
                     el.removeChild(node);
                     bodyDef.transforms.push(new HTransformDefinition(node, framesetDef));
                 }
@@ -3426,8 +3279,8 @@
                 mainSelector: el.getAttribute("main")
             });
             frameDef.bodies = [];
-            forEach(Array.from(el.childNodes), node => {
-                let tag = getTagName(node);
+            forEach(Array.from(el.children), node => {
+                let tag = node.localName;
                 if (!tag) return;
                 if (includes(hfHeadTags, tag)) return;
                 if (tag === framesetDef.namespaces.lookupTagNameNS("body", HYPERFRAMESET_URN)) {
@@ -3811,7 +3664,7 @@
                     stage: "after",
                     url: document$1.URL
                 });
-            }, () => Thenfu.wait(() => checkStyleSheets()) ]);
+            }, () => cssReady() ]);
         }
         framesetEntered(frameset) {
             this.frameset = frameset;
@@ -3844,7 +3697,7 @@
             let linkElement = closest(e.target, "a, [link]");
             if (!linkElement) return;
             let hyperlink;
-            if (getTagName(linkElement) === "a") hyperlink = linkElement; else {
+            if (linkElement.localName === "a") hyperlink = linkElement; else {
                 hyperlink = find$1("a, link", linkElement);
                 if (!hyperlink) hyperlink = closest("a", linkElement);
                 if (!hyperlink) return;
@@ -3884,8 +3737,11 @@
         }
         triggerRequestNavigation(url, details) {
             Thenfu.defer(() => {
-                let event = document$1.createEvent("CustomEvent");
-                event.initCustomEvent("requestnavigation", true, true, details.url);
+                let event = new CustomEvent("requestnavigation", {
+                    bubbles: true,
+                    cancelable: true,
+                    detail: details.url
+                });
                 let acceptDefault = details.element.dispatchEvent(event);
                 if (acceptDefault !== false) {
                     location.assign(details.url);
@@ -4052,10 +3908,16 @@
             let framesetMarker = Framer.#getFramesetMarker(dstDoc);
             if (!framesetMarker) throw Error(`No ${FRAMESET_REL} marker found. `);
             let selfMarker = Framer.#getSelfMarker(dstDoc);
-            if (isFrameset) forEach(siblings("after", framesetMarker, "before", selfMarker), remove); else forEach(siblings("after", selfMarker), remove);
-            function remove(node) {
-                if (getTagName(node) == "script" && (!node.type || node.type.match(/^text\/javascript/i))) return;
-                dstHead.removeChild(node);
+            if (isFrameset) Framer.#removeBetween(framesetMarker, selfMarker); else Framer.#removeBetween(selfMarker);
+        }
+        static #removeBetween(exclusiveStart, exclusiveEnd) {
+            let node = exclusiveStart.nextSibling;
+            while (node && node !== exclusiveEnd) {
+                let next = node.nextSibling;
+                if (!(node.localName === "script" && (!node.type || /^text\/javascript/i.test(node.type)))) {
+                    node.remove();
+                }
+                node = next;
             }
         }
         static #mergeHead(dstDoc, srcHead, isFrameset) {
@@ -4066,8 +3928,8 @@
             let selfMarker = Framer.#getSelfMarker();
             Framer.#separateHead(dstDoc, isFrameset);
             forEach(Array.from(srcHead.childNodes), srcNode => {
-                if (srcNode.nodeType != 1) return;
-                switch (getTagName(srcNode)) {
+                if (srcNode.nodeType !== 1) return;
+                switch (srcNode.localName) {
                   default:
                     break;
 
@@ -4092,7 +3954,7 @@
                     break;
                 }
                 if (isFrameset) insertNode("beforebegin", selfMarker, srcNode); else insertNode("beforeend", dstHead, srcNode);
-                if (getTagName(srcNode) == "link") srcNode.href = srcNode.getAttribute("href");
+                if (srcNode.localName === "link") srcNode.href = srcNode.getAttribute("href");
             });
         }
         static #mergeElement(dst, src) {
