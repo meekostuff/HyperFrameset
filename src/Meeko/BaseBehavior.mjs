@@ -23,35 +23,10 @@ attr(name, value) {
 	if (value == null) element.removeAttribute(name);
 	else element.setAttribute(name, value);
 }
-hasClass(token) {
-	let element = this.element;
-	let text = element.getAttribute('class');
-	if (!text) return false;
-	return text.split(/\s+/).includes(token);
-}
-addClass(token) {
-	let element = this.element;
-	let text = element.getAttribute('class');
-	if (!text) { element.setAttribute('class', token); return; }
-	if (text.split(/\s+/).includes(token)) return;
-	let n = text.length, space = (n && text.charAt(n-1) !== ' ') ? ' ' : '';
-	text += space + token;
-	element.setAttribute('class', text);
-}
-removeClass(token) {
-	let element = this.element;
-	let text = element.getAttribute('class');
-	if (!text) return;
-	let prev = text.split(/\s+/);
-	let next = prev.filter(str => str !== token);
-	if (prev.length === next.length) return;
-	element.setAttribute('class', next.join(' '));
-}
-toggleClass(token, force) {
-	let found = this.hasClass(token);
-	if (found) { if (force) return true; this.removeClass(token); return false; }
-	else { if (force === false) return false; this.addClass(token); return true; }
-}
+hasClass(token) { return this.element.classList.contains(token); }
+addClass(...tokens) { this.element.classList.add(...tokens); }
+removeClass(...tokens) { this.element.classList.remove(...tokens); }
+toggleClass(token, force) { return this.element.classList.toggle(token, force); }
 css(name, value) {
 	let element = this.element;
 	let isKebabCase = (name.indexOf('-') >= 0);

@@ -84,6 +84,15 @@ describe('BaseBehavior', () => {
       expect(b.element.getAttribute('class')).toBe('foo');
       cleanup(b);
     });
+
+    it('adds multiple classes', () => {
+      let b = create();
+      b.addClass('foo', 'bar', 'baz');
+      expect(b.hasClass('foo')).toBe(true);
+      expect(b.hasClass('bar')).toBe(true);
+      expect(b.hasClass('baz')).toBe(true);
+      cleanup(b);
+    });
   });
 
   describe('removeClass()', () => {
@@ -92,6 +101,15 @@ describe('BaseBehavior', () => {
       b.removeClass('foo');
       expect(b.hasClass('foo')).toBe(false);
       expect(b.hasClass('bar')).toBe(true);
+      cleanup(b);
+    });
+
+    it('removes multiple classes', () => {
+      let b = create('<div class="foo bar baz"></div>');
+      b.removeClass('foo', 'baz');
+      expect(b.hasClass('foo')).toBe(false);
+      expect(b.hasClass('bar')).toBe(true);
+      expect(b.hasClass('baz')).toBe(false);
       cleanup(b);
     });
 

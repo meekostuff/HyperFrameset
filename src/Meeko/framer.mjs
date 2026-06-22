@@ -440,8 +440,7 @@ onSubmit(e) { // return false means success
  */
 triggerRequestNavigation(url, details) {
 	Thenfu.defer(() => {
-		let event = document.createEvent('CustomEvent');
-		event.initCustomEvent('requestnavigation', true, true, details.url);
+		let event = new CustomEvent('requestnavigation', { bubbles: true, cancelable: true, detail: details.url });
 		let acceptDefault = details.element.dispatchEvent(event);
 		if (acceptDefault !== false) { location.assign(details.url); }
 	});

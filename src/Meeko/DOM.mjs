@@ -44,36 +44,6 @@ function uniqueId(node) {
 	return nodeId;
 }
 
-/** @type {WeakMap<Node, *>} Storage for node-associated data */
-const nodeData = new WeakMap();
-
-/**
- * Store data associated with a DOM node
- * @param {Element} node - DOM element to store data for
- * @param {*} data - Data to store
- */
-function setData(node, data) {
-	nodeData.set(node, data);
-}
-
-/**
- * Check if node has associated data
- * @param {Node} node - DOM node to check
- * @returns {boolean} True if node has stored data
- */
-function hasData(node) {
-	return nodeData.has(node);
-}
-
-/**
- * Retrieve data associated with a DOM node
- * @param {Node} node - DOM node to get data for
- * @returns {*} Stored data or undefined
- */
-function getData(node) {
-	return nodeData.get(node);
-}
-
 /**
  * Get lowercase tag name of element
  * @param {Element} el - DOM element
@@ -280,24 +250,32 @@ function contains(node, otherNode) {
 }
 
 /**
- * Dispatch custom event on target element
- * @param {Element} target - Target element
- * @param {string|Object} type - Event type or event object
- * @param {Object} [params] - Event parameters
- * @returns {boolean} True if event was not cancelled
+ * Create a custom event
+ * @param {string|Object} type - Event type or params object with .type
+ * @param {Object} [params] - Event parameters (bubbles, cancelable, detail, plus extra properties)
+ * @returns {CustomEvent}
  */
-function dispatchEvent(target, type, params) { // NOTE every JS initiated event is a custom-event
+function createEvent(type, params) {
 	if (typeof type === 'object') {
 		params = type;
 		type = params.type;
 	}
-	if (typeof type !== 'string') throw Error('trigger() called with invalid event type');
-	let event = new CustomEvent(type, {
-		bubbles: params && 'bubbles' in params ? !!params.bubbles : true,
-		cancelable: params && 'cancelable' in params ? !!params.cancelable : true,
-		detail: params && params.detail
-	});
-	if (params) _.defaults(event, params);
+	if (typeof type !== 'string') throw Error('createEvent() called with invalid event type');
+	let { bubbles = true, cancelable = true, detail, type: _type, ...extra } = params || {};
+	let event = new CustomEvent(type, { bubbles, cancelable, detail });
+	Object.assign(event, extra);
+	return event;
+}
+
+/**
+ * Dispatch custom event on target element
+ * @param {Element} target - Target element
+ * @param {string|Object} type - Event type or params object with .type
+ * @param {Object} [params] - Event parameters
+ * @returns {boolean} True if event was not cancelled
+ */
+function dispatchEvent(target, type, params) {
+	let event = createEvent(type, params);
 	return target.dispatchEvent(event);
 }
 
@@ -472,20 +450,8 @@ function cloneDocument(srcDoc) {
 	return srcDoc.cloneNode(true);
 }
 
-/**
- * Scroll to element with given ID
- * @param {string} id - Element ID to scroll to
- */
-function scrollToId(id) { // FIXME this isn't being used
-	if (id) {
-		let el = findId(id);
-		if (el) el.scrollIntoView(true);
-	}
-	else window.scroll(0, 0);
-}
-
 /** @constant {Object} Lookup table for document ready states */
-let readyStateLookup = { // used in domReady() and checkStyleSheets()
+let readyStateLookup = { // used in checkStyleSheets()
 	'uninitialized': false,
 	'loading': false,
 	'interactive': false,
@@ -493,75 +459,16 @@ let readyStateLookup = { // used in domReady() and checkStyleSheets()
 	'complete': true
 }
 
-/**
- * Execute function when DOM is ready
- * @type {Function}
- */
-let domReady = (function() { // WARN this assumes that document.readyState is valid or that content is ready...
-
-/** @type {string} Current document ready state */
-let readyState = document.readyState;
-/** @type {boolean} Whether DOM is loaded */
-let loaded = readyState ? readyStateLookup[readyState] : true;
-/** @type {Array<Function>} Queue of functions to execute when ready */
-let queue = [];
-
-/**
- * Execute function when DOM is ready
- * @param {Function} fn - Function to execute
- */
-function domReady(fn) {
-	if (typeof fn !== 'function') return;
-	queue.push(fn);
-	if (loaded) processQueue();
-}
-
-/**
- * Process queued functions
- * @private
- */
-function processQueue() {
-	_.forEach(queue, (fn) => { setTimeout(fn); });
-	queue.length = 0;
-}
-
-/** @type {Object} Event listeners for DOM ready */
-let events = {
-	'DOMContentLoaded': document,
-	'load': window
-};
-
-if (!loaded) _.forOwn(events, (node, type) => { node.addEventListener(type, onLoaded, false); });
-
-return domReady;
-
-// NOTE the following functions are hoisted
-/**
- * Handle DOM loaded event
- * @private
- * @param {Event} e - DOM event
- */
-function onLoaded(e) {
-	loaded = true;
-	_.forOwn(events, (node, type) => { node.removeEventListener(type, onLoaded, false); });
-	processQueue();
-}
-
-})();
-
 export {
-	nodeIdProperty as uniqueIdAttr,
-	uniqueId, setData, getData, hasData,
 	getTagName,
 	contains, matches,
 	findId, find, findAll, closest, siblings,
+	createEvent,
 	dispatchEvent,
 	adoptContents,
 	isVisible, whenVisible,
 	insertNode,
 	checkStyleSheets,
 	copyAttributes, removeAttributes, // attrs
-	domReady as ready, // events
 	createDocument, createHTMLDocument, cloneDocument, // documents
-	scrollToId
 }

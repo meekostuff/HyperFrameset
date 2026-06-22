@@ -114,31 +114,6 @@ describe('DOM.mjs', () => {
     expect(DOM.contains(div, div)).toBe(true);
   });
 
-  test('uniqueId returns consistent id for same node', () => {
-    const div = document.createElement('div');
-    const id1 = DOM.uniqueId(div);
-    const id2 = DOM.uniqueId(div);
-    expect(id1).toBe(id2);
-  });
-
-  test('uniqueId returns different ids for different nodes', () => {
-    const a = document.createElement('div');
-    const b = document.createElement('div');
-    expect(DOM.uniqueId(a)).not.toBe(DOM.uniqueId(b));
-  });
-
-  test('setData/getData stores and retrieves data', () => {
-    const div = document.createElement('div');
-    DOM.setData(div, { foo: 'bar' });
-    expect(DOM.hasData(div)).toBe(true);
-    expect(DOM.getData(div)).toEqual({ foo: 'bar' });
-  });
-
-  test('hasData returns false for untagged nodes', () => {
-    const div = document.createElement('div');
-    expect(DOM.hasData(div)).toBe(false);
-  });
-
   test('copyAttributes copies all attributes', () => {
     const src = document.createElement('div');
     src.setAttribute('class', 'foo');
@@ -380,5 +355,51 @@ describe('DOM.mjs', () => {
     await new Promise(r => setTimeout(r, 50));
     expect(resolved).toBe(true);
     div.remove();
+  });
+});
+
+describe('DOM.createEvent', () => {
+
+  test('creates event with string type', () => {
+    let event = DOM.createEvent('myevent');
+    expect(event.type).toBe('myevent');
+    expect(event.bubbles).toBe(true);
+    expect(event.cancelable).toBe(true);
+  });
+
+  test('defaults bubbles and cancelable to true', () => {
+    let event = DOM.createEvent('test');
+    expect(event.bubbles).toBe(true);
+    expect(event.cancelable).toBe(true);
+  });
+
+  test('allows overriding bubbles and cancelable', () => {
+    let event = DOM.createEvent('test', { bubbles: false, cancelable: false });
+    expect(event.bubbles).toBe(false);
+    expect(event.cancelable).toBe(false);
+  });
+
+  test('passes detail', () => {
+    let event = DOM.createEvent('test', { detail: { foo: 'bar' } });
+    expect(event.detail).toEqual({ foo: 'bar' });
+  });
+
+  test('accepts object with type property', () => {
+    let event = DOM.createEvent({ type: 'myevent', detail: 42 });
+    expect(event.type).toBe('myevent');
+    expect(event.detail).toBe(42);
+  });
+
+  test('copies extra properties onto event', () => {
+    let event = DOM.createEvent('test', { detail: null, myProp: 'hello' });
+    expect(event.myProp).toBe('hello');
+  });
+
+  test('throws for invalid type', () => {
+    expect(() => DOM.createEvent(123)).toThrow('invalid event type');
+  });
+
+  test('throws for missing type in object form', () => {
+    expect(() => DOM.createEvent({ detail: 'x' })).toThrow('invalid event type');
   });
 });

@@ -198,11 +198,4 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 	}
 }
 
-function markElement(context) {
-	if (context.hasAttribute(DOM.uniqueIdAttr)) return context.getAttribute(DOM.uniqueIdAttr);
-	let uid = DOM.uniqueId(context);
-	context.setAttribute(DOM.uniqueIdAttr, uid);
-	return uid;
-}
-
 export default CSSDecoder;
