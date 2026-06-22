@@ -60,7 +60,8 @@ function resolveAll(doc, baseURL) {
 
 	(nodeList) => {
 		return Thenfu.reduce(null, nodeList, (dummy, el) => {
-			let tag = DOM.getTagName(el);
+			let tag = el.localName;
+			if (!tag) return;
 			let attrList = urlAttributes[tag];
 			_.forOwn(attrList, (attrDesc, attrName) => {
 				if (!el.hasAttribute(attrName)) return;

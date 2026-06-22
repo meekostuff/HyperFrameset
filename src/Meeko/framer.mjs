@@ -16,9 +16,9 @@ import * as DOM from './DOM.mjs';
 import scriptQueue from './scriptQueue.mjs';
 import httpProxy from './httpProxy.mjs';
 import HistoryState from './HistoryState.mjs';
-import { install, instance } from './behaviors.mjs';
+import {install} from './behaviors.mjs';
 import layoutElements from './layoutElements.mjs';
-import transcluder, {HTransclude, transcludeDefinitions } from './transcluder.mjs';
+import transcluder, {HTransclude, transcludeDefinitions} from './transcluder.mjs';
 import {HFramesetDefinition} from './framesetDefinitions.mjs';
 import {HYPERFRAMESET_URN} from './CustomNamespace.mjs';
 
@@ -378,7 +378,7 @@ onClick(e) { // return false means success
 	let linkElement = DOM.closest(e.target, 'a, [link]');
 	if (!linkElement) return;
 	let hyperlink;
-	if (DOM.getTagName(linkElement) === 'a') hyperlink = linkElement;
+	if (linkElement.localName === 'a') hyperlink = linkElement;
 	else {
 		hyperlink = DOM.find('a, link', linkElement);
 		if (!hyperlink) hyperlink = DOM.closest('a', linkElement);
@@ -769,7 +769,7 @@ static #separateHead(dstDoc, isFrameset) {
 	if (isFrameset) _.forEach(DOM.siblings('after', framesetMarker, 'before', selfMarker), remove);
 	else _.forEach(DOM.siblings('after', selfMarker), remove);
 	function remove(node) {
-		if (DOM.getTagName(node) == 'script' && (!node.type || node.type.match(/^text\/javascript/i))) return;
+		if (node.localName === 'script' && (!node.type || node.type.match(/^text\/javascript/i))) return;
 		dstHead.removeChild(node);
 	}
 }
@@ -798,8 +798,8 @@ static #mergeHead(dstDoc, srcHead, isFrameset) {
 	Framer.#separateHead(dstDoc, isFrameset);
 
 	_.forEach(Array.from(srcHead.childNodes), (srcNode) => {
-		if (srcNode.nodeType != 1) return;
-		switch (DOM.getTagName(srcNode)) {
+		if (srcNode.nodeType !== 1) return;
+		switch (srcNode.localName) {
 		default: break;
 		case 'title':
 			if (isFrameset) return;
@@ -817,7 +817,7 @@ static #mergeHead(dstDoc, srcHead, isFrameset) {
 		}
 		if (isFrameset) DOM.insertNode('beforebegin', selfMarker, srcNode);
 		else DOM.insertNode('beforeend', dstHead, srcNode);
-		if (DOM.getTagName(srcNode) == 'link') srcNode.href = srcNode.getAttribute('href');
+		if (srcNode.localName === 'link') srcNode.href = srcNode.getAttribute('href');
 	});
 }
 

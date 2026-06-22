@@ -5,7 +5,6 @@
  */
 
 import * as _ from './stuff.mjs';
-import * as DOM from './DOM.mjs';
 
 /**
  * @implements {Processor}
@@ -21,7 +20,7 @@ loadTemplate(template) {
 	_.forEach(Array.from(template.childNodes), (node) => {
 		switch (node.nodeType) {
 		case 1: // Element
-			switch (DOM.getTagName(node)) {
+			switch (node.localName) {
 			case 'script':
 				if (script) console.warn('Ignoring secondary <script> in "script" transform template');
 				else script = node;

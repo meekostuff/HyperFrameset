@@ -3,16 +3,6 @@ import * as DOM from '../src/Meeko/DOM.mjs';
 
 describe('DOM.mjs', () => {
 
-  test('getTagName returns lowercase tag name', () => {
-    const div = document.createElement('div');
-    expect(DOM.getTagName(div)).toBe('div');
-  });
-
-  test('getTagName returns empty string for non-elements', () => {
-    expect(DOM.getTagName(null)).toBe('');
-    expect(DOM.getTagName(document.createTextNode('hi'))).toBe('');
-  });
-
   test('find returns first matching element', () => {
     const div = document.createElement('div');
     div.innerHTML = '<span>a</span><span>b</span>';

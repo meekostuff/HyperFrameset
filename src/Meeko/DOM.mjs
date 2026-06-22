@@ -45,15 +45,6 @@ function uniqueId(node) {
 }
 
 /**
- * Get lowercase tag name of element
- * @param {Element} el - DOM element
- * @returns {string} Lowercase tag name or empty string
- */
-function getTagName(el) {
-	return el && el.nodeType === 1 ? _.lc(el.tagName) : '';
-}
-
-/**
  * Test if element matches CSS selector
  * @param {Element} element - Element to test
  * @param {string|Function} selector - CSS selector or test function
@@ -420,7 +411,6 @@ function cloneDocument(srcDoc) {
 	return srcDoc.cloneNode(true);
 }
 export {
-	getTagName,
 	contains, matches,
 	findId, find, findAll, closest, siblings,
 	createEvent,

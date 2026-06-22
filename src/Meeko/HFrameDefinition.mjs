@@ -4,8 +4,7 @@
  * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
  */
 import * as _ from './stuff.mjs';
-import * as DOM from './DOM.mjs';
-import { HYPERFRAMESET_URN } from './CustomNamespace.mjs';
+import {HYPERFRAMESET_URN} from './CustomNamespace.mjs';
 import HBodyDefinition from './HBodyDefinition.mjs';
 
 /** Tag names to ignore when scanning HFrame children (they belong in &lt;head>). */
@@ -27,8 +26,8 @@ init(el) {
 		mainSelector: el.getAttribute('main') // TODO consider using a hash in `@src`
     });
 	frameDef.bodies = [];
-	_.forEach(Array.from(el.childNodes), (node) => {
-		let tag = DOM.getTagName(node);
+	_.forEach(Array.from(el.children), (node) => {
+		let tag = node.localName;
 		if (!tag) return;
 		if (_.includes(hfHeadTags, tag)) return; // ignore typical <head> elements
 		if (tag === framesetDef.namespaces.lookupTagNameNS('body', HYPERFRAMESET_URN)) {

@@ -6,7 +6,7 @@
 import * as _ from './stuff.mjs';
 import Thenfu from './Thenfu.mjs';
 import * as DOM from './DOM.mjs';
-import { HYPERFRAMESET_URN } from './CustomNamespace.mjs';
+import {HYPERFRAMESET_URN} from './CustomNamespace.mjs';
 import HTransformDefinition from './HTransformDefinition.mjs';
 
 /** Valid HBody readiness states. */
@@ -56,8 +56,8 @@ init(el) {
 		condition: finalCondition,
 		transforms: []
 	});
-	_.forEach(Array.from(el.childNodes), (node) => {
-		if (DOM.getTagName(node) === framesetDef.namespaces.lookupTagNameNS('transform', HYPERFRAMESET_URN)) {
+	_.forEach(Array.from(el.children), (node) => {
+		if (node.localName === framesetDef.namespaces.lookupTagNameNS('transform', HYPERFRAMESET_URN)) {
 			el.removeChild(node);
 			bodyDef.transforms.push(new HTransformDefinition(node, framesetDef));
 		}	
