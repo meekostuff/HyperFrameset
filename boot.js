@@ -7,21 +7,18 @@
 
 var defaults = { // NOTE defaults also define the type of the associated config option
 	"no_boot": false, 
-	"no_frameset": false, // NOTE !(history.pushState && window.XMLHttpRequest && && 'readyState' in document) is enforced anyway
+	"no_frameset": false, // NOTE !(history.pushState && window.XMLHttpRequest) is enforced anyway
 	"no_style": false,
 	"file_access_from_files": false,
 	"capturing": true,
 	"hidden_timeout": 3000,
 	"startup_timeout": 10000, // abort if startup takes longer than this
-	"polling_interval": 1000/60,
+	"polling_interval": 1000/60, // obsolete
 	"main_script": /[?&]dev($|[=&])/.test(location.search)
 		? '{bootscriptdir}src/HyperFrameset.mjs'
 		: '{bootscriptdir}HyperFrameset.js',
 	"config_script": '{bootscriptdir}config.js'
 }
-
-var window = this;
-var document = window.document;
 
 /*
 	HyperFrameset requires support for many built-in browser features.
@@ -64,8 +61,6 @@ function some(a, fn, context) {
 }
 function forEach(a, fn, context) { for (var n=a.length, i=0; i<n; i++) fn.call(context, a[i], i, a); }
 
-function words(text) { return text.split(/\s+/); }
-
 var parseJSON = function(text) { // NOTE this allows code to run. This is a feature, not a bug. I think.
 	try { return ( Function('return ( ' + text + ' );') )(); }
 	catch (error) { return; }
@@ -78,7 +73,6 @@ var parseJSON = function(text) { // NOTE this allows code to run. This is a feat
 */
 
 var useSessionOptions = (function() {
-	if (!('JSON' in window)) return false;
 	try {
 		if (!window.sessionStorage) return false;
 	}
@@ -177,7 +171,7 @@ if (isSet('no_boot')) return;
  ### DOM utilities
  */
 
-function getTagName(el) { return el && el.nodeType === 1 ? el.tagName.toLowerCase() : ""; }
+function getTagName(el) { return el && el.nodeType === 1 ? el.tagName.toLowerCase() : ''; }
 
 function $$(selector, context) {
 	context = context || document;
@@ -186,20 +180,12 @@ function $$(selector, context) {
 	return nodeList;
 }
 
-function empty(el) {
-	var node;
-	while (node = el.firstChild) el.removeChild(node);
-}
-
 function nextSiblings(el, callback) {
 	var nodeList = [];
 	for (var node=el.nextSibling; node; node=node.nextSibling) nodeList.push(node);
 	if (callback) forEach(nodeList, callback);
 	return nodeList;
 }
-
-if (!document.head) document.head = $$('head')[0];
-if (!document.head) throw 'ABORT: <head> not found. This implies a legacy browser.';
 
 function getBootScript() {
 	var script = document.currentScript;
@@ -219,14 +205,10 @@ function getBootScript() {
 }
 
 function resolveURL(url, params) {
-	if (url.substr(0,2) == '//') url = location.protocol + url;
-	for (var name in params) {
-		url = url.replace('{' + name + '}', params[name]); // WARN max of one reolace per param
+	if (params) for (var name in params) {
+		url = url.replace('{' + name + '}', params[name]);
 	}
-	// needs to be more complex for IE < 8
-	var a = document.createElement('a');
-	a.setAttribute('href', url);
-	return a.href;
+	return new URL(url, document.baseURI).href;
 }
 
 var domReady = (function() {
@@ -272,7 +254,6 @@ function onLoaded(e) {
 
 var taskQueue = (function() {
 
-var head = document.head;
 var testScript = document.createElement('script');
 var supportsOnLoad = (testScript.setAttribute('onload', ';'), typeof testScript.onload === 'function');
 var supportsSync = (testScript.async === true);
@@ -287,7 +268,7 @@ function prepareScript(url, onload, onerror) { // create script (and insert if s
 	script.src = url;
 	if (supportsSync) {
 		script.async = false;
-		head.appendChild(script);
+		document.head.append(script);
 	}
 	return script;
 
@@ -308,7 +289,7 @@ function prepareScript(url, onload, onerror) { // create script (and insert if s
 function enableScript(script) { // insert script if not already done, i.e. !supportsSync
 	// TODO assert (!!script.parentNode === supportsSync)
 	if (supportsSync) return;
-	head.appendChild(script);
+	document.head.append(script);
 }
 
 function disableScript(script) {
@@ -389,40 +370,41 @@ return {
 
 })();
 
-
-
-
 /*
  ### Viewport hide / unhide
  */
 var Viewport = (function() {
 
-var head = document.head;
-var fragment = document.createDocumentFragment();
 var style = document.createElement("style");
-fragment.appendChild(style); // NOTE on IE this realizes style.styleSheet 
 
 // NOTE hide the page until the frameset is ready
 var selector = 'body', property = 'visibility', value = 'hidden';
 
 var cssText = selector + ' { ' + property + ': ' + value + '; }\n';
+style.textContent = cssText;
+/*
+// NOTE on IE this realizes style.styleSheet
+var fragment = document.createDocumentFragment();
+fragment.append(style);
 if (style.styleSheet) style.styleSheet.cssText = cssText;
-else style.textContent = cssText;
+*/
 
 function hide() {
-	head.insertBefore(style, selfMarker);
+	document.head.insertBefore(style, selfMarker);
 }
 
 function unhide() {
-	var pollingInterval = bootOptions['polling_interval'];
-	if (style.parentNode != head) return;
-	head.removeChild(style);
-	// NOTE on IE sometimes content stays hidden although 
+	if (style.parentNode !== document.head) return;
+	document.head.removeChild(style);
+/*
+	// NOTE on IE sometimes content stays hidden although
 	// the stylesheet has been removed.
 	// The following forces the content to be revealed
 	var el = $$(selector)[0];
 	el.style[property] = value;
+	var pollingInterval = bootOptions['polling_interval'];
 	setTimeout(function() { el.style[property] = ""; }, pollingInterval);
+*/
 }
 
 return {
@@ -615,7 +597,7 @@ function start() {
 		contentDocument: new Promise(function(resolve, reject) { // FIXME this is bound to have cross-browser failures
 			var dstDoc = document.cloneNode(true);
 			var dstHead = dstDoc.head;
-			empty(dstHead);
+			dstHead.replaceChildren();
 			nextSiblings(selfMarker, function(srcNode) {
 				var node = dstDoc.importNode(srcNode, true);
 				switch (getTagName(srcNode)) {
@@ -628,9 +610,9 @@ function start() {
 					srcNode.parentNode.removeChild(srcNode);
 					break;
 				}
-				dstHead.appendChild(node);
+				dstHead.append(node);
 			});
-			empty(document.body);
+			document.body.replaceChildren();
 			resolve(dstDoc);
 		}) 
 	});

@@ -17,7 +17,7 @@ Meeko.options = { // these are the default values
 	"capturing": true, // false, "auto", true, "strict"
 	"hidden_timeout": 3000,
 	"startup_timeout": 10000, // abort if startup takes longer than this
-	"polling_interval": 50,
+	"polling_interval": 50, // obsolete
 	"main_script": '{bootscriptdir}HyperFrameset.js', // use an abs-path or abs-url
 	"config_script": '{bootscriptdir}config.js' // can be a script-url OR a function
 };
