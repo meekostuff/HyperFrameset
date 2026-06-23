@@ -133,7 +133,10 @@ var bootOptions = Meeko.bootOptions = (function() {
 })();
 
 // Don't even load HyperFrameset if "no_boot" is set
-if (bootOptions['no_boot']) return;
+if (bootOptions['no_boot']) {
+	console.info('HyperFrameset disabled (no_boot)');
+	return;
+}
 
 /*
  ### DOM utilities
@@ -412,11 +415,13 @@ if (bootOptions['no_style']) {
 	return;	
 }
 
-var no_frameset = bootOptions['no_frameset'];
-if (no_frameset) return; // TODO console.info()
+if (bootOptions['no_frameset']) {
+	console.info('HyperFrameset disabled (no_frameset)');
+	return;
+}
 if (location.protocol === 'file:') {
 	if (!bootOptions['file_access_from_files']) {
-		console.debug('HyperFrameset is not recommended for `file:` URLs. Aborting.');
+		console.warn('HyperFrameset is not recommended for `file:` URLs. Aborting.');
 		return;
 	}
 	else {
