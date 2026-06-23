@@ -3,15 +3,12 @@
 These options aren't specifically related to the operation of HyperFrameset. 
 The boot-script has the following options (default values in **bold**).
 
-- log_level: "none", "error", **"warn"**, "info", "debug"
 - polling_interval: **50** (milliseconds)
 - no_style: **false**, true
 - no_frameset: **false**, true
 - capturing: false, "auto", **true**, "strict"
 - hidden_timeout: **3000** (milliseconds)
 - startup_timeout: **10000** (milliseconds)
-- html5\_block\_elements: **"article aside figcaption figure footer header hgroup main nav section"**
-- html5\_inline\_elements: **"abbr mark output time audio video picture"**
 - config_script: **"{bootscriptdir}config.js"**
 - main_script: **"{bootscriptdir}HyperFrameset.js"**
 
@@ -26,14 +23,12 @@ Options can be **preset** by script, like this:
 <script>
 var Meeko = window.Meeko || (window.Meeko = {});
 Meeko.options = {
-	log_level: "info",
 	hidden_timeout: 1000
 };
 </script>
 ```
 
 This tells HyperFrameset to
-- log 'info', 'warn' and 'error' messages
 - hide the page until all frameset-resources are loaded *or*
 	1000 milliseconds (1 second) have elapsed, whichever comes *first*.
 
@@ -43,14 +38,13 @@ especially as you may have to change them back after you've found the problem.
 For this reason HyperFrameset reads `sessionStorage` and `localStorage` at startup, looking for config options.
 `sessionStorage` options override those found in `localStorage`, which in turn override those in data-attributes.
 
-Config options are read from JSON stored in the `Meeko.options` key. Thus the following would disable hiding of the landing-page and turn on `debug` logging.
+Config options are read from JSON stored in the `Meeko.options` key. Thus the following would disable hiding of the landing-page.
 
 ``` .html
 sessionStorage.setItem(
 	'Meeko.options', 
 	JSON.stringify({ 
-		hidden_timeout: 0, 
-		log_level: "debug" 
+		hidden_timeout: 0
 	}) 
 );
 ```
