@@ -3,6 +3,9 @@
  * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
  */
 
+// NOTE This script uses modern JavaScript syntax (private class fields, optional chaining, etc.)
+//   and will not parse — let alone boot — on older browsers. This is intentional.
+
 (function() { // NOTE throwing an error or returning from this wrapper function prematurely aborts booting
 
 var defaults = { // NOTE defaults also define the type of the associated config option
@@ -373,46 +376,42 @@ return {
 /*
  ### Viewport hide / unhide
  */
-var Viewport = (function() {
+class Viewport {
+	#style = document.createElement("style");
 
-var style = document.createElement("style");
+	constructor() {
+		// NOTE hide the page until the frameset is ready
+		var selector = 'body', property = 'visibility', value = 'hidden';
+		var cssText = selector + ' { ' + property + ': ' + value + '; }\n';
+		this.#style.textContent = cssText;
+		/*
+		// NOTE on IE the following realizes style.styleSheet
+		var fragment = document.createDocumentFragment();
+		fragment.append(style);
+		if (style.styleSheet) style.styleSheet.cssText = cssText;
+		*/
+	}
 
-// NOTE hide the page until the frameset is ready
-var selector = 'body', property = 'visibility', value = 'hidden';
+	hide() {
+		document.head.insertBefore(this.#style, selfMarker);
+	}
 
-var cssText = selector + ' { ' + property + ': ' + value + '; }\n';
-style.textContent = cssText;
-/*
-// NOTE on IE this realizes style.styleSheet
-var fragment = document.createDocumentFragment();
-fragment.append(style);
-if (style.styleSheet) style.styleSheet.cssText = cssText;
-*/
-
-function hide() {
-	document.head.insertBefore(style, selfMarker);
+	unhide() {
+		if (this.#style.parentNode !== document.head) return;
+		document.head.removeChild(this.#style);
+		/*
+		// NOTE on IE sometimes content stays hidden although
+		// the stylesheet has been removed.
+		// The following forces the content to be revealed
+		var el = $$(selector)[0];
+		el.style[property] = value;
+		var pollingInterval = bootOptions['polling_interval'];
+		setTimeout(function() { el.style[property] = ""; }, pollingInterval);
+		*/
+	}
 }
 
-function unhide() {
-	if (style.parentNode !== document.head) return;
-	document.head.removeChild(style);
-/*
-	// NOTE on IE sometimes content stays hidden although
-	// the stylesheet has been removed.
-	// The following forces the content to be revealed
-	var el = $$(selector)[0];
-	el.style[property] = value;
-	var pollingInterval = bootOptions['polling_interval'];
-	setTimeout(function() { el.style[property] = ""; }, pollingInterval);
-*/
-}
-
-return {
-	hide: hide,
-	unhide: unhide
-}
-
-})();
+var viewport = new Viewport();
 
 /*
  ### Capturing
@@ -567,8 +566,8 @@ document.write = document.writeln = document.open = document.close = function() 
 
 var hidden_timeout = bootOptions["hidden_timeout"];
 if (hidden_timeout > 0) {
-	Viewport.hide();
-	setTimeout(Viewport.unhide, hidden_timeout);
+	viewport.hide();
+	setTimeout(() => viewport.unhide(), hidden_timeout);
 }
 
 function config() {
@@ -603,8 +602,8 @@ function start() {
 			resolve(dstDoc);
 		}) 
 	});
-	startFu.then(Viewport.unhide, function(error) {
-		Viewport.unhide();
+	startFu.then(() => viewport.unhide(), function(error) {
+		viewport.unhide();
 		throw error;
 	});
 }
@@ -644,7 +643,7 @@ function init(callback) {
 			sessionOptions.setItem('no_frameset', true);
 			location.reload();
 		});
-		else Viewport.unhide();
+		else viewport.unhide();
 	});
 }
 
