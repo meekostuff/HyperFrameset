@@ -56,8 +56,6 @@ var Meeko = window.Meeko || (window.Meeko = {});
 /*
  ### JS utilities
  */
-function forEach(a, fn, context) { for (var n=a.length, i=0; i<n; i++) fn.call(context, a[i], i, a); }
-
 /*
  ### Get options
  */
@@ -142,13 +140,6 @@ if (bootOptions['no_boot']) {
  ### DOM utilities
  */
 
-function $$(selector, context) {
-	context = context || document;
-	var nodeList = [];
-	forEach(context.getElementsByTagName(selector), function(el) { nodeList.push(el); });
-	return nodeList;
-}
-
 /**
  * Iterate siblings after `el`, calling `callback` for each.
  * If `callback` returns true, stop and return that sibling.
@@ -178,7 +169,7 @@ function getBootScript() {
 	In other cases - dynamic-insertion, document.write into an iframe -
 	the inserting code must ensure the script is last in document.
 	*/
-	var allScripts = $$('script');
+	var allScripts = [...document.getElementsByTagName('script')];
 	script = allScripts[allScripts.length - 1];
 	return script;
 }
@@ -312,7 +303,7 @@ class Capture {
 
 	test() {
 		if (document.body) throw 'When capturing, boot-script MUST be in - or before - <head>';
-		if ($$('script').length > 1) return 'When capturing, boot-script SHOULD be first <script>';
+		if (document.getElementsByTagName('script').length > 1) return 'When capturing, boot-script SHOULD be first <script>';
 		let invalid = findNextMatchingSibling(selfMarker, function(node) {
 			if (node.nodeType !== 1) return false; // comments and text-nodes are ok
 			if (node === bootScript) return false; // boot-script is ok. TODO should be last node in <head>
@@ -332,7 +323,7 @@ class Capture {
 				var html = plaintext.firstChild.nodeValue;
 				plaintext.remove();
 				if (!/\s*<!DOCTYPE/i.test(html)) html = this.#capturedHTML + html;
-				resolve(new String(html));
+				resolve(String(html));
 			});
 		})
 		.then((text) => Meeko.htmlParser.parse(text, { url: document.URL, mustResolve: false }));
