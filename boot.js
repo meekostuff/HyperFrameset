@@ -51,124 +51,89 @@ if (!(window.WeakRef && window.MutationObserver && window.XMLHttpRequest && hist
 var SELF_REL = 'self'; // TODO DRY with libHyperFrameset.js
 var FRAMESET_REL = 'frameset'; // ditto
 
-var vendorPrefix = "Meeko";
-
 var Meeko = window.Meeko || (window.Meeko = {});
 
 /*
  ### JS utilities
  */
-function some(a, fn, context) {
-	for (var n=a.length, i=0; i<n; i++) if (fn.call(context, a[i], i, a)) return true;
-	return false;
-}
 function forEach(a, fn, context) { for (var n=a.length, i=0; i<n; i++) fn.call(context, a[i], i, a); }
-
-var parseJSON = function(text) { // NOTE this allows code to run. This is a feature, not a bug. I think.
-	try { return ( Function('return ( ' + text + ' );') )(); }
-	catch (error) { return; }
-}
 
 /*
  ### Get options
+ */
 
- TODO It would be nice if all data sources had the same API
-*/
+class Options {
+	#sources = [];
 
-var useSessionOptions = (function() {
-	try {
-		if (!window.sessionStorage) return false;
+	addSource(fn) {
+		this.#sources.push(fn);
 	}
-	catch (error) {
-		return false;
-	}
-	return true;
-})();
 
-var sessionOptions = useSessionOptions && (function() {
-
-var optionsKey = 'Meeko.options';
-var text = sessionStorage.getItem(optionsKey);
-var options = parseJSON(text);
-if (typeof options !== 'object' || options === null) options = {};
-
-return {
-
-getItem: function(key) {
-	return options[key];
-},
-
-setItem: function(key, name) {
-	options[key] = name;
-	sessionStorage.setItem(optionsKey, JSON.stringify(options));
-}
-
-}
-
-})();
-
-var dataSources = [];
-
-function addDataSource(name, key) {
-	if (!key) key = vendorPrefix + '.options';
-	try { // NOTE IE10 can throw on `localStorage.getItem()` - see http://stackoverflow.com/questions/13102116/access-denied-for-localstorage-in-ie10
-		// Also Firefox on `window.localStorage` - see http://meyerweb.com/eric/thoughts/2012/04/25/firefox-failing-localstorage/
-		var source = window[name] || Meeko[name];
-		if (!source) return;
-		var options = parseJSON(source.getItem(key));
-		if (options) dataSources.push( function(name) { return options[name]; } );
-	} catch(error) {
-		console.warn(name + ' inaccessible');
-	}
-}
-
-addDataSource('sessionStorage');
-addDataSource('localStorage');
-if (Meeko.options) dataSources.push( function(name) { return Meeko.options[name]; } )
-
-var getData = function(name, type) {
-	var data = null;
-	some(dataSources, function(fn) {
-		var val = fn(name);
-		if (val == null) return false;
-		switch (type) {
-		case "string": data = val; // WARN this DOES NOT convert to String
-			break;
-		case "number":
-			if (!isNaN(val)) data = 1 * val;
-			// TODO else console.warn("incorrect config option " + val + " for " + name); 
-			break;
-		case "boolean":
-			data = val; // WARN this does NOT convert to Boolean
-			// if ([false, true, 0, 1].indexOf(val) < 0) console.warn("incorrect config option " + val + " for " + name); 
-			break;
+	addStorageSource(name, key = 'Meeko.options') {
+		try {
+			let source = window[name];
+			if (!source) return;
+			let text = source.getItem(key);
+			if (!text) return;
+			let options = JSON.parse(text);
+			if (options) this.#sources.push((name) => options[name]);
+		} catch(e) {
+			console.warn(name + ' inaccessible');
 		}
-		return (data !== null); 
-	});
-	return data;
+	}
+
+	getData(name, type) {
+		for (let fn of this.#sources) {
+			let val = fn(name);
+			if (val == null) continue;
+			switch (type) {
+			case "string": return val;
+			case "number": if (!isNaN(val)) return Number(val); break;
+			case "boolean": return val;
+			}
+		}
+		return null;
+	}
 }
 
-var bootOptions = Meeko.bootOptions = (function() {
-	var options = {};
-	for (var name in defaults) {
-		var def = options[name] = defaults[name];
-		var val = getData(name, typeof def);
-		if (val != null) options[name] = val;
-	}
-	return options;
-})();
+var options = new Options();
 
-
+// NOTE valueless params (e.g. ?no_boot) become empty string in URLSearchParams; treat as true
 var searchParams = Object.fromEntries(
 	[...new URLSearchParams(location.search)].map(([k, v]) => [k, v || true])
 );
 
-function isSet(option) {
-	if (searchParams[option] || bootOptions[option]) return true;
-}
+options.addSource((name) => searchParams[name]);
+options.addStorageSource('sessionStorage');
+options.addStorageSource('localStorage');
+if (Meeko.options) options.addSource((name) => Meeko.options[name]);
+options.addSource((name) => defaults[name]);
 
-// Don't even load HyperFrameset if "no_boot" is one of the search options (or true in Meeko.options)
-if (isSet('no_boot')) return;
+// sessionOptions is used for capture error-recovery (read/write during reload)
+var sessionOptions = (function() {
+	try {
+		let text = sessionStorage.getItem('Meeko.options');
+		let data = text ? JSON.parse(text) : {};
+		return {
+			getItem(key) { return data[key]; },
+			setItem(key, value) {
+				data[key] = value;
+				sessionStorage.setItem('Meeko.options', JSON.stringify(data));
+			}
+		};
+	} catch(e) { return null; }
+})();
+
+var bootOptions = Meeko.bootOptions = (function() {
+	let result = {};
+	for (let name in defaults) {
+		result[name] = options.getData(name, typeof defaults[name]);
+	}
+	return result;
+})();
+
+// Don't even load HyperFrameset if "no_boot" is set
+if (bootOptions['no_boot']) return;
 
 /*
  ### DOM utilities
@@ -430,7 +395,7 @@ document.head.insertBefore(selfMarker, document.head.firstChild);
 */
 
 
-if (isSet('no_style')) {
+if (bootOptions['no_style']) {
 	domReady(function() {
 		var parent = selfMarker.parentNode;
 		findNextMatchingSibling(selfMarker, function(node) {
@@ -447,10 +412,10 @@ if (isSet('no_style')) {
 	return;	
 }
 
-var no_frameset = isSet('no_frameset');
+var no_frameset = bootOptions['no_frameset'];
 if (no_frameset) return; // TODO console.info()
 if (location.protocol === 'file:') {
-	if (!isSet('file_access_from_files')) {
+	if (!bootOptions['file_access_from_files']) {
 		console.debug('HyperFrameset is not recommended for `file:` URLs. Aborting.');
 		return;
 	}
