@@ -162,16 +162,9 @@ var bootOptions = Meeko.bootOptions = (function() {
 })();
 
 
-var searchParams = (function() {
-	var search = location.search,
-		options = {}; 
-	if (search) search.substr(1)
-		.replace(/(?:^|&)([^&=]+)=?([^&]*)/g, function(m, key, val) {
-			val = (val) ? decodeURIComponent(val) : true;
-			options[key] = val;
-		});
-	return options;
-})();
+var searchParams = Object.fromEntries(
+	[...new URLSearchParams(location.search)].map(([k, v]) => [k, v || true])
+);
 
 function isSet(option) {
 	if (searchParams[option] || bootOptions[option]) return true;
