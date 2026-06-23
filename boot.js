@@ -183,11 +183,21 @@ function $$(selector, context) {
 	return nodeList;
 }
 
-function nextSiblings(el, callback) {
-	var nodeList = [];
-	for (var node=el.nextSibling; node; node=node.nextSibling) nodeList.push(node);
-	if (callback) forEach(nodeList, callback);
-	return nodeList;
+/**
+ * Iterate siblings after `el`, calling `callback` for each.
+ * If `callback` returns true, stop and return that sibling.
+ * Safe to use when the callback removes nodes.
+ * @param {Node} el - Starting node (not visited).
+ * @param {function(Node): boolean} callback
+ * @returns {Node|undefined} The first matching sibling, or undefined.
+ */
+function findNextMatchingSibling(el, callback) {
+	let node = el.nextSibling;
+	while (node) {
+		let next = node.nextSibling;
+		if (callback(node)) return node;
+		node = next;
+	}
 }
 
 function getBootScript() {
@@ -408,15 +418,15 @@ class Capture {
 	test() {
 		if (document.body) throw 'When capturing, boot-script MUST be in - or before - <head>';
 		if ($$('script').length > 1) return 'When capturing, boot-script SHOULD be first <script>';
-		var nodeList = nextSiblings(selfMarker);
-		if (some(nodeList, function(node) { // return true if invalid node
+		let invalid = findNextMatchingSibling(selfMarker, function(node) {
 			if (node.nodeType !== 1) return false; // comments and text-nodes are ok
 			if (node === bootScript) return false; // boot-script is ok. TODO should be last node in <head>
 			if (node.localName === 'title' && node.firstChild === null) return false; // IE6 adds a dummy <title>
 			if (node.localName !== 'meta') return true;
 			if (node.httpEquiv || node.getAttribute('charset')) return false; // <meta http-equiv> are ok
 			return true;
-		})) return 'When capturing, only <meta http-equiv> or <meta charset> nodes may precede boot-script';
+		});
+		if (invalid) return 'When capturing, only <meta http-equiv> or <meta charset> nodes may precede boot-script';
 		return false;
 	}
 
@@ -494,7 +504,7 @@ document.head.insertBefore(selfMarker, document.head.firstChild);
 if (isSet('no_style')) {
 	domReady(function() {
 		var parent = selfMarker.parentNode;
-		nextSiblings(selfMarker, function(node) {
+		findNextMatchingSibling(selfMarker, function(node) {
 			switch (getTagName(node)) {
 			case 'style': break;
 			case 'link':
@@ -554,7 +564,7 @@ function start() {
 			var dstDoc = document.cloneNode(true);
 			var dstHead = dstDoc.head;
 			dstHead.replaceChildren();
-			nextSiblings(selfMarker, function(srcNode) {
+			findNextMatchingSibling(selfMarker, function(srcNode) {
 				var node = dstDoc.importNode(srcNode, true);
 				switch (getTagName(srcNode)) {
 				case '':
