@@ -214,42 +214,13 @@ function resolveURL(url, params) {
 	return new URL(url, document.baseURI).href;
 }
 
-var domReady = (function() {
-// WARN this function assumes document.readyState is available
-
-var loaded = false;
-var queue = [];
-
-function domReady(fn) {
-	if (typeof fn !== 'function') return;
-	queue.push(fn);
-	if (loaded) processQueue();
-}
-
-function processQueue() {
-	forEach(queue, function(fn) { setTimeout(fn); });
-	queue.length = 0;
-}
-
-// See https://gist.github.com/shogun70/5388420 
+// See https://gist.github.com/shogun70/5388420
 // for testing document.readyState in different browsers
-if (/loaded|complete/.test(document.readyState)) loaded = true;
-else {
-	document.addEventListener('DOMContentLoaded', onLoaded, false);
-	window.addEventListener('load', onLoaded, false);
-}
+var domReadyPromise = document.readyState !== 'loading'
+	? Promise.resolve()
+	: new Promise(resolve => document.addEventListener('DOMContentLoaded', resolve, { once: true }));
 
-return domReady;
-
-function onLoaded(e) {
-	loaded = true;
-	document.removeEventListener('DOMContentLoaded', onLoaded, false);
-	window.removeEventListener('load', onLoaded, false);
-	processQueue();
-}
-
-})();
-
+var domReady = (fn) => domReadyPromise.then(() => setTimeout(fn));
 
 /*
  ### async functions
@@ -571,7 +542,6 @@ if (hidden_timeout > 0) {
 }
 
 function config() {
-	Meeko.DOM.ready = domReady;
 }
 
 function start() {
