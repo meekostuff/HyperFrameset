@@ -418,80 +418,68 @@ return {
  ### Capturing
      See https://hacks.mozilla.org/2013/03/capturing-improving-performance-of-the-adaptive-web/
  */
-var Capture = (function() {
+class Capture {
 
-var capturedHTML = '';
+	#capturedHTML = '';
 
-var Capture = {
-// TODO might be better to clone the partially loaded document at the start of booting so boot modifications don't get captured
-start: function(strict) {
-	var warnMsg = Capture.test(); // NOTE test() can also throw
-	if (warnMsg) {
-		if (strict) throw warnMsg;
-		else console.warn(warnMsg);
+	// TODO might be better to clone the partially loaded document at the start of booting so boot modifications don't get captured
+	start(strict) {
+		var warnMsg = this.test();
+		if (warnMsg) {
+			if (strict) throw warnMsg;
+			else console.warn(warnMsg);
+		}
+		this.#capturedHTML += this.#getDocTypeTag(document);
+		this.#capturedHTML += this.#toStartTag(document.documentElement);
+		this.#capturedHTML += this.#toStartTag(document.head);
+		document.write('<plaintext style="display: none;">');
 	}
-	capturedHTML += getDocTypeTag(document); // WARN relies on document.doctype
-	capturedHTML += toStartTag(document.documentElement); // WARN relies on element.outerHTML
-	capturedHTML += toStartTag(document.head);
-	document.write('<plaintext style="display: none;">');
-},
 
-test: function() { // return `false` for strict, otherwise warning message
-	if (document.body) throw 'When capturing, boot-script MUST be in - or before - <head>';
-	if ($$('script').length > 1) return 'When capturing, boot-script SHOULD be first <script>';
-	var nodeList = nextSiblings(selfMarker);
-	if (some(nodeList, function(node) { // return true if invalid node
-		if (node.nodeType !== 1) return false; // comments and text-nodes are ok
-		if (node === bootScript) return false; // boot-script is ok. TODO should be last node in <head>
-		var tag = getTagName(node);
-		if (tag === 'title' && node.firstChild === null) return false; // IE6 adds a dummy <title>
-		if (tag !== 'meta') return true; 
-		if (node.httpEquiv || node.getAttribute('charset')) return false; // <meta http-equiv> are ok
-		return true;
-	})) return 'When capturing, only <meta http-equiv> or <meta charset> nodes may precede boot-script';
-	return false; 
-},
+	test() {
+		if (document.body) throw 'When capturing, boot-script MUST be in - or before - <head>';
+		if ($$('script').length > 1) return 'When capturing, boot-script SHOULD be first <script>';
+		var nodeList = nextSiblings(selfMarker);
+		if (some(nodeList, function(node) { // return true if invalid node
+			if (node.nodeType !== 1) return false; // comments and text-nodes are ok
+			if (node === bootScript) return false; // boot-script is ok. TODO should be last node in <head>
+			if (node.localName === 'title' && node.firstChild === null) return false; // IE6 adds a dummy <title>
+			if (node.localName !== 'meta') return true;
+			if (node.httpEquiv || node.getAttribute('charset')) return false; // <meta http-equiv> are ok
+			return true;
+		})) return 'When capturing, only <meta http-equiv> or <meta charset> nodes may precede boot-script';
+		return false;
+	}
 
-getDocument: function() { // WARN this assumes HyperFrameset is ready
-	return new Promise(function(resolve, reject) {
-		domReady(function() {
-			var elts = $$('plaintext');
-			var plaintext = elts[elts.length - 1]; // NOTE There should only be one, but take the last just to be sure
-			var html = plaintext.firstChild.nodeValue;
-			plaintext.parentNode.removeChild(plaintext);
-			
-			if (!/\s*<!DOCTYPE/i.test(html)) html = capturedHTML + html;
-			resolve(new String(html));
-		});
-	})
-	.then(function(text) {
-		return Meeko.htmlParser.parse(text, { url: document.URL, mustResolve: false });
-	});
+	getDocument() {
+		return new Promise((resolve) => {
+			domReady(() => {
+				var plaintext = document.querySelector('plaintext:last-of-type');
+				var html = plaintext.firstChild.nodeValue;
+				plaintext.remove();
+				if (!/\s*<!DOCTYPE/i.test(html)) html = this.#capturedHTML + html;
+				resolve(new String(html));
+			});
+		})
+		.then((text) => Meeko.htmlParser.parse(text, { url: document.URL, mustResolve: false }));
+	}
+
+	#toStartTag(el) { // WARN outerHTML not available before Firefox 11
+		var html = el.outerHTML;
+		return html.slice(0, html.indexOf('>') + 1);
+	}
+
+	#getDocTypeTag(doc) { // WARN doctype not available before IE 9
+		var doctype = doc.doctype;
+		return doctype ?
+			'<!DOCTYPE ' + doctype.name +
+			(doctype.publicId ? ' PUBLIC "' + doctype.publicId + '"': '') +
+			(doctype.systemId ? ' "' + doctype.systemId + '"' : '') +
+			'>\n' :
+			'<!DOCTYPE html>\n';
+	}
 }
 
-}
-
-return Capture;
-
-function toStartTag(el) { // WARN outerHTML not available before Firefox 11
-	var html = el.outerHTML;
-	return html.substr(0, html.indexOf('>') + 1);
-}
-
-function getDocTypeTag(doc) { // WARN doctype not available before IE 9
-	var doctype = doc.doctype;
-	return (doctype) ?
-
-		'<!DOCTYPE ' + doctype.name +
-		(doctype.publicId ? ' PUBLIC "' + doctype.publicId + '"': '') +
-		(doctype.systemId ? ' "' + doctype.systemId + '"' : '') +
-		'>\n' :
-
-		'<!DOCTYPE html>\n';
-}
-
-
-})();
+var capture = new Capture();
 
 
 /*
@@ -570,9 +558,8 @@ if (capturing === 'auto') capturing = !document.body;
 if (!sessionOptions) capturing = false; 
 
 if (capturing) {
-	Capture.start(capturing === 'strict');
+	capture.start(capturing === 'strict');
 }
-
 
 // Capturing uses document.write, but after this point document.write, etc is forbidden
 document.write = document.writeln = document.open = document.close = function()  { throw 'document.write(), etc is incompatible with HyperFrameset'; }
@@ -591,7 +578,7 @@ function config() {
 function start() {
 	var startFu;
 	if (capturing) startFu = Meeko.framer.start({
-		contentDocument: Capture.getDocument()
+		contentDocument: capture.getDocument()
 	});
 	else startFu = Meeko.framer.start({
 		contentDocument: new Promise(function(resolve, reject) { // FIXME this is bound to have cross-browser failures
