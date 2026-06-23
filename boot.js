@@ -142,8 +142,6 @@ if (bootOptions['no_boot']) {
  ### DOM utilities
  */
 
-function getTagName(el) { return el && el.nodeType === 1 ? el.tagName.toLowerCase() : ''; }
-
 function $$(selector, context) {
 	context = context || document;
 	var nodeList = [];
@@ -216,7 +214,7 @@ class TaskQueue {
 
 	#loadScript(url) {
 		let script = document.createElement('script');
-		if (/\.mjs$/i.test(url)) script.type = 'module';
+		if (/\.mjs$/i.test(url)) script.type = 'module'; // FIXME find a better way to detect js module URLs
 		script.async = false;
 		script.src = url;
 		let promise = new Promise((resolve, reject) => {
@@ -399,26 +397,23 @@ document.head.insertBefore(selfMarker, document.head.firstChild);
 
 
 if (bootOptions['no_style']) {
-	domReady(function() {
-		var parent = selfMarker.parentNode;
-		findNextMatchingSibling(selfMarker, function(node) {
-			switch (getTagName(node)) {
+	domReady(() => {
+		findNextMatchingSibling(selfMarker, (node) => {
+			switch (node.localName) {
 			case 'style': break;
 			case 'link':
-				if (/\bSTYLESHEET\b/i.test(node.rel))  break;
+				if (/\bSTYLESHEET\b/i.test(node.rel)) break;
 				return;
 			default: return;
 			}
-			parent.removeChild(node);
+			node.remove();
 		});
 	});
-	return;	
-}
-
-if (bootOptions['no_frameset']) {
-	console.info('HyperFrameset disabled (no_frameset)');
 	return;
 }
+
+if (bootOptions['no_frameset']) { console.info('HyperFrameset disabled (no_frameset)'); return; }
+
 if (location.protocol === 'file:') {
 	if (!bootOptions['file_access_from_files']) {
 		console.warn('HyperFrameset is not recommended for `file:` URLs. Aborting.');
@@ -430,121 +425,120 @@ if (location.protocol === 'file:') {
 }
 
 
-var capturing = bootOptions['capturing'];
-if (capturing === 'auto') capturing = !document.body;
-// WARN startup failure will reload the page (if capturing is enabled)
-// but without sessionOptions the reload will (probably) cause the same failure again.
-if (!sessionOptions) capturing = false; 
+class Launcher {
+	#options;
+	#capturing;
+	#mainScript;
+	#configScripts;
 
-if (capturing) {
-	capture.start(capturing === 'strict');
-}
+	constructor(options) {
+		this.#options = options;
+		this.#capturing = this.#resolveCapturing();
+		this.#mainScript = this.#resolveMainScript();
+		this.#configScripts = this.#resolveConfigScripts();
+	}
 
-// Capturing uses document.write, but after this point document.write, etc is forbidden
-document.write = document.writeln = document.open = document.close = function()  { throw 'document.write(), etc is incompatible with HyperFrameset'; }
+	#resolveCapturing() {
+		let capturing = this.#options['capturing'];
+		if (capturing === 'auto') capturing = !document.body;
+		// WARN startup failure will reload the page (if capturing is enabled)
+		//   but without sessionOptions the reload will (probably) cause the same failure again.
+		if (!sessionOptions) capturing = false;
+		return capturing;
+	}
 
+	#resolveMainScript() {
+		let url = this.#options['main_script'];
+		if (typeof url !== 'string') throw 'HyperFrameset script URL is not configured';
+		return resolveURL(url, urlParams);
+	}
 
-var hidden_timeout = bootOptions["hidden_timeout"];
-if (hidden_timeout > 0) {
-	viewport.hide();
-	setTimeout(() => viewport.unhide(), hidden_timeout);
-}
+	#resolveConfigScripts() {
+		let scripts = this.#options['config_script'];
+		if (!Array.isArray(scripts)) scripts = [scripts];
+		return scripts.map(s => typeof s === 'string' ? resolveURL(s, urlParams) : s ?? (() => {}));
+	}
 
-function config() {
-}
+	launch() {
+		if (this.#capturing) {
+			capture.start(this.#capturing === 'strict');
+		}
 
-function start() {
-	var startFu;
-	if (capturing) startFu = Meeko.framer.start({
-		contentDocument: capture.getDocument()
-	});
-	else startFu = Meeko.framer.start({
-		contentDocument: new Promise(function(resolve, reject) { // FIXME this is bound to have cross-browser failures
-			var dstDoc = document.cloneNode(true);
-			var dstHead = dstDoc.head;
+		// Capturing uses document.write, but after this point document.write, etc is forbidden
+		document.write = document.writeln = document.open = document.close =
+			() => { throw 'document.write(), etc is incompatible with HyperFrameset'; };
+
+		let hidden_timeout = this.#options['hidden_timeout'];
+		if (hidden_timeout > 0) {
+			viewport.hide();
+			setTimeout(() => viewport.unhide(), hidden_timeout);
+		}
+
+		if (this.#capturing) {
+			domReady(() => {
+				if (window.stop) window.stop();
+				setTimeout(() => this.#init(() => this.#start()));
+			});
+		} else {
+			setTimeout(() => this.#init(() => domReady(() => this.#start())));
+		}
+
+		let timeout = this.#options['startup_timeout'];
+		if (timeout > 0) setTimeout(() => taskQueue.abort(), timeout);
+	}
+
+	#init(callback) {
+		let sequence = [this.#mainScript, ...this.#configScripts];
+		taskQueue.queue(sequence, callback, (err) => {
+			setTimeout(() => { throw err; });
+			if (this.#capturing) domReady(() => {
+				if (sessionOptions.getItem('no_frameset') === false) return;
+				sessionOptions.setItem('no_frameset', true);
+				location.reload();
+			});
+			else viewport.unhide();
+		});
+	}
+
+	#start() {
+		let startFu;
+		if (this.#capturing) {
+			startFu = Meeko.framer.start({ contentDocument: capture.getDocument() });
+		} else {
+			startFu = Meeko.framer.start({ contentDocument: this.#cloneDocument() });
+		}
+		startFu.then(() => viewport.unhide(), (error) => {
+			viewport.unhide();
+			throw error;
+		});
+	}
+
+	#cloneDocument() {
+		return new Promise((resolve) => {
+			let dstDoc = document.cloneNode(true);
+			let dstHead = dstDoc.head;
 			dstHead.replaceChildren();
-			findNextMatchingSibling(selfMarker, function(srcNode) {
-				var node = dstDoc.importNode(srcNode, true);
-				switch (getTagName(srcNode)) {
-				case '':
+			findNextMatchingSibling(selfMarker, (srcNode) => {
+				let node = dstDoc.importNode(srcNode, true);
+				switch (srcNode.localName) {
+				case null:
+				case undefined:
 					break;
 				case 'script':
 					if (!srcNode.type || /^text\/javascript$/i.test(srcNode.type)) break;
-					// else fall-thru
+					// fall-thru
 				default:
-					srcNode.parentNode.removeChild(srcNode);
+					srcNode.remove();
 					break;
 				}
 				dstHead.append(node);
 			});
 			document.body.replaceChildren();
 			resolve(dstDoc);
-		}) 
-	});
-	startFu.then(() => viewport.unhide(), function(error) {
-		viewport.unhide();
-		throw error;
-	});
-}
-
-function resolveScript(script) {
-	switch (typeof script) {
-	case "string": return resolveURL(script, urlParams);
-	case "function": return script;
-	default: return function() { /* dummy */ };
+		});
 	}
 }
 
-var main_script = bootOptions['main_script'];
-if (typeof main_script !== 'string') throw 'HyperFrameset script URL is not configured';
-main_script = bootOptions['main_script'] = resolveURL(main_script, urlParams);
+new Launcher(bootOptions).launch();
 
-var config_script = bootOptions['config_script'];
-if (config_script instanceof Array) forEach(config_script, function(script, i, list) {
-	list[i] = resolveScript(script);
-});
-else {
-	config_script = [ resolveScript(config_script) ];
-	bootOptions['config_script'] = config_script;
-}
-
-var initSequence = [].concat(
-	main_script,
-	config,
-	config_script
-);
-
-function init(callback) {
-	taskQueue.queue(initSequence, callback, function(err) {
-		setTimeout(function() { throw err; });
-		if (capturing) domReady(function() { // TODO would it be better to do this with document.write()?
-			if (sessionOptions.getItem('no_frameset') === false) return; // ignore failure if `no_frameset` is *explicitly* `false` in sessionOptions
-			sessionOptions.setItem('no_frameset', true);
-			location.reload();
-		});
-		else viewport.unhide();
-	});
-}
-
-if (capturing) { // wait for DOMReady then do init and start
-	domReady(function() {
-		if (window.stop) window.stop();
-		setTimeout(function() {
-			init(start);
-		});
-	});
-}
-else setTimeout(function() { // init immediately but wait for DOMReady before start
-	init(function() {
-		domReady(start);
-	});
-});
-
-var startup_timeout = bootOptions["startup_timeout"];
-if (startup_timeout > 0) {
-	setTimeout(function() {
-		taskQueue.abort(); // if the queue is not empty this will trigger its error callback		
-	}, startup_timeout);
-}
-
-}).call(this);
+}).call();
