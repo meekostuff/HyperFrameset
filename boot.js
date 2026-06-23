@@ -236,123 +236,52 @@ var domReady = (fn) => domReadyPromise.then(() => setTimeout(fn));
  ### async functions
  */
 
-var taskQueue = (function() {
-
+/*
+ * NOTE historically this checked for script.onload and script.async support. Both are universal on modern browsers.
 var testScript = document.createElement('script');
 var supportsOnLoad = (testScript.setAttribute('onload', ';'), typeof testScript.onload === 'function');
 var supportsSync = (testScript.async === true);
-
 if (!supportsOnLoad) throw "script.onload not supported in this browser";
+*/
+class TaskQueue {
+	#controller = new AbortController();
 
-function prepareScript(url, onload, onerror) { // create script (and insert if supportsSync)
-	var script = document.createElement('script');
-	script.onerror = onError;
-	script.onload = onLoad;
-	if (/\.mjs$/i.test(url)) script.type = 'module'; // FIXME find a better way to detect js module URLs.
-	script.src = url;
-	if (supportsSync) {
+	#loadScript(url) {
+		let script = document.createElement('script');
+		if (/\.mjs$/i.test(url)) script.type = 'module';
 		script.async = false;
+		script.src = url;
+		let promise = new Promise((resolve, reject) => {
+			script.onload = () => { script.onload = script.onerror = null; resolve(); };
+			script.onerror = () => { script.onload = script.onerror = null; reject(Error('Failed to load ' + url)); };
+		});
 		document.head.append(script);
+		return promise;
 	}
-	return script;
 
-	// The following are hoisted
-	function onLoad() {
-		script.onerror = null;
-		script.onload = null;
-		onload();
-	}
-	
-	function onError(errEvent) { 
-		script.onerror = null;
-		script.onload = null;
-		onerror(Error('An error occured while loading ' + script.src));
-	}	
-}
-
-function enableScript(script) { // insert script if not already done, i.e. !supportsSync
-	// TODO assert (!!script.parentNode === supportsSync)
-	if (supportsSync) return;
-	document.head.append(script);
-}
-
-function disableScript(script) {
-	if (!script.parentNode) return;
-	script.parentNode.removeChild(script);
-}
-
-var list = [];
-var oncomplete, onerror;
-var aborted = false;
-
-function queue(fnList, callback, errCallback) {
-	if (aborted) {
-		setTimeout(errCallback);
-		return;
-	}
-	oncomplete = callback;
-	onerror = errCallback;
-	forEach(fnList, function(fn) {
-		switch(typeof fn) {
-		case "string":
-			list.push(prepareScript(fn, queueback, errorback));
-			break;
-		case "function":
-			list.push(fn);
-			break;
-		default: // TODO
-			break;
-		}
-	});
-	queueback();
-}
-
-function abort() {
-	if (aborted) return;
-	if (list.length <= 0) return;
-	aborted = true;
-	errorback(Error('Startup aborted'));
-}
-
-function errorback(err) {
-	var fn;
-	while (fn = list.shift()) {
-		if (typeof fn == 'function') continue;
-		// NOTE the only other option is a prepared script
-		disableScript(fn);
-	}
-	
-	if (onerror) try { onerror(err); } catch (oops) { }
-	else setTimeout(function() { throw err; });
-
-	if (!aborted) abort();
-}
-
-function queueback() {
-	var fn;
-	while (list.length) {
-		fn = list.shift();
-		if (typeof fn == "function") {
-			try { fn(); continue; }
-			catch(err) {
-				errorback(err);
-				return;
+	async queue(fnList, callback, errCallback) {
+		try {
+			// Prepare all scripts upfront (parallel download, sequential execution)
+			let steps = fnList.map(fn =>
+				typeof fn === 'string' ? { run: null, loaded: this.#loadScript(fn) } : { run: fn, loaded: null }
+			);
+			for (let step of steps) {
+				if (this.#controller.signal.aborted) throw Error('Startup aborted');
+				if (step.loaded) await step.loaded;
+				else step.run();
 			}
-		}
-		else { // NOTE the only other option is a prepared script
-			setTimeout(function() { enableScript(fn); });
-			return;
+			callback();
+		} catch (err) {
+			errCallback(err);
 		}
 	}
-	if (!aborted && oncomplete) oncomplete();
+
+	abort() {
+		this.#controller.abort();
+	}
 }
 
-return {
-	queue: queue,
-	abort: abort
-}
-
-})();
+var taskQueue = new TaskQueue();
 
 /*
  ### Viewport hide / unhide
