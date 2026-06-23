@@ -15,7 +15,6 @@ Meeko.options = { // these are the default values
 	"no_style": false, // a demo option. `no_frameset` plus remove all stylesheets. 
 	"file_access_from_files": false, // whether to support file: URLs when possible
 	"capturing": true, // false, "auto", true, "strict"
-	"log_level": "warn", // debug, info, warn, error, none
 	"hidden_timeout": 3000,
 	"startup_timeout": 10000, // abort if startup takes longer than this
 	"polling_interval": 50,

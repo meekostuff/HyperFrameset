@@ -11,7 +11,6 @@ var defaults = { // NOTE defaults also define the type of the associated config 
 	"no_style": false,
 	"file_access_from_files": false,
 	"capturing": true,
-	"log_level": "warn",
 	"hidden_timeout": 3000,
 	"startup_timeout": 10000, // abort if startup takes longer than this
 	"polling_interval": 1000/60,
@@ -23,95 +22,45 @@ var defaults = { // NOTE defaults also define the type of the associated config 
 	"config_script": '{bootscriptdir}config.js'
 }
 
-var SELF_REL = 'self'; // TODO DRY with libHyperFrameset.js
-var FRAMESET_REL = 'frameset'; // ditto
-
 var window = this;
 var document = window.document;
 
 /*
- ### console is required
- */
-var console = window.console;
-if (!console || !console.log) return; // TODO should this throw
-if (!(console.info && console.warn && console.error)) {
-	console.log('Interception aborting: depends on console.warn');
+	HyperFrameset requires support for many built-in browser features.
+	Ideally we would test directly for them all up-front,
+	but many of them can be assumed based on presence of newer DOM APIs.
+
+	The newest features used are:
+		- WeakRef (Chrome 84, Safari 14.1, Firefox 90 — 2020/2021)
+		- Private class fields (#) (Chrome 74, Safari 14.1, Firefox 90)
+		- Optional chaining (?.) and nullish coalescing (??)
+		- history.pushState
+		- MutationObserver
+		- XMLHttpRequest
+		- Promises, globalThis, composedPath, ES modules
+
+	WeakRef is the most recent, so testing for it implies all others.
+	We also explicitly check history.pushState, MutationObserver, and
+	XMLHttpRequest since they are architecturally central to HyperFrameset.
+	XMLHttpRequest is used in preference to fetch for responseType='document'.
+*/
+
+if (!(window.WeakRef && window.MutationObserver && window.XMLHttpRequest && history.pushState)) {
+	console.log('HyperFrameset depends on native browser features including WeakRef, MutationObserver, XMLHttpRequest, history.pushState');
 	return;
 }
+
+var SELF_REL = 'self'; // TODO DRY with libHyperFrameset.js
+var FRAMESET_REL = 'frameset'; // ditto
 
 var vendorPrefix = "Meeko";
 
 var Meeko = window.Meeko || (window.Meeko = {});
 
-/* 
-	HyperFrameset requires support for many DOM APIs. 
-	Ideally we would test directly for them all up-front, 
-	but many of them can be assumed based on presence of newer DOM APIs.
-	Conveniently, window.requestAnimationFrame (including prefixed versions)
-	is a good proxy for many of the other features, 
-	even if not technically required. See 
-		http://caniuse.com/#feat=requestanimationframe
-
-	Some of the required features are:
-		- native XMLHttpRequest
-		- history.pushState
-		- inert staging documents (created by XMLHttpRequest, DOMParser, etc)
-			We don't want <img> and <script> in staging documents to download 
-			or run when they may be removed or changed before entering the view
-		- MutationObservers
-		- sessionStorage for saving state during reload
-		- document.readyState for determining whether all landing page content
-			is available.
-
-	These features rule out browsers older than IE11, Safari6.
-	This allows us to assume the presence of features such as:
-		- Node.addEventListener
-		- <script>.onload
-		- Object.create, etc
-
-	TODO up-front feature testing to prevent boot on unsupportable platorms
-	e.g. where script.onload can't be used or faked
-*/
-
-/*
-	STAGING_DOCUMENT_IS_INERT indicates that resource URLs - like img@src -
-	WILL NOT start downloading when the document they are in is parsed.
-	If this is false then the `no_frameset` option applies.
-*/
-
-/* 
-// NOTE requestAnimationFrame is a good proxy for this, ruling out Opera12, IE9 
-var STAGING_DOCUMENT_IS_INERT = (function() {
-
-	try { var doc = document.implementation.createHTMLDocument(''); }
-	catch (error) { return false; } // IE <= 8
-	if (doc.URL !== document.URL) return true; // FF, Webkit, Chrome
-
-	// Use a data-uri image to see if browser will try to fetch.
-	// The smallest such image might be a 1x1 white gif,
-	// see http://proger.i-forge.net/The_smallest_transparent_pixel/eBQ
-	var img = doc.createElement('img');
-	img.src = 'data:image/gif;base64,R0lGODlhAQABAIAAAP///wAAACwAAAAAAQABAAACAkQBADs=';
-	doc.body.appendChild(img);
-
-	// Sometimes the img check isn't ready on IE9, so one intermediate check
-	var script = doc.createElement('script');
-	if (!('readyState' in script)) script.onload = function() { this.readyState = 'complte'; };
-	script.text = ';';
-	doc.body.appendChild(script);
-	if (script.readyState === 'complete') return false; // IE9
-
-	if (img.width) return false; // IE9, Opera-12 will have width == 1 / height == 1 
-
-	return true; // Presumably IE10,11 or Edge
-})();
-*/
-
 /*
  ### JS utilities
  */
-var lc = function(str) { return str ? str.toLowerCase() : ''; }
-function some(a, fn, context) { 
+function some(a, fn, context) {
 	for (var n=a.length, i=0; i<n; i++) if (fn.call(context, a[i], i, a)) return true;
 	return false;
 }
@@ -123,43 +72,6 @@ var parseJSON = function(text) { // NOTE this allows code to run. This is a feat
 	try { return ( Function('return ( ' + text + ' );') )(); }
 	catch (error) { return; }
 }
-
-/*
- ### extend console
-	+ `console.logLevel` allows logging to be switched off
-	
-	NOTE:
-	+ this assumes log, info, warn, error are defined
-*/
-
-if (!console.debug) console.debug = console.log;
-var logLevels = words('debug info warn error none'); // accept "all" as alias for "debug"
-forEach(logLevels, function(level) {
-	var _level = '_' + level;
-	if (!console[level]) return;
-	console[_level] = console[level];
-});
-
-var currentLogLevel = 'debug';
-
-Object.defineProperty(console, 'logLevel', {
-	get: function() { return currentLogLevel; },
-	set: function(newLevel) {
-		newLevel = lc(newLevel);
-		if (newLevel === 'all') newLevel = 'debug'
-		if (logLevels.indexOf(newLevel) < 0) return; // WARN??
-		if (newLevel === currentLogLevel) return;
-		currentLogLevel = newLevel;
-		var found = false;
-		forEach(logLevels, function(level) {
-			var _level = '_' + level;
-			if (level === newLevel) found = true;
-			if (!console[_level] || !found) console[level] = function() {};
-			else console[level] = console[_level];
-		});
-		console.warn('Changed logLevel: ' + newLevel);
-	}
-});
 
 /*
  ### Get options
@@ -269,8 +181,6 @@ function isSet(option) {
 
 // Don't even load HyperFrameset if "no_boot" is one of the search options (or true in Meeko.options)
 if (isSet('no_boot')) return;
-
-if (bootOptions['log_level']) console.logLevel = bootOptions["log_level"];
 
 /*
  ### DOM utilities
@@ -709,11 +619,6 @@ if (isSet('no_style')) {
 
 var no_frameset = isSet('no_frameset');
 if (no_frameset) return; // TODO console.info()
-if (!(history.pushState && window.XMLHttpRequest && 'readyState' in document &&
-	window.requestAnimationFrame && window.MutationObserver)) {
-	console.debug('HyperFrameset depends on native XMLHttpRequest, history.pushState, and MutationObserver');
-	return;
-}
 if (location.protocol === 'file:') {
 	if (!isSet('file_access_from_files')) {
 		console.debug('HyperFrameset is not recommended for `file:` URLs. Aborting.');
