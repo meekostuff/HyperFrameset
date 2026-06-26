@@ -6,11 +6,10 @@
 import * as _ from './stuff.mjs';
 import * as Microdata from './Microdata.mjs';
 
-let document = window.document;
-
-
 /**
  * @implements {Decoder}
+ * @fixme evaluate() ignores variables — $variable references won't resolve
+ * @fixme matches() is not implemented
  */
 class MicrodataDecoder {
 
@@ -22,6 +21,7 @@ init(node) {
 }
 
 evaluate(query, context, variables, wantArray) {
+	// FIXME variables are ignored — $variable references won't resolve
 	if (!context) context = this.rootNode;
 
 	query = query.trim();
@@ -31,6 +31,7 @@ evaluate(query, context, variables, wantArray) {
 
 	if (query === '.') return (wantArray) ? [ context ] : context;
 
+	// Step 1: Parse optional schema prefix, e.g. "^[Person].name" or "[Product].price"
 	let m = query.match(/^(?:(\^)?\[([^\]]*)\]\.)/);
 	if (m && m.length) {
 		query = query.substr(m[0].length);
@@ -39,6 +40,7 @@ evaluate(query, context, variables, wantArray) {
 	}
 	pathParts = _.words(query.trim());
 	
+	// Step 2: Find starting items (by schema type or use context directly)
 	let nodes;
 	if (baseSchema) {
 		if (startAtRoot) context = this.view;
@@ -46,6 +48,7 @@ evaluate(query, context, variables, wantArray) {
 	}
 	else nodes = [ context ];
 
+	// Step 3: Walk the property path, resolving named properties at each level
 	let resultList = nodes;
 	_.forEach(pathParts, (relPath, i) => {
 		let parents = resultList;
@@ -59,7 +62,7 @@ evaluate(query, context, variables, wantArray) {
 		});
 	});
 
-	// now convert elements to values
+	// Step 4: Convert leaf elements to their microdata values (text, URL, etc.)
 	resultList = Array.from(resultList, (el) => {
 		let props = Microdata.getProperties(el);
 		if (props) return el;
@@ -69,6 +72,11 @@ evaluate(query, context, variables, wantArray) {
 	if (wantArray) return resultList;
 
 	return resultList[0];
+}
+
+matches(context, query) {
+	console.warn('MicrodataDecoder.matches() is not implemented');
+	return false;
 }
 
 }

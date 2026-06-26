@@ -10,6 +10,8 @@ import * as _ from './stuff.mjs';
 
 /**
  * @implements {Decoder}
+ * @fixme evaluate() ignores variables — $variable references won't resolve
+ * @fixme matches() is not implemented
  */
 class JSONDecoder {
 
@@ -21,6 +23,7 @@ init(object) {
 }
 
 evaluate(query, context, variables, wantArray) {
+	// FIXME variables are ignored — $variable references won't resolve
 	if (!context) context = this.object;
 
 	query = query.trim();
@@ -52,6 +55,11 @@ evaluate(query, context, variables, wantArray) {
 
 	let value = resultList[0];
 	return value;
+}
+
+matches(context, query) {
+	console.warn('JSONDecoder.matches() is not implemented');
+	return false;
 }
 
 }

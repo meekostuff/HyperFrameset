@@ -4,8 +4,6 @@
  * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
  */
 
-const document = window.document;
-
 const nodeData = new WeakMap();
 
 function intersects(a1, a2) {

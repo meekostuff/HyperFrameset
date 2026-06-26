@@ -11,9 +11,10 @@ import CustomNamespace from './CustomNamespace.mjs';
 
 let document = window.document;
 
-// NOTE textAttr & htmlAttr used in HazardProcessor & CSSDecoder
-const textAttr = '_text';
-const htmlAttr = '_html';
+// Suffixes for expression attribute names (e.g. expr:_text, expr:_html)
+// NOTE same values as TEXT_ATTR/HTML_ATTR in CSSDecoder but unrelated
+const TEXT_SUFFIX = '_text';
+const HTML_SUFFIX = '_html';
 
 const PIPE_OPERATOR = '//>';
 
@@ -161,13 +162,13 @@ loadTemplate(template) {
 	let exprPrefix = namespaces.lookupPrefix(HAZARD_EXPRESSION_URN);
 	let mexprPrefix = namespaces.lookupPrefix(HAZARD_MEXPRESSION_URN);
 
-	let exprHtmlAttr = exprPrefix + htmlAttr; // NOTE this is mapped to haz:eval
+	let exprHtmlAttr = exprPrefix + HTML_SUFFIX; // NOTE this is mapped to haz:eval
 	let hazEvalTag = `${hazPrefix}eval`;
-	let mexprHtmlAttr = mexprPrefix + htmlAttr; // NOTE this is invalid
+	let mexprHtmlAttr = mexprPrefix + HTML_SUFFIX; // NOTE this is invalid
 
-	let mexprTextAttr = mexprPrefix + textAttr; // NOTE this is mapped to haz:mtext
+	let mexprTextAttr = mexprPrefix + TEXT_SUFFIX; // NOTE this is mapped to haz:mtext
 	let hazMTextTag = `${hazPrefix}mtext`;
-	let exprTextAttr = exprPrefix + textAttr; // NOTE this is mapped to haz:text
+	let exprTextAttr = exprPrefix + TEXT_SUFFIX; // NOTE this is mapped to haz:text
 	let hazTextTag = `${hazPrefix}text`;
 
 	// FIXME extract exprToHazPriority from hazLang
@@ -359,6 +360,7 @@ _transform(provider, details, frag) {
 	processor.localParamsStack = [];
 	processor.localVarsStack = [];
 
+	/** @type {DecoderVariables} */
 	processor.variables = {
 		has: (key) => {
 			let result =
@@ -370,7 +372,7 @@ _transform(provider, details, frag) {
 			return result;
 		},
 		// NOTE returns the stored value for the first scope that contains the key,
-		// even if that value is falsy (0, "", false). Only returns undefined if no scope has the key.
+		//   even if that value is falsy (0, "", false). Only returns undefined if no scope has the key.
 		get: (key) => {
 			if (key in processor.localVars) return processor.localVars[key];
 			if (key in processor.localParams) return processor.localParams[key];

@@ -6,10 +6,10 @@
 import * as _ from './stuff.mjs';
 import * as DOM from './DOM.mjs'
 
-// FIXME textAttr & htmlAttr used in HazardProcessor & CSSDecoder
-const textAttr = '_text';
-const htmlAttr = '_html';
-// TODO what about tagnameAttr, namespaceAttr
+// Pseudo-attribute names for extracting text content or child nodes from elements
+// NOTE same values as TEXT_SUFFIX/HTML_SUFFIX in HazardProcessor but unrelated
+const TEXT_ATTR = '_text';
+const HTML_ATTR = '_html';
 
 const CSS_CONTEXT_VARIABLE = '_';
 
@@ -24,8 +24,9 @@ init(node) {
 	this.srcNode = node;
 }
 
-// TODO should matches() support Hazard variables
-matches(element, query) { // FIXME refactor common-code in matches / evaluate
+// FIXME refactor common-code in matches / evaluate
+// TODO should matches() support Hazard variables?
+matches(element, query) {
 	// Parse "selector { @attr }" — captures selector and optional attribute accessor
 	let queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
 	let selector = queryParts[1];
@@ -41,28 +42,10 @@ matches(element, query) { // FIXME refactor common-code in matches / evaluate
 	}
 
 	return result;
-
-	function getAttr(node, attr) {
-		switch(attr) {
-		case null: case undefined: case '': return node;
-		case textAttr: 
-			return node.textContent;
-		case htmlAttr:
-			let frag = doc.createDocumentFragment();
-			_.forEach(node.childNodes, (child) => { 
-				frag.appendChild(doc.importNode(child, true)); // TODO does `child` really need to be cloned??
-			});
-			return frag;
-		default: 
-			return node.getAttribute(attr);
-		}
-	}
-
 }
 
 evaluate(query, context, variables, wantArray) {
 	if (!context) context = this.srcNode;
-	let doc = context.nodeType === 9 ? context : context.ownerDocument; // FIXME which document??
 	// Parse "selector { @attr }" — captures selector and optional attribute accessor
 	let queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
 	let selector = queryParts[1];
@@ -81,40 +64,64 @@ evaluate(query, context, variables, wantArray) {
 	}
 
 	return result;
+}
 
-	function getAttr(node, attr) {
-		switch(attr) {
-		case null: case undefined: case '': return node;
-		case textAttr: 
-			return node.textContent;
-		case htmlAttr:
-			let frag = doc.createDocumentFragment();
-			_.forEach(node.childNodes, (child) => { 
-				frag.appendChild(doc.importNode(child, true)); // TODO does `child` really need to be cloned??
-			});
-			return frag;
-		default: 
-			return node.getAttribute(attr);
-		}
+}
+
+/**
+ * Get an attribute value or content from a node.
+ * @param {Node} node - The source node.
+ * @param {string} attr - Attribute name, or '_text' for textContent, or '_html' for child nodes as fragment.
+ * @returns {Node|string|DocumentFragment} The attribute value, text content, or cloned children.
+ */
+function getAttr(node, attr) {
+	switch(attr) {
+	case null: case undefined: case '': return node;
+	case TEXT_ATTR:
+		return node.textContent;
+	case HTML_ATTR:
+		let doc = node.ownerDocument;
+		let frag = doc.createDocumentFragment();
+		_.forEach(node.childNodes, (child) => {
+			frag.appendChild(doc.importNode(child, true)); // TODO does `child` really need to be cloned??
+		});
+		return frag;
+	default:
+		return node.getAttribute(attr);
 	}
-
 }
 
-}
-
+/**
+ * Test if an element matches a CSS selector group.
+ * @param {Element} element - Element to test.
+ * @param {string} selectorGroup - CSS selector group.
+ * @returns {boolean|undefined} True if matches, undefined if selector is empty.
+ */
 function matches(element, selectorGroup) {
 	if (selectorGroup.trim() === '') return;
 	return DOM.matches(element, selectorGroup);
 }
 
+/**
+ * Find elements matching a CSS selector group, with $variable context support.
+ * @param {string} selectorGroup - CSS selector group, may contain $variable references.
+ * @param {Node} context - Context node for relative selectors.
+ * @param {DecoderVariables} variables - Variable bindings for $variable resolution.
+ * @param {boolean} wantArray - If true, return all matches; if false, return first match only.
+ * @returns {Node|Node[]|null} Matched node(s), or null/[] if no match.
+ */
 function find(selectorGroup, context, variables, wantArray) { // FIXME currently only implements `context` expansion
 	selectorGroup = selectorGroup.trim();
 	if (selectorGroup === '') return wantArray ? [ context ] : context;
 	let nullResult = wantArray ? [] : null;
+
+	// Step 1: Split selector group into individual selectors
 	// Split selector group on commas, but not commas inside () or []
 	let selectors = selectorGroup.split(/,(?![^\(]*\)|[^\[]*\])/);
 	selectors = Array.from(selectors, (s) => { return s.trim(); });
 
+	// Step 2: Validate $variable usage across selectors
+	// All selectors in a group must share the same context variable (or have none)
 	let invalidVarUse = false;
 	let contextVar;
 	_.forEach(selectors, (s, i) => {
@@ -152,6 +159,8 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 		return nullResult;
 	}
 
+	// Step 3: Resolve $variable context
+	// If a context variable is used, look it up and replace the query context
 	if (contextVar && contextVar !== CSS_CONTEXT_VARIABLE) {
 		if (!variables.has(contextVar)) {
 			console.debug(`Context variable $${contextVar} not defined for ${selectorGroup}`);
@@ -169,6 +178,7 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 		}
 	}
 
+	// Step 4: Filter out unsupported combinator selectors
 	let isRoot = false;
 	if (context.nodeType === 9 || context.nodeType === 11) isRoot = true;
 
@@ -184,6 +194,7 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 
 	if (selectors.length <= 0) return nullResult;
 
+	// Step 5: Rewrite selectors to be scoped relative to context
 	selectors = Array.from(selectors, (s) => {
 			if (isRoot) return s;
 			let prefix = ':scope';
@@ -192,6 +203,7 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 				prefix + ' ' + s;
 		});
 	
+	// Step 6: Execute the final query
 	let finalSelector = selectors.join(', ');
 
 	if (wantArray) {
