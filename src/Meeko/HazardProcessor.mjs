@@ -581,6 +581,7 @@ transformHazardTree(el, context, frag) {
 
 	switch (def.tag) { // TODO refactor these cases into individual methods, e.g transformHazardLetTree()
 	default: // for unknown (or unhandled) haz: elements just process the children
+		console.warn(`Unknown hazard element <${el.localName}> — processing children only`);
 		return processor.transformChildNodes(el, context, frag); 
 		
 	case 'template':
@@ -596,7 +597,7 @@ transformHazardTree(el, context, frag) {
 			}
 			catch (err) {
 				window.reportError(err);
-				console.warn('Error evaluating <haz:var name="' + name + '" select="' + selector + '">. Assumed empty.');
+				console.warn(`Error evaluating <haz:var name="${name}" select="${selector}">. Assumed empty.`);
 				value = undefined;
 			}
 		}
@@ -614,7 +615,7 @@ transformHazardTree(el, context, frag) {
 			}
 			catch (err) {
 				window.reportError(err);
-				console.warn('Error evaluating <haz:param name="' + name + '" select="' + selector + '">. Assumed empty.');
+				console.warn(`Error evaluating <haz:param name="${name}" select="${selector}">. Assumed empty.`);
 				value = undefined;
 			}
 		}
@@ -628,7 +629,7 @@ transformHazardTree(el, context, frag) {
 		name = el.getAttribute('name');
 		template = processor.getNamedTemplate(name);
 		if (!template) {
-			console.warn('Hazard could not find template name=' + name);
+			console.warn(`Hazard could not find template name="${name}"`);
 			return frag;
 		}
 	
@@ -636,10 +637,10 @@ transformHazardTree(el, context, frag) {
 
 	case 'apply': // WARN only applies to DOM-based provider
 		template = processor.getMatchingTemplate(context);
-		let promise = Thenfu.asap(el);
 		if (template) {
 			return processor.transformTemplate(template, context, null, frag);
 		}
+		console.warn('<haz:apply> found no matching template:', context);
 		node = context.cloneNode(false);
 		frag.appendChild(node);
 		return Thenfu.reduce(null, context.childNodes, (dummy, child) => {
@@ -663,7 +664,10 @@ transformHazardTree(el, context, frag) {
 		mexpr = el.getAttribute('name');
 		name = evalMExpression(mexpr, processor.provider, context, processor.variables);
 		type = typeof value;
-		if (type !== 'string') return frag;
+		if (type !== 'string') {
+			console.debug(`<haz:element name="${mexpr}"> did not resolve to a string — skipped`);
+			return frag;
+		}
 
 		node = doc.createElement(name);
 		frag.appendChild(node);
@@ -675,7 +679,10 @@ transformHazardTree(el, context, frag) {
 		mexpr = el.getAttribute('name');
 		name = evalMExpression(mexpr, processor.provider, context, processor.variables);
 		type = typeof value;
-		if (type !== 'string') return frag;
+		if (type !== 'string') {
+			console.debug(`<haz:attr name="${mexpr}"> did not resolve to a string — skipped`);
+			return frag;
+		}
 
 		node = doc.createDocumentFragment();
 		return processor.transformChildNodes(el, context, node)
@@ -691,7 +698,10 @@ transformHazardTree(el, context, frag) {
 		selector = el.getAttribute('select');
 		value = evalExpression(selector, processor.provider, context, processor.variables, 'node');
 		type = typeof value;
-		if (type === 'undefined' || type === 'boolean' || value == null) return frag;
+		if (type === 'undefined' || type === 'boolean' || value == null) {
+			console.debug(`<haz:eval select="${selector}"> resolved to nothing`);
+			return frag;
+		}
 		if (!value.nodeType) { // TODO test performance
 			value = htmlToFragment(value, doc);
 		}
@@ -704,7 +714,11 @@ transformHazardTree(el, context, frag) {
 		mexpr = el.getAttribute('select');
 		value = evalMExpression(mexpr, processor.provider, context, processor.variables);
 		// FIXME `value` should always already be "text"
-		if (type === 'undefined' || type === 'boolean' || value == null) return frag;
+		if (type === 'undefined' || type === 'boolean' || value == null) {
+			console.debug(`<haz:mtext select="${mexpr}"> resolved to nothing`);
+			return frag;
+		}
+
 		if (!value.nodeType) {
 			value = doc.createTextNode(value);
 		}
@@ -718,7 +732,10 @@ transformHazardTree(el, context, frag) {
 		value = evalExpression(expr, processor.provider, context, processor.variables, 'text');
 		// FIXME `value` should always already be "text"
 		type = typeof value;
-		if (type === 'undefined' || type === 'boolean' || value == null) return frag;
+		if (type === 'undefined' || type === 'boolean' || value == null) {
+			console.debug(`<haz:text select="${expr}"> resolved to nothing`);
+			return frag;
+		}
 		if (!value.nodeType) {
 			value = doc.createTextNode(value);
 		}
@@ -736,7 +753,7 @@ transformHazardTree(el, context, frag) {
 		}
 		catch (err) {
 			window.reportError(err);
-			console.warn('Error evaluating <haz:if test="' + testVal + '">. Assumed false.');
+			console.warn(`Error evaluating <haz:if test="${testVal}">. Assumed false.`);
 			pass = false;
 		}
 		if (invertTest) pass = !pass;
@@ -764,7 +781,10 @@ transformHazardTree(el, context, frag) {
 			return true;
 		});
 		if (!found) when = otherwise;
-		if (!when) return frag;
+		if (!when) {
+			console.debug('<haz:choose> had no matching <haz:when> and no <haz:otherwise>');
+			return frag;
+		}
 		return processor.transformChildNodes(when, context, frag); 
 
 	case 'one': // FIXME refactor common parts with `case 'each':`
@@ -776,11 +796,14 @@ transformHazardTree(el, context, frag) {
 		}
 		catch (err) {
 			window.reportError(err);
-			console.warn('Error evaluating <haz:one select="' + selector + '">. Assumed empty.');
+			console.warn(`Error evaluating <haz:one select="${selector}">. Assumed empty.`);
 			return frag;
 		}
 
-		if (!subContext) return frag;
+		if (!subContext) {
+			console.debug(`<haz:one select="${selector}"> resolved to nothing`);
+			return frag;
+		}
 		return processor.transformChildNodes(el, subContext, frag);
 
 
@@ -793,7 +816,7 @@ transformHazardTree(el, context, frag) {
 		}
 		catch (err) {
 			window.reportError(err);
-			console.warn('Error evaluating <haz:each select="' + selector + '">. Assumed empty.');
+			console.warn(`Error evaluating <haz:each select="${selector}">. Assumed empty.`);
 			return frag;
 		}
 
@@ -846,7 +869,7 @@ transformSingleElement(srcNode, context) {
 		}
 		catch (err) {
 			window.reportError(err);
-			console.warn('Error evaluating @' + desc.attrName + '="' + desc.expression + '". Assumed false.');
+			console.warn(`Error evaluating @${desc.attrName}="${desc.expression}". Assumed false.`);
 			value = false;
 		}
 		setAttribute(el, desc.attrName, value);
@@ -941,14 +964,14 @@ function interpretExpression(exprText) { // FIXME robustness
 		let text = filterSpec;
 		let m = text.match(/^([_a-zA-Z][_a-zA-Z0-9]*)\s*(:?)/);
 		if (!m) {
-			console.warn('Syntax Error in filter call: ' + filterSpec);
+			console.warn(`Syntax Error in filter call: ${filterSpec}`);
 			return false;
 		}
 		let filterName = m[1];
 		let hasParams = m[2];
 		text = text.substr(m[0].length);
 		if (!hasParams && /\S+/.test(text)) {
-			console.warn('Syntax Error in filter call: ' + filterSpec);
+			console.warn(`Syntax Error in filter call: ${filterSpec}`);
 			return false;
 		}
 
@@ -962,7 +985,7 @@ function interpretExpression(exprText) { // FIXME robustness
 			return true;
 		}
 		catch (err) {
-			console.warn('Syntax Error in filter call: ' + filterSpec);
+			console.warn(`Syntax Error in filter call: ${filterSpec}`);
 			return false;
 		}
 	});
@@ -1010,7 +1033,7 @@ function processExpression(expr, provider, context, variables, type) { // FIXME 
 		}
 		catch (err) {
 			window.reportError(err);
-			console.warn('Failure processing filter call: "' + filter.text + '" with input: "' + value + '"');
+			console.warn(`Failure processing filter call: "${filter.text}" with input: "${value}"`);
 			value = '';
 			return false;
 		}
