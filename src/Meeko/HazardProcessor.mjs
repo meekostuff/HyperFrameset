@@ -126,8 +126,7 @@ function htmlToFragment(html, doc) {
 	if (!doc) doc = document;
 	let div = doc.createElement('div');
 	div.innerHTML = html;
-	let result = childNodesToFragment(div);
-	return result;
+	return childNodesToFragment(div);
 }
 
 /**
@@ -144,6 +143,36 @@ constructor(options, namespaces) {
 		namespaces.add(exprDefaultNS);
 	if (!namespaces.lookupNamespace(HAZARD_MEXPRESSION_URN))
 		namespaces.add(mexprDefaultNS);
+	this.#init();
+}
+
+#hazPrefix;
+#exprPrefix;
+#mexprPrefix;
+#exprHtmlAttr;
+#mexprTextAttr;
+#exprTextAttr;
+#exprToHazPriority;
+#exprToHazMap;
+#mexprHtmlAttr;
+
+#init() {
+	let namespaces = this.namespaces;
+	this.#hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
+	this.#exprPrefix = namespaces.lookupPrefix(HAZARD_EXPRESSION_URN);
+	this.#mexprPrefix = namespaces.lookupPrefix(HAZARD_MEXPRESSION_URN);
+
+	this.#exprHtmlAttr = this.#exprPrefix + HTML_SUFFIX; // mapped to haz:eval
+	this.#mexprTextAttr = this.#mexprPrefix + TEXT_SUFFIX; // mapped to haz:mtext
+	this.#exprTextAttr = this.#exprPrefix + TEXT_SUFFIX; // mapped to haz:text
+	this.#mexprHtmlAttr = this.#mexprPrefix + HTML_SUFFIX; // invalid, warn if seen
+
+	// FIXME extract exprToHazPriority from hazLang
+	this.#exprToHazPriority = [ this.#exprHtmlAttr, this.#mexprTextAttr, this.#exprTextAttr ];
+	this.#exprToHazMap = {};
+	this.#exprToHazMap[this.#exprHtmlAttr] = `${this.#hazPrefix}eval`;
+	this.#exprToHazMap[this.#mexprTextAttr] = `${this.#hazPrefix}mtext`;
+	this.#exprToHazMap[this.#exprTextAttr] = `${this.#hazPrefix}text`;
 }
 
 /**
@@ -153,56 +182,34 @@ constructor(options, namespaces) {
  * @param {DocumentFragment} template - The template fragment to process.
  */
 loadTemplate(template) {
-	let processor = this;
-	processor.root = template; // FIXME assert template is Fragment
-	processor.templates = [];
-
-	let namespaces = processor.namespaces;
-	let hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
-	let exprPrefix = namespaces.lookupPrefix(HAZARD_EXPRESSION_URN);
-	let mexprPrefix = namespaces.lookupPrefix(HAZARD_MEXPRESSION_URN);
-
-	let exprHtmlAttr = exprPrefix + HTML_SUFFIX; // NOTE this is mapped to haz:eval
-	let hazEvalTag = `${hazPrefix}eval`;
-	let mexprHtmlAttr = mexprPrefix + HTML_SUFFIX; // NOTE this is invalid
-
-	let mexprTextAttr = mexprPrefix + TEXT_SUFFIX; // NOTE this is mapped to haz:mtext
-	let hazMTextTag = `${hazPrefix}mtext`;
-	let exprTextAttr = exprPrefix + TEXT_SUFFIX; // NOTE this is mapped to haz:text
-	let hazTextTag = `${hazPrefix}text`;
-
-	// FIXME extract exprToHazPriority from hazLang
-	let exprToHazPriority = [ exprHtmlAttr, mexprTextAttr, exprTextAttr ];
-	let exprToHazMap = {};
-	exprToHazMap[exprHtmlAttr] = hazEvalTag;
-	exprToHazMap[mexprTextAttr] = hazMTextTag;
-	exprToHazMap[exprTextAttr] = hazTextTag;
+	this.root = template; // FIXME assert template is Fragment
+	this.templates = [];
 
 	let doc = template.ownerDocument;
 
 	// Pass 1: Rewrite expression attributes (expr:_text, expr:_html, etc.) into hazard elements
 	walkTree(template, true, (el) => {
 		let tag = el.localName;
-		if (tag.indexOf(hazPrefix) === 0) return;
+		if (tag.indexOf(this.#hazPrefix) === 0) return;
 
 		// pre-process @expr:_html -> @haz:eval, etc
-		_.forEach(exprToHazPriority, (attr) => {
+		_.forEach(this.#exprToHazPriority, (attr) => {
 			if (!el.hasAttribute(attr)) return;
-			let tag = exprToHazMap[attr];
+			let tag = this.#exprToHazMap[attr];
 			let val = el.getAttribute(attr);
 			el.removeAttribute(attr);
 			el.setAttribute(tag, val);
 		});
 
-		if (el.hasAttribute(mexprHtmlAttr)) {
-			console.warn(`Removing unsupported @${mexprHtmlAttr}`);
-			el.removeAttribute(mexprHtmlAttr);
+		if (el.hasAttribute(this.#mexprHtmlAttr)) {
+			console.warn(`Removing unsupported @${this.#mexprHtmlAttr}`);
+			el.removeAttribute(this.#mexprHtmlAttr);
 		}
 
 		// promote applicable hazard attrs to elements
 		_.forEach(hazLang, (def) => {
 			if (!def.attrToElement) return;
-			let nsTag = hazPrefix + def.tag;
+			let nsTag = this.#hazPrefix + def.tag;
 			if (!el.hasAttribute(nsTag)) return;
 
 			// create <haz:element> ...
@@ -216,7 +223,7 @@ loadTemplate(template) {
 			// copy non-default hazard attrs
 			_.forEach(def.attrs, (attr, i) => {
 				if (i === 0) return; // the defaultAttr
-				let nsAttr = hazPrefix + attr;
+				let nsAttr = this.#hazPrefix + attr;
 				if (!el.hasAttribute(nsAttr)) return;
 				let value = el.getAttribute(nsAttr);
 				el.removeAttribute(nsAttr);
@@ -245,16 +252,16 @@ loadTemplate(template) {
 	// Pass 2: Mark named templates and imply <haz:otherwise> in <haz:choose> blocks
 	walkTree(template, true, (el) => {
 		let tag = el.localName;
-		if (tag === hazPrefix + 'template') this.#markTemplate(el);
-		if (tag === hazPrefix + 'choose') this.#implyOtherwise(el, hazPrefix);
+		if (tag === this.#hazPrefix + 'template') this.#markTemplate(el);
+		if (tag === this.#hazPrefix + 'choose') this.#implyOtherwise(el);
 	});
 
 	// Pass 3: Wrap loose content nodes in an implicit entry template
-	this.#implyEntryTemplate(template, hazPrefix);
+	this.#implyEntryTemplate(template);
 
 	// Pass 4: Extract hazardDetails (parsed directive info) for every element
 	walkTree(template, true, (el) => {
-		el.hazardDetails = getHazardDetails(el, processor.namespaces);
+		el.hazardDetails = this.#getHazardDetails(el);
 	});
 	
 }
@@ -271,13 +278,12 @@ loadTemplate(template) {
  * Wrap non-<haz:when> children of a <haz:choose> in an implied <haz:otherwise>.
  * NOTE this slurps *any* non-<haz:when>, including <haz:otherwise>
  * @param {Element} el - The <haz:choose> element.
- * @param {string} hazPrefix - Namespace prefix for hazard elements.
  */
-#implyOtherwise(el, hazPrefix) {
-	let otherwise = el.ownerDocument.createElement(hazPrefix + 'otherwise');
+#implyOtherwise(el) {
+	let otherwise = el.ownerDocument.createElement(this.#hazPrefix + 'otherwise');
 	_.forEach(Array.from(el.childNodes), (node) => {
 		let tag = node.localName;
-		if (tag === hazPrefix + 'when') return;
+		if (tag === this.#hazPrefix + 'when') return;
 		otherwise.appendChild(node);
 	});
 	el.appendChild(otherwise);
@@ -287,20 +293,19 @@ loadTemplate(template) {
  * Wrap loose content nodes (non-template, non-param) in an implicit entry template.
  * NOTE this slurps *any* non-<haz:template>
  * @param {Element|DocumentFragment} el - The root template container.
- * @param {string} hazPrefix - Namespace prefix for hazard elements.
  */
-#implyEntryTemplate(el, hazPrefix) {
+#implyEntryTemplate(el) {
 	let firstExplicitTemplate;
 	let contentNodes = _.filter(el.childNodes, (node) => {
 		if (node.nodeType === 3) return (/\S/).test(node.nodeValue);
 		if (node.nodeType !== 1) return false;
 		let tag = node.localName;
-		if (tag === hazPrefix + 'template') {
+		if (tag === this.#hazPrefix + 'template') {
 			if (!firstExplicitTemplate) firstExplicitTemplate = node;
 			return false;
 		}
-		if (tag === hazPrefix + 'let') return false;
-		if (tag === hazPrefix + 'param') return false;
+		if (tag === this.#hazPrefix + 'let') return false;
+		if (tag === this.#hazPrefix + 'param') return false;
 		return true;
 	});
 
@@ -308,7 +313,7 @@ loadTemplate(template) {
 		if (firstExplicitTemplate) return;
 		console.warn('This Hazard Template cannot generate any content.');
 	}
-	let entryTemplate = el.ownerDocument.createElement(hazPrefix + 'template');
+	let entryTemplate = el.ownerDocument.createElement(this.#hazPrefix + 'template');
 	_.forEach(contentNodes, (node) => {
 		entryTemplate.appendChild(node);
 	});
@@ -320,6 +325,67 @@ loadTemplate(template) {
 /** @returns {Element} The first (entry) template element. */
 getEntryTemplate() {
 	return this.templates[0];
+}
+
+/**
+ * Extract hazard directive details from an element (tag definition and expression attributes).
+ * @param {Element} el - Element to inspect.
+ * @returns {Object} Details with .definition and .exprAttributes.
+ */
+#getHazardDetails(el) {
+	console.assert(el.nodeType === 1);
+	let details = {};
+	let tag = el.localName;
+	let isHazElement = tag.indexOf(this.#hazPrefix) === 0;
+
+	if (isHazElement) { // FIXME preprocess attrs of <haz:*>
+		tag = tag.substr(this.#hazPrefix.length);
+		let def = hazLangLookup[tag];
+		details.definition = def || { tag: '' };
+	}
+
+	details.exprAttributes = this.#getExprAttributes(el);
+	return details;
+}
+
+/**
+ * Extract and remove expression/mexpression attributes from an element.
+ * @param {Element} el - Element to extract from.
+ * @returns {Array<Object>} Array of expression attribute descriptors.
+ */
+#getExprAttributes(el) {
+	let attrs = [];
+	let namespaces = this.namespaces;
+	let exprNS = namespaces.lookupNamespace(HAZARD_EXPRESSION_URN);
+	let mexprNS = namespaces.lookupNamespace(HAZARD_MEXPRESSION_URN);
+	_.forEach(Array.from(el.attributes), (attr) => {
+		let ns = _.find([ exprNS, mexprNS ], (ns) => {
+			return (attr.name.indexOf(ns.prefix) === 0);
+		});
+		if (!ns) return;
+		let prefix = ns.prefix;
+		let namespaceURI = ns.urn;
+		let attrName = attr.name.substr(prefix.length);
+		el.removeAttribute(attr.name);
+		let desc = {
+			namespaceURI: namespaceURI,
+			prefix: prefix,
+			attrName: attrName,
+			type: 'text'
+		}
+		switch (namespaceURI) {
+		case HAZARD_EXPRESSION_URN:
+			desc.expression = interpretExpression(attr.value);
+			break;
+		case HAZARD_MEXPRESSION_URN:
+			desc.mexpression = interpretMExpression(attr.value);
+			break;
+		default: // TODO an error?
+			break;
+		}
+		attrs.push(desc);
+	});
+	return attrs;
 }
 
 /**
@@ -791,69 +857,7 @@ transformSingleElement(srcNode, context) {
 
 }
 
-/**
- * Extract hazard directive details from an element (tag definition and expression attributes).
- * @param {Element} el - Element to inspect.
- * @param {NamespaceCollection} namespaces - Namespace definitions.
- * @returns {Object} Details with .definition and .exprAttributes.
- */
-function getHazardDetails(el, namespaces) {
-	console.assert(el.nodeType === 1);
-	let details = {};
-	let tag = el.localName;
-	let hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
-	let isHazElement = tag.indexOf(hazPrefix) === 0;
 
-	if (isHazElement) { // FIXME preprocess attrs of <haz:*>
-		tag = tag.substr(hazPrefix.length);
-		let def = hazLangLookup[tag];
-		details.definition = def || { tag: '' };
-	}
-
-	details.exprAttributes = getExprAttributes(el, namespaces);
-	return details;
-}
-
-/**
- * Extract and remove expression/mexpression attributes from an element.
- * @param {Element} el - Element to extract from.
- * @param {NamespaceCollection} namespaces - Namespace definitions.
- * @returns {Array<Object>} Array of expression attribute descriptors.
- */
-function getExprAttributes(el, namespaces) {
-	let attrs = [];
-	
-	let exprNS = namespaces.lookupNamespace(HAZARD_EXPRESSION_URN);
-	let mexprNS = namespaces.lookupNamespace(HAZARD_MEXPRESSION_URN);
-	_.forEach(Array.from(el.attributes), (attr) => {
-		let ns = _.find([ exprNS, mexprNS ], (ns) => {
-			return (attr.name.indexOf(ns.prefix) === 0);
-		});
-		if (!ns) return;
-		let prefix = ns.prefix;
-		let namespaceURI = ns.urn;
-		let attrName = attr.name.substr(prefix.length);
-		el.removeAttribute(attr.name);
-		let desc = {
-			namespaceURI: namespaceURI,
-			prefix: prefix,
-			attrName: attrName,
-			type: 'text'
-		}
-		switch (namespaceURI) {
-		case HAZARD_EXPRESSION_URN:
-			desc.expression = interpretExpression(attr.value);
-			break;
-		case HAZARD_MEXPRESSION_URN:
-			desc.mexpression = interpretMExpression(attr.value);
-			break;
-		default: // TODO an error?
-			break;
-		}
-		attrs.push(desc);
-	});
-	return attrs;
-}
 
 
 /**
