@@ -180,7 +180,7 @@ loadTemplate(template) {
 
 	let doc = template.ownerDocument;
 
-	// rewrite the template if necessary
+	// Pass 1: Rewrite expression attributes (expr:_text, expr:_html, etc.) into hazard elements
 	walkTree(template, true, (el) => {
 		let tag = el.localName;
 		if (tag.indexOf(hazPrefix) === 0) return;
@@ -242,15 +242,17 @@ loadTemplate(template) {
 		});
 	});
 	
+	// Pass 2: Mark named templates and imply <haz:otherwise> in <haz:choose> blocks
 	walkTree(template, true, (el) => {
 		let tag = el.localName;
 		if (tag === hazPrefix + 'template') markTemplate(el);
 		if (tag === hazPrefix + 'choose') implyOtherwise(el);
 	});
 
+	// Pass 3: Wrap loose content nodes in an implicit entry template
 	implyEntryTemplate(template);
 
-	// finally, preprocess all elements to extract hazardDetails
+	// Pass 4: Extract hazardDetails (parsed directive info) for every element
 	walkTree(template, true, (el) => {
 		el.hazardDetails = getHazardDetails(el, processor.namespaces);
 	});
