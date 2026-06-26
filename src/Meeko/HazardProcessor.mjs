@@ -245,61 +245,76 @@ loadTemplate(template) {
 	// Pass 2: Mark named templates and imply <haz:otherwise> in <haz:choose> blocks
 	walkTree(template, true, (el) => {
 		let tag = el.localName;
-		if (tag === hazPrefix + 'template') markTemplate(el);
-		if (tag === hazPrefix + 'choose') implyOtherwise(el);
+		if (tag === hazPrefix + 'template') this.#markTemplate(el);
+		if (tag === hazPrefix + 'choose') this.#implyOtherwise(el, hazPrefix);
 	});
 
 	// Pass 3: Wrap loose content nodes in an implicit entry template
-	implyEntryTemplate(template);
+	this.#implyEntryTemplate(template, hazPrefix);
 
 	// Pass 4: Extract hazardDetails (parsed directive info) for every element
 	walkTree(template, true, (el) => {
 		el.hazardDetails = getHazardDetails(el, processor.namespaces);
 	});
 	
-	function implyOtherwise(el) { // NOTE this slurps *any* non-<haz:when>, including <haz:otherwise>
-		let otherwise = el.ownerDocument.createElement(hazPrefix + 'otherwise');
-		_.forEach(Array.from(el.childNodes), (node) => {
-			let tag = node.localName;
-			if (tag === hazPrefix + 'when') return;
-			otherwise.appendChild(node);
-		});
-		el.appendChild(otherwise);
-	}
+}
 
-	function markTemplate(el) {
-		processor.templates.push(el);
-	}
+/**
+ * Register a named template element for later matching.
+ * @param {Element} el - The <haz:template> element.
+ */
+#markTemplate(el) {
+	this.templates.push(el);
+}
 
-	function implyEntryTemplate(el) { // NOTE this slurps *any* non-<haz:template>
-		let firstExplicitTemplate;
-		let contentNodes = _.filter(el.childNodes, (node) => {
-			if (node.nodeType === 3) return (/\S/).test(node.nodeValue);
-			if (node.nodeType !== 1) return false;
-			let tag = node.localName;
-			if (tag === hazPrefix + 'template') {
-				if (!firstExplicitTemplate) firstExplicitTemplate = node;
-				return false;
-			}
-			if (tag === hazPrefix + 'let') return false;
-			if (tag === hazPrefix + 'param') return false;
-			return true;
-		});
+/**
+ * Wrap non-<haz:when> children of a <haz:choose> in an implied <haz:otherwise>.
+ * NOTE this slurps *any* non-<haz:when>, including <haz:otherwise>
+ * @param {Element} el - The <haz:choose> element.
+ * @param {string} hazPrefix - Namespace prefix for hazard elements.
+ */
+#implyOtherwise(el, hazPrefix) {
+	let otherwise = el.ownerDocument.createElement(hazPrefix + 'otherwise');
+	_.forEach(Array.from(el.childNodes), (node) => {
+		let tag = node.localName;
+		if (tag === hazPrefix + 'when') return;
+		otherwise.appendChild(node);
+	});
+	el.appendChild(otherwise);
+}
 
-		if (contentNodes.length <= 0) {
-			if (firstExplicitTemplate) return;
-			console.warn('This Hazard Template cannot generate any content.');
+/**
+ * Wrap loose content nodes (non-template, non-param) in an implicit entry template.
+ * NOTE this slurps *any* non-<haz:template>
+ * @param {Element|DocumentFragment} el - The root template container.
+ * @param {string} hazPrefix - Namespace prefix for hazard elements.
+ */
+#implyEntryTemplate(el, hazPrefix) {
+	let firstExplicitTemplate;
+	let contentNodes = _.filter(el.childNodes, (node) => {
+		if (node.nodeType === 3) return (/\S/).test(node.nodeValue);
+		if (node.nodeType !== 1) return false;
+		let tag = node.localName;
+		if (tag === hazPrefix + 'template') {
+			if (!firstExplicitTemplate) firstExplicitTemplate = node;
+			return false;
 		}
-		let entryTemplate = el.ownerDocument.createElement(hazPrefix + 'template');
-		_.forEach(contentNodes, (node) => {
-			entryTemplate.appendChild(node);
-		}); 
-		// NOTE in IE10 el.insertBefore(node, refNode) throws if refNode is undefined
-		if (firstExplicitTemplate) el.insertBefore(entryTemplate, firstExplicitTemplate);
-		else el.appendChild(entryTemplate);
-		processor.templates.unshift(entryTemplate);
-	}
+		if (tag === hazPrefix + 'let') return false;
+		if (tag === hazPrefix + 'param') return false;
+		return true;
+	});
 
+	if (contentNodes.length <= 0) {
+		if (firstExplicitTemplate) return;
+		console.warn('This Hazard Template cannot generate any content.');
+	}
+	let entryTemplate = el.ownerDocument.createElement(hazPrefix + 'template');
+	_.forEach(contentNodes, (node) => {
+		entryTemplate.appendChild(node);
+	});
+	if (firstExplicitTemplate) el.insertBefore(entryTemplate, firstExplicitTemplate);
+	else el.appendChild(entryTemplate);
+	this.templates.unshift(entryTemplate);
 }
 
 /** @returns {Element} The first (entry) template element. */
@@ -869,8 +884,7 @@ function setAttribute(el, attrName, value) {
  */
 function evalMExpression(mexprText, provider, context, variables) {
 	let mexpr = interpretMExpression(mexprText);
-	let result = processMExpression(mexpr, provider, context, variables);
-	return result;
+	return processMExpression(mexpr, provider, context, variables);
 }
 
 /**
@@ -884,8 +898,7 @@ function evalMExpression(mexprText, provider, context, variables) {
  */
 function evalExpression(exprText, provider, context, variables, type) {
 	let expr = interpretExpression(exprText);
-	let result = processExpression(expr, provider, context, variables, type);
-	return result;
+	return processExpression(expr, provider, context, variables, type);
 }
 	
 /**
@@ -979,9 +992,6 @@ function processMExpression(mexpr, provider, context, variables) {
  * @returns {*} Evaluated and cast result.
  */
 function processExpression(expr, provider, context, variables, type) { // FIXME robustness
-	let doc = (context && context.nodeType) ? // TODO which document
-		(context.nodeType === 9 ? context : context.ownerDocument) : 
-		document; 
 	let value = provider.evaluate(expr.selector, context, variables);
 
 	_.every(expr.filters, (filter) => {
@@ -1002,38 +1012,58 @@ function processExpression(expr, provider, context, variables, type) { // FIXME 
 		}
 	});
 
-	let result = cast(value, type);
-	return result;
+	return cast(value, type, context);
+}
 
-	function cast(value, type) {
-		switch (type) {
-		case 'text':
-			if (value && value.nodeType) value = value.textContent;
-			break;
-		case 'node':
-			let frag = doc.createDocumentFragment();
-			if (value && value.nodeType) frag.appendChild(doc.importNode(value, true)); // NOTE no adoption
-			else {
-				let div = doc.createElement('div');
-				div.innerHTML = value;
-				let node;
-				while (node = div.firstChild) frag.appendChild(node); // NOTE no adoption
-			}
-			value = frag;
-			break;
-		case 'boolean':
-			// NOTE only literal `false` or absence (null/undefined) means false; all other values are true
-			if (value == null || value === false) value = false;
-			else value = true;
-			break;
-		default: // FIXME should never occur. console.warn !?
-			if (value && value.nodeType) value = value.textContent;
-			break;
+/**
+ * Get the ownerDocument from a context node.
+ * @param {Node} context - A document, element, or other node.
+ * @returns {Document}
+ */
+function getDocument(context) {
+	if (context && context.nodeType === 9) return context;
+	if (context && context.ownerDocument) return context.ownerDocument;
+	return document;
+}
+
+/**
+ * Cast a value to the specified output type.
+ * @param {*} value - The value to cast.
+ * @param {string} type - Target type: 'text', 'node', or 'boolean'.
+ * @param {Node} context - Context node (used to derive document for fragment creation).
+ * @returns {string|DocumentFragment|boolean} The cast value.
+ */
+function cast(value, type, context) {
+	switch (type) {
+	case 'text':
+		if (value && value.nodeType) value = value.textContent;
+		break;
+	case 'node':
+		let doc = getDocument(context);
+		let frag = doc.createDocumentFragment();
+		if (value && value.nodeType) frag.appendChild(doc.importNode(value, true)); // NOTE no adoption
+		else {
+			let div = doc.createElement('div');
+			div.innerHTML = value;
+			let node;
+			while (node = div.firstChild) frag.appendChild(node); // NOTE no adoption
 		}
-		return value;
+		value = frag;
+		break;
+	case 'boolean':
+		// NOTE only literal `false` or absence (null/undefined) means false; all other values are true
+		if (value == null || value === false) value = false;
+		else {
+			if (!value) console.warn(`Casting present but falsy value (${JSON.stringify(value)}) to true`);
+			value = true;
+		}
+		break;
+	default:
+		console.warn(`Unexpected cast type: ${type}`);
+		if (value && value.nodeType) value = value.textContent;
+		break;
 	}
-
-
+	return value;
 }
 
 export default HazardProcessor;
