@@ -369,22 +369,30 @@ _transform(provider, details, frag) {
 				false;
 			return result;
 		},
+		// NOTE returns the stored value for the first scope that contains the key,
+		// even if that value is falsy (0, "", false). Only returns undefined if no scope has the key.
 		get: (key) => {
-			let result =
-				key in processor.localVars && processor.localVars[key] ||
-				key in processor.localParams && processor.localParams[key] ||
-				key in processor.globalVars && processor.globalVars[key] ||
-				key in processor.globalParams && processor.globalParams[key] ||
-				undefined;
-			return result;
+			if (key in processor.localVars) return processor.localVars[key];
+			if (key in processor.localParams) return processor.localParams[key];
+			if (key in processor.globalVars) return processor.globalVars[key];
+			if (key in processor.globalParams) return processor.globalParams[key];
+			return undefined;
 		},
 		set: (key, value, inParams, isGlobal) => {
 			let mapName = isGlobal ?
 				( inParams ? 'globalParams' : 'globalVars' ) :
 				( inParams ? 'localParams' : 'localVars' );
 			// NOTE params are write-once
-			if (mapName === 'localParams' && key in processor.localParams) return;
-			if (mapName === 'globalParams' && key in processor.globalParams) return;
+			if (inParams && key in processor[mapName]) {
+				console.warn(`Param "${key}" already set`);
+				return;
+			}
+			// NOTE null/undefined deletes the value, allowing outer scope to show through
+			if (value == null) {
+				console.warn(`Variable "${key}" set to null/undefined — removing from scope`);
+				delete processor[mapName][key];
+				return;
+			}
 			processor[mapName][key] = value;
 		},
 		push: (params) => {
@@ -1010,6 +1018,7 @@ function processExpression(expr, provider, context, variables, type) { // FIXME 
 			value = frag;
 			break;
 		case 'boolean':
+			// NOTE only literal `false` or absence (null/undefined) means false; all other values are true
 			if (value == null || value === false) value = false;
 			else value = true;
 			break;

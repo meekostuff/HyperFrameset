@@ -26,6 +26,7 @@ init(node) {
 
 // TODO should matches() support Hazard variables
 matches(element, query) { // FIXME refactor common-code in matches / evaluate
+	// Parse "selector { @attr }" — captures selector and optional attribute accessor
 	let queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
 	let selector = queryParts[1];
 	let attr = queryParts[2];
@@ -62,6 +63,7 @@ matches(element, query) { // FIXME refactor common-code in matches / evaluate
 evaluate(query, context, variables, wantArray) {
 	if (!context) context = this.srcNode;
 	let doc = context.nodeType === 9 ? context : context.ownerDocument; // FIXME which document??
+	// Parse "selector { @attr }" — captures selector and optional attribute accessor
 	let queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
 	let selector = queryParts[1];
 	let attr = queryParts[2];
@@ -109,12 +111,14 @@ function find(selectorGroup, context, variables, wantArray) { // FIXME currently
 	selectorGroup = selectorGroup.trim();
 	if (selectorGroup === '') return wantArray ? [ context ] : context;
 	let nullResult = wantArray ? [] : null;
+	// Split selector group on commas, but not commas inside () or []
 	let selectors = selectorGroup.split(/,(?![^\(]*\)|[^\[]*\])/);
 	selectors = Array.from(selectors, (s) => { return s.trim(); });
 
 	let invalidVarUse = false;
 	let contextVar;
 	_.forEach(selectors, (s, i) => {
+		// Match $variable references (e.g. $myVar), or escaped \$ (which are ignored later)
 		let m = s.match(/\\?\$[_a-zA-Z][_a-zA-Z0-9]*\b/g);
 		if (!m) {
 			if (i > 0 && contextVar) {
