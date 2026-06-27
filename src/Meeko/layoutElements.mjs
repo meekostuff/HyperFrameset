@@ -221,7 +221,7 @@ function registerLayoutElements(ns) {
 
 	let style = document.createElement('style');
 	style.textContent = cssText;
-	document.head.insertBefore(style, document.head.firstChild);
+	document.head.append(style);
 }
 
 let layoutElements = {

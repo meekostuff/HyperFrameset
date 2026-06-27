@@ -28,6 +28,33 @@ const SELF_REL = 'self';
 
 let document = window.document;
 
+/**
+ * Test if a node is an executable script (text/javascript, module, or no type).
+ * @param {Node} node
+ * @returns {boolean}
+ */
+function isExecutableScript(node) {
+	if (node.localName !== 'script') return false;
+	return !node.type || /^text\/javascript/i.test(node.type) || node.type === 'module';
+}
+
+/**
+ * Walk siblings starting at inclusiveStart, calling callback for each.
+ * Safe to use when the callback removes or moves nodes.
+ * @param {Node} inclusiveStart - First node to visit.
+ * @param {function(Node): void} callback - Called for each sibling.
+ * @param {Node} [exclusiveEnd] - Optional stop node (not visited).
+ */
+function walkSiblings(inclusiveStart, callback, exclusiveEnd) {
+	if (exclusiveEnd) console.assert(inclusiveStart.parentNode === exclusiveEnd.parentNode);
+	let node = inclusiveStart;
+	while (node && node !== exclusiveEnd) {
+		let next = node.nextSibling;
+		callback(node);
+		node = next;
+	}
+}
+
 
 class Framer {
 
@@ -94,7 +121,7 @@ start(startOptions) {
 	let framer = this;
 	if (framer.started) throw Error('Already started');
 	framer.started = true;
-	framer.behaviors = install({ globalName: 'behaviors', attr: 'config', container: document.body, autoProcess: false });
+	framer.behaviors = install({ globalName: 'behaviors', attr: '_config', container: document.head, autoProcess: false });
 	if (!startOptions || !startOptions.contentDocument) {
 		console.info("No contentDocument passed to start(). Assuming landing-page is the frameset.")
 		return framer.#startAsFrameset(startOptions);
@@ -203,8 +230,8 @@ start(startOptions) {
 		() => definition.preprocess(),
 
 		// Insert frameset/self markers so content-specific head elements can be managed
-		// Order: [frameset marker] [frameset elements] [self marker] [content elements]
-		() => Framer.#insertMarkers(document.URL, framer.framesetURL, true),
+		// Order: [self marker] [content elements] [frameset marker] [frameset elements]
+		() => Framer.#insertMarkers(document.URL, framer.framesetURL),
 
 		// Register elements, start sprockets, initialize history
 		() => framer.#activate(),
@@ -697,7 +724,7 @@ static #encode(form) {
  * and executes any frameset scripts.
  *
  * The definition document is cloned (to avoid mutating the cached definition).
- * <head> is partitioned by selfMarker/framesetMarker <linK> into zones for frameset-owned vs content-owned elements.
+ * <head> is partitioned by selfMarker/framesetMarker <link> into zones: [self marker] [content elements] [frameset marker] [frameset elements].
  *
  * @param {Document} dstDoc - The live document to prepare.
  * @param {HFramesetDefinition} definition - The parsed frameset definition.
@@ -722,7 +749,7 @@ static #prepareFrameset(dstDoc, definition) {
 		while (node = dstBody.firstChild) dstBody.removeChild(node);
 	},
 	// Ensure self/frameset markers are in place
-	() => Framer.#insertMarkers(dstDoc.URL, definition.src, false),
+	() => Framer.#insertMarkers(dstDoc.URL, definition.src),
 	// Merge frameset attributes and head elements into the live document, then execute scripts
 	() => {
 		Framer.#mergeElement(dstDoc.documentElement, srcDoc.documentElement);
@@ -750,49 +777,44 @@ static #prerenderFrameset(dstDoc, definition) {
 }
 
 /**
- * Remove head elements between the frameset marker and self marker (or after self marker),
- * depending on whether we're separating frameset-owned or content-owned elements.
+ * Remove head elements in a zone, preserving executable scripts.
  *
- * When isFrameset=true, removes nodes between framesetMarker and selfMarker (old frameset elements).
- * When isFrameset=false, removes nodes after selfMarker (old content elements).
- * Scripts with type text/javascript are preserved in both cases.
+ * Order: [self marker] [content elements] [frameset marker] [frameset elements]
+ * When isFrameset=true, removes nodes after framesetMarker (old frameset elements).
+ * When isFrameset=false, removes nodes between selfMarker and framesetMarker (old content elements).
+ * Scripts with type text/javascript or module are preserved (see isExecutableScript).
  *
  * @param {Document} dstDoc - The live document.
  * @param {boolean} isFrameset - Whether to separate frameset-owned elements (true) or content-owned (false).
  * @throws {Error} If no frameset marker is found.
  */
 static #separateHead(dstDoc, isFrameset) {
-	let dstHead = dstDoc.head;
 	let framesetMarker = Framer.#getFramesetMarker(dstDoc);
 	if (!framesetMarker) throw Error(`No ${FRAMESET_REL} marker found. `);
 	let selfMarker = Framer.#getSelfMarker(dstDoc);
-	if (isFrameset) Framer.#removeBetween(framesetMarker, selfMarker);
-	else Framer.#removeBetween(selfMarker);
+	// Order: [self marker] [content elements] [frameset marker] [frameset elements]
+	if (isFrameset) Framer.#removeBetween(framesetMarker);
+	else Framer.#removeBetween(selfMarker, framesetMarker);
 }
 
 /**
- * Remove sibling nodes between two boundaries, skipping inline script elements.
+ * Remove sibling nodes between two boundaries, skipping executable scripts.
  * @param {Node} exclusiveStart - Start node (not removed); removal begins at its nextSibling.
  * @param {Node} [exclusiveEnd] - Optional end node (not removed); removal stops before it.
  */
 static #removeBetween(exclusiveStart, exclusiveEnd) {
-	let node = exclusiveStart.nextSibling;
-	while (node && node !== exclusiveEnd) {
-		let next = node.nextSibling;
-		if (!(node.localName === 'script' && (!node.type || /^text\/javascript/i.test(node.type)))) {
-			node.remove();
-		}
-		node = next;
-	}
+	walkSiblings(exclusiveStart.nextSibling, (node) => {
+		if (!isExecutableScript(node)) node.remove();
+	}, exclusiveEnd);
 }
 
 /**
  * Merge <head> elements from a source document (frameset or content) into the live document.
  * Uses the frameset/self markers to position elements in the correct zone.
  *
- * The <head> is assumed to be structured as: [framesetMarker] [frameset elements] [selfMarker] [content elements].
- * When isFrameset=true, source elements are inserted before selfMarker.
- * When isFrameset=false, source elements are appended to end of head.
+ * The <head> is structured as: [selfMarker] [content elements] [framesetMarker] [frameset elements].
+ * When isFrameset=true, source elements are appended after framesetMarker (end of head).
+ * When isFrameset=false, source elements are inserted before framesetMarker (content zone).
  * Scripts are disabled (type suffixed with ?disabled) when merging frameset head.
  *
  * @param {Document} dstDoc - The live document.
@@ -827,8 +849,9 @@ static #mergeHead(dstDoc, srcHead, isFrameset) {
 			if (!srcNode.type || /^text\/javascript$/i.test(srcNode.type)) srcNode.type = 'text/javascript?disabled';
 			break;
 		}
-		if (isFrameset) DOM.insertNode('beforebegin', selfMarker, srcNode);
-		else DOM.insertNode('beforeend', dstHead, srcNode);
+		// Order: [self marker] [content elements] [frameset marker] [frameset elements]
+		if (isFrameset) DOM.insertNode('beforeend', dstHead, srcNode);
+		else DOM.insertNode('beforebegin', framesetMarker, srcNode);
 		if (srcNode.localName === 'link') srcNode.href = srcNode.getAttribute('href');
 	});
 }
@@ -886,7 +909,7 @@ static #getSelfMarker(doc) {
  * @param {string} framesetURL - The URL for the frameset marker.
  * @param {boolean} isFrameset - true if the landing page is the frameset document.
  */
-static #insertMarkers(selfURL, framesetURL, isFrameset) {
+static #insertMarkers(selfURL, framesetURL) {
 	let head = document.head;
 
 	let framesetMarker = document.createElement('link');
@@ -898,15 +921,16 @@ static #insertMarkers(selfURL, framesetURL, isFrameset) {
 		selfMarker = document.createElement('link');
 		selfMarker.rel = SELF_REL;
 		selfMarker.href = selfURL;
+		head.prepend(selfMarker);
 	}
 
-	if (isFrameset) {
-		head.insertBefore(framesetMarker, head.firstChild);
-		head.appendChild(selfMarker);
-	} else {
-		head.insertBefore(selfMarker, head.firstChild);
-		head.insertBefore(framesetMarker, selfMarker);
-	}
+	// Frameset marker goes at end: [self marker] [content] [frameset marker] [frameset elements]
+	head.append(framesetMarker);
+
+	// Move startup executable scripts above self marker (they're infrastructure, not content)
+	walkSiblings(selfMarker.nextSibling, (node) => {
+		if (isExecutableScript(node)) head.insertBefore(node, selfMarker);
+	}, framesetMarker);
 }
 
 /**
@@ -1023,7 +1047,7 @@ static #registerFramesetElement() {
 	let cssText = ['html, body { margin: 0; padding: 0; }', 'html { width: 100%; height: 100%; }'];
 	let style = document.createElement('style');
 	style.textContent = cssText.join('\n');
-	document.head.insertBefore(style, document.head.firstChild);
+	document.head.append(style);
 
 	let frameset = new HFrameset(document.body);
 	frameset.connectedCallback();

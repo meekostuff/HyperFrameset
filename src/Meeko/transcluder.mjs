@@ -141,7 +141,7 @@ function registerElement(ns, name, Cls) {
 	let cssText = `${tagName} { box-sizing: border-box; display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }`;
 	let style = document.createElement('style');
 	style.textContent = cssText;
-	document.head.insertBefore(style, document.head.firstChild);
+	document.head.append(style);
 }
 
 let transcluder = {
