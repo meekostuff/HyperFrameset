@@ -276,7 +276,7 @@ static #deriveScope(scope, startURL, framesetURL) {
 	let framer = this;
 	return Thenfu.pipe(null, [
 
-	// Register global event listeners, frame definitions, sprocket elements, and start DOM monitoring
+	// Register global event listeners, frame definitions, frameset elements, and start DOM monitoring
 	() => {
 		window.addEventListener('click', (e) => {
 			if (e.defaultPrevented) return;
@@ -290,43 +290,54 @@ static #deriveScope(scope, startURL, framesetURL) {
 		}, false);
 
 		Framer.#registerFrames(framer.definition);
-		Framer.#registerFramesetElement();
+		framer.#registerFramesetElement();
 		let namespace = framer.definition.namespaces.lookupNamespace(HYPERFRAMESET_URN);
 		layoutElements.register(namespace);
 		transcluder.registerElement(namespace, 'transclude', HTransclude);
 		transcluder.registerElement(namespace, 'frame', HFrame);
-		this.framesetReady.resolve();
 	},
 
-	// Wait for the frameset sprocket to enter the document, then start history management
-	() => { // TODO ideally frameset rendering wouldn't start until after this step
-		return framer.framesetReady.promise
-		.then(() => {
-			let changeset = framer.currentChangeset;
-			if (changeset) {
-				let state = HistoryState.create(changeset, '', document.URL);
-				navigation.updateCurrentEntry({ state: state.settings });
+	() => {
+		navigation.addEventListener('navigate', (e) => {
+			if (!e.canIntercept) return;
+			// WARN: We intercept all traversals unconditionally
+			//   because e.destination.getState() is unreliable in WebKit,
+			//   so we can't validate before intercepting.
+			//   HyperFrameset assumes it owns all history entries in the document.
+			if (e.navigationType === 'traverse') {
+				e.intercept({
+					handler: () => {
+						let settings = navigation.currentEntry.getState();
+						if (!HistoryState.isValid(settings)) return;
+						let state = new HistoryState(settings);
+						this.onPopState(state.getData());
+					}
+				});
 			}
-			navigation.addEventListener('navigate', (e) => {
-				if (!e.canIntercept) return;
-				// WARN: We intercept all traversals unconditionally
-				//   because e.destination.getState() is unreliable in WebKit,
-				//   so we can't validate before intercepting.
-				//   HyperFrameset assumes it owns all history entries in the document.
-				if (e.navigationType === 'traverse') {
-					e.intercept({
-						handler: () => {
-							let settings = navigation.currentEntry.getState();
-							if (!HistoryState.isValid(settings)) return;
-							let state = new HistoryState(settings);
-							framer.onPopState(state.getData());
-						}
-					});
-				}
-				// TODO intercept 'reload' to support re-rendering POST response pages
-				//   without a real network request. Requires storing POST body in entry state.
-			});
+			// TODO intercept 'reload' to support re-rendering POST response pages
+			//   without a real network request. Requires storing POST body in entry state.
 		});
+	},
+
+	// Wait for the frameset to enter the document, then start history management
+	// TODO ideally frameset rendering wouldn't start until after this step
+	() => {
+		let url = document.URL;
+		if (url === this.framesetURL) return; // frameset-first with no start_url — no changeset
+		this.currentChangeset = this.frameset.lookup(url, {referrer: document.referrer});
+		console.debug('framesetEntered: lookup returned', this.currentChangeset, 'for', url);
+		if (!this.currentChangeset && this.options.lookup) {
+			let target = this.options.lookup(url);
+			if (target) this.currentChangeset = Framer.#inferChangeset(url, target);
+			console.debug('framesetEntered: options.lookup returned', this.currentChangeset);
+		}
+	},
+
+	() => {
+		let changeset = this.currentChangeset;
+		if (changeset) {
+			this.load(document.URL, changeset, 'replace');
+		}
 	},
 
 	// Fire the enteredState lifecycle notification
@@ -340,39 +351,7 @@ static #deriveScope(scope, startURL, framesetURL) {
 
 	]);
 }
-
-/**
- * Called when the HFrameset sprocket (bound to document.body) enters the document.
- * Sets the active frameset reference, resolves the initial navigation changeset
- * by calling frameset.lookup on the current URL, and resolves the framesetReady promise
- * to unblock history initialization.
- *
- * @param {Object} frameset - The HFrameset sprocket instance (body's sprocket).
- */
-framesetEntered(frameset) {
-	this.frameset = frameset;
-	let url = document.URL;
-	if (url === this.framesetURL) return; // frameset-first with no start_url — no changeset
-	this.currentChangeset = frameset.lookup(url, { referrer: document.referrer });
-	console.debug('framesetEntered: lookup returned', this.currentChangeset, 'for', url);
-	if (!this.currentChangeset && this.options.lookup) {
-		let target = this.options.lookup(url);
-		if (target) this.currentChangeset = Framer.#inferChangeset(url, target);
-		console.debug('framesetEntered: options.lookup returned', this.currentChangeset);
-	}
-}
-
-/**
- * Called when the HFrameset sprocket leaves the document.
- * This should never happen in normal operation.
- *
- * @param {Object} frameset - The HFrameset sprocket instance.
- */
-framesetLeft(frameset) { // WARN this should never happen
-	delete this.frameset;
-}
-
-/**
+	/**
  * Called when an HFrame connects to the document.
  * If this frame's targetname matches the current changeset, sets its @src.
  *
@@ -575,11 +554,10 @@ navigate(url, changeset) { // FIXME doesn't support replaceState
  * @param {string} url - The URL to load.
  * @param {Object} changeset - Navigation state.
  * @param {string} changeset.target - The targetname of the frame(s) to update.
- * @param {boolean|number} changeState - If truthy, push a history state. If 0, notify without pushing (used by popstate).
+ * @param {boolean|string|number} changeState - 'replace' for replaceState, truthy for pushState, 0/falsy for no state change (popstate).
  * @returns {Promise} Resolves when the load pipeline completes.
  */
 load(url, changeset, changeState) { // FIXME doesn't support replaceState
-	let framer = this;
 	let mustNotify = changeState || changeState === 0;
 	let target = changeset.target;
 	let frames = document.body.querySelectorAll(`[targetname="${target}"]`);
@@ -594,18 +572,20 @@ load(url, changeset, changeState) { // FIXME doesn't support replaceState
 	return Thenfu.pipe(null, [
 	// Notify lifecycle: leaving current state
 	() => {
-		if (mustNotify) return Framer.#notify({ module: 'frameset', type: 'leftState', stage: 'before', url: document.URL });
+		// TODO disabled for 'replace' assumes this is the landing page. Might need to rethink this.
+		if (changeState !== 'replace' && mustNotify) return Framer.#notify({ module: 'frameset', type: 'leftState', stage: 'before', url: document.URL });
 	},
 	// Set @src on matching frames to trigger their refresh/load cycle
 	() => { _.forEach(frames, (frame) => { frame.setAttribute('src', fullURL); }); },
 	// Fetch the document via httpProxy
 	// NOTE .load() is just to sync pushState
 	() => httpProxy.load(nohash, request).then((resp) => { response = resp; }),
-	// Push new history state (skipped for popstate-triggered loads)
+	// Update history state (push, replace, or skip)
 	() => {
 		if (changeState) {
 			let state = HistoryState.create(changeset, '', url);
-			history.pushState(null, '', url);
+			if (changeState === 'replace') history.replaceState(null, '', url);
+			else history.pushState(null, '', url);
 			navigation.updateCurrentEntry({ state: state.settings });
 		}
 	},
@@ -1043,14 +1023,26 @@ static #registerFrames(framesetDef) {
 /**
  * Register the HFrameset element on <body> and inject base CSS reset styles.
  */
-static #registerFramesetElement() {
+#registerFramesetElement() {
 	let cssText = ['html, body { margin: 0; padding: 0; }', 'html { width: 100%; height: 100%; }'];
 	let style = document.createElement('style');
 	style.textContent = cssText.join('\n');
 	document.head.append(style);
 
-	let frameset = new HFrameset(document.body);
-	frameset.connectedCallback();
+	let element = document.body;
+	this.frameset  = new HFrameset(element);
+	// Listen for requestnavigation if lookup is available
+	// TODO replace this with 'navigate' listener.
+	element.addEventListener('requestnavigation', (e) => {
+		if (e.defaultPrevented) return;
+		// Read page-author's lookup from behavior (script[for] on body)
+		if (!this.frameset?.element?.behavior?.lookup) return;
+
+		let acceptDefault = this.onRequestNavigation(e, this.frameset);
+		if (acceptDefault === false) e.preventDefault();
+	});
+
+	this.frameset.render();
 }
 
 } // end class Framer
@@ -1069,21 +1061,6 @@ constructor(body) {
 	this.behavior = this.element.behavior;
 	this.isFrameset = true;
 	this.definition = framer.definition;
-}
-
-connectedCallback() {
-	// Listen for requestnavigation if lookup is available
-	this.element.addEventListener('requestnavigation', (e) => {
-		if (e.defaultPrevented) return;
-		// Read page-author's lookup from behavior (script[for] on body)
-		if(!this.element.behavior.lookup) return;
-
-		let acceptDefault = framer.onRequestNavigation(e, this);
-		if (acceptDefault === false) e.preventDefault();
-	});
-
-	framer.framesetEntered(this);
-	this.render();
 }
 
 lookup(url, details) {
