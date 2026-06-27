@@ -580,6 +580,15 @@ load(url, changeset, changeState) { // FIXME doesn't support replaceState
 	// Fetch the document via httpProxy
 	// NOTE .load() is just to sync pushState
 	() => httpProxy.load(nohash, request).then((resp) => { response = resp; }),
+	// Update self section of <head> with new content document's head
+	// TODO at minimum we need a <title> even if the response has no head
+	// TODO title will need to be captured in history state for back/forward restoration
+	() => {
+		Framer.#separateHead(document, false);
+		let selfMarker = Framer.#getSelfMarker();
+		if (selfMarker) selfMarker.href = url;
+		if (response?.document?.head) Framer.#mergeHead(document, response.document.head, false);
+	},
 	// Update history state (push, replace, or skip)
 	() => {
 		if (changeState) {
@@ -816,22 +825,31 @@ static #mergeHead(dstDoc, srcHead, isFrameset) {
 		switch (srcNode.localName) {
 		default: break;
 		case 'title':
-			if (isFrameset) return;
+			// NOTE if isFrameset, title is kept as a fallback (content page title takes precedence by position)
 			if (!srcNode.innerHTML) return;
 			break;
-		case 'link': break;
+		case 'link':
+			// FIXME there may be other link rels that should be rejected when !isFrameset
+			if (/\bframeset\b/i.test(srcNode.rel)) return;
+			if (/\bself\b/i.test(srcNode.rel)) return;
+			if (!isFrameset && /\bstylesheet\b/i.test(srcNode.rel)) return;
+			break;
 		case 'meta':
 			if (srcNode.httpEquiv) return;
 			break;
-		case 'style': break;
-		case 'script':
+		case 'style':
 			if (!isFrameset) return;
+			break;
+		case 'script':
+			// FIXME non-executable scripts (e.g. type=application/json) should be copied even when !isFrameset
+			if (!isFrameset) return;
+			// FIXME need to handle script type=module
 			if (!srcNode.type || /^text\/javascript$/i.test(srcNode.type)) srcNode.type = 'text/javascript?disabled';
 			break;
 		}
 		// Order: [self marker] [content elements] [frameset marker] [frameset elements]
-		if (isFrameset) DOM.insertNode('beforeend', dstHead, srcNode);
-		else DOM.insertNode('beforebegin', framesetMarker, srcNode);
+		if (isFrameset) dstHead.append(srcNode);
+		else framesetMarker.before(srcNode);
 		if (srcNode.localName === 'link') srcNode.href = srcNode.getAttribute('href');
 	});
 }
