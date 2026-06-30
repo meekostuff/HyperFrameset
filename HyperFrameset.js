@@ -3064,16 +3064,28 @@
 	 * transcluder
 	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
-	 */    let transcludeDefinitions = new Registry({
-        writeOnce: true,
-        keyValidator: key => typeof key === "string",
-        valueValidator: o => o != null && typeof o === "object"
-    });
+	 */    const DEF_ATTR$1 = "def";
+    let definitionLookup;
+    function setDefinitionLookup(fn) {
+        definitionLookup = fn;
+    }
+    function registerElement(ns, name, Cls) {
+        let tagName = ns.lookupTagName(name);
+        customElements.define(tagName, Cls);
+        let cssText = `${tagName} { box-sizing: border-box; display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }`;
+        let style = document.createElement("style");
+        style.textContent = cssText;
+        document.head.append(style);
+    }
+    let transcluder = {
+        registerElement: registerElement,
+        setDefinitionLookup: setDefinitionLookup
+    };
     class HTransclude extends Panel {
         static observedAttributes=[ "src" ];
         connectedCallback() {
-            let def = this.getAttribute("def");
-            this.definition = transcludeDefinitions.get(def);
+            let def = this.getAttribute(DEF_ATTR$1);
+            this.definition = definitionLookup(def);
             this.bodyElement = null;
             this.targetname = this.getAttribute("targetname");
             this.src = this.getAttribute("src");
@@ -3163,17 +3175,6 @@
             return element instanceof HTransclude;
         }
     }
-    function registerElement(ns, name, Cls) {
-        let tagName = ns.lookupTagName(name);
-        customElements.define(tagName, Cls);
-        let cssText = `${tagName} { box-sizing: border-box; display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }`;
-        let style = document.createElement("style");
-        style.textContent = cssText;
-        document.head.append(style);
-    }
-    let transcluder = {
-        registerElement: registerElement
-    };
     /*!
 	 * HTransformDefinition
 	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
@@ -3341,6 +3342,8 @@
 	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */    const {rebase: rebase, rebaseURL: rebaseURL, normalizeScopedStyles: normalizeScopedStyles} = htmlParser;
+    const DEFID_ATTR = "defid";
+    const DEF_ATTR = "def";
     const hfDefaultNamespace = new CustomNamespace({
         name: "hf",
         style: "vendor",
@@ -3352,11 +3355,12 @@
         namespaces;
         document;
         element;
-        frames={};
+        frameContainer;
         constructor(doc, settings) {
             if (!doc) return;
             if (!settings?.behaviors) throw Error("HFramesetDefinition requires settings.behaviors");
             this.behaviors = settings.behaviors;
+            if (settings.frameContainer) this.frameContainer = settings.frameContainer;
             this.namespaces = null;
             this.init(doc, settings);
         }
@@ -3368,6 +3372,7 @@
             let body = doc.body;
             this.document = doc;
             this.element = body;
+            if (!this.frameContainer) this.frameContainer = doc.head;
         }
         #initMetadata(doc, settings) {
             defaults(this, {
@@ -3461,40 +3466,43 @@
         }
         #preprocessFrames() {
             let body = this.element;
+            let container = this.frameContainer;
             let frameElts = findAll(this.namespaces.lookupSelector("frame", HYPERFRAMESET_URN), body);
             let frameDefElts = [];
             let frameRefElts = [];
             forEach(frameElts, (el, index) => {
                 let placeholder = el.cloneNode(false);
                 el.parentNode.replaceChild(placeholder, el);
-                let defId = el.getAttribute("defid");
-                let def = el.getAttribute("def");
+                let defId = el.getAttribute(DEFID_ATTR);
+                let def = el.getAttribute(DEF_ATTR);
                 if (def && def !== defId) {
                     frameRefElts.push(el);
                     return;
                 }
                 if (!defId) {
                     defId = "__frame_" + index + "__";
-                    el.setAttribute("defid", defId);
+                    el.setAttribute(DEFID_ATTR, defId);
                 }
                 if (!def) {
                     def = defId;
-                    placeholder.setAttribute("def", def);
+                    placeholder.setAttribute(DEF_ATTR, def);
                 }
                 frameDefElts.push(el);
             });
             forEach(frameDefElts, el => {
-                let defId = el.getAttribute("defid");
-                this.frames[defId] = new HFrameDefinition(el, this);
+                let tmpl = container.ownerDocument.createElement("template");
+                tmpl.setAttribute(DEFID_ATTR, el.getAttribute(DEFID_ATTR));
+                tmpl.content.appendChild(el);
+                container.appendChild(tmpl);
             });
             forEach(frameRefElts, el => {
-                let def = el.getAttribute("def");
-                let ref = this.frames[def];
-                if (!ref) {
+                let def = el.getAttribute(DEF_ATTR);
+                let tmpl = find$1(`template[${DEFID_ATTR}="${def}"]`, container);
+                let refEl = tmpl && tmpl.content.firstElementChild;
+                if (!refEl) {
                     console.warn("Frame declaration references non-existant frame definition: " + def);
                     return;
                 }
-                let refEl = ref.element;
                 if (!refEl.hasAttribute("scopeid")) return;
                 let id = el.getAttribute("id");
                 if (id) {
@@ -3509,6 +3517,17 @@
                 }
                 el.setAttribute("id", scopeId);
             });
+        }
+        get frameIds() {
+            let templates = findAll(`template[${DEFID_ATTR}]`, this.frameContainer);
+            return templates.map(tmpl => tmpl.getAttribute(DEFID_ATTR));
+        }
+        getFrame(defId) {
+            let tmpl = find$1(`template[${DEFID_ATTR}="${defId}"]`, this.frameContainer);
+            if (!tmpl) return undefined;
+            let el = tmpl.content.firstElementChild;
+            if (!el) return undefined;
+            return new HFrameDefinition(el, this);
         }
         render() {
             return this.element.cloneNode(true);
@@ -3619,7 +3638,8 @@
                     responseType: "document"
                 }).then(response => new HFramesetDefinition(response.document, {
                     ...framerConfig,
-                    behaviors: framer.behaviors
+                    behaviors: framer.behaviors,
+                    frameContainer: document$1.head
                 }));
             }, definition => Thenfu.pipe(definition, [ () => {
                 framer.definition = definition;
@@ -3635,7 +3655,8 @@
             let settings = {
                 framesetURL: framer.framesetURL,
                 scope: framer.scope,
-                behaviors: framer.behaviors
+                behaviors: framer.behaviors,
+                frameContainer: document$1.head
             };
             let definition = new HFramesetDefinition(document$1, settings);
             framer.definition = definition;
@@ -3662,7 +3683,7 @@
         #activate() {
             let framer = this;
             return Thenfu.pipe(null, [ () => {
-                Framer.#registerFrames(framer.definition);
+                transcluder.setDefinitionLookup(def => framer.definition.getFrame(def));
                 framer.#registerFramesetElement();
                 let namespace = framer.definition.namespaces.lookupNamespace(HYPERFRAMESET_URN);
                 layoutElements.register(namespace);
@@ -4097,11 +4118,6 @@
             }
             return Thenfu.asap();
         }
-        static #registerFrames(framesetDef) {
-            forOwn(framesetDef.frames, (o, key) => {
-                transcludeDefinitions.set(key, o);
-            });
-        }
         #registerFramesetElement() {
             let cssText = [ "html, body { margin: 0; padding: 0; }", "html { width: 100%; height: 100%; }" ];
             let style = document$1.createElement("style");
@@ -4189,7 +4205,6 @@
             processors: processors,
             controllers: controllers,
             transcluder: transcluder,
-            transcludeDefinitions: transcludeDefinitions,
             framer: framer,
             CSSDecoder: CSSDecoder,
             MicrodataDecoder: MicrodataDecoder,
