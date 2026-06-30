@@ -18,7 +18,7 @@ import httpProxy from './httpProxy.mjs';
 import HistoryState from './HistoryState.mjs';
 import {install} from './behaviors.mjs';
 import layoutElements from './layoutElements.mjs';
-import transcluder, {HTransclude, transcludeDefinitions} from './transcluder.mjs';
+import transcluder, {HTransclude} from './transcluder.mjs';
 import {HFramesetDefinition} from './framesetDefinitions.mjs';
 import {HYPERFRAMESET_URN} from './CustomNamespace.mjs';
 import Task from "./Task.mjs";
@@ -158,7 +158,7 @@ start(startOptions) {
 		if (framesetURL.hash) console.info(`Ignoring hash component of frameset URL: ${framesetURL.hash}`);
 		framer.framesetURL = framerConfig.framesetURL = framesetURL.nohash;
 		return httpProxy.load(framer.framesetURL, { responseType: 'document' })
-		.then((response) => new HFramesetDefinition(response.document, { ...framerConfig, behaviors: framer.behaviors }));
+		.then((response) => new HFramesetDefinition(response.document, { ...framerConfig, behaviors: framer.behaviors, frameContainer: document.head }));
 	},
 
 	// Prepare the live document, preprocess the definition, and pre-render the frameset body
@@ -206,7 +206,7 @@ start(startOptions) {
 	framer.framesetURL = framesetURL.nohash;
 	framer.scope = Framer.#deriveScope(startOptions && startOptions.scope, startURL, framesetURL);
 
-	let settings = { framesetURL: framer.framesetURL, scope: framer.scope, behaviors: framer.behaviors };
+	let settings = { framesetURL: framer.framesetURL, scope: framer.scope, behaviors: framer.behaviors, frameContainer: document.head };
 	let definition = new HFramesetDefinition(document, settings);
 
 	framer.definition = definition;
@@ -280,7 +280,7 @@ static #deriveScope(scope, startURL, framesetURL) {
 
 	// Register global event listeners, frame definitions, frameset elements, and start DOM monitoring
 	() => {
-		Framer.#registerFrames(framer.definition);
+		transcluder.setDefinitionLookup((def) => framer.definition.getFrame(def));
 		framer.#registerFramesetElement();
 		let namespace = framer.definition.namespaces.lookupNamespace(HYPERFRAMESET_URN);
 		layoutElements.register(namespace);
@@ -1024,18 +1024,7 @@ static #notify(msg) {
 	}
 	return Thenfu.asap();
 }
-
-/**
- * Register all frame definitions from the frameset definition into the
- * global transcludeDefinitions registry, keyed by their definition name.
- *
- * @param {HFramesetDefinition} framesetDef - The frameset definition containing frame configs.
- */
-static #registerFrames(framesetDef) {
-	_.forOwn(framesetDef.frames, (o, key) => { transcludeDefinitions.set(key, o); });
-}
-
-/**
+	/**
  * Register the HFrameset element on <body> and inject base CSS reset styles.
  */
 #registerFramesetElement() {

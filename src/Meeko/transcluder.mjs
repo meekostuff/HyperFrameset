@@ -9,23 +9,53 @@ import Thenfu from './Thenfu.mjs';
 import URLux from './URLux.mjs';
 import * as DOM from './DOM.mjs';
 import httpProxy from './httpProxy.mjs';
-import Registry from './Registry.mjs';
 import { instance } from './behaviors.mjs';
 import { Panel } from './layoutElements.mjs';
 
-let transcludeDefinitions = new Registry({
-	writeOnce: true,
-	keyValidator: (key) => typeof key === 'string',
-	valueValidator: (o) => o != null && typeof o === 'object'
-});
+// TODO DRY with HFramesetDefinition.mjs which defines the same constant
+/** Attribute name for the frame declaration reference, linking a placeholder to its definition. */
+const DEF_ATTR = 'def';
+
+/** @type {function(string): Object|undefined} Lookup function for frame definitions, set via setDefinitionLookup. */
+let definitionLookup;
+
+/**
+ * Set the function used to resolve a frame definition by its defid.
+ * Must be called before any transclusion elements connect.
+ * @param {function(string): Object|undefined} fn - Lookup function that takes a defid and returns a definition.
+ */
+function setDefinitionLookup(fn) {
+	definitionLookup = fn;
+}
+
+/**
+ * Register a transclusion custom element with the detected namespace.
+ * @param {CustomNamespace} ns - The namespace for resolving tag names.
+ * @param {string} name - The element name (e.g. 'frame' or 'transclude').
+ * @param {Function} Cls - The custom element class.
+ */
+function registerElement(ns, name, Cls) {
+	let tagName = ns.lookupTagName(name);
+	customElements.define(tagName, Cls);
+
+	let cssText = `${tagName} { box-sizing: border-box; display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }`;
+	let style = document.createElement('style');
+	style.textContent = cssText;
+	document.head.append(style);
+}
+
+let transcluder = {
+	registerElement,
+	setDefinitionLookup
+};
 
 class HTransclude extends Panel {
 
 static observedAttributes = ["src"];
 
 connectedCallback() {
-	let def = this.getAttribute('def');
-	this.definition = transcludeDefinitions.get(def);
+	let def = this.getAttribute(DEF_ATTR);
+	this.definition = definitionLookup(def);
 	this.bodyElement = null;
 	this.targetname = this.getAttribute('targetname');
 	this.src = this.getAttribute('src');
@@ -128,30 +158,9 @@ static isFrame(element) { return element instanceof HTransclude; }
 
 }
 
-/**
- * Register a transclusion custom element with the detected namespace.
- * @param {CustomNamespace} ns - The namespace for resolving tag names.
- * @param {string} name - The element name (e.g. 'frame' or 'transclude').
- * @param {Function} Cls - The custom element class.
- */
-function registerElement(ns, name, Cls) {
-	let tagName = ns.lookupTagName(name);
-	customElements.define(tagName, Cls);
-
-	let cssText = `${tagName} { box-sizing: border-box; display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }`;
-	let style = document.createElement('style');
-	style.textContent = cssText;
-	document.head.append(style);
-}
-
-let transcluder = {
-	registerElement
-};
-
 export {
 	HTransclude,
-	transcluder,
-	transcludeDefinitions
+	transcluder
 }
 
 export default transcluder;

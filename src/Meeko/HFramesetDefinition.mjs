@@ -12,6 +12,12 @@ import htmlParser from './htmlParser.mjs';
 
 const { rebase, rebaseURL, normalizeScopedStyles } = htmlParser;
 
+/** Attribute name for the frame definition ID (on both the frame element and its template wrapper). */
+const DEFID_ATTR = 'defid';
+
+/** Attribute name for the frame declaration reference (on the placeholder element, pointing to a defid). */
+const DEF_ATTR = 'def';
+
 /** Fallback namespace registered when the frameset document doesn't declare one. */
 const hfDefaultNamespace = new CustomNamespace({
 	name: 'hf',
@@ -45,8 +51,8 @@ document;
 /** @type {HTMLElement} The detached <body> element used as a render template. */
 element;
 
-/** @type {Object<string, HFrameDefinition>} Map of frame definition IDs to HFrameDefinition instances. Indexed by @defid (which may be auto-generated) */
-frames = {};
+/** @type {Node} Container where frame definition templates are stored. Defaults to the frameset document's head. */
+frameContainer;
 
 /**
  * @param {Document} doc - The frameset HTML document to process.
@@ -54,11 +60,13 @@ frames = {};
  * @param {BehaviorRegistry} settings.behaviors - The installed behaviors instance (required).
  * @param {string} settings.framesetURL - The resolved URL of the frameset.
  * @param {string} settings.scope - The base scope URL for relative URL resolution.
+ * @param {Node} [settings.frameContainer] - Where to store frame definition templates. Defaults to window.document.head.
  */
 constructor(doc, settings) {
 	if (!doc) return; // in case of inheritance
 	if (!settings?.behaviors) throw Error('HFramesetDefinition requires settings.behaviors');
 	this.behaviors = settings.behaviors;
+	if (settings.frameContainer) this.frameContainer = settings.frameContainer;
 	this.namespaces = null;
 	this.init(doc, settings);
 }
@@ -83,6 +91,7 @@ init(doc, settings) {
 	let body = doc.body;
 	this.document = doc;
 	this.element = body;
+	if (!this.frameContainer) this.frameContainer = doc.head;
 }
 
 #initMetadata(doc, settings) {
@@ -216,6 +225,7 @@ preprocess() {
 
 #preprocessFrames() {
 	let body = this.element;
+	let container = this.frameContainer;
 	let frameElts = DOM.findAll(
 		this.namespaces.lookupSelector('frame', HYPERFRAMESET_URN),
 		body);
@@ -227,34 +237,38 @@ preprocess() {
 		let placeholder = el.cloneNode(false);
 		el.parentNode.replaceChild(placeholder, el); // NOTE no adoption
 
-		let defId = el.getAttribute('defid');
-		let def = el.getAttribute('def');
+		let defId = el.getAttribute(DEFID_ATTR);
+		let def = el.getAttribute(DEF_ATTR);
 		if (def && def !== defId) {
 			frameRefElts.push(el);
 			return;
 		}
 		if (!defId) {
 			defId = '__frame_' + index + '__'; // FIXME not guaranteed to be unique. Should be a function at top of module
-			el.setAttribute('defid', defId);
+			el.setAttribute(DEFID_ATTR, defId);
 		}
 		if (!def) {
 			def = defId;
-			placeholder.setAttribute('def', def);
+			placeholder.setAttribute(DEF_ATTR, def);
 		}
 		frameDefElts.push(el);
 	});
 	_.forEach(frameDefElts, (el) => {
-		let defId = el.getAttribute('defid');
-		this.frames[defId] = new HFrameDefinition(el, this);
+		// Wrap in <template> so the definition is inert (not matched by document-level selectors)
+		// but still inspectable in devtools.
+		let tmpl = container.ownerDocument.createElement('template');
+		tmpl.setAttribute(DEFID_ATTR, el.getAttribute(DEFID_ATTR));
+		tmpl.content.appendChild(el);
+		container.appendChild(tmpl);
 	});
 	_.forEach(frameRefElts, (el) => {
-		let def = el.getAttribute('def');
-		let ref = this.frames[def];
-		if (!ref) {
+		let def = el.getAttribute(DEF_ATTR);
+		let tmpl = DOM.find(`template[${DEFID_ATTR}="${def}"]`, container);
+		let refEl = tmpl && tmpl.content.firstElementChild;
+		if (!refEl) {
 			console.warn('Frame declaration references non-existant frame definition: ' + def);
 			return;
 		}
-		let refEl = ref.element;
 		if (!refEl.hasAttribute('scopeid')) return;
 		let id = el.getAttribute('id');
 		if (id) {
@@ -269,6 +283,30 @@ preprocess() {
 		}
 		el.setAttribute('id', scopeId);
 	});
+}
+
+/**
+ * Get all frame definition IDs from the template elements stored in the frame container.
+ * @returns {string[]} Array of defid values.
+ */
+get frameIds() {
+	let templates = DOM.findAll(`template[${DEFID_ATTR}]`, this.frameContainer);
+	return templates.map(tmpl => tmpl.getAttribute(DEFID_ATTR));
+}
+
+/**
+ * Look up a frame definition by its defid. Queries the frame definition element
+ * from a <template> in the frame container and lazily constructs an HFrameDefinition instance (cached).
+ * 
+ * @param {string} defId - The frame definition ID (@defid attribute value).
+ * @returns {HFrameDefinition|undefined} The frame definition, or undefined if not found.
+ */
+getFrame(defId) {
+	let tmpl = DOM.find(`template[${DEFID_ATTR}="${defId}"]`, this.frameContainer);
+	if (!tmpl) return undefined;
+	let el = tmpl.content.firstElementChild;
+	if (!el) return undefined;
+	return new HFrameDefinition(el, this);
 }
 
 /**

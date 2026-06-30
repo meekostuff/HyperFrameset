@@ -280,8 +280,8 @@ describe('framesetDefinitions exports', () => {
         scope: 'http://example.com/'
       });
       def.preprocess();
-      expect(def.frames).toBeDefined();
-      expect(def.frames['main_frame']).toBeInstanceOf(HFrameDefinition);
+      expect(def.frameIds.length).toBe(1);
+      expect(def.getFrame('main_frame')).toBeInstanceOf(HFrameDefinition);
     });
 
     it('preprocess auto-generates defid when missing', () => {
@@ -291,8 +291,8 @@ describe('framesetDefinitions exports', () => {
         scope: 'http://example.com/'
       });
       def.preprocess();
-      expect(Object.keys(def.frames).length).toBe(1);
-      expect(Object.keys(def.frames)[0]).toMatch(/^__frame_\d+__$/);
+      expect(def.frameIds.length).toBe(1);
+      expect(def.frameIds[0]).toMatch(/^__frame_\d+__$/);
     });
 
     it('preprocess handles multiple frames', () => {
@@ -304,8 +304,8 @@ describe('framesetDefinitions exports', () => {
         scope: 'http://example.com/'
       });
       def.preprocess();
-      expect(def.frames['nav']).toBeInstanceOf(HFrameDefinition);
-      expect(def.frames['main']).toBeInstanceOf(HFrameDefinition);
+      expect(def.getFrame('nav')).toBeInstanceOf(HFrameDefinition);
+      expect(def.getFrame('main')).toBeInstanceOf(HFrameDefinition);
     });
 
     it('render returns a clone of the frameset body', () => {
@@ -333,7 +333,7 @@ describe('framesetDefinitions exports', () => {
       });
       def.preprocess();
 
-      const frameDef = def.frames['content'];
+      const frameDef = def.getFrame('content');
       expect(frameDef.bodies.length).toBe(2);
 
       // Render the loading body
@@ -543,7 +543,7 @@ describe('framesetDefinitions exports', () => {
         scope: 'http://example.com/'
       });
       def.preprocess();
-      expect(def.frames['shared']).toBeInstanceOf(HFrameDefinition);
+      expect(def.getFrame('shared')).toBeInstanceOf(HFrameDefinition);
     });
   });
 });
