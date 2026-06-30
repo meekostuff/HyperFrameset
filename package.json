@@ -9,7 +9,12 @@
     "./behaviors": "./src/Meeko/behaviors.mjs",
     "./BaseBehavior": "./src/Meeko/BaseBehavior.mjs"
   },
-  "files": ["src/", "HyperFrameset.js", "behaviors.js", "boot.js"],
+  "files": [
+    "src/",
+    "HyperFrameset.js",
+    "behaviors.js",
+    "boot.js"
+  ],
   "directories": {
     "doc": "doc",
     "test": "demo"
@@ -31,7 +36,7 @@
   "author": "Sean Hogan",
   "license": "MPL-2.0",
   "devDependencies": {
-    "@playwright/test": "^1.59.1",
+    "@playwright/test": "^1.61.1",
     "@rollup/plugin-terser": "^1.0.0",
     "@vitest/browser": "^4.1.2",
     "@vitest/browser-playwright": "^4.1.2",
