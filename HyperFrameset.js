@@ -488,7 +488,7 @@
 	 * URLux
 	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
-	 */    const document$7 = window.document;
+	 */    const document$5 = window.document;
     class URLux extends URL {
         constructor(href, base) {
             super(href, base);
@@ -527,7 +527,7 @@
             this.attrName = attrName;
             this.loads = loads;
             this.compound = compound;
-            this.supported = attrName in document$7.createElement(tagName);
+            this.supported = attrName in document$5.createElement(tagName);
         }
         resolve(el, baseURL) {
             const url = el.getAttribute(this.attrName);
@@ -576,7 +576,7 @@
 	 (c) Sean Hogan, 2008,2012,2013,2014,2026
 	 Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	*/    const vendorPrefix = "meeko";
-    let document$6 = window.document;
+    let document$4 = window.document;
     const nodeIdSuffix = Math.round(Math.random() * 1e6);
     const nodeIdProperty = `__${vendorPrefix}${nodeIdSuffix}`;
     let nodeCount = 0;
@@ -642,12 +642,12 @@
     }
     function findId(id, doc) {
         if (!id) return;
-        if (!doc) doc = document$6;
+        if (!doc) doc = document$4;
         if (!doc.getElementById) throw Error("Context for findId() must be a Document node");
         return doc.getElementById(id);
     }
     function findAll(selector, node, scope, inclusive) {
-        if (!node) node = document$6;
+        if (!node) node = document$4;
         if (!node.querySelectorAll) return [];
         if (scope && !scope.nodeType) scope = node;
         return scopeify(absSelector => {
@@ -657,7 +657,7 @@
         }, selector, scope);
     }
     function find$1(selector, node, scope, inclusive) {
-        if (!node) node = document$6;
+        if (!node) node = document$4;
         if (!node.querySelector) return null;
         if (scope && !scope.nodeType) scope = node;
         return scopeify(absSelector => {
@@ -702,7 +702,7 @@
                     resolve();
                 }
             });
-            observer.observe(document$6, {
+            observer.observe(document$4, {
                 attributes: true,
                 attributeFilter: [ "hidden" ],
                 subtree: true
@@ -744,14 +744,14 @@
         return refNode;
     }
     function adoptContents(parentNode, doc) {
-        if (!doc) doc = document$6;
+        if (!doc) doc = document$4;
         let frag = doc.createDocumentFragment();
         let node;
         while (node = parentNode.firstChild) frag.appendChild(doc.adoptNode(node));
         return frag;
     }
     function cssReady() {
-        let links = document$6.querySelectorAll('link[rel="stylesheet"]');
+        let links = document$4.querySelectorAll('link[rel="stylesheet"]');
         let promises = Array.from(links, link => {
             if (link.sheet || link.disabled) return Promise.resolve();
             return new Promise(resolve => {
@@ -774,7 +774,7 @@
         return node;
     }
     function createDocument(srcDoc) {
-        if (!srcDoc) srcDoc = document$6;
+        if (!srcDoc) srcDoc = document$4;
         return srcDoc.cloneNode(false);
     }
     function createHTMLDocument(title, srcDoc) {
@@ -812,7 +812,7 @@
 	 * scriptQueue
 	 * Copyright 2009-2016 Sean Hogan (http://meekostuff.net/)
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
-	 */    let document$5 = window.document;
+	 */    let document$3 = window.document;
     class ScriptQueue {
         #queue=[];
         #emptying=false;
@@ -830,7 +830,7 @@
                     resolve();
                     return;
                 }
-                let script = document$5.createElement("script");
+                let script = document$3.createElement("script");
                 if (node.src) addListeners();
                 copyAttributes(script, node);
                 script.text = node.text;
@@ -1381,8 +1381,8 @@
 	 * CSSDecoder
 	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
-	 */    const textAttr$1 = "_text";
-    const htmlAttr$1 = "_html";
+	 */    const TEXT_ATTR = "_text";
+    const HTML_ATTR = "_html";
     const CSS_CONTEXT_VARIABLE = "_";
     class CSSDecoder {
         constructor(options, namespaces) {}
@@ -1402,31 +1402,9 @@
                 result = getAttr(node, attr);
             }
             return result;
-            function getAttr(node, attr) {
-                switch (attr) {
-                  case null:
-                  case undefined:
-                  case "":
-                    return node;
-
-                  case textAttr$1:
-                    return node.textContent;
-
-                  case htmlAttr$1:
-                    let frag = doc.createDocumentFragment();
-                    forEach(node.childNodes, child => {
-                        frag.appendChild(doc.importNode(child, true));
-                    });
-                    return frag;
-
-                  default:
-                    return node.getAttribute(attr);
-                }
-            }
         }
         evaluate(query, context, variables, wantArray) {
             if (!context) context = this.srcNode;
-            let doc = context.nodeType === 9 ? context : context.ownerDocument;
             let queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
             let selector = queryParts[1];
             let attr = queryParts[2];
@@ -1439,27 +1417,28 @@
                 if (!wantArray) result = result[0];
             }
             return result;
-            function getAttr(node, attr) {
-                switch (attr) {
-                  case null:
-                  case undefined:
-                  case "":
-                    return node;
+        }
+    }
+    function getAttr(node, attr) {
+        switch (attr) {
+          case null:
+          case undefined:
+          case "":
+            return node;
 
-                  case textAttr$1:
-                    return node.textContent;
+          case TEXT_ATTR:
+            return node.textContent;
 
-                  case htmlAttr$1:
-                    let frag = doc.createDocumentFragment();
-                    forEach(node.childNodes, child => {
-                        frag.appendChild(doc.importNode(child, true));
-                    });
-                    return frag;
+          case HTML_ATTR:
+            let doc = node.ownerDocument;
+            let frag = doc.createDocumentFragment();
+            forEach(node.childNodes, child => {
+                frag.appendChild(doc.importNode(child, true));
+            });
+            return frag;
 
-                  default:
-                    return node.getAttribute(attr);
-                }
-            }
+          default:
+            return node.getAttribute(attr);
         }
     }
     function matches(element, selectorGroup) {
@@ -1551,13 +1530,12 @@
 	 * Microdata
 	 * HTML Microdata parsing and querying
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
-	 */    const document$4 = window.document;
-    const nodeData = new WeakMap;
+	 */    const nodeData = new WeakMap;
     function intersects(a1, a2) {
         return a1.some(i1 => a2.includes(i1));
     }
     function walkTree$1(root, skipRoot, callback) {
-        let walker = document$4.createNodeIterator(root, 1, el => {
+        let walker = document.createNodeIterator(root, 1, el => {
             if (skipRoot && el === root) return NodeFilter.FILTER_SKIP;
             return callback(el);
         });
@@ -1622,7 +1600,7 @@
         return scopeDesc;
     }
     function parse(rootNode) {
-        if (!rootNode) rootNode = document$4;
+        if (!rootNode) rootNode = document;
         getScopeDesc(rootNode);
     }
     function getItems(rootNode, type) {
@@ -1665,8 +1643,7 @@
 	 * MicrodataDecoder
 	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
-	 */    let document$3 = window.document;
-    class MicrodataDecoder {
+	 */    class MicrodataDecoder {
         constructor(options, namespaces) {}
         init(node) {
             getItems(node);
@@ -1711,6 +1688,10 @@
             if (wantArray) return resultList;
             return resultList[0];
         }
+        matches(context, query) {
+            console.warn("MicrodataDecoder.matches() is not implemented");
+            return false;
+        }
     }
     /*!
 	 * JSONDecoder
@@ -1747,6 +1728,10 @@
             if (wantArray) return resultList;
             let value = resultList[0];
             return value;
+        }
+        matches(context, query) {
+            console.warn("JSONDecoder.matches() is not implemented");
+            return false;
         }
     }
     /*!
@@ -1858,8 +1843,8 @@
 	 * Copyright 2014-2016 Sean Hogan (http://meekostuff.net/)
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */    let document$2 = window.document;
-    const textAttr = "_text";
-    const htmlAttr = "_html";
+    const TEXT_SUFFIX = "_text";
+    const HTML_SUFFIX = "_html";
     const PIPE_OPERATOR = "//>";
     const HAZARD_TRANSFORM_URN = "HazardTransform";
     const hazDefaultNS = new CustomNamespace({
@@ -1929,8 +1914,7 @@
         if (!doc) doc = document$2;
         let div = doc.createElement("div");
         div.innerHTML = html;
-        let result = childNodesToFragment(div);
-        return result;
+        return childNodesToFragment(div);
     }
     class HazardProcessor {
         constructor(options, namespaces) {
@@ -1939,45 +1923,53 @@
             if (!namespaces.lookupNamespace(HAZARD_TRANSFORM_URN)) namespaces.add(hazDefaultNS);
             if (!namespaces.lookupNamespace(HAZARD_EXPRESSION_URN)) namespaces.add(exprDefaultNS);
             if (!namespaces.lookupNamespace(HAZARD_MEXPRESSION_URN)) namespaces.add(mexprDefaultNS);
+            this.#init();
+        }
+        #hazPrefix;
+        #exprPrefix;
+        #mexprPrefix;
+        #exprHtmlAttr;
+        #mexprTextAttr;
+        #exprTextAttr;
+        #exprToHazPriority;
+        #exprToHazMap;
+        #mexprHtmlAttr;
+        #init() {
+            let namespaces = this.namespaces;
+            this.#hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
+            this.#exprPrefix = namespaces.lookupPrefix(HAZARD_EXPRESSION_URN);
+            this.#mexprPrefix = namespaces.lookupPrefix(HAZARD_MEXPRESSION_URN);
+            this.#exprHtmlAttr = this.#exprPrefix + HTML_SUFFIX;
+            this.#mexprTextAttr = this.#mexprPrefix + TEXT_SUFFIX;
+            this.#exprTextAttr = this.#exprPrefix + TEXT_SUFFIX;
+            this.#mexprHtmlAttr = this.#mexprPrefix + HTML_SUFFIX;
+            this.#exprToHazPriority = [ this.#exprHtmlAttr, this.#mexprTextAttr, this.#exprTextAttr ];
+            this.#exprToHazMap = {};
+            this.#exprToHazMap[this.#exprHtmlAttr] = `${this.#hazPrefix}eval`;
+            this.#exprToHazMap[this.#mexprTextAttr] = `${this.#hazPrefix}mtext`;
+            this.#exprToHazMap[this.#exprTextAttr] = `${this.#hazPrefix}text`;
         }
         loadTemplate(template) {
-            let processor = this;
-            processor.root = template;
-            processor.templates = [];
-            let namespaces = processor.namespaces;
-            let hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
-            let exprPrefix = namespaces.lookupPrefix(HAZARD_EXPRESSION_URN);
-            let mexprPrefix = namespaces.lookupPrefix(HAZARD_MEXPRESSION_URN);
-            let exprHtmlAttr = exprPrefix + htmlAttr;
-            let hazEvalTag = `${hazPrefix}eval`;
-            let mexprHtmlAttr = mexprPrefix + htmlAttr;
-            let mexprTextAttr = mexprPrefix + textAttr;
-            let hazMTextTag = `${hazPrefix}mtext`;
-            let exprTextAttr = exprPrefix + textAttr;
-            let hazTextTag = `${hazPrefix}text`;
-            let exprToHazPriority = [ exprHtmlAttr, mexprTextAttr, exprTextAttr ];
-            let exprToHazMap = {};
-            exprToHazMap[exprHtmlAttr] = hazEvalTag;
-            exprToHazMap[mexprTextAttr] = hazMTextTag;
-            exprToHazMap[exprTextAttr] = hazTextTag;
+            this.root = template;
+            this.templates = [];
             let doc = template.ownerDocument;
             walkTree(template, true, el => {
                 let tag = el.localName;
-                if (tag.indexOf(hazPrefix) === 0) return;
-                forEach(exprToHazPriority, attr => {
+                if (tag.indexOf(this.#hazPrefix) === 0) return;
+                forEach(this.#exprToHazPriority, attr => {
                     if (!el.hasAttribute(attr)) return;
-                    let tag = exprToHazMap[attr];
+                    let tag = this.#exprToHazMap[attr];
                     let val = el.getAttribute(attr);
                     el.removeAttribute(attr);
                     el.setAttribute(tag, val);
                 });
-                if (el.hasAttribute(mexprHtmlAttr)) {
-                    console.warn(`Removing unsupported @${mexprHtmlAttr}`);
-                    el.removeAttribute(mexprHtmlAttr);
+                if (el.hasAttribute(this.#mexprHtmlAttr)) {
+                    console.warn(`Removing unsupported @${this.#mexprHtmlAttr}`);
+                    el.removeAttribute(this.#mexprHtmlAttr);
                 }
                 forEach(hazLang, def => {
                     if (!def.attrToElement) return;
-                    let nsTag = hazPrefix + def.tag;
+                    let nsTag = this.#hazPrefix + def.tag;
                     if (!el.hasAttribute(nsTag)) return;
                     let directiveEl = doc.createElement(nsTag);
                     let defaultAttr = def.attrs[0];
@@ -1986,7 +1978,7 @@
                     if (defaultAttr) directiveEl.setAttribute(defaultAttr, value);
                     forEach(def.attrs, (attr, i) => {
                         if (i === 0) return;
-                        let nsAttr = hazPrefix + attr;
+                        let nsAttr = this.#hazPrefix + attr;
                         if (!el.hasAttribute(nsAttr)) return;
                         let value = el.getAttribute(nsAttr);
                         el.removeAttribute(nsAttr);
@@ -2015,53 +2007,102 @@
             });
             walkTree(template, true, el => {
                 let tag = el.localName;
-                if (tag === hazPrefix + "template") markTemplate(el);
-                if (tag === hazPrefix + "choose") implyOtherwise(el);
+                if (tag === this.#hazPrefix + "template") this.#markTemplate(el);
+                if (tag === this.#hazPrefix + "choose") this.#implyOtherwise(el);
             });
-            implyEntryTemplate(template);
+            this.#implyEntryTemplate(template);
             walkTree(template, true, el => {
-                el.hazardDetails = getHazardDetails(el, processor.namespaces);
+                el.hazardDetails = this.#getHazardDetails(el);
             });
-            function implyOtherwise(el) {
-                let otherwise = el.ownerDocument.createElement(hazPrefix + "otherwise");
-                forEach(Array.from(el.childNodes), node => {
-                    let tag = node.localName;
-                    if (tag === hazPrefix + "when") return;
-                    otherwise.appendChild(node);
-                });
-                el.appendChild(otherwise);
-            }
-            function markTemplate(el) {
-                processor.templates.push(el);
-            }
-            function implyEntryTemplate(el) {
-                let firstExplicitTemplate;
-                let contentNodes = filter(el.childNodes, node => {
-                    if (node.nodeType === 3) return /\S/.test(node.nodeValue);
-                    if (node.nodeType !== 1) return false;
-                    let tag = node.localName;
-                    if (tag === hazPrefix + "template") {
-                        if (!firstExplicitTemplate) firstExplicitTemplate = node;
-                        return false;
-                    }
-                    if (tag === hazPrefix + "let") return false;
-                    if (tag === hazPrefix + "param") return false;
-                    return true;
-                });
-                if (contentNodes.length <= 0) {
-                    if (firstExplicitTemplate) return;
-                    console.warn("This Hazard Template cannot generate any content.");
+        }
+        #markTemplate(el) {
+            this.templates.push(el);
+        }
+        #implyOtherwise(el) {
+            let otherwise = el.ownerDocument.createElement(this.#hazPrefix + "otherwise");
+            forEach(Array.from(el.childNodes), node => {
+                let tag = node.localName;
+                if (tag === this.#hazPrefix + "when") return;
+                otherwise.appendChild(node);
+            });
+            el.appendChild(otherwise);
+        }
+        #implyEntryTemplate(el) {
+            let firstExplicitTemplate;
+            let contentNodes = filter(el.childNodes, node => {
+                if (node.nodeType === 3) return /\S/.test(node.nodeValue);
+                if (node.nodeType !== 1) return false;
+                let tag = node.localName;
+                if (tag === this.#hazPrefix + "template") {
+                    if (!firstExplicitTemplate) firstExplicitTemplate = node;
+                    return false;
                 }
-                let entryTemplate = el.ownerDocument.createElement(hazPrefix + "template");
-                forEach(contentNodes, node => {
-                    entryTemplate.appendChild(node);
-                });
-                if (firstExplicitTemplate) el.insertBefore(entryTemplate, firstExplicitTemplate); else el.appendChild(entryTemplate);
-                processor.templates.unshift(entryTemplate);
+                if (tag === this.#hazPrefix + "let") return false;
+                if (tag === this.#hazPrefix + "param") return false;
+                return true;
+            });
+            if (contentNodes.length <= 0) {
+                if (firstExplicitTemplate) return;
+                console.warn("This Hazard Template cannot generate any content.");
             }
+            let entryTemplate = el.ownerDocument.createElement(this.#hazPrefix + "template");
+            forEach(contentNodes, node => {
+                entryTemplate.appendChild(node);
+            });
+            if (firstExplicitTemplate) el.insertBefore(entryTemplate, firstExplicitTemplate); else el.appendChild(entryTemplate);
+            this.templates.unshift(entryTemplate);
         }
         getEntryTemplate() {
             return this.templates[0];
+        }
+        #getHazardDetails(el) {
+            console.assert(el.nodeType === 1);
+            let details = {};
+            let tag = el.localName;
+            let isHazElement = tag.indexOf(this.#hazPrefix) === 0;
+            if (isHazElement) {
+                tag = tag.substr(this.#hazPrefix.length);
+                let def = hazLangLookup[tag];
+                details.definition = def || {
+                    tag: ""
+                };
+            }
+            details.exprAttributes = this.#getExprAttributes(el);
+            return details;
+        }
+        #getExprAttributes(el) {
+            let attrs = [];
+            let namespaces = this.namespaces;
+            let exprNS = namespaces.lookupNamespace(HAZARD_EXPRESSION_URN);
+            let mexprNS = namespaces.lookupNamespace(HAZARD_MEXPRESSION_URN);
+            forEach(Array.from(el.attributes), attr => {
+                let ns = find$2([ exprNS, mexprNS ], ns => attr.name.indexOf(ns.prefix) === 0);
+                if (!ns) return;
+                let prefix = ns.prefix;
+                let namespaceURI = ns.urn;
+                let attrName = attr.name.substr(prefix.length);
+                el.removeAttribute(attr.name);
+                let desc = {
+                    namespaceURI: namespaceURI,
+                    prefix: prefix,
+                    attrName: attrName,
+                    type: "text"
+                };
+                switch (namespaceURI) {
+                  case HAZARD_EXPRESSION_URN:
+                    desc.expression = interpretExpression(attr.value);
+                    break;
+
+                  case HAZARD_MEXPRESSION_URN:
+                    desc.mexpression = interpretMExpression(attr.value);
+                    break;
+
+                  default:
+                    break;
+                }
+                attrs.push(desc);
+            });
+            return attrs;
         }
         getNamedTemplate(name) {
             let processor = this;
@@ -2098,13 +2139,23 @@
                     return result;
                 },
                 get: key => {
-                    let result = key in processor.localVars && processor.localVars[key] || key in processor.localParams && processor.localParams[key] || key in processor.globalVars && processor.globalVars[key] || key in processor.globalParams && processor.globalParams[key] || undefined;
-                    return result;
+                    if (key in processor.localVars) return processor.localVars[key];
+                    if (key in processor.localParams) return processor.localParams[key];
+                    if (key in processor.globalVars) return processor.globalVars[key];
+                    if (key in processor.globalParams) return processor.globalParams[key];
+                    return undefined;
                 },
                 set: (key, value, inParams, isGlobal) => {
                     let mapName = isGlobal ? inParams ? "globalParams" : "globalVars" : inParams ? "localParams" : "localVars";
-                    if (mapName === "localParams" && key in processor.localParams) return;
-                    if (mapName === "globalParams" && key in processor.globalParams) return;
+                    if (inParams && key in processor[mapName]) {
+                        console.warn(`Param "${key}" already set`);
+                        return;
+                    }
+                    if (value == null) {
+                        console.warn(`Variable "${key}" set to null/undefined — removing from scope`);
+                        delete processor[mapName][key];
+                        return;
+                    }
                     processor[mapName][key] = value;
                 },
                 push: params => {
@@ -2163,6 +2214,7 @@
             let name, selector, value, type, template, node, expr, mexpr;
             switch (def.tag) {
               default:
+                console.warn(`Unknown hazard element <${el.localName}> — processing children only`);
                 return processor.transformChildNodes(el, context, frag);
 
               case "template":
@@ -2177,7 +2229,7 @@
                         value = processor.provider.evaluate(selector, context, processor.variables, false);
                     } catch (err) {
                         window.reportError(err);
-                        console.warn('Error evaluating <haz:var name="' + name + '" select="' + selector + '">. Assumed empty.');
+                        console.warn(`Error evaluating <haz:var name="${name}" select="${selector}">. Assumed empty.`);
                         value = undefined;
                     }
                 }
@@ -2193,7 +2245,7 @@
                         value = processor.provider.evaluate(selector, context, processor.variables, false);
                     } catch (err) {
                         window.reportError(err);
-                        console.warn('Error evaluating <haz:param name="' + name + '" select="' + selector + '">. Assumed empty.');
+                        console.warn(`Error evaluating <haz:param name="${name}" select="${selector}">. Assumed empty.`);
                         value = undefined;
                     }
                 }
@@ -2204,17 +2256,17 @@
                 name = el.getAttribute("name");
                 template = processor.getNamedTemplate(name);
                 if (!template) {
-                    console.warn("Hazard could not find template name=" + name);
+                    console.warn(`Hazard could not find template name="${name}"`);
                     return frag;
                 }
                 return processor.transformTemplate(template, context, null, frag);
 
               case "apply":
                 template = processor.getMatchingTemplate(context);
-                let promise = Thenfu.asap(el);
                 if (template) {
                     return processor.transformTemplate(template, context, null, frag);
                 }
+                console.warn("<haz:apply> found no matching template:", context);
                 node = context.cloneNode(false);
                 frag.appendChild(node);
                 return Thenfu.reduce(null, context.childNodes, (dummy, child) => processor.transformHazardTree(el, child, node));
@@ -2233,7 +2285,10 @@
                 mexpr = el.getAttribute("name");
                 name = evalMExpression(mexpr, processor.provider, context, processor.variables);
                 type = typeof value;
-                if (type !== "string") return frag;
+                if (type !== "string") {
+                    console.debug(`<haz:element name="${mexpr}"> did not resolve to a string — skipped`);
+                    return frag;
+                }
                 node = doc.createElement(name);
                 frag.appendChild(node);
                 return processor.transformChildNodes(el, context, node);
@@ -2242,7 +2297,10 @@
                 mexpr = el.getAttribute("name");
                 name = evalMExpression(mexpr, processor.provider, context, processor.variables);
                 type = typeof value;
-                if (type !== "string") return frag;
+                if (type !== "string") {
+                    console.debug(`<haz:attr name="${mexpr}"> did not resolve to a string — skipped`);
+                    return frag;
+                }
                 node = doc.createDocumentFragment();
                 return processor.transformChildNodes(el, context, node).then(() => {
                     value = node.textContent;
@@ -2254,7 +2312,10 @@
                 selector = el.getAttribute("select");
                 value = evalExpression(selector, processor.provider, context, processor.variables, "node");
                 type = typeof value;
-                if (type === "undefined" || type === "boolean" || value == null) return frag;
+                if (type === "undefined" || type === "boolean" || value == null) {
+                    console.debug(`<haz:eval select="${selector}"> resolved to nothing`);
+                    return frag;
+                }
                 if (!value.nodeType) {
                     value = htmlToFragment(value, doc);
                 }
@@ -2264,7 +2325,10 @@
               case "mtext":
                 mexpr = el.getAttribute("select");
                 value = evalMExpression(mexpr, processor.provider, context, processor.variables);
-                if (type === "undefined" || type === "boolean" || value == null) return frag;
+                if (type === "undefined" || type === "boolean" || value == null) {
+                    console.debug(`<haz:mtext select="${mexpr}"> resolved to nothing`);
+                    return frag;
+                }
                 if (!value.nodeType) {
                     value = doc.createTextNode(value);
                 }
@@ -2275,7 +2339,10 @@
                 expr = el.getAttribute("select");
                 value = evalExpression(expr, processor.provider, context, processor.variables, "text");
                 type = typeof value;
-                if (type === "undefined" || type === "boolean" || value == null) return frag;
+                if (type === "undefined" || type === "boolean" || value == null) {
+                    console.debug(`<haz:text select="${expr}"> resolved to nothing`);
+                    return frag;
+                }
                 if (!value.nodeType) {
                     value = doc.createTextNode(value);
                 }
@@ -2292,7 +2359,7 @@
                     pass = evalExpression(testVal, processor.provider, context, processor.variables, "boolean");
                 } catch (err) {
                     window.reportError(err);
-                    console.warn('Error evaluating <haz:if test="' + testVal + '">. Assumed false.');
+                    console.warn(`Error evaluating <haz:if test="${testVal}">. Assumed false.`);
                     pass = false;
                 }
                 if (invertTest) pass = !pass;
@@ -2318,7 +2385,10 @@
                     return true;
                 });
                 if (!found) when = otherwise;
-                if (!when) return frag;
+                if (!when) {
+                    console.debug("<haz:choose> had no matching <haz:when> and no <haz:otherwise>");
+                    return frag;
+                }
                 return processor.transformChildNodes(when, context, frag);
 
               case "one":
@@ -2328,10 +2398,13 @@
                     subContext = processor.provider.evaluate(selector, context, processor.variables, false);
                 } catch (err) {
                     window.reportError(err);
-                    console.warn('Error evaluating <haz:one select="' + selector + '">. Assumed empty.');
+                    console.warn(`Error evaluating <haz:one select="${selector}">. Assumed empty.`);
                     return frag;
                 }
-                if (!subContext) return frag;
+                if (!subContext) {
+                    console.debug(`<haz:one select="${selector}"> resolved to nothing`);
+                    return frag;
+                }
                 return processor.transformChildNodes(el, subContext, frag);
 
               case "each":
@@ -2341,7 +2414,7 @@
                     subContexts = processor.provider.evaluate(selector, context, processor.variables, true);
                 } catch (err) {
                     window.reportError(err);
-                    console.warn('Error evaluating <haz:each select="' + selector + '">. Assumed empty.');
+                    console.warn(`Error evaluating <haz:each select="${selector}">. Assumed empty.`);
                     return frag;
                 }
                 return Thenfu.reduce(null, subContexts, (dummy, subContext) => processor.transformChildNodes(el, subContext, frag));
@@ -2365,62 +2438,13 @@
                     value = desc.namespaceURI === HAZARD_MEXPRESSION_URN ? processMExpression(desc.mexpression, processor.provider, context, processor.variables) : processExpression(desc.expression, processor.provider, context, processor.variables, desc.type);
                 } catch (err) {
                     window.reportError(err);
-                    console.warn("Error evaluating @" + desc.attrName + '="' + desc.expression + '". Assumed false.');
+                    console.warn(`Error evaluating @${desc.attrName}="${desc.expression}". Assumed false.`);
                     value = false;
                 }
                 setAttribute(el, desc.attrName, value);
             });
             return el;
         }
-    }
-    function getHazardDetails(el, namespaces) {
-        console.assert(el.nodeType === 1);
-        let details = {};
-        let tag = el.localName;
-        let hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
-        let isHazElement = tag.indexOf(hazPrefix) === 0;
-        if (isHazElement) {
-            tag = tag.substr(hazPrefix.length);
-            let def = hazLangLookup[tag];
-            details.definition = def || {
-                tag: ""
-            };
-        }
-        details.exprAttributes = getExprAttributes(el, namespaces);
-        return details;
-    }
-    function getExprAttributes(el, namespaces) {
-        let attrs = [];
-        let exprNS = namespaces.lookupNamespace(HAZARD_EXPRESSION_URN);
-        let mexprNS = namespaces.lookupNamespace(HAZARD_MEXPRESSION_URN);
-        forEach(Array.from(el.attributes), attr => {
-            let ns = find$2([ exprNS, mexprNS ], ns => attr.name.indexOf(ns.prefix) === 0);
-            if (!ns) return;
-            let prefix = ns.prefix;
-            let namespaceURI = ns.urn;
-            let attrName = attr.name.substr(prefix.length);
-            el.removeAttribute(attr.name);
-            let desc = {
-                namespaceURI: namespaceURI,
-                prefix: prefix,
-                attrName: attrName,
-                type: "text"
-            };
-            switch (namespaceURI) {
-              case HAZARD_EXPRESSION_URN:
-                desc.expression = interpretExpression(attr.value);
-                break;
-
-              case HAZARD_MEXPRESSION_URN:
-                desc.mexpression = interpretMExpression(attr.value);
-                break;
-
-              default:
-                break;
-            }
-            attrs.push(desc);
-        });
-        return attrs;
     }
     function setAttribute(el, attrName, value) {
         let type = typeof value;
@@ -2432,13 +2456,11 @@
     }
     function evalMExpression(mexprText, provider, context, variables) {
         let mexpr = interpretMExpression(mexprText);
-        let result = processMExpression(mexpr, provider, context, variables);
-        return result;
+        return processMExpression(mexpr, provider, context, variables);
     }
     function evalExpression(exprText, provider, context, variables, type) {
         let expr = interpretExpression(exprText);
-        let result = processExpression(expr, provider, context, variables, type);
-        return result;
+        return processExpression(expr, provider, context, variables, type);
     }
     function interpretMExpression(mexprText) {
         let expressions = [];
@@ -2463,14 +2485,14 @@
             let text = filterSpec;
             let m = text.match(/^([_a-zA-Z][_a-zA-Z0-9]*)\s*(:?)/);
             if (!m) {
-                console.warn("Syntax Error in filter call: " + filterSpec);
+                console.warn(`Syntax Error in filter call: ${filterSpec}`);
                 return false;
             }
             let filterName = m[1];
             let hasParams = m[2];
             text = text.substr(m[0].length);
             if (!hasParams && /\S+/.test(text)) {
-                console.warn("Syntax Error in filter call: " + filterSpec);
+                console.warn(`Syntax Error in filter call: ${filterSpec}`);
                 return false;
             }
             try {
@@ -2482,7 +2504,7 @@
                 });
                 return true;
             } catch (err) {
-                console.warn("Syntax Error in filter call: " + filterSpec);
+                console.warn(`Syntax Error in filter call: ${filterSpec}`);
                 return false;
             }
         });
@@ -2493,7 +2515,6 @@
         return mexpr.template.replace(/\{\{\}\}/g, all => processExpression(mexpr.expressions[i++], provider, context, variables, "text"));
     }
     function processExpression(expr, provider, context, variables, type) {
-        let doc = context && context.nodeType ? context.nodeType === 9 ? context : context.ownerDocument : document$2;
         let value = provider.evaluate(expr.selector, context, variables);
         every(expr.filters, filter => {
             if (value == null) value = "";
@@ -2505,40 +2526,49 @@
                 return true;
             } catch (err) {
                 window.reportError(err);
-                console.warn('Failure processing filter call: "' + filter.text + '" with input: "' + value + '"');
+                console.warn(`Failure processing filter call: "${filter.text}" with input: "${value}"`);
                 value = "";
                 return false;
             }
         });
-        let result = cast(value, type);
-        return result;
-        function cast(value, type) {
-            switch (type) {
-              case "text":
-                if (value && value.nodeType) value = value.textContent;
-                break;
+        return cast(value, type, context);
+    }
+    function getDocument(context) {
+        if (context && context.nodeType === 9) return context;
+        if (context && context.ownerDocument) return context.ownerDocument;
+        return document$2;
+    }
+    function cast(value, type, context) {
+        switch (type) {
+          case "text":
+            if (value && value.nodeType) value = value.textContent;
+            break;
 
-              case "node":
-                let frag = doc.createDocumentFragment();
-                if (value && value.nodeType) frag.appendChild(doc.importNode(value, true)); else {
-                    let div = doc.createElement("div");
-                    div.innerHTML = value;
-                    let node;
-                    while (node = div.firstChild) frag.appendChild(node);
-                }
-                value = frag;
-                break;
-
-              case "boolean":
-                if (value == null || value === false) value = false; else value = true;
-                break;
-
-              default:
-                if (value && value.nodeType) value = value.textContent;
-                break;
+          case "node":
+            let doc = getDocument(context);
+            let frag = doc.createDocumentFragment();
+            if (value && value.nodeType) frag.appendChild(doc.importNode(value, true)); else {
+                let div = doc.createElement("div");
+                div.innerHTML = value;
+                let node;
+                while (node = div.firstChild) frag.appendChild(node);
             }
-            return value;
+            value = frag;
+            break;
+
+          case "boolean":
+            if (value == null || value === false) value = false; else {
+                if (!value) console.warn(`Casting present but falsy value (${JSON.stringify(value)}) to true`);
+                value = true;
+            }
+            break;
+
+          default:
+            console.warn(`Unexpected cast type: ${type}`);
+            if (value && value.nodeType) value = value.textContent;
+            break;
         }
+        return value;
     }
     /*!
 	 * Builtin Processors
@@ -2758,7 +2788,7 @@
         cssText += `${ns.lookupTagName("body")} { ${boxSizingCSS} display: block; width: auto; height: auto; margin: 0; }\n`;
         let style = document.createElement("style");
         style.textContent = cssText;
-        document.head.insertBefore(style, document.head.firstChild);
+        document.head.append(style);
     }
     let layoutElements = {
         register: registerLayoutElements
@@ -3139,7 +3169,7 @@
         let cssText = `${tagName} { box-sizing: border-box; display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0; }`;
         let style = document.createElement("style");
         style.textContent = cssText;
-        document.head.insertBefore(style, document.head.firstChild);
+        document.head.append(style);
     }
     let transcluder = {
         registerElement: registerElement
@@ -3529,6 +3559,19 @@
 	 */    const FRAMESET_REL = "frameset";
     const SELF_REL = "self";
     let document$1 = window.document;
+    function isExecutableScript(node) {
+        if (node.localName !== "script") return false;
+        return !node.type || /^text\/javascript/i.test(node.type) || node.type === "module";
+    }
+    function walkSiblings(inclusiveStart, callback, exclusiveEnd) {
+        if (exclusiveEnd) console.assert(inclusiveStart.parentNode === exclusiveEnd.parentNode);
+        let node = inclusiveStart;
+        while (node && node !== exclusiveEnd) {
+            let next = node.nextSibling;
+            callback(node);
+            node = next;
+        }
+    }
     class Framer {
         options={};
         frameset=null;
@@ -3548,8 +3591,8 @@
             framer.started = true;
             framer.behaviors = install({
                 globalName: "behaviors",
-                attr: "config",
-                container: document$1.body,
+                attr: "_config",
+                container: document$1.head,
                 autoProcess: false
             });
             if (!startOptions || !startOptions.contentDocument) {
@@ -3563,9 +3606,9 @@
             }));
             return Thenfu.pipe(null, [ () => Thenfu.wait(() => !!document$1.body), () => {
                 let framerConfig;
-                framerConfig = framer.lookup(document$1.URL);
+                framerConfig = framer.lookupFrameset(document$1.URL);
                 if (framerConfig) return framerConfig;
-                return startOptions.contentDocument.then(doc => framer.detect(doc));
+                return startOptions.contentDocument.then(doc => framer.detectFrameset(doc));
             }, framerConfig => {
                 if (!framerConfig) throw Error("No frameset could be determined for this page");
                 framer.scope = framerConfig.scope;
@@ -3604,7 +3647,7 @@
                 });
             }), () => {
                 if (startURL) history.replaceState(null, "", startURL);
-            }, () => definition.preprocess(), () => Framer.#insertMarkers(document$1.URL, framer.framesetURL, true), () => framer.#activate(), () => {
+            }, () => definition.preprocess(), () => Framer.#insertMarkers(document$1.URL, framer.framesetURL), () => framer.#activate(), () => {
                 if (startOptions && startOptions.hide) document$1.body.hidden = false;
             } ]);
         }
@@ -3619,69 +3662,102 @@
         #activate() {
             let framer = this;
             return Thenfu.pipe(null, [ () => {
+                Framer.#registerFrames(framer.definition);
+                framer.#registerFramesetElement();
+                let namespace = framer.definition.namespaces.lookupNamespace(HYPERFRAMESET_URN);
+                layoutElements.register(namespace);
+                transcluder.registerElement(namespace, "transclude", HTransclude);
+                transcluder.registerElement(namespace, "frame", HFrame);
+            }, () => {
+                navigation.addEventListener("navigate", e => this.onNavigate(e));
                 window.addEventListener("click", e => {
                     if (e.defaultPrevented) return;
                     let acceptDefault = framer.onClick(e);
                     if (acceptDefault === false) e.preventDefault();
                 }, false);
-                window.addEventListener("submit", e => {
-                    if (e.defaultPrevented) return;
-                    let acceptDefault = framer.onSubmit(e);
-                    if (acceptDefault === false) e.preventDefault();
-                }, false);
-                Framer.#registerFrames(framer.definition);
-                Framer.#registerFramesetElement();
-                let namespace = framer.definition.namespaces.lookupNamespace(HYPERFRAMESET_URN);
-                layoutElements.register(namespace);
-                transcluder.registerElement(namespace, "transclude", HTransclude);
-                transcluder.registerElement(namespace, "frame", HFrame);
-                this.framesetReady.resolve();
-            }, () => framer.framesetReady.promise.then(() => {
-                let changeset = framer.currentChangeset;
+            }, () => {
+                let url = document$1.URL;
+                if (url === this.framesetURL) return;
+                this.currentChangeset = this.frameset.lookup(url, {
+                    referrer: document$1.referrer
+                });
+                console.debug("framesetEntered: options.lookup returned", this.currentChangeset);
+                if (!this.currentChangeset && this.options.lookupTarget) {
+                    let target = this.options.lookupTarget(url);
+                    if (target) this.currentChangeset = Framer.#inferChangeset(url, target);
+                    console.debug("framesetEntered: config.lookupTarget returned", this.currentChangeset);
+                }
+            }, () => {
+                let changeset = this.currentChangeset;
                 if (changeset) {
-                    let state = HistoryState.create(changeset, "", document$1.URL);
+                    console.debug("#activate: calling renderChangeset()", changeset);
                     navigation.updateCurrentEntry({
-                        state: state.settings
+                        state: HistoryState.create(changeset, "", document$1.URL).settings
+                    });
+                    return this.#renderChangeset(document$1.URL, changeset, {
+                        isFrameset: true,
+                        firstLoad: true
                     });
                 }
-                navigation.addEventListener("navigate", e => {
-                    if (!e.canIntercept) return;
-                    if (e.navigationType === "traverse") {
-                        e.intercept({
-                            handler: () => {
-                                let settings = navigation.currentEntry.getState();
-                                if (!HistoryState.isValid(settings)) return;
-                                let state = new HistoryState(settings);
-                                framer.onPopState(state.getData());
-                            }
-                        });
-                    }
-                });
-            }), () => {
-                Framer.#notify({
-                    module: "frameset",
-                    type: "enteredState",
-                    stage: "after",
-                    url: document$1.URL
-                });
+                console.debug("#activate: no changeset, skipping renderChangeset()");
             }, () => cssReady() ]);
         }
-        framesetEntered(frameset) {
-            this.frameset = frameset;
-            let url = document$1.URL;
-            if (url === this.framesetURL) return;
-            this.currentChangeset = frameset.lookup(url, {
-                referrer: document$1.referrer
-            });
-            console.debug("framesetEntered: lookup returned", this.currentChangeset, "for", url);
-            if (!this.currentChangeset && this.options.lookup) {
-                let target = this.options.lookup(url);
-                if (target) this.currentChangeset = Framer.#inferChangeset(url, target);
-                console.debug("framesetEntered: options.lookup returned", this.currentChangeset);
+        onNavigate(e) {
+            console.debug("navigate event:", e.navigationType, e.destination.url, "canIntercept:", e.canIntercept, "hashChange:", e.hashChange);
+            if (!e.canIntercept) {
+                console.debug("navigate: not interceptable, allowing default");
+                return;
             }
-        }
-        framesetLeft(frameset) {
-            delete this.frameset;
+            if (e.navigationType === "traverse") {
+                let settings = e.destination.getState() ?? navigation.entries().find(entry => entry.key === e.destination.key)?.getState();
+                if (!HistoryState.isValid(settings)) {
+                    console.warn(`Traversal to ${e.destination.url} has no HyperFrameset state — allowing default navigation`);
+                    return;
+                }
+                console.debug("navigate: intercepting traverse");
+                e.intercept({
+                    handler: async () => {
+                        console.debug("traverse handler: running onPopState");
+                        let state = new HistoryState(settings);
+                        this.onPopState(state.getData());
+                        console.debug("traverse handler: complete");
+                    }
+                });
+            } else if (e.navigationType === "push" || e.navigationType === "replace") {
+                if (e.formData) {
+                    console.debug("navigate: form submission, allowing default");
+                    return;
+                }
+                let sourceElement = e.sourceElement || e.info?.sourceElement || document$1.body;
+                console.debug("navigate: dispatching requestnavigation to", sourceElement.localName || "body");
+                let reqEvent = new NavigateEvent("requestnavigation", e);
+                let handled = !sourceElement.dispatchEvent(reqEvent);
+                console.debug("navigate: requestnavigation handled by frame?", handled);
+                if (handled) {
+                    console.debug("navigate: frame handled, calling preventDefault");
+                    e.preventDefault();
+                } else {
+                    console.debug("navigate: calling onRequestNavigation on frameset");
+                    let framesetHandled = !this.onRequestNavigation(e, this.frameset);
+                    console.debug("navigate: framesetHandled =", framesetHandled);
+                    if (framesetHandled) {
+                        let changeset = this.currentChangeset;
+                        console.debug("navigate: intercepting with changeset", changeset);
+                        e.intercept({
+                            handler: async () => {
+                                console.debug("navigate intercept handler: saving state");
+                                let state = HistoryState.create(changeset, "", e.destination.url);
+                                navigation.updateCurrentEntry({
+                                    state: state.settings
+                                });
+                                console.debug("navigate intercept handler: complete");
+                            }
+                        });
+                    } else {
+                        console.debug("navigate: frameset did not handle, allowing default navigation");
+                    }
+                }
+            }
         }
         frameEntered(frame) {
             let targetName = frame.getAttribute("targetname");
@@ -3692,68 +3768,31 @@
             }
         }
         onClick(e) {
-            if (e.button != 0) return;
+            if (e.defaultPrevented) return;
+            if (e.button !== 0) return;
             if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
-            let linkElement = closest(e.target, "a, [link]");
+            let linkElement = closest(e.target, "[link]");
             if (!linkElement) return;
-            let hyperlink;
-            if (linkElement.localName === "a") hyperlink = linkElement; else {
-                hyperlink = find$1("a, link", linkElement);
-                if (!hyperlink) hyperlink = closest("a", linkElement);
-                if (!hyperlink) return;
-            }
+            let hyperlink = find$1("a, link", linkElement);
+            if (!hyperlink) return;
             let href = hyperlink.getAttribute("href");
             if (!href) return;
             let baseURL = URLux.create(document$1.URL);
             let url = baseURL.resolve(href);
-            let details = {
-                url: url,
-                element: hyperlink
-            };
-            this.triggerRequestNavigation(details.url, details);
-            return false;
-        }
-        onSubmit(e) {
-            let form = e.target;
-            if (form.target) return;
-            let baseURL = URLux.create(document$1.URL);
-            let action = baseURL.resolve(form.action);
-            let details = {
-                element: form
-            };
-            let method = lc(form.method);
-            switch (method) {
-              case "get":
-                let oURL = URLux.create(action);
-                let query = Framer.#encode(form);
-                details.url = oURL.nosearch + (oURL.search || "?") + query + oURL.hash;
-                break;
-
-              default:
-                return;
-            }
-            this.triggerRequestNavigation(details.url, details);
-            return false;
-        }
-        triggerRequestNavigation(url, details) {
-            Thenfu.defer(() => {
-                let event = new CustomEvent("requestnavigation", {
-                    bubbles: true,
-                    cancelable: true,
-                    detail: details.url
-                });
-                let acceptDefault = details.element.dispatchEvent(event);
-                if (acceptDefault !== false) {
-                    location.assign(details.url);
+            Task.asap(() => navigation.navigate(url, {
+                info: {
+                    sourceElement: linkElement
                 }
-            });
+            }));
+            return false;
         }
         onRequestNavigation(e, frame) {
             if (!frame) throw Error("Invalid frame / frameset in onRequestNavigation");
-            let url = e.detail;
+            let url = e.destination.url;
+            let sourceElement = e.sourceElement || e.info?.sourceElement || e.target;
             let details = {
                 url: url,
-                element: e.target
+                element: sourceElement
             };
             let framer = this;
             if (!frame.isFrameset) {
@@ -3762,14 +3801,14 @@
             }
             let baseURL = URLux.create(document$1.URL);
             let oURL = URLux.create(url);
-            if (oURL.origin != baseURL.origin) return;
+            if (oURL.origin !== baseURL.origin) return;
             let isPageLink = oURL.nohash === baseURL.nohash;
             if (isPageLink) {
                 framer.onPageLink(url, details);
                 return false;
             }
             let frameset = frame;
-            let framesetScope = framer.lookup(url);
+            let framesetScope = framer.lookupFrameset(url);
             if (!framesetScope || !framer.compareFramesetScope(framesetScope)) return;
             if (framer.requestNavigation(frameset, url, details)) return false;
         }
@@ -3777,18 +3816,23 @@
             let changeset = frame.lookup(url, details);
             if (changeset === "" || changeset === true) return true;
             if (changeset == null || changeset === false) return false;
-            this.load(url, changeset, frame.isFrameset);
+            this.currentChangeset = changeset;
+            this.#renderChangeset(url, changeset, {
+                isFrameset: frame.isFrameset
+            });
             return true;
         }
         onPageLink(url, details) {
             console.warn("Ignoring on-same-page links for now.");
         }
-        navigate(url, changeset) {
-            return this.load(url, changeset, true);
+        navigate(url, changeset, useReplace) {
+            return navigation.navigate(url, {
+                history: !!useReplace ? "replace" : "push",
+                state: HistoryState.create(changeset, "", url)
+            });
         }
-        load(url, changeset, changeState) {
-            let framer = this;
-            let mustNotify = changeState || changeState === 0;
+        #renderChangeset(url, changeset, options) {
+            let {isFrameset: isFrameset = false, firstLoad: firstLoad = false} = options || {};
             let target = changeset.target;
             let frames = document$1.body.querySelectorAll(`[targetname="${target}"]`);
             frames = Array.from(frames).filter(el => el instanceof HFrame);
@@ -3802,28 +3846,26 @@
             };
             let response;
             return Thenfu.pipe(null, [ () => {
-                if (mustNotify) return Framer.#notify({
+                if (isFrameset && !firstLoad) return Framer.#notify({
                     module: "frameset",
                     type: "leftState",
                     stage: "before",
                     url: document$1.URL
                 });
-            }, () => {
-                forEach(frames, frame => {
-                    frame.setAttribute("src", fullURL);
-                });
             }, () => httpProxy.load(nohash, request).then(resp => {
                 response = resp;
             }), () => {
-                if (changeState) {
-                    let state = HistoryState.create(changeset, "", url);
-                    history.pushState(null, "", url);
-                    navigation.updateCurrentEntry({
-                        state: state.settings
-                    });
-                }
+                forEach(frames, frame => {
+                    frame.setAttribute("src", fullURL);
+                });
             }, () => {
-                if (mustNotify) return Framer.#notify({
+                if (!isFrameset) return;
+                Framer.#separateHead(document$1, false);
+                let selfMarker = Framer.#getSelfMarker();
+                if (selfMarker) selfMarker.href = url;
+                if (response?.document?.head) Framer.#mergeHead(document$1, response.document.head, false);
+            }, () => {
+                if (isFrameset) return Framer.#notify({
                     module: "frameset",
                     type: "enteredState",
                     stage: "after",
@@ -3836,25 +3878,27 @@
             if (url !== document$1.URL) {
                 console.warn("Popped state URL does not match address-bar URL.");
             }
-            this.load(url, changeset, 0);
+            this.#renderChangeset(url, changeset, {
+                isFrameset: true
+            });
         }
-        lookup(docURL) {
-            if (!this.options.lookup) {
+        lookupFrameset(docURL) {
+            if (!this.options.lookupFrameset) {
                 if (docURL.indexOf(this.scope) === 0) return {
                     scope: this.scope,
                     framesetURL: this.framesetURL
                 };
                 return false;
             }
-            let result = this.options.lookup(docURL);
+            let result = this.options.lookupFrameset(docURL);
             if (result == null || result === false) return false;
             if (typeof result === "string") result = Framer.#implyFramesetScope(result, docURL);
             if (typeof result !== "object" || !result.scope || !result.framesetURL) throw Error("Unexpected result from frameset lookup");
             return result;
         }
-        detect(srcDoc) {
-            if (!this.options.detect) return;
-            let result = this.options.detect(srcDoc);
+        detectFrameset(srcDoc) {
+            if (!this.options.detectFrameset) return;
+            let result = this.options.detectFrameset(srcDoc);
             if (result == null || result === false) return false;
             if (typeof result === "string") result = Framer.#implyFramesetScope(result, document$1.URL);
             if (typeof result !== "object" || !result.scope || !result.framesetURL) throw Error("Unexpected result from frameset detect");
@@ -3888,7 +3932,7 @@
                 let dstBody = dstDoc.body;
                 let node;
                 while (node = dstBody.firstChild) dstBody.removeChild(node);
-            }, () => Framer.#insertMarkers(dstDoc.URL, definition.src, false), () => {
+            }, () => Framer.#insertMarkers(dstDoc.URL, definition.src), () => {
                 Framer.#mergeElement(dstDoc.documentElement, srcDoc.documentElement);
                 Framer.#mergeElement(dstDoc.head, srcDoc.head);
                 Framer.#mergeHead(dstDoc, srcDoc.head, true);
@@ -3904,21 +3948,15 @@
             Framer.#mergeElement(dstBody, srcBody);
         }
         static #separateHead(dstDoc, isFrameset) {
-            let dstHead = dstDoc.head;
             let framesetMarker = Framer.#getFramesetMarker(dstDoc);
             if (!framesetMarker) throw Error(`No ${FRAMESET_REL} marker found. `);
             let selfMarker = Framer.#getSelfMarker(dstDoc);
-            if (isFrameset) Framer.#removeBetween(framesetMarker, selfMarker); else Framer.#removeBetween(selfMarker);
+            if (isFrameset) Framer.#removeBetween(framesetMarker); else Framer.#removeBetween(selfMarker, framesetMarker);
         }
         static #removeBetween(exclusiveStart, exclusiveEnd) {
-            let node = exclusiveStart.nextSibling;
-            while (node && node !== exclusiveEnd) {
-                let next = node.nextSibling;
-                if (!(node.localName === "script" && (!node.type || /^text\/javascript/i.test(node.type)))) {
-                    node.remove();
-                }
-                node = next;
-            }
+            walkSiblings(exclusiveStart.nextSibling, node => {
+                if (!isExecutableScript(node)) node.remove();
+            }, exclusiveEnd);
         }
         static #mergeHead(dstDoc, srcHead, isFrameset) {
             let baseURL = URLux.create(dstDoc.URL);
@@ -3934,11 +3972,13 @@
                     break;
 
                   case "title":
-                    if (isFrameset) return;
                     if (!srcNode.innerHTML) return;
                     break;
 
                   case "link":
+                    if (/\bframeset\b/i.test(srcNode.rel)) return;
+                    if (/\bself\b/i.test(srcNode.rel)) return;
+                    if (!isFrameset && /\bstylesheet\b/i.test(srcNode.rel)) return;
                     break;
 
                   case "meta":
@@ -3946,6 +3986,7 @@
                     break;
 
                   case "style":
+                    if (!isFrameset) return;
                     break;
 
                   case "script":
@@ -3953,7 +3994,7 @@
                     if (!srcNode.type || /^text\/javascript$/i.test(srcNode.type)) srcNode.type = "text/javascript?disabled";
                     break;
                 }
-                if (isFrameset) insertNode("beforebegin", selfMarker, srcNode); else insertNode("beforeend", dstHead, srcNode);
+                if (isFrameset) dstHead.append(srcNode); else framesetMarker.before(srcNode);
                 if (srcNode.localName === "link") srcNode.href = srcNode.getAttribute("href");
             });
         }
@@ -3971,7 +4012,7 @@
             if (!doc) doc = document$1;
             return find$1(`link[rel~=${SELF_REL}]`, doc.head);
         }
-        static #insertMarkers(selfURL, framesetURL, isFrameset) {
+        static #insertMarkers(selfURL, framesetURL) {
             let head = document$1.head;
             let framesetMarker = document$1.createElement("link");
             framesetMarker.rel = FRAMESET_REL;
@@ -3981,14 +4022,12 @@
                 selfMarker = document$1.createElement("link");
                 selfMarker.rel = SELF_REL;
                 selfMarker.href = selfURL;
+                head.prepend(selfMarker);
             }
-            if (isFrameset) {
-                head.insertBefore(framesetMarker, head.firstChild);
-                head.appendChild(selfMarker);
-            } else {
-                head.insertBefore(selfMarker, head.firstChild);
-                head.insertBefore(framesetMarker, selfMarker);
-            }
+            head.append(framesetMarker);
+            walkSiblings(selfMarker.nextSibling, node => {
+                if (isExecutableScript(node)) head.insertBefore(node, selfMarker);
+            }, framesetMarker);
         }
         static #implyFramesetScope(framesetSrc, docSrc) {
             let docURL = URLux.create(docSrc);
@@ -4063,13 +4102,14 @@
                 transcludeDefinitions.set(key, o);
             });
         }
-        static #registerFramesetElement() {
+        #registerFramesetElement() {
             let cssText = [ "html, body { margin: 0; padding: 0; }", "html { width: 100%; height: 100%; }" ];
             let style = document$1.createElement("style");
             style.textContent = cssText.join("\n");
-            document$1.head.insertBefore(style, document$1.head.firstChild);
-            let frameset = new HFrameset(document$1.body);
-            frameset.connectedCallback();
+            document$1.head.append(style);
+            let element = document$1.body;
+            this.frameset = new HFrameset(element);
+            this.frameset.render();
         }
     }
     let framer = new Framer;
@@ -4079,16 +4119,6 @@
             this.behavior = this.element.behavior;
             this.isFrameset = true;
             this.definition = framer.definition;
-        }
-        connectedCallback() {
-            this.element.addEventListener("requestnavigation", e => {
-                if (e.defaultPrevented) return;
-                if (!this.element.behavior.lookup) return;
-                let acceptDefault = framer.onRequestNavigation(e, this);
-                if (acceptDefault === false) e.preventDefault();
-            });
-            framer.framesetEntered(this);
-            this.render();
         }
         lookup(url, details) {
             let partial = this.element.behavior.lookup(url, details);
