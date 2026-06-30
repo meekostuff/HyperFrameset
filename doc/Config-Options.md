@@ -25,16 +25,22 @@ This can be achieved by editing the site-specific `config.js` created during [In
 Usually you only want to configure how HyperFrameset determines the appropriate frameset-document for a page. 
 Do this by providing one of the following options: 
 
-- **`detect(doc)`** 
+- **`detectFrameset(doc)`** 
 	MUST return the frameset-URL by inspecting the landing-page document when HyperFrameset starts (this doesn't allow panning)
 
-- **`lookup(url)`**
+- **`lookupFrameset(url)`**
 	MUST return the frameset-URL for any URL in the site, either the landing-page `document.URL`,
 	or the URL of a different page that is to be panned in.
 
-`lookup(url)` is the recommended option.
-`detect(doc)` is mainly provided for backwards compatibility,
-as can be seen in the default `config.js` script. 
+- **`lookupTarget(url)`**
+	Optional fallback for routing a URL to a target frame name.
+	Only used if the frameset's own `lookup()` (in its `<script for>`) does not return a result.
+	MUST return a target frame name string (e.g. `'hf_main'`), or null/false if not handled.
+
+`lookupFrameset(url)` is the recommended option for frameset resolution.
+`detectFrameset(doc)` is mainly provided for backwards compatibility,
+as can be seen in the default `config.js` script.
+`lookupTarget(url)` is rarely needed — the frameset's own `lookup()` handles routing in most cases. 
 
 **TODO:**
 

@@ -21,6 +21,7 @@ import layoutElements from './layoutElements.mjs';
 import transcluder, {HTransclude, transcludeDefinitions} from './transcluder.mjs';
 import {HFramesetDefinition} from './framesetDefinitions.mjs';
 import {HYPERFRAMESET_URN} from './CustomNamespace.mjs';
+import Task from "./Task.mjs";
 
 // FIXME DRY these @rel values with boot.js
 const FRAMESET_REL = 'frameset'; // NOTE http://lists.w3.org/Archives/Public/www-html/1996Dec/0143.html
@@ -60,8 +61,9 @@ class Framer {
 
 /**
  * Configuration callbacks and lifecycle hooks.
- * @property {function(string): (Object|string|false|null)} [lookup] - Given a page URL, returns frameset config ({framesetURL, scope}), a framesetURL string, or falsy if unknown.
- * @property {function(Document): (Object|string|false|null)} [detect] - Given the landing page document, returns frameset config ({framesetURL, scope}), a framesetURL string, or falsy if unknown.
+ * @property {function(string): (Object|string|false|null)} [lookupFrameset] - Given a page URL, returns frameset config ({framesetURL, scope}), a framesetURL string, or falsy if unknown.
+ * @property {function(Document): (Object|string|false|null)} [detectFrameset] - Given the landing page document, returns frameset config ({framesetURL, scope}), a framesetURL string, or falsy if unknown.
+ * @property {function(string): (string|null|false)} [lookupTarget] - Fallback: given a URL, returns a target frame name string, or falsy if not handled.
  * @property {{before?: Function, after?: Function}} [entering] - Lifecycle hooks called when navigating into a new state.
  * @property {{before?: Function, after?: Function}} [leaving] - Lifecycle hooks called when leaving the current state (not currently invoked).
  * @property {Function} [ready] - Called when the frameset is fully rendered and active.
@@ -86,7 +88,7 @@ framesetURL = null;
 /** @type {?HFramesetDefinition} Parsed frameset definition used for rendering. */
 definition = null;
 
-/** @type {?Object} Current navigation state: {url, target}. */
+/** @type {?Changeset} Current navigation state: {url, target}. */
 currentChangeset = null;
 
 /**
@@ -142,10 +144,10 @@ start(startOptions) {
 	// Resolve frameset URL via lookup (by URL) or detect (by inspecting content document)
 	() => {
 		let framerConfig;
-		framerConfig = framer.lookup(document.URL);
+		framerConfig = framer.lookupFrameset(document.URL);
 		if (framerConfig) return framerConfig;
 		return startOptions.contentDocument
-			.then((doc) => framer.detect(doc));
+			.then((doc) => framer.detectFrameset(doc));
 	},
 
 	// Fetch the frameset document and create a definition from it
@@ -278,17 +280,6 @@ static #deriveScope(scope, startURL, framesetURL) {
 
 	// Register global event listeners, frame definitions, frameset elements, and start DOM monitoring
 	() => {
-		window.addEventListener('click', (e) => {
-			if (e.defaultPrevented) return;
-			let acceptDefault = framer.onClick(e);
-			if (acceptDefault === false) e.preventDefault();
-		}, false); // onClick generates requestnavigation event
-		window.addEventListener('submit', (e) => {
-			if (e.defaultPrevented) return;
-			let acceptDefault = framer.onSubmit(e);
-			if (acceptDefault === false) e.preventDefault();
-		}, false);
-
 		Framer.#registerFrames(framer.definition);
 		framer.#registerFramesetElement();
 		let namespace = framer.definition.namespaces.lookupNamespace(HYPERFRAMESET_URN);
@@ -298,51 +289,38 @@ static #deriveScope(scope, startURL, framesetURL) {
 	},
 
 	() => {
-		navigation.addEventListener('navigate', (e) => {
-			if (!e.canIntercept) return;
-			// WARN: We intercept all traversals unconditionally
-			//   because e.destination.getState() is unreliable in WebKit,
-			//   so we can't validate before intercepting.
-			//   HyperFrameset assumes it owns all history entries in the document.
-			if (e.navigationType === 'traverse') {
-				e.intercept({
-					handler: () => {
-						let settings = navigation.currentEntry.getState();
-						if (!HistoryState.isValid(settings)) return;
-						let state = new HistoryState(settings);
-						this.onPopState(state.getData());
-					}
-				});
-			}
-			// TODO intercept 'reload' to support re-rendering POST response pages
-			//   without a real network request. Requires storing POST body in entry state.
-		});
+		// start history management
+		navigation.addEventListener('navigate', (e) => this.onNavigate(e));
+
+		// Handle clicks on [link] elements — card-pattern navigation where
+		// the clickable area is larger than the actual <a href> inside it.
+		window.addEventListener('click', (e) => {
+			if (e.defaultPrevented) return;
+			let acceptDefault = framer.onClick(e);
+			if (acceptDefault === false) e.preventDefault();
+		}, false);
 	},
 
-	// Wait for the frameset to enter the document, then start history management
-	// TODO ideally frameset rendering wouldn't start until after this step
 	() => {
 		let url = document.URL;
 		if (url === this.framesetURL) return; // frameset-first with no start_url — no changeset
 		this.currentChangeset = this.frameset.lookup(url, {referrer: document.referrer});
-		console.debug('framesetEntered: lookup returned', this.currentChangeset, 'for', url);
-		if (!this.currentChangeset && this.options.lookup) {
-			let target = this.options.lookup(url);
+		console.debug('framesetEntered: options.lookup returned', this.currentChangeset);
+		if (!this.currentChangeset && this.options.lookupTarget) {
+			let target = this.options.lookupTarget(url);
 			if (target) this.currentChangeset = Framer.#inferChangeset(url, target);
-			console.debug('framesetEntered: options.lookup returned', this.currentChangeset);
+			console.debug('framesetEntered: config.lookupTarget returned', this.currentChangeset);
 		}
 	},
 
 	() => {
 		let changeset = this.currentChangeset;
 		if (changeset) {
-			this.load(document.URL, changeset, 'replace');
+			console.debug('#activate: calling renderChangeset()', changeset);
+			navigation.updateCurrentEntry({ state: HistoryState.create(changeset, '', document.URL).settings });
+			return this.#renderChangeset(document.URL, changeset, { isFrameset: true, firstLoad: true });
 		}
-	},
-
-	// Fire the enteredState lifecycle notification
-	() => { // FIXME this should wait until at least the landing document has been rendered in one frame
-		Framer.#notify({ module: 'frameset', type: 'enteredState', stage: 'after', url: document.URL });
+		console.debug('#activate: no changeset, skipping renderChangeset()');
 	},
 
 	// Wait for all stylesheets to finish loading before considering the frameset ready
@@ -351,7 +329,85 @@ static #deriveScope(scope, startURL, framesetURL) {
 
 	]);
 }
-	/**
+
+/**
+ * Navigation API event handler. Handles all navigate events:
+ *
+ * - 'traverse' (back/forward): reads state from destination entry (with WebKit fallback),
+ *   intercepts and calls onPopState to restore frame content.
+ * - 'push'/'replace' (link clicks, programmatic): dispatches a 'requestnavigation' event
+ *   to the source element for frame-scoped interception. If a frame handles it, prevents
+ *   default. If not, falls through to frameset-level routing via onRequestNavigation.
+ *   On success, intercepts and saves changeset to history state.
+ * - Form submissions (e.formData present): allowed through for full page navigation.
+ * - Non-interceptable navigations (cross-origin): ignored.
+ *
+ * @param {NavigateEvent} e - The navigate event from the Navigation API.
+ */
+onNavigate(e) {
+	console.debug('navigate event:', e.navigationType, e.destination.url, 'canIntercept:', e.canIntercept, 'hashChange:', e.hashChange);
+	if (!e.canIntercept) {
+		console.debug('navigate: not interceptable, allowing default');
+		return;
+	}
+	if (e.navigationType === 'traverse') {
+		// NOTE e.destination.getState() is unreliable in WebKit — falls back to entries lookup by key
+		let settings = e.destination.getState()
+			?? navigation.entries().find(entry => entry.key === e.destination.key)?.getState();
+		if (!HistoryState.isValid(settings)) {
+			console.warn(`Traversal to ${e.destination.url} has no HyperFrameset state — allowing default navigation`);
+			return;
+		}
+		console.debug('navigate: intercepting traverse');
+		e.intercept({
+			handler: async () => {
+				console.debug('traverse handler: running onPopState');
+				let state = new HistoryState(settings);
+				this.onPopState(state.getData());
+				console.debug('traverse handler: complete');
+			}
+		});
+	} else if (e.navigationType === 'push' || e.navigationType === 'replace') {
+		// Don't intercept non-GET form submissions (let the browser handle them)
+		if (e.formData) {
+			console.debug('navigate: form submission, allowing default');
+			return;
+		}
+		let sourceElement = e.sourceElement || e.info?.sourceElement || document.body;
+		console.debug('navigate: dispatching requestnavigation to', sourceElement.localName || 'body');
+		// Dispatch requestnavigation to source element for frame-scoped interception
+		let reqEvent = new NavigateEvent('requestnavigation', e);
+		let handled = !sourceElement.dispatchEvent(reqEvent);
+		console.debug('navigate: requestnavigation handled by frame?', handled);
+		if (handled) {
+			// A frame/frameset handled it — suppress full page navigation
+			console.debug('navigate: frame handled, calling preventDefault');
+			e.preventDefault();
+		} else {
+			console.debug('navigate: calling onRequestNavigation on frameset');
+			let framesetHandled = !this.onRequestNavigation(e, this.frameset);
+			console.debug('navigate: framesetHandled =', framesetHandled);
+			if (framesetHandled) {
+				let changeset = this.currentChangeset;
+				console.debug('navigate: intercepting with changeset', changeset);
+				e.intercept({
+					handler: async () => {
+						console.debug('navigate intercept handler: saving state');
+						let state = HistoryState.create(changeset, '', e.destination.url);
+						navigation.updateCurrentEntry({state: state.settings});
+						console.debug('navigate intercept handler: complete');
+					}
+				});
+			} else {
+				console.debug('navigate: frameset did not handle, allowing default navigation');
+			}
+		}
+		// TODO intercept 'reload' to support re-rendering POST response pages
+		//   without a real network request. Requires storing POST body in entry state.
+	}
+}
+
+/**
  * Called when an HFrame connects to the document.
  * If this frame's targetname matches the current changeset, sets its @src.
  *
@@ -367,7 +423,7 @@ frameEntered(frame) {
 }
 
 /**
- * Global click handler. Intercepts left-clicks on hyperlinks (or elements with [link]),
+ * Global click handler. Intercepts left-clicks on elements with [link],
  * resolves the href against the current URL, and dispatches a 'requestnavigation'
  * custom event. Returns false to indicate the default click action should be prevented.
  *
@@ -377,86 +433,30 @@ frameEntered(frame) {
  * @returns {false|undefined} false if navigation was intercepted, undefined otherwise.
  */
 onClick(e) { // return false means success
-	if (e.button != 0) return; // FIXME what is the value for button in IE's W3C events model??
+	if (e.defaultPrevented) return;
+	if (e.button !== 0) return; // FIXME what is the value for button in IE's W3C events model??
 	if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return; // FIXME do these always trigger modified click behavior??
 
-	// Find closest <a href> to e.target
-	let linkElement = DOM.closest(e.target, 'a, [link]');
+	// Find closest [link] element
+	let linkElement = DOM.closest(e.target, '[link]');
 	if (!linkElement) return;
-	let hyperlink;
-	if (linkElement.localName === 'a') hyperlink = linkElement;
-	else {
-		hyperlink = DOM.find('a, link', linkElement);
-		if (!hyperlink) hyperlink = DOM.closest('a', linkElement);
-		if (!hyperlink) return;
-	}
+	let hyperlink = DOM.find('a, link', linkElement);
+	if (!hyperlink) return;
 	let href = hyperlink.getAttribute('href');
 	if (!href) return; // not really a hyperlink
 
 	let baseURL = URLux.create(document.URL);
 	let url = baseURL.resolve(href);
 
-	let details = { url: url, element: hyperlink };
-	this.triggerRequestNavigation(details.url, details);
+	Task.asap(() => navigation.navigate(url, { info: { sourceElement: linkElement } }));
 	return false;
-}
-
-/**
- * Global submit handler. Intercepts form submissions (GET only), serializes form
- * data into a query string, resolves the action URL, and dispatches a
- * 'requestnavigation' custom event. Returns false to prevent default submission.
- *
- * Ignores forms with a @target attribute (those target an iframe).
- *
- * @param {Event} e - The submit event.
- * @returns {false|undefined} false if navigation was intercepted, undefined otherwise.
- */
-onSubmit(e) { // return false means success
-	let form = e.target;
-	if (form.target) return; // no iframe
-	let baseURL = URLux.create(document.URL);
-	let action = baseURL.resolve(form.action);
-
-	let details = { element: form };
-	let method = _.lc(form.method);
-	switch(method) {
-	case 'get':
-		let oURL = URLux.create(action);
-		let query = Framer.#encode(form);
-		details.url = oURL.nosearch + (oURL.search || '?') + query + oURL.hash;
-		break;
-	default: return; // TODO handle POST
-	}
-
-	this.triggerRequestNavigation(details.url, details);
-	return false;
-}
-
-/**
- * Dispatches a 'requestnavigation' CustomEvent on the source element.
- * The event bubbles up through the DOM, giving frame/frameset sprockets a chance
- * to intercept it. If no handler prevents default, falls back to location.assign().
- *
- * Deferred via Thenfu.defer() to avoid re-entrancy during event handling.
- *
- * @param {string} url - The resolved navigation URL.
- * @param {Object} details - Navigation context.
- * @param {string} details.url - The target URL.
- * @param {Element} details.element - The source element (link or form).
- */
-triggerRequestNavigation(url, details) {
-	Thenfu.defer(() => {
-		let event = new CustomEvent('requestnavigation', { bubbles: true, cancelable: true, detail: details.url });
-		let acceptDefault = details.element.dispatchEvent(event);
-		if (acceptDefault !== false) { location.assign(details.url); }
-	});
 }
 
 /**
  * Handles a 'requestnavigation' event that has bubbled up to a frame or frameset sprocket.
  *
  * The requestnavigation event bubbles from the source element (e.g. a clicked link)
- * up through ancestor frames. Each frame with an options.lookup gets a chance to
+ * up through ancestor frames. Each frame with a behavior.lookup gets a chance to
  * handle the navigation in this order:
  *   1. Nearest ancestor frame — if its lookup returns a changeset, navigation is handled here.
  *   2. Next nearest ancestor frame — if the previous frame's lookup returned false/null,
@@ -466,15 +466,16 @@ triggerRequestNavigation(url, details) {
  *      is within the current frameset's scope before attempting pushState navigation.
  *   4. If no sprocket prevents default, triggerRequestNavigation falls back to location.assign().
  *
- * @param {CustomEvent} e - The requestnavigation event. e.detail is the target URL.
+ * @param {NavigateEvent} e - The requestnavigation event. e.destination.url is the target URL.
  * @param {Object} frame - The frame or frameset sprocket that received the event.
  * @returns {false|undefined} false if navigation was handled (preventDefault), undefined to allow continued bubbling.
  */
 onRequestNavigation(e, frame) { // `return false` means success (so preventDefault)
 	if (!frame) throw Error('Invalid frame / frameset in onRequestNavigation');
 
-	let url = e.detail;
-	let details = { url: url, element: e.target };
+	let url = e.destination.url;
+	let sourceElement = e.sourceElement || e.info?.sourceElement || e.target;
+	let details = { url: url, element: sourceElement };
 	let framer = this;
 
 	if (!frame.isFrameset) {
@@ -485,13 +486,13 @@ onRequestNavigation(e, frame) { // `return false` means success (so preventDefau
 	// test hyperlinks
 	let baseURL = URLux.create(document.URL);
 	let oURL = URLux.create(url);
-	if (oURL.origin != baseURL.origin) return; // no external urls
+	if (oURL.origin !== baseURL.origin) return; // no external urls
 
 	let isPageLink = (oURL.nohash === baseURL.nohash);
 	if (isPageLink) { framer.onPageLink(url, details); return false; }
 
 	let frameset = frame;
-	let framesetScope = framer.lookup(url);
+	let framesetScope = framer.lookupFrameset(url);
 	if (!framesetScope || !framer.compareFramesetScope(framesetScope)) return;
 
 	if (framer.requestNavigation(frameset, url, details)) return false;
@@ -518,7 +519,8 @@ requestNavigation(frame, url, details) {
 	let changeset = frame.lookup(url, details);
 	if (changeset === '' || changeset === true) return true;
 	if (changeset == null || changeset === false) return false;
-	this.load(url, changeset, frame.isFrameset);
+	this.currentChangeset = changeset;
+	this.#renderChangeset(url, changeset, { isFrameset: frame.isFrameset });
 	return true;
 }
 
@@ -540,25 +542,30 @@ onPageLink(url, details) {
  * @param {string} url - The URL to navigate to.
  * @param {Object} changeset - Navigation state with target frame info.
  * @param {string} changeset.target - The targetname of the frame to load content into.
+ * @param {boolean} useReplace - Whether to replace the current state.
  * @returns {Promise} Resolves when navigation is complete.
  */
-navigate(url, changeset) { // FIXME doesn't support replaceState
-	return this.load(url, changeset, true);
+navigate(url, changeset, useReplace) { // FIXME doesn't support replaceState
+	return navigation.navigate(url, {
+		history: !!useReplace ? 'replace' : 'push',
+		state: HistoryState.create(changeset, '', url)
+	});
 }
 
 /**
- * Core navigation implementation. Finds matching frames by target name,
- * sets their @src to trigger content loading, fetches the document via httpProxy,
- * optionally pushes history state, and fires lifecycle notifications.
+ * Render a changeset — load content into target frame(s).
+ * Does not modify history — caller is responsible for that.
  *
  * @param {string} url - The URL to load.
- * @param {Object} changeset - Navigation state.
+ * @param {Changeset} changeset - Navigation state.
  * @param {string} changeset.target - The targetname of the frame(s) to update.
- * @param {boolean|string|number} changeState - 'replace' for replaceState, truthy for pushState, 0/falsy for no state change (popstate).
+ * @param {Object} [options] - Additional options.
+ * @param {boolean} [options.isFrameset=false] - If true, update <head> and fire lifecycle notifications.
+ * @param {boolean} [options.firstLoad=false] - If true, this is the initial load (skip leftState notification).
  * @returns {Promise} Resolves when the load pipeline completes.
  */
-load(url, changeset, changeState) { // FIXME doesn't support replaceState
-	let mustNotify = changeState || changeState === 0;
+#renderChangeset(url, changeset, options) {
+	let { isFrameset = false, firstLoad = false } = options || {};
 	let target = changeset.target;
 	let frames = document.body.querySelectorAll(`[targetname="${target}"]`);
 	frames = Array.from(frames).filter(el => el instanceof HFrame);
@@ -572,35 +579,25 @@ load(url, changeset, changeState) { // FIXME doesn't support replaceState
 	return Thenfu.pipe(null, [
 	// Notify lifecycle: leaving current state
 	() => {
-		// TODO disabled for 'replace' assumes this is the landing page. Might need to rethink this.
-		if (changeState !== 'replace' && mustNotify) return Framer.#notify({ module: 'frameset', type: 'leftState', stage: 'before', url: document.URL });
+		if (isFrameset && !firstLoad) return Framer.#notify({ module: 'frameset', type: 'leftState', stage: 'before', url: document.URL });
 	},
+	// Preload the document via httpProxy (will be a cache hit when frames fetch)
+	() => httpProxy.load(nohash, request).then((resp) => { response = resp; }),
 	// Set @src on matching frames to trigger their refresh/load cycle
 	() => { _.forEach(frames, (frame) => { frame.setAttribute('src', fullURL); }); },
-	// Fetch the document via httpProxy
-	// NOTE .load() is just to sync pushState
-	() => httpProxy.load(nohash, request).then((resp) => { response = resp; }),
-	// Update self section of <head> with new content document's head
-	// TODO at minimum we need a <title> even if the response has no head
-	// TODO title will need to be captured in history state for back/forward restoration
 	() => {
+		if (!isFrameset) return;
+		// Update self section of <head> with new content document's head (frameset-level only)
+		// TODO at minimum we need a <title> even if the response has no head
+		// TODO title will need to be captured in history state for back/forward restoration
 		Framer.#separateHead(document, false);
 		let selfMarker = Framer.#getSelfMarker();
 		if (selfMarker) selfMarker.href = url;
 		if (response?.document?.head) Framer.#mergeHead(document, response.document.head, false);
 	},
-	// Update history state (push, replace, or skip)
-	() => {
-		if (changeState) {
-			let state = HistoryState.create(changeset, '', url);
-			if (changeState === 'replace') history.replaceState(null, '', url);
-			else history.pushState(null, '', url);
-			navigation.updateCurrentEntry({ state: state.settings });
-		}
-	},
 	// Notify lifecycle: entered new state
 	() => {
-		if (mustNotify) return Framer.#notify({ module: 'frameset', type: 'enteredState', stage: 'after', url: url });
+		if (isFrameset) return Framer.#notify({ module: 'frameset', type: 'enteredState', stage: 'after', url: url });
 	}
 	]);
 }
@@ -619,24 +616,24 @@ onPopState(changeset) {
 	if (url !== document.URL) {
 		console.warn('Popped state URL does not match address-bar URL.');
 	}
-	this.load(url, changeset, 0);
+	this.#renderChangeset(url, changeset, { isFrameset: true });
 }
 
 /**
- * Resolve a document URL to a frameset scope configuration using options.lookup.
- * In content-first mode, options.lookup returns a frameset URL string which is
+ * Resolve a document URL to a frameset scope configuration using options.lookupFrameset.
+ * In content-first mode, options.lookupFrameset returns a frameset URL string which is
  * then resolved to a { scope, framesetURL } object via #implyFramesetScope.
  *
  * @param {string} docURL - The document URL to look up.
  * @returns {Object|false|undefined} { scope, framesetURL } if found, false if explicitly not handled, undefined if no lookup configured.
- * @throws {Error} If options.lookup returns an invalid result.
+ * @throws {Error} If options.lookupFrameset returns an invalid result.
  */
-lookup(docURL) {
-	if (!this.options.lookup) {
+lookupFrameset(docURL) {
+	if (!this.options.lookupFrameset) {
 		if (docURL.indexOf(this.scope) === 0) return { scope: this.scope, framesetURL: this.framesetURL };
 		return false;
 	}
-	let result = this.options.lookup(docURL);
+	let result = this.options.lookupFrameset(docURL);
 	if (result == null || result === false) return false;
 	if (typeof result === 'string') result = Framer.#implyFramesetScope(result, docURL);
 	if (typeof result !== 'object' || !result.scope || !result.framesetURL) throw Error('Unexpected result from frameset lookup');
@@ -644,17 +641,17 @@ lookup(docURL) {
 }
 
 /**
- * Resolve a frameset from the content document itself using options.detect.
- * Used as a fallback when options.lookup doesn't match. Typically inspects the
+ * Resolve a frameset from the content document itself using options.detectFrameset.
+ * Used as a fallback when options.lookupFrameset doesn't match. Typically inspects the
  * document for a <link rel="frameset"> element.
  *
  * @param {Document} srcDoc - The content document to inspect.
  * @returns {Object|false|undefined} { scope, framesetURL } if detected, false if not, undefined if no detect configured.
- * @throws {Error} If options.detect returns an invalid result.
+ * @throws {Error} If options.detectFrameset returns an invalid result.
  */
-detect(srcDoc) {
-	if (!this.options.detect) return;
-	let result = this.options.detect(srcDoc);
+detectFrameset(srcDoc) {
+	if (!this.options.detectFrameset) return;
+	let result = this.options.detectFrameset(srcDoc);
 	if (result == null || result === false) return false;
 	if (typeof result === 'string') result = Framer.#implyFramesetScope(result, document.URL);
 	if (typeof result !== 'object' || !result.scope || !result.framesetURL) throw Error('Unexpected result from frameset detect');
@@ -683,7 +680,7 @@ compareFramesetScope(settings) {
  *
  * @param {string} url - The navigation URL.
  * @param {string} partial - The target frame name returned by a lookup function.
- * @returns {Object} Changeset object: { url, target }.
+ * @returns {Changeset} Changeset object: { url, target }.
  */
 inferChangeset(url, partial) {
 	return Framer.#inferChangeset(url, partial);
@@ -971,7 +968,7 @@ static #implyScope(framesetSrc, docSrc) {
  *
  * @param {string} url - The navigation URL.
  * @param {string} partial - The target frame name.
- * @returns {Object} { url, target }
+ * @returns {Changeset} { url, target }
  * @throws {Error} If partial is not a string.
  */
 static #inferChangeset(url, partial) {
@@ -1049,17 +1046,6 @@ static #registerFrames(framesetDef) {
 
 	let element = document.body;
 	this.frameset  = new HFrameset(element);
-	// Listen for requestnavigation if lookup is available
-	// TODO replace this with 'navigate' listener.
-	element.addEventListener('requestnavigation', (e) => {
-		if (e.defaultPrevented) return;
-		// Read page-author's lookup from behavior (script[for] on body)
-		if (!this.frameset?.element?.behavior?.lookup) return;
-
-		let acceptDefault = this.onRequestNavigation(e, this.frameset);
-		if (acceptDefault === false) e.preventDefault();
-	});
-
 	this.frameset.render();
 }
 
@@ -1081,6 +1067,14 @@ constructor(body) {
 	this.definition = framer.definition;
 }
 
+/**
+ * Route a URL through the frameset's lookup function (defined in the frameset's script[for]).
+ * @param {string} url - The URL to route.
+ * @param {Object} details - Navigation context.
+ * @param {string} details.url - The target URL.
+ * @param {Element} details.element - The source element that triggered navigation.
+ * @returns {true|false|Changeset} true if accepted (no content change), false if not handled, or a changeset object.
+ */
 lookup(url, details) {
 	let partial = this.element.behavior.lookup(url, details);
 	if (partial === '' || partial === true) return true;
@@ -1088,6 +1082,11 @@ lookup(url, details) {
 	return framer.inferChangeset(url, partial);
 }
 
+/**
+ * Render the frameset body into the live document. Appends all child nodes
+ * from the definition's rendered body into document.body.
+ * @returns {Promise}
+ */
 render() {
 	let definition = this.definition;
 	let dstBody = this.element;
@@ -1111,6 +1110,11 @@ render() {
  * HFrame extends HTransclude with routing awareness: frame-tree participation,
  * targetname-based navigation, and framer lifecycle integration.
  */
+/**
+ * HFrame — a frame element that participates in navigation routing.
+ * Extends HTransclude with lookup-based routing and requestnavigation handling.
+ * Registered as a custom element (e.g. <hf-frame>).
+ */
 class HFrame extends HTransclude {
 
 	connectedCallback() {
@@ -1129,6 +1133,14 @@ class HFrame extends HTransclude {
 		super.disconnectedCallback();
 	}
 
+	/**
+	 * Route a URL through this frame's lookup function (defined in a script[for] on the frame).
+	 * @param {string} url - The URL to route.
+	 * @param {Object} details - Navigation context.
+	 * @param {string} details.url - The target URL.
+	 * @param {Element} details.element - The source element that triggered navigation.
+	 * @returns {true|false|Changeset} true if this frame accepts the URL, false if not handled, or a changeset object.
+	 */
 	lookup(url, details) {
 		let element = this;
 		if (!element.behavior.lookup) return false;

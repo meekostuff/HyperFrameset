@@ -17,7 +17,7 @@ Meeko.framer.config({
 		- allows you to test a frameset-document on the live site
 	 */
 	
-	lookup: function(url) {
+	lookupFrameset: function(url) {
 		if (!framesetURL) return null;
 		return {
 			framesetURL: framesetURL,
@@ -25,10 +25,10 @@ Meeko.framer.config({
 		}
 	},
 	
-	detect: function(doc) {
+	detectFrameset: function(doc) {
 		framesetURL = getFramesetURL(doc);
 		scope = baseURL.base;
-		return this.lookup(document.URL);
+		return this.lookupFrameset(document.URL);
 	}
 });
 

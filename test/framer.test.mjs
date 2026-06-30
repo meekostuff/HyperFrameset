@@ -57,34 +57,34 @@ describe('framer.mjs', () => {
     });
   });
 
-  describe('lookup', () => {
-    it('returns scope match when no lookup option configured and URL is within scope', () => {
+  describe('lookupFrameset', () => {
+    it('returns scope match when no lookupFrameset option configured and URL is within scope', () => {
       framer.options = {};
       framer.scope = 'http://example.com/';
       framer.framesetURL = 'http://example.com/frameset.html';
-      let result = framer.lookup('http://example.com/page.html');
+      let result = framer.lookupFrameset('http://example.com/page.html');
       expect(result).toEqual({ scope: 'http://example.com/', framesetURL: 'http://example.com/frameset.html' });
     });
 
-    it('returns false when no lookup option configured and URL is outside scope', () => {
+    it('returns false when no lookupFrameset option configured and URL is outside scope', () => {
       framer.options = {};
       framer.scope = 'http://example.com/app/';
-      expect(framer.lookup('http://other.com/page.html')).toBe(false);
+      expect(framer.lookupFrameset('http://other.com/page.html')).toBe(false);
     });
 
-    it('returns false when lookup returns null', () => {
-      framer.options = { lookup: () => null };
-      expect(framer.lookup('http://example.com/')).toBe(false);
+    it('returns false when lookupFrameset returns null', () => {
+      framer.options = { lookupFrameset: () => null };
+      expect(framer.lookupFrameset('http://example.com/')).toBe(false);
     });
 
-    it('returns false when lookup returns false', () => {
-      framer.options = { lookup: () => false };
-      expect(framer.lookup('http://example.com/')).toBe(false);
+    it('returns false when lookupFrameset returns false', () => {
+      framer.options = { lookupFrameset: () => false };
+      expect(framer.lookupFrameset('http://example.com/')).toBe(false);
     });
 
     it('converts string result to scope object', () => {
-      framer.options = { lookup: () => '/frameset.html' };
-      const result = framer.lookup('http://example.com/app/page.html');
+      framer.options = { lookupFrameset: () => '/frameset.html' };
+      const result = framer.lookupFrameset('http://example.com/app/page.html');
       expect(result).toHaveProperty('framesetURL');
       expect(result).toHaveProperty('scope');
       expect(result.framesetURL).toContain('frameset.html');
@@ -92,18 +92,18 @@ describe('framer.mjs', () => {
 
     it('passes through object result with scope and framesetURL', () => {
       const expected = { scope: 'http://example.com/', framesetURL: 'http://example.com/fs.html' };
-      framer.options = { lookup: () => expected };
-      expect(framer.lookup('http://example.com/page')).toBe(expected);
+      framer.options = { lookupFrameset: () => expected };
+      expect(framer.lookupFrameset('http://example.com/page')).toBe(expected);
     });
 
     it('throws when object result missing scope', () => {
-      framer.options = { lookup: () => ({ framesetURL: '/fs.html' }) };
-      expect(() => framer.lookup('http://example.com/')).toThrow('Unexpected result');
+      framer.options = { lookupFrameset: () => ({ framesetURL: '/fs.html' }) };
+      expect(() => framer.lookupFrameset('http://example.com/')).toThrow('Unexpected result');
     });
 
     it('throws when object result missing framesetURL', () => {
-      framer.options = { lookup: () => ({ scope: '/' }) };
-      expect(() => framer.lookup('http://example.com/')).toThrow('Unexpected result');
+      framer.options = { lookupFrameset: () => ({ scope: '/' }) };
+      expect(() => framer.lookupFrameset('http://example.com/')).toThrow('Unexpected result');
     });
   });
 
