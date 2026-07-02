@@ -73,7 +73,10 @@ render(resource, details) {
 	let doc = resource.document; // FIXME what if resource is a Request?
 	if (!doc) return null;
 	let frag0 = doc;
-	if (details.mainSelector) frag0 = DOM.find(details.mainSelector, doc);
+	if (details.mainSelector) {
+		frag0 = DOM.find(details.mainSelector, doc);
+		if (frag0 == null) console.warn(`[HyperFrameset] Main selector "${details.mainSelector}" matched nothing in document. Content will be empty.`);
+	}
 
 	return Thenfu.reduce(frag0, this.transforms, (fragment, transform) => {
 		return transform.process(fragment, details);

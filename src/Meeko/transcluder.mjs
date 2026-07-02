@@ -70,7 +70,10 @@ disconnectedCallback() {
 
 attributeChangedCallback(name, oldValue, newValue) {
 	if (!this._connected) return;
-	if (name === 'src') this.refresh();
+	if (name === 'src') {
+		console.info(`[HyperFrameset] Frame "${this.targetname || '(unnamed)'}" src changed: "${oldValue}" → "${newValue}"`);
+		this.refresh();
+	}
 }
 
 get options() {
@@ -143,7 +146,14 @@ refresh() {
 		return Thenfu.pipe(null, [
 			() => this.preload(request),
 			() => httpProxy.load(nohash, request),
-			(resp) => { response = resp; },
+			(resp) => {
+				response = resp;
+				if (response && response.status === 404) {
+					console.warn(`[HyperFrameset] Frame "${this.targetname || '(unnamed)'}" src returned 404: ${nohash}`);
+				} else if (!response || !response.document) {
+					console.warn(`[HyperFrameset] Frame "${this.targetname || '(unnamed)'}" src returned empty/null document: ${nohash}`);
+				}
+			},
 			() => DOM.whenVisible(this),
 			() => {
 				if (this.getAttribute('src') !== src) return; // abort if src changed

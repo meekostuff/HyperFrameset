@@ -158,7 +158,12 @@ start(startOptions) {
 		if (framesetURL.hash) console.info(`Ignoring hash component of frameset URL: ${framesetURL.hash}`);
 		framer.framesetURL = framerConfig.framesetURL = framesetURL.nohash;
 		return httpProxy.load(framer.framesetURL, { responseType: 'document' })
-		.then((response) => new HFramesetDefinition(response.document, { ...framerConfig, behaviors: framer.behaviors, frameContainer: document.head }));
+		.then((response) => {
+			if (!response || !response.document) {
+				console.warn(`[HyperFrameset] Frameset document failed to load or is empty: ${framer.framesetURL}`);
+			}
+			return new HFramesetDefinition(response.document, { ...framerConfig, behaviors: framer.behaviors, frameContainer: document.head });
+		});
 	},
 
 	// Prepare the live document, preprocess the definition, and pre-render the frameset body
@@ -310,6 +315,9 @@ static #deriveScope(scope, startURL, framesetURL) {
 			let target = this.options.lookupTarget(url);
 			if (target) this.currentChangeset = Framer.#inferChangeset(url, target);
 			console.debug('framesetEntered: config.lookupTarget returned', this.currentChangeset);
+		}
+		if (!this.currentChangeset && url.indexOf(this.scope) === 0) {
+			console.warn(`[HyperFrameset] No target found for URL "${url}" within scope "${this.scope}". Check your frameset lookup() function.`);
 		}
 	},
 
