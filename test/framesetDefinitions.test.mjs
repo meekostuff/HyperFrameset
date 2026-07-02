@@ -115,11 +115,11 @@ describe('framesetDefinitions exports', () => {
       expect(def.bodies[1].condition).toBe('loaded');
     });
 
-    it('removes hf-body children from the source element', () => {
+    it('keeps hf-body children in the source element', () => {
       const el = document.createElement('div');
       el.appendChild(document.createElement('hf-body'));
       new HFrameDefinition(el, makeFramesetDef());
-      expect(el.querySelector('hf-body')).toBeNull();
+      expect(el.querySelector('hf-body')).not.toBeNull();
     });
 
     it('ignores head-like children (title, meta, link, style, script)', () => {

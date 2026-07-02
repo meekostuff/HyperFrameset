@@ -19,20 +19,18 @@ constructor(el, framesetDef) {
 }
 
 init(el) {
-    let frameDef = this;
-	let framesetDef = frameDef.framesetDefinition;
-	_.defaults(frameDef, {
+	_.defaults(this, {
 		element: el,
 		mainSelector: el.getAttribute('main') // TODO consider using a hash in `@src`
     });
-	frameDef.bodies = [];
+	this.bodies = [];
 	_.forEach(Array.from(el.children), (node) => {
 		let tag = node.localName;
 		if (!tag) return;
 		if (_.includes(hfHeadTags, tag)) return; // ignore typical <head> elements
-		if (tag === framesetDef.namespaces.lookupTagNameNS('body', HYPERFRAMESET_URN)) {
-			el.removeChild(node);
-			frameDef.bodies.push(new HBodyDefinition(node, framesetDef));
+		if (tag === this.framesetDefinition.namespaces.lookupTagNameNS('body', HYPERFRAMESET_URN)) {
+			//el.removeChild(node);
+			this.bodies.push(new HBodyDefinition(node, this.framesetDefinition));
 			return;
 		}
 		console.warn(`Unexpected element in HFrame: ${tag}`);
@@ -43,15 +41,13 @@ init(el) {
 }
 
 render(resource, condition, details) {
-	let frameDef = this;
-	let framesetDef = frameDef.framesetDefinition;
 	if (!details) details = {};
 	_.defaults(details, { // TODO more details??
-		scope: framesetDef.scope,
+		scope: this.framesetDefinition.scope,
 		url: resource && resource.url,
-		mainSelector: frameDef.mainSelector,
+		mainSelector: this.mainSelector,
 	});
-	let bodyDef = _.find(frameDef.bodies, (body) => { return body.condition === condition;});
+	let bodyDef = _.find(this.bodies, (body) => { return body.condition === condition;});
 	if (!bodyDef) return; // FIXME what to do here??
 	return bodyDef.render(resource, details);
 }

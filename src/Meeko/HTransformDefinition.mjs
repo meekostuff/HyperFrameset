@@ -16,38 +16,31 @@ constructor(el, framesetDef) {
 }
 
 init(el) {
-	let transform = this;
-	let framesetDef = transform.framesetDefinition;
-	_.defaults(transform, {
+	_.defaults(this, {
 		element: el,
 		type: el.getAttribute('type') || 'main',
 		format: el.getAttribute('format')
     });
-	if (transform.type === 'main') transform.format = '';
-	let doc = framesetDef.document; // or el.ownerDocument
-	let frag = doc.createDocumentFragment();
-	let node;
-	while (node = el.firstChild) frag.appendChild(node); // NOTE no adoption
+	if (this.type === 'main') this.format = '';
+	let doc = this.framesetDefinition.document; // or el.ownerDocument
+	// let frag = doc.createDocumentFragment();
+	// frag.append(...el.childNodes); // NOTE no adoption
 
 	let options = el.behavior;
-	let processor = transform.processor = processors.create(transform.type, options, framesetDef.namespaces);
-	processor.loadTemplate(frag);
+	let processor = this.processor = processors.create(this.type, options, this.framesetDefinition.namespaces);
+	processor.loadTemplate(el);
 }
 
 process(srcNode, details) {
-	let transform = this;
-	let framesetDef = transform.framesetDefinition;
 	let decoder;
-	if (transform.format) {
-		decoder = decoders.create(transform.format, {}, framesetDef.namespaces);
+	if (this.format) {
+		decoder = decoders.create(this.format, {}, this.framesetDefinition.namespaces);
 		decoder.init(srcNode);
 	}
 	else decoder = {
 		srcNode: srcNode
 	}
-	let processor = transform.processor;
-	let output = processor.transform(decoder, details);
-	return output;
+	return this.processor.transform(decoder, details);
 }
 
 }

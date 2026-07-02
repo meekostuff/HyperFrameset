@@ -38,8 +38,6 @@ constructor(el, framesetDef) {
 }
 
 init(el) {
-	let bodyDef = this;
-	let framesetDef = bodyDef.framesetDefinition;
 	let condition = el.getAttribute('condition');
 	let finalCondition;
 	if (condition) {
@@ -51,27 +49,25 @@ init(el) {
 	}
 	else finalCondition = 'loaded';
 		
-	_.defaults(bodyDef, {
+	_.defaults(this, {
 		element: el,
 		condition: finalCondition,
 		transforms: []
 	});
 	_.forEach(Array.from(el.children), (node) => {
-		if (node.localName === framesetDef.namespaces.lookupTagNameNS('transform', HYPERFRAMESET_URN)) {
-			el.removeChild(node);
-			bodyDef.transforms.push(new HTransformDefinition(node, framesetDef));
+		if (node.localName === this.framesetDefinition.namespaces.lookupTagNameNS('transform', HYPERFRAMESET_URN)) {
+			//el.removeChild(node);
+			this.transforms.push(new HTransformDefinition(node, this.framesetDefinition));
 		}	
 	});
-	if (!bodyDef.transforms.length && bodyDef.condition === 'loaded') {
+	if (!this.transforms.length && this.condition === 'loaded') {
 		console.warn('HBody definition for loaded content contains no HTransform definitions');
 	}
 }
 
 render(resource, details) {
-	let bodyDef = this;
-	let framesetDef = bodyDef.framesetDefinition;
-	if (bodyDef.transforms.length <= 0) {
-		return bodyDef.element.cloneNode(true);
+	if (this.transforms.length <= 0) {
+		return this.element.cloneNode(true);
 	}
 	if (!resource) return null;
 	let doc = resource.document; // FIXME what if resource is a Request?
@@ -79,11 +75,11 @@ render(resource, details) {
 	let frag0 = doc;
 	if (details.mainSelector) frag0 = DOM.find(details.mainSelector, doc);
 
-	return Thenfu.reduce(frag0, bodyDef.transforms, (fragment, transform) => {
+	return Thenfu.reduce(frag0, this.transforms, (fragment, transform) => {
 		return transform.process(fragment, details);
 	})
 	.then((fragment) => {
-		let el = bodyDef.element.cloneNode(false);
+		let el = this.element.cloneNode(false);
 		// crop to <body> if it exists
 		let htmlBody = DOM.find('body', fragment);
 		if (htmlBody) fragment = DOM.adoptContents(htmlBody, el.ownerDocument);
