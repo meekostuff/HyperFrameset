@@ -1864,6 +1864,7 @@
         name: "mexpr",
         style: "xml"
     });
+    const _cache = new WeakMap;
     let hazLangDefinition = "<otherwise <when@test <each@select <one@select +var@name,select <if@test <unless@test " + ">choose <template@name,match >eval@select >mtext@select >text@select " + "call@name apply param@name,select clone deepclone element@name attr@name";
     let hazLang = Array.from(words(hazLangDefinition), def => {
         def = def.split("@");
@@ -1949,7 +1950,17 @@
             this.#exprToHazMap[this.#mexprTextAttr] = `${this.#hazPrefix}mtext`;
             this.#exprToHazMap[this.#exprTextAttr] = `${this.#hazPrefix}text`;
         }
+        #getHazardTag(el) {
+            if (!el.localName.startsWith(this.#hazPrefix)) return null;
+            return el.localName.substring(this.#hazPrefix.length);
+        }
         loadTemplate(template) {
+            if (_cache.has(template)) {
+                let cached = _cache.get(template);
+                this.root = cached.root;
+                this.templates = cached.templates;
+                return;
+            }
             this.root = template;
             this.templates = [];
             let doc = template.ownerDocument;
@@ -2012,7 +2023,12 @@
             });
             this.#implyEntryTemplate(template);
             walkTree(template, true, el => {
-                el.hazardDetails = this.#getHazardDetails(el);
+                let attrs = this.#getExprAttributes(el);
+                if (attrs.length) _cache.set(el, attrs);
+            });
+            _cache.set(template, {
+                root: this.root,
+                templates: this.templates
             });
         }
         #markTemplate(el) {
@@ -2054,21 +2070,6 @@
         }
         getEntryTemplate() {
             return this.templates[0];
-        }
-        #getHazardDetails(el) {
-            console.assert(el.nodeType === 1);
-            let details = {};
-            let tag = el.localName;
-            let isHazElement = tag.indexOf(this.#hazPrefix) === 0;
-            if (isHazElement) {
-                tag = tag.substr(this.#hazPrefix.length);
-                let def = hazLangLookup[tag];
-                details.definition = def || {
-                    tag: ""
-                };
-            }
-            details.exprAttributes = this.#getExprAttributes(el);
-            return details;
         }
         #getExprAttributes(el) {
             let attrs = [];
@@ -2118,61 +2119,58 @@
             });
         }
         transform(provider, details) {
-            let processor = this;
-            let root = processor.root;
-            let doc = root.ownerDocument;
+            let doc = this.root.ownerDocument;
             let frag = doc.createDocumentFragment();
-            return processor._transform(provider, details, frag).then(() => frag);
+            return this._transform(provider, details, frag).then(() => frag);
         }
         _transform(provider, details, frag) {
-            let processor = this;
-            processor.provider = provider;
-            processor.globalParams = assign({}, details);
-            processor.globalVars = {};
-            processor.localParams = processor.globalParams;
-            processor.localVars = processor.globalVars;
-            processor.localParamsStack = [];
-            processor.localVarsStack = [];
-            processor.variables = {
+            this.provider = provider;
+            this.globalParams = assign({}, details);
+            this.globalVars = {};
+            this.localParams = this.globalParams;
+            this.localVars = this.globalVars;
+            this.localParamsStack = [];
+            this.localVarsStack = [];
+            this.variables = {
                 has: key => {
-                    let result = key in processor.localVars || key in processor.localParams || key in processor.globalVars || key in processor.globalParams || false;
+                    let result = key in this.localVars || key in this.localParams || key in this.globalVars || key in this.globalParams || false;
                     return result;
                 },
                 get: key => {
-                    if (key in processor.localVars) return processor.localVars[key];
-                    if (key in processor.localParams) return processor.localParams[key];
-                    if (key in processor.globalVars) return processor.globalVars[key];
-                    if (key in processor.globalParams) return processor.globalParams[key];
+                    if (key in this.localVars) return this.localVars[key];
+                    if (key in this.localParams) return this.localParams[key];
+                    if (key in this.globalVars) return this.globalVars[key];
+                    if (key in this.globalParams) return this.globalParams[key];
                     return undefined;
                 },
                 set: (key, value, inParams, isGlobal) => {
                     let mapName = isGlobal ? inParams ? "globalParams" : "globalVars" : inParams ? "localParams" : "localVars";
-                    if (inParams && key in processor[mapName]) {
+                    if (inParams && key in this[mapName]) {
                         console.warn(`Param "${key}" already set`);
                         return;
                     }
                     if (value == null) {
                         console.warn(`Variable "${key}" set to null/undefined — removing from scope`);
-                        delete processor[mapName][key];
+                        delete this[mapName][key];
                         return;
                     }
-                    processor[mapName][key] = value;
+                    this[mapName][key] = value;
                 },
                 push: params => {
-                    processor.localParamsStack.push(processor.localParams);
-                    processor.localVarsStack.push(processor.localVars);
+                    this.localParamsStack.push(this.localParams);
+                    this.localVarsStack.push(this.localVars);
                     if (typeof params !== "object" || params == null) params = {};
-                    processor.localParams = params;
-                    processor.localVars = {};
+                    this.localParams = params;
+                    this.localVars = {};
                 },
                 pop: () => {
-                    processor.localParams = processor.localParamsStack.pop();
-                    processor.localVars = processor.localVarsStack.pop();
+                    this.localParams = this.localParamsStack.pop();
+                    this.localVars = this.localVarsStack.pop();
                 }
             };
-            return processor.transformChildNodes(processor.root, null, frag).then(() => {
-                let template = processor.getEntryTemplate();
-                return processor.transformTemplate(template, null, null, frag);
+            return this.transformChildNodes(this.root, null, frag).then(() => {
+                let template = this.getEntryTemplate();
+                return this.transformTemplate(template, null, null, frag);
             });
         }
         transformTemplate(template, context, params, frag) {
@@ -2188,7 +2186,6 @@
             return Thenfu.reduce(null, srcNode.childNodes, (dummy, current) => processor.transformNode(current, context, frag));
         }
         transformNode(srcNode, context, frag) {
-            let processor = this;
             switch (srcNode.nodeType) {
               default:
                 let node = srcNode.cloneNode(true);
@@ -2201,21 +2198,18 @@
                 return;
 
               case 1:
-                let details = srcNode.hazardDetails;
-                if (details.definition) return processor.transformHazardTree(srcNode, context, frag); else return processor.transformTree(srcNode, context, frag);
+                if (this.#getHazardTag(srcNode)) return this.transformHazardTree(srcNode, context, frag); else return this.transformTree(srcNode, context, frag);
             }
         }
         transformHazardTree(el, context, frag) {
-            let processor = this;
             let doc = el.ownerDocument;
-            let details = el.hazardDetails;
-            let def = details.definition;
+            let tag = this.#getHazardTag(el);
             let invertTest = false;
             let name, selector, value, type, template, node, expr, mexpr;
-            switch (def.tag) {
+            switch (tag) {
               default:
                 console.warn(`Unknown hazard element <${el.localName}> — processing children only`);
-                return processor.transformChildNodes(el, context, frag);
+                return this.transformChildNodes(el, context, frag);
 
               case "template":
                 return frag;
@@ -2226,14 +2220,14 @@
                 value = context;
                 if (selector) {
                     try {
-                        value = processor.provider.evaluate(selector, context, processor.variables, false);
+                        value = this.provider.evaluate(selector, context, this.variables, false);
                     } catch (err) {
                         window.reportError(err);
                         console.warn(`Error evaluating <haz:var name="${name}" select="${selector}">. Assumed empty.`);
                         value = undefined;
                     }
                 }
-                processor.variables.set(name, value);
+                this.variables.set(name, value);
                 return frag;
 
               case "param":
@@ -2242,39 +2236,39 @@
                 value = context;
                 if (selector) {
                     try {
-                        value = processor.provider.evaluate(selector, context, processor.variables, false);
+                        value = this.provider.evaluate(selector, context, this.variables, false);
                     } catch (err) {
                         window.reportError(err);
                         console.warn(`Error evaluating <haz:param name="${name}" select="${selector}">. Assumed empty.`);
                         value = undefined;
                     }
                 }
-                processor.variables.set(name, value, true);
+                this.variables.set(name, value, true);
                 return frag;
 
               case "call":
                 name = el.getAttribute("name");
-                template = processor.getNamedTemplate(name);
+                template = this.getNamedTemplate(name);
                 if (!template) {
                     console.warn(`Hazard could not find template name="${name}"`);
                     return frag;
                 }
-                return processor.transformTemplate(template, context, null, frag);
+                return this.transformTemplate(template, context, null, frag);
 
               case "apply":
-                template = processor.getMatchingTemplate(context);
+                template = this.getMatchingTemplate(context);
                 if (template) {
-                    return processor.transformTemplate(template, context, null, frag);
+                    return this.transformTemplate(template, context, null, frag);
                 }
                 console.warn("<haz:apply> found no matching template:", context);
                 node = context.cloneNode(false);
                 frag.appendChild(node);
-                return Thenfu.reduce(null, context.childNodes, (dummy, child) => processor.transformHazardTree(el, child, node));
+                return Thenfu.reduce(null, context.childNodes, (dummy, child) => this.transformHazardTree(el, child, node));
 
               case "clone":
                 node = context.cloneNode(false);
                 frag.appendChild(node);
-                return processor.transformChildNodes(el, context, node);
+                return this.transformChildNodes(el, context, node);
 
               case "deepclone":
                 node = context.cloneNode(true);
@@ -2283,7 +2277,7 @@
 
               case "element":
                 mexpr = el.getAttribute("name");
-                name = evalMExpression(mexpr, processor.provider, context, processor.variables);
+                name = evalMExpression(mexpr, this.provider, context, this.variables);
                 type = typeof value;
                 if (type !== "string") {
                     console.debug(`<haz:element name="${mexpr}"> did not resolve to a string — skipped`);
@@ -2291,18 +2285,18 @@
                 }
                 node = doc.createElement(name);
                 frag.appendChild(node);
-                return processor.transformChildNodes(el, context, node);
+                return this.transformChildNodes(el, context, node);
 
               case "attr":
                 mexpr = el.getAttribute("name");
-                name = evalMExpression(mexpr, processor.provider, context, processor.variables);
+                name = evalMExpression(mexpr, this.provider, context, this.variables);
                 type = typeof value;
                 if (type !== "string") {
                     console.debug(`<haz:attr name="${mexpr}"> did not resolve to a string — skipped`);
                     return frag;
                 }
                 node = doc.createDocumentFragment();
-                return processor.transformChildNodes(el, context, node).then(() => {
+                return this.transformChildNodes(el, context, node).then(() => {
                     value = node.textContent;
                     frag.setAttribute(name, value);
                     return frag;
@@ -2310,7 +2304,7 @@
 
               case "eval":
                 selector = el.getAttribute("select");
-                value = evalExpression(selector, processor.provider, context, processor.variables, "node");
+                value = evalExpression(selector, this.provider, context, this.variables, "node");
                 type = typeof value;
                 if (type === "undefined" || type === "boolean" || value == null) {
                     console.debug(`<haz:eval select="${selector}"> resolved to nothing`);
@@ -2324,7 +2318,7 @@
 
               case "mtext":
                 mexpr = el.getAttribute("select");
-                value = evalMExpression(mexpr, processor.provider, context, processor.variables);
+                value = evalMExpression(mexpr, this.provider, context, this.variables);
                 if (type === "undefined" || type === "boolean" || value == null) {
                     console.debug(`<haz:mtext select="${mexpr}"> resolved to nothing`);
                     return frag;
@@ -2337,7 +2331,7 @@
 
               case "text":
                 expr = el.getAttribute("select");
-                value = evalExpression(expr, processor.provider, context, processor.variables, "text");
+                value = evalExpression(expr, this.provider, context, this.variables, "text");
                 type = typeof value;
                 if (type === "undefined" || type === "boolean" || value == null) {
                     console.debug(`<haz:text select="${expr}"> resolved to nothing`);
@@ -2356,7 +2350,7 @@
                 let testVal = el.getAttribute("test");
                 let pass = false;
                 try {
-                    pass = evalExpression(testVal, processor.provider, context, processor.variables, "boolean");
+                    pass = evalExpression(testVal, this.provider, context, this.variables, "boolean");
                 } catch (err) {
                     window.reportError(err);
                     console.warn(`Error evaluating <haz:if test="${testVal}">. Assumed false.`);
@@ -2364,22 +2358,22 @@
                 }
                 if (invertTest) pass = !pass;
                 if (!pass) return frag;
-                return processor.transformChildNodes(el, context, frag);
+                return this.transformChildNodes(el, context, frag);
 
               case "choose":
                 let otherwise;
                 let when;
                 let found = some(el.childNodes, child => {
                     if (child.nodeType !== 1) return false;
-                    let childDef = child.hazardDetails.definition;
-                    if (!childDef) return false;
-                    if (childDef.tag === "otherwise") {
+                    let childTag = this.#getHazardTag(child);
+                    if (!childTag) return false;
+                    if (childTag === "otherwise") {
                         if (!otherwise) otherwise = child;
                         return false;
                     }
-                    if (childDef.tag !== "when") return false;
+                    if (childTag !== "when") return false;
                     let testVal = child.getAttribute("test");
-                    let pass = evalExpression(testVal, processor.provider, context, processor.variables, "boolean");
+                    let pass = evalExpression(testVal, this.provider, context, this.variables, "boolean");
                     if (!pass) return false;
                     when = child;
                     return true;
@@ -2389,13 +2383,13 @@
                     console.debug("<haz:choose> had no matching <haz:when> and no <haz:otherwise>");
                     return frag;
                 }
-                return processor.transformChildNodes(when, context, frag);
+                return this.transformChildNodes(when, context, frag);
 
               case "one":
                 selector = el.getAttribute("select");
                 let subContext;
                 try {
-                    subContext = processor.provider.evaluate(selector, context, processor.variables, false);
+                    subContext = this.provider.evaluate(selector, context, this.variables, false);
                 } catch (err) {
                     window.reportError(err);
                     console.warn(`Error evaluating <haz:one select="${selector}">. Assumed empty.`);
@@ -2405,19 +2399,19 @@
                     console.debug(`<haz:one select="${selector}"> resolved to nothing`);
                     return frag;
                 }
-                return processor.transformChildNodes(el, subContext, frag);
+                return this.transformChildNodes(el, subContext, frag);
 
               case "each":
                 selector = el.getAttribute("select");
                 let subContexts;
                 try {
-                    subContexts = processor.provider.evaluate(selector, context, processor.variables, true);
+                    subContexts = this.provider.evaluate(selector, context, this.variables, true);
                 } catch (err) {
                     window.reportError(err);
                     console.warn(`Error evaluating <haz:each select="${selector}">. Assumed empty.`);
                     return frag;
                 }
-                return Thenfu.reduce(null, subContexts, (dummy, subContext) => processor.transformChildNodes(el, subContext, frag));
+                return Thenfu.reduce(null, subContexts, (dummy, subContext) => this.transformChildNodes(el, subContext, frag));
             }
         }
         transformTree(srcNode, context, frag) {
@@ -2430,9 +2424,9 @@
         }
         transformSingleElement(srcNode, context) {
             let processor = this;
-            let details = srcNode.hazardDetails;
+            let exprAttributes = _cache.get(srcNode);
             let el = srcNode.cloneNode(false);
-            forEach(details.exprAttributes, desc => {
+            if (exprAttributes) forEach(exprAttributes, desc => {
                 let value;
                 try {
                     value = desc.namespaceURI === HAZARD_MEXPRESSION_URN ? processMExpression(desc.mexpression, processor.provider, context, processor.variables) : processExpression(desc.expression, processor.provider, context, processor.variables, desc.type);
@@ -3186,35 +3180,26 @@
             this.init(el);
         }
         init(el) {
-            let transform = this;
-            let framesetDef = transform.framesetDefinition;
-            defaults(transform, {
+            defaults(this, {
                 element: el,
                 type: el.getAttribute("type") || "main",
                 format: el.getAttribute("format")
             });
-            if (transform.type === "main") transform.format = "";
-            let doc = framesetDef.document;
-            let frag = doc.createDocumentFragment();
-            let node;
-            while (node = el.firstChild) frag.appendChild(node);
+            if (this.type === "main") this.format = "";
+            let doc = this.framesetDefinition.document;
             let options = el.behavior;
-            let processor = transform.processor = processors.create(transform.type, options, framesetDef.namespaces);
-            processor.loadTemplate(frag);
+            let processor = this.processor = processors.create(this.type, options, this.framesetDefinition.namespaces);
+            processor.loadTemplate(el);
         }
         process(srcNode, details) {
-            let transform = this;
-            let framesetDef = transform.framesetDefinition;
             let decoder;
-            if (transform.format) {
-                decoder = decoders.create(transform.format, {}, framesetDef.namespaces);
+            if (this.format) {
+                decoder = decoders.create(this.format, {}, this.framesetDefinition.namespaces);
                 decoder.init(srcNode);
             } else decoder = {
                 srcNode: srcNode
             };
-            let processor = transform.processor;
-            let output = processor.transform(decoder, details);
-            return output;
+            return this.processor.transform(decoder, details);
         }
     }
     /*!
@@ -3242,8 +3227,6 @@
             this.init(el);
         }
         init(el) {
-            let bodyDef = this;
-            let framesetDef = bodyDef.framesetDefinition;
             let condition = el.getAttribute("condition");
             let finalCondition;
             if (condition) {
@@ -3253,34 +3236,31 @@
                     console.warn(`Frame body defined with unknown condition: ${condition}`);
                 }
             } else finalCondition = "loaded";
-            defaults(bodyDef, {
+            defaults(this, {
                 element: el,
                 condition: finalCondition,
                 transforms: []
             });
             forEach(Array.from(el.children), node => {
-                if (node.localName === framesetDef.namespaces.lookupTagNameNS("transform", HYPERFRAMESET_URN)) {
-                    el.removeChild(node);
-                    bodyDef.transforms.push(new HTransformDefinition(node, framesetDef));
+                if (node.localName === this.framesetDefinition.namespaces.lookupTagNameNS("transform", HYPERFRAMESET_URN)) {
+                    this.transforms.push(new HTransformDefinition(node, this.framesetDefinition));
                 }
             });
-            if (!bodyDef.transforms.length && bodyDef.condition === "loaded") {
+            if (!this.transforms.length && this.condition === "loaded") {
                 console.warn("HBody definition for loaded content contains no HTransform definitions");
             }
         }
         render(resource, details) {
-            let bodyDef = this;
-            let framesetDef = bodyDef.framesetDefinition;
-            if (bodyDef.transforms.length <= 0) {
-                return bodyDef.element.cloneNode(true);
+            if (this.transforms.length <= 0) {
+                return this.element.cloneNode(true);
             }
             if (!resource) return null;
             let doc = resource.document;
             if (!doc) return null;
             let frag0 = doc;
             if (details.mainSelector) frag0 = find$1(details.mainSelector, doc);
-            return Thenfu.reduce(frag0, bodyDef.transforms, (fragment, transform) => transform.process(fragment, details)).then(fragment => {
-                let el = bodyDef.element.cloneNode(false);
+            return Thenfu.reduce(frag0, this.transforms, (fragment, transform) => transform.process(fragment, details)).then(fragment => {
+                let el = this.element.cloneNode(false);
                 let htmlBody = find$1("body", fragment);
                 if (htmlBody) fragment = adoptContents(htmlBody, el.ownerDocument);
                 forEach(findAll("link[rel~=stylesheet], style", fragment), node => {
@@ -3303,20 +3283,17 @@
             this.init(el);
         }
         init(el) {
-            let frameDef = this;
-            let framesetDef = frameDef.framesetDefinition;
-            defaults(frameDef, {
+            defaults(this, {
                 element: el,
                 mainSelector: el.getAttribute("main")
             });
-            frameDef.bodies = [];
+            this.bodies = [];
             forEach(Array.from(el.children), node => {
                 let tag = node.localName;
                 if (!tag) return;
                 if (includes(hfHeadTags, tag)) return;
-                if (tag === framesetDef.namespaces.lookupTagNameNS("body", HYPERFRAMESET_URN)) {
-                    el.removeChild(node);
-                    frameDef.bodies.push(new HBodyDefinition(node, framesetDef));
+                if (tag === this.framesetDefinition.namespaces.lookupTagNameNS("body", HYPERFRAMESET_URN)) {
+                    this.bodies.push(new HBodyDefinition(node, this.framesetDefinition));
                     return;
                 }
                 console.warn(`Unexpected element in HFrame: ${tag}`);
@@ -3324,15 +3301,13 @@
             });
         }
         render(resource, condition, details) {
-            let frameDef = this;
-            let framesetDef = frameDef.framesetDefinition;
             if (!details) details = {};
             defaults(details, {
-                scope: framesetDef.scope,
+                scope: this.framesetDefinition.scope,
                 url: resource && resource.url,
-                mainSelector: frameDef.mainSelector
+                mainSelector: this.mainSelector
             });
-            let bodyDef = find$2(frameDef.bodies, body => body.condition === condition);
+            let bodyDef = find$2(this.bodies, body => body.condition === condition);
             if (!bodyDef) return;
             return bodyDef.render(resource, details);
         }
