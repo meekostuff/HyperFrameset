@@ -256,6 +256,37 @@ describe('HazardProcessor', () => {
     expect(result.querySelector('span').textContent).toBe('Test Page');
   });
 
+  test('haz:call passes params to template', async () => {
+    const result = await getResult(
+      '<haz:template name="card"><span><haz:text select="name"></haz:text></span></haz:template>' +
+      '<div><haz:call name="card"><haz:param name="name" select="root.title"></haz:param></haz:call></div>'
+    );
+    expect(result.querySelector('span').textContent).toBe('Test Page');
+  });
+
+  test('haz:call with multiple params', async () => {
+    const result = await getResult(
+      '<haz:template name="badge"><span><haz:text select="`${label}: ${value}`"></haz:text></span></haz:template>' +
+      '<div><haz:call name="badge">' +
+        '<haz:param name="label" select="root.label"></haz:param>' +
+        '<haz:param name="value" select="root.count"></haz:param>' +
+      '</haz:call></div>'
+    );
+    expect(result.querySelector('span').textContent).toBe('item: 3');
+  });
+
+  test('haz:call params do not leak to outer scope', async () => {
+    const result = await getResult(
+      '<haz:template name="inner"><haz:text select="secret"></haz:text></haz:template>' +
+      '<div>' +
+        '<haz:call name="inner"><haz:param name="secret" select="\'hidden\'"></haz:param></haz:call>' +
+        '<span><haz:text select="secret"></haz:text></span>' +
+      '</div>'
+    );
+    // secret should be undefined outside the call
+    expect(result.querySelector('span').textContent).toBe('');
+  });
+
   // --- ${} attribute expressions ---
 
   test('${} attribute sets value from JS expression', async () => {

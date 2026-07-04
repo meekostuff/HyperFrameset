@@ -305,23 +305,6 @@ getNamedTemplate(name) {
 }
 
 /**
- * Find a template whose @match expression matches the given element.
- * @param {Element} element - Element to test against template match expressions.
- * @returns {Element|undefined} First matching template element.
- */
-getMatchingTemplate(element) {
-	return _.find(this.templates, (template) => {
-		if (!template.hasAttribute('match')) return false;
-		let expression = template.getAttribute('match');
-		try { return evaluate(expression, this.scope.values); }
-		catch (err) {
-			console.warn(`Error evaluating template match="${expression}".`);
-			return false;
-		}
-	});	
-}
-
-/**
  * Transform the loaded template against a data source.
  * @param {Object} provider - Data source with a `source` property (the root data).
  * @param {Object} details - Transform details (passed as initial global scope).
@@ -455,15 +438,24 @@ transformHazardTree(el, frag) {
 			console.warn(`Hazard could not find template name="${name}"`);
 			return frag;
 		}
-		return this.transformTemplate(template, null, frag);
+		// Collect params from child <haz:param> elements
+		let params = {};
+		for (let child of el.children) {
+			if (this.#getHazardTag(child) === 'param') {
+				let pName = child.getAttribute('name');
+				let pSelect = child.getAttribute('select');
+				if (pName && pSelect) {
+					try { params[pName] = evaluate(pSelect, this.scope.values); }
+					catch (err) { console.warn(`Error evaluating param "${pName}": ${pSelect}`); }
+				}
+			}
+		}
+		return this.transformTemplate(template, params, frag);
 	}
 
+	// TODO consider reimplementing apply with @select, @as, and template @match as JS expressions
 	case 'apply': {
-		let template = this.getMatchingTemplate(this.scope.get('root'));
-		if (template) {
-			return this.transformTemplate(template, null, frag);
-		}
-		console.warn('<haz:apply> found no matching template');
+		console.warn('<haz:apply> is not currently supported. Use haz:call with explicit template names.');
 		return frag;
 	}
 
