@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
+  timeout: 5000,
   workers: 1,
   testMatch: 'test/**/*.spec.mjs',
   projects: [
