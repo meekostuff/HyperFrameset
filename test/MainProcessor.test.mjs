@@ -12,7 +12,7 @@ describe('MainProcessor', () => {
   test('transform extracts <main> content', () => {
     const doc = document.implementation.createHTMLDocument('');
     doc.body.innerHTML = '<header>h</header><main><p>content</p></main><footer>f</footer>';
-    const frag = proc().transform({ srcNode: doc }, {});
+    const frag = proc().transform({ source: doc }, {});
     expect(frag.querySelector('p').textContent).toBe('content');
     expect(frag.querySelector('header')).toBeNull();
     expect(frag.querySelector('footer')).toBeNull();
@@ -21,21 +21,21 @@ describe('MainProcessor', () => {
   test('transform extracts [role=main] content', () => {
     const doc = document.implementation.createHTMLDocument('');
     doc.body.innerHTML = '<div role="main"><p>main content</p></div>';
-    const frag = proc().transform({ srcNode: doc }, {});
+    const frag = proc().transform({ source: doc }, {});
     expect(frag.querySelector('p').textContent).toBe('main content');
   });
 
   test('transform falls back to body when no main element', () => {
     const doc = document.implementation.createHTMLDocument('');
     doc.body.innerHTML = '<p>body content</p>';
-    const frag = proc().transform({ srcNode: doc }, {});
+    const frag = proc().transform({ source: doc }, {});
     expect(frag.querySelector('p').textContent).toBe('body content');
   });
 
   test('transform on a non-document node uses that node', () => {
     const div = document.createElement('div');
     div.innerHTML = '<span>hello</span>';
-    const frag = proc().transform({ srcNode: div }, {});
+    const frag = proc().transform({ source: div }, {});
     expect(frag.querySelector('span').textContent).toBe('hello');
   });
 

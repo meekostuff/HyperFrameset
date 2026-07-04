@@ -102,12 +102,9 @@ describe('HazardProcessor', () => {
   });
 
   test('haz:eval renders fallback on expression error', async () => {
-    const reportError = window.reportError;
-    window.reportError = () => {}; // suppress
     const result = await getResult(
       '<div><haz:eval select="root.foo.bar.baz"><span>error fallback</span></haz:eval></div>'
     );
-    window.reportError = reportError;
     expect(result.querySelector('span').textContent).toBe('error fallback');
   });
 
@@ -301,6 +298,28 @@ describe('HazardProcessor', () => {
       '<span title="${root.missing}">text</span>'
     );
     expect(result.querySelector('span').hasAttribute('title')).toBe(false);
+  });
+
+  test('${} on src attribute does not trigger fetch of literal expression', async () => {
+    const result = await getResult(
+      '<img src="${root.title}">'
+    );
+    // src should be the evaluated value, not the literal "${root.title}"
+    expect(result.querySelector('img').getAttribute('src')).toBe('Test Page');
+  });
+
+  test('${} on href attribute evaluates correctly', async () => {
+    const result = await getResult(
+      '<a href="${root.status}">link</a>'
+    );
+    expect(result.querySelector('a').getAttribute('href')).toBe('active');
+  });
+
+  test('backtick on src attribute evaluates correctly', async () => {
+    const result = await getResult(
+      '<img src="`/images/${root.status}.png`">'
+    );
+    expect(result.querySelector('img').getAttribute('src')).toBe('/images/active.png');
   });
 
   // --- backtick attribute expressions ---

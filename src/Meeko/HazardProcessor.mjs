@@ -159,6 +159,30 @@ loadTemplate(template) {
 
 	let doc = template.ownerDocument;
 
+	// Pass 0: Convert html: prefixed elements and attributes to unprefixed
+	walkTree(template, true, (el) => {
+		// Convert html:* element to unprefixed
+		if (el.localName.startsWith('html:')) {
+			let newEl = doc.createElement(el.localName.substring(5));
+			for (let attr of Array.from(el.attributes)) {
+				newEl.setAttribute(attr.name, attr.value);
+			}
+			while (el.firstChild) newEl.appendChild(el.firstChild);
+			el.parentNode.replaceChild(newEl, el);
+			el = newEl;
+		}
+		// Convert html:* attributes to unprefixed
+		for (let attr of Array.from(el.attributes)) {
+			if (!attr.name.startsWith('html:')) continue;
+			let targetName = attr.name.substring(5);
+			if (el.hasAttribute(targetName)) {
+				console.warn(`<${el.localName}> html:${targetName} overrides existing @${targetName}`);
+			}
+			el.removeAttribute(attr.name);
+			el.setAttribute(targetName, attr.value);
+		}
+	});
+
 	// Pass 1: Promote hazard attributes to elements
 	walkTree(template, true, (el) => {
 		let tag = el.localName;
@@ -408,7 +432,6 @@ transformHazardTree(el, frag) {
 		if (selectExpr) {
 			try { value = evaluate(selectExpr, this.scope.values); }
 			catch (err) {
-				window.reportError(err);
 				console.warn(`Error evaluating <haz:var name="${name}" select="${selectExpr}">. Assumed undefined.`);
 			}
 		}
@@ -423,7 +446,6 @@ transformHazardTree(el, frag) {
 		if (selectExpr) {
 			try { value = evaluate(selectExpr, this.scope.values); }
 			catch (err) {
-				window.reportError(err);
 				console.warn(`Error evaluating <haz:param name="${name}" select="${selectExpr}">. Assumed undefined.`);
 			}
 		}
@@ -480,7 +502,6 @@ transformHazardTree(el, frag) {
 		let name;
 		try { name = evaluate(nameExpr, this.scope.values); }
 		catch (err) {
-			window.reportError(err);
 			console.warn(`Error evaluating <haz:element name="${nameExpr}">.`);
 			return frag;
 		}
@@ -499,7 +520,6 @@ transformHazardTree(el, frag) {
 		let name, value;
 		try { name = evaluate(nameExpr, this.scope.values); }
 		catch (err) {
-			window.reportError(err);
 			console.warn(`Error evaluating <haz:attr name="${nameExpr}">.`);
 			return frag;
 		}
@@ -510,7 +530,6 @@ transformHazardTree(el, frag) {
 		if (valueExpr) {
 			try { value = evaluate(valueExpr, this.scope.values); }
 			catch (err) {
-				window.reportError(err);
 				console.warn(`Error evaluating <haz:attr value="${valueExpr}">.`);
 				return frag;
 			}
@@ -532,7 +551,6 @@ transformHazardTree(el, frag) {
 		let value;
 		try { value = evaluate(selectExpr, this.scope.values); }
 		catch (err) {
-			window.reportError(err);
 			console.warn(`Error evaluating <haz:eval select="${selectExpr}">.`);
 			return this.transformChildNodes(el, frag); // fallback to children
 		}
@@ -553,7 +571,6 @@ transformHazardTree(el, frag) {
 		let value;
 		try { value = evaluate(selectExpr, this.scope.values); }
 		catch (err) {
-			window.reportError(err);
 			console.warn(`Error evaluating <haz:text select="${selectExpr}">.`);
 			return frag;
 		}
@@ -572,7 +589,6 @@ transformHazardTree(el, frag) {
 		let pass = false;
 		try { pass = evaluate(testExpr, this.scope.values); }
 		catch (err) {
-			window.reportError(err);
 			console.warn(`Error evaluating <haz:if test="${testExpr}">. Assumed false.`);
 		}
 		if (invertTest) pass = !pass;
@@ -596,7 +612,6 @@ transformHazardTree(el, frag) {
 			let pass = false;
 			try { pass = evaluate(testExpr, this.scope.values); }
 			catch (err) {
-				window.reportError(err);
 				console.warn(`Error evaluating <haz:when test="${testExpr}">. Assumed false.`);
 			}
 			if (!pass) return false;
@@ -617,7 +632,6 @@ transformHazardTree(el, frag) {
 		let value;
 		try { value = evaluate(selectExpr, this.scope.values); }
 		catch (err) {
-			window.reportError(err);
 			console.warn(`Error evaluating <haz:one select="${selectExpr}">. Assumed empty.`);
 			return frag;
 		}
@@ -635,7 +649,6 @@ transformHazardTree(el, frag) {
 		let items;
 		try { items = evaluate(selectExpr, this.scope.values); }
 		catch (err) {
-			window.reportError(err);
 			console.warn(`Error evaluating <haz:each select="${selectExpr}">. Assumed empty.`);
 			return frag;
 		}
@@ -667,33 +680,43 @@ transformTree(srcNode, frag) {
 
 /**
  * Clone an element (shallow) and evaluate any ${} expression attributes.
+ * html: prefixed elements and attributes are already converted during preprocessing.
  * @param {Element} srcNode - Source element to clone and evaluate.
- * @returns {Element} Cloned element with evaluated attributes.
+ * @returns {Element} Output element with evaluated attributes.
  */
 transformSingleElement(srcNode) {
 	let el = srcNode.cloneNode(false);
 
-	for (let attr of Array.from(el.attributes)) {
+	for (let attr of Array.from(srcNode.attributes)) {
+		let name = attr.name;
 		let value = attr.value;
-		if (value.startsWith('`') && value.endsWith('`')) {
-			// Template literal: `text ${expr}`
-			try { value = evaluate(value, this.scope.values); }
-			catch (err) {
-				window.reportError(err);
-				console.warn(`Error evaluating attribute ${attr.name}="${value}".`);
+		if (value.startsWith('`')) {
+			if (!value.endsWith('`')) {
+				console.warn(`<${srcNode.localName}> @${name} starts with backtick but does not end with one: "${value}"`);
 				continue;
 			}
-			setAttribute(el, attr.name, value);
-		} else if (value.startsWith('${') && value.endsWith('}')) {
+			// Template literal: `text ${expr}`
+			el.removeAttribute(name);
+			try { value = evaluate(value, this.scope.values); }
+			catch (err) {
+				console.warn(`Error evaluating attribute ${name}="${attr.value}".`);
+				continue;
+			}
+			setAttribute(el, name, value);
+		} else if (value.startsWith('${')) {
+			if (!value.endsWith('}')) {
+				console.warn(`<${srcNode.localName}> @${name} starts with \${ but does not end with }: "${value}"`);
+				continue;
+			}
 			// Single expression: ${expr}
+			el.removeAttribute(name);
 			let expr = value.slice(2, -1);
 			try { value = evaluate(expr, this.scope.values); }
 			catch (err) {
-				window.reportError(err);
-				console.warn(`Error evaluating attribute ${attr.name}="${value}".`);
+				console.warn(`Error evaluating attribute ${name}="${attr.value}".`);
 				continue;
 			}
-			setAttribute(el, attr.name, value);
+			setAttribute(el, name, value);
 		}
 	}
 

@@ -39,7 +39,7 @@ describe('ScriptProcessor', () => {
     });
     const div = document.createElement('div');
     div.textContent = 'hello';
-    proc.transform({ srcNode: div }, {});
+    proc.transform({ source: div }, {});
     expect(results).toEqual(['hello']);
   });
 
@@ -49,12 +49,12 @@ describe('ScriptProcessor', () => {
     const proc = new ScriptProcessor({
       transform: () => frag
     });
-    const result = proc.transform({ srcNode: document.createElement('div') }, {});
+    const result = proc.transform({ source: document.createElement('div') }, {});
     expect(result).toBe(frag);
   });
 
   test('transform with no processor does not throw', () => {
     const proc = new ScriptProcessor();
-    expect(() => proc.transform({ srcNode: document.createElement('div') }, {})).not.toThrow();
+    expect(() => proc.transform({ source: document.createElement('div') }, {})).not.toThrow();
   });
 });
