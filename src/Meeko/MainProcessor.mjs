@@ -17,8 +17,8 @@ loadTemplate(template) {
 	if (/\S+/.test(template.textContent)) console.warn('"main" transforms do not use templates');
 }
 
-transform(provider, details) { // TODO how to use details?
-	let srcNode = provider.srcNode;
+transform(provider, details) {
+	let srcNode = provider.source;
 	let srcDoc = srcNode.nodeType === 9 ? srcNode : srcNode.ownerDocument;
 	let main;
 	if (!main) main = DOM.find('main, [role=main]', srcNode);

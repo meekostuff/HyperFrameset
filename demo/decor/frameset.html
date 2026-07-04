@@ -33,10 +33,11 @@ nav li { display: inline; list-style: outside none; margin: 0.1em; padding: 0.25
 
 <hf-frame targetname="hf_top" src="scope:./index.html" type="html">
 	<hf-body>
-		<hf-transform type="hazard" format="css">
-			<h1 expr:_text=".title {_text}">{{title}}</h1>
-			
-			<nav expr:_html=".nav">
+		<hf-transform type="hazard">
+			<h1><haz:text select="root.querySelector('.title')?.textContent ?? ''"></haz:text></h1>
+
+			<nav>
+				<haz:eval select="root.querySelector('.nav')"></haz:eval>
 			</nav>
 
 <!-- #hf_top encapsulates #hf_main -->		
@@ -56,30 +57,30 @@ in the &lt;body&gt; of the frameset document aren't being imported.
 
 <hf-frame targetname="hf_main" src="scope:./normal.html" type="html">
 	<hf-body>
-		<hf-transform type="hazard" format="css">
+		<hf-transform type="hazard">
 		
 			<div id="frameset-header" class="section">
 			#frameset-header
-				<div expr:_html="#page-header">
+				<haz:eval select="root.querySelector('#page-header')">
 					<div id="page-header" class="remove">
 					#page-header in frameset: You should NOT be able to see this.
 					</div>
-				</div>
+				</haz:eval>
 			</div>
 			
-			<div expr:_html="#page-main">
+			<haz:eval select="root.querySelector('#page-main')">
 				<div id="page-main" class="remove">
 				#page-main in frameset: You should NOT be able to see this.
 				</div>
-			</div>
+			</haz:eval>
 			
 			<div id="frameset-footer" class="section">
 			#frameset-footer
-				<div expr:_html="#page-footer">
+				<haz:eval select="root.querySelector('#page-footer')">
 					<div id="page-footer" class="remove">
 					#page-footer in frameset: You should NOT be able to see this.
 					</div>
-				</div>
+				</haz:eval>
 			</div>
 		
 		</hf-transform>
@@ -92,4 +93,3 @@ in the &lt;body&gt; of the frameset document aren't being imported.
 
 </body>
 </html>
-

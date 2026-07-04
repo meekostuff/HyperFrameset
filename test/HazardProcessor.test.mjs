@@ -1,8 +1,6 @@
 import { describe, test, expect, beforeEach } from 'vitest';
 import HazardProcessor from '../src/Meeko/HazardProcessor.mjs';
-import JSONDecoder from '../src/Meeko/JSONDecoder.mjs';
 import CustomNamespace from '../src/Meeko/CustomNamespace.mjs';
-import '../src/Meeko/builtin-filters.mjs';
 
 const timeout = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -28,17 +26,13 @@ function createNamespaces() {
 }
 
 function createProvider() {
-  const decoder = new JSONDecoder();
-  decoder.init(sourceData);
-  return decoder;
+  return { source: sourceData };
 }
 
 function loadAndTransform(templateHTML, details) {
   const proc = new HazardProcessor({}, createNamespaces());
-  const template = document.createDocumentFragment();
-  const div = document.createElement('div');
-  div.innerHTML = templateHTML;
-  while (div.firstChild) template.appendChild(div.firstChild);
+  const template = document.createElement('div');
+  template.innerHTML = templateHTML;
   proc.loadTemplate(template);
   return proc.transform(createProvider(), details || {});
 }
@@ -62,59 +56,100 @@ describe('HazardProcessor', () => {
 
   // --- haz:text ---
 
-  test('haz:text outputs text from evaluated expression', async () => {
-    const result = await getResult('<span haz:text="title"></span>');
+  test('haz:text outputs text from JS expression', async () => {
+    const result = await getResult('<span><haz:text select="root.title"></haz:text></span>');
     expect(result.querySelector('span').textContent).toBe('Test Page');
   });
 
   test('haz:text with nested path', async () => {
-    const result = await getResult('<span haz:text="single.name"></span>');
+    const result = await getResult('<span><haz:text select="root.single.name"></haz:text></span>');
     expect(result.querySelector('span').textContent).toBe('only');
+  });
+
+  test('haz:text with template literal', async () => {
+    const result = await getResult('<span><haz:text select="`Count: ${root.count}`"></haz:text></span>');
+    expect(result.querySelector('span').textContent).toBe('Count: 3');
   });
 
   // --- haz:eval ---
 
-  test('haz:eval outputs HTML from evaluated expression', async () => {
-    const result = await getResult('<div haz:eval="greeting"></div>');
-    expect(result.querySelector('em')).not.toBeNull();
-    expect(result.querySelector('em').textContent).toBe('World');
+  test('haz:eval outputs value as text when not a node', async () => {
+    const result = await getResult('<div><haz:eval select="root.title"></haz:eval></div>');
+    expect(result.querySelector('div').textContent).toBe('Test Page');
+  });
+
+  test('haz:eval renders fallback children when expression is null', async () => {
+    const result = await getResult(
+      '<div><haz:eval select="root.missing"><span class="fallback">not found</span></haz:eval></div>'
+    );
+    expect(result.querySelector('.fallback')).not.toBeNull();
+    expect(result.querySelector('.fallback').textContent).toBe('not found');
+  });
+
+  test('haz:eval renders fallback children when expression is undefined', async () => {
+    const result = await getResult(
+      '<div><haz:eval select="root.nope"><p>fallback</p></haz:eval></div>'
+    );
+    expect(result.querySelector('p').textContent).toBe('fallback');
+  });
+
+  test('haz:eval does NOT render fallback when expression has value', async () => {
+    const result = await getResult(
+      '<div><haz:eval select="root.title"><span class="fallback">should not appear</span></haz:eval></div>'
+    );
+    expect(result.querySelector('.fallback')).toBeNull();
+    expect(result.querySelector('div').textContent).toBe('Test Page');
+  });
+
+  test('haz:eval renders fallback on expression error', async () => {
+    const reportError = window.reportError;
+    window.reportError = () => {}; // suppress
+    const result = await getResult(
+      '<div><haz:eval select="root.foo.bar.baz"><span>error fallback</span></haz:eval></div>'
+    );
+    window.reportError = reportError;
+    expect(result.querySelector('span').textContent).toBe('error fallback');
   });
 
   // --- haz:if ---
 
-  test('haz:if includes element when truthy', async () => {
-    const result = await getResult('<span haz:if="visible">yes</span>');
+  test('haz:if includes children when truthy', async () => {
+    const result = await getResult('<haz:if test="root.visible"><span>yes</span></haz:if>');
     expect(result.querySelector('span')).not.toBeNull();
   });
 
-  test('haz:if excludes element when falsy', async () => {
-    const result = await getResult('<span haz:if="hidden">no</span>');
+  test('haz:if excludes children when falsy', async () => {
+    const result = await getResult('<haz:if test="root.hidden"><span>no</span></haz:if>');
     expect(result.querySelector('span')).toBeNull();
   });
 
-  test('haz:if excludes element when empty string', async () => {
-    // NOTE: JSONDecoder returns '' as a non-null value, so haz:if treats it as truthy
-    const result = await getResult('<span haz:if="empty">yes</span>');
+  test('haz:if with empty string is falsy', async () => {
+    const result = await getResult('<haz:if test="root.empty"><span>yes</span></haz:if>');
+    expect(result.querySelector('span')).toBeNull();
+  });
+
+  test('haz:if with comparison expression', async () => {
+    const result = await getResult('<haz:if test="root.count > 2"><span>yes</span></haz:if>');
     expect(result.querySelector('span')).not.toBeNull();
   });
 
   // --- haz:unless ---
 
-  test('haz:unless includes element when falsy', async () => {
-    const result = await getResult('<span haz:unless="hidden">yes</span>');
+  test('haz:unless includes children when falsy', async () => {
+    const result = await getResult('<haz:unless test="root.hidden"><span>yes</span></haz:unless>');
     expect(result.querySelector('span')).not.toBeNull();
   });
 
-  test('haz:unless excludes element when truthy', async () => {
-    const result = await getResult('<span haz:unless="visible">no</span>');
+  test('haz:unless excludes children when truthy', async () => {
+    const result = await getResult('<haz:unless test="root.visible"><span>no</span></haz:unless>');
     expect(result.querySelector('span')).toBeNull();
   });
 
   // --- haz:each ---
 
-  test('haz:each iterates over array', async () => {
+  test('haz:each iterates over array with @as', async () => {
     const result = await getResult(
-      '<ul><li haz:each="items" haz:text="name"></li></ul>'
+      '<ul><haz:each select="root.items" as="item"><li><haz:text select="item.name"></haz:text></li></haz:each></ul>'
     );
     const lis = result.querySelectorAll('li');
     expect(lis).toHaveLength(3);
@@ -123,41 +158,60 @@ describe('HazardProcessor', () => {
     expect(lis[2].textContent).toBe('charlie');
   });
 
-  test('haz:each with empty array produces no output', async () => {
-    // 'missing' path returns undefined, which JSONDecoder returns as empty array for wantArray
+  test('haz:each with missing value produces no output', async () => {
     const result = await getResult(
-      '<ul><li haz:each="missing">x</li></ul>'
+      '<ul><haz:each select="root.missing" as="item"><li>x</li></haz:each></ul>'
     );
     expect(result.querySelectorAll('li')).toHaveLength(0);
   });
 
+  test('haz:each with JS expression', async () => {
+    const result = await getResult(
+      '<ul><haz:each select="root.items.filter(i => i.value > 1)" as="item"><li><haz:text select="item.name"></haz:text></li></haz:each></ul>'
+    );
+    const lis = result.querySelectorAll('li');
+    expect(lis).toHaveLength(2);
+    expect(lis[0].textContent).toBe('bravo');
+  });
+
   // --- haz:one ---
 
-  test('haz:one selects single item', async () => {
+  test('haz:one selects single item with @as', async () => {
     const result = await getResult(
-      '<div haz:one="single"><span haz:text="name"></span></div>'
+      '<haz:one select="root.single" as="s"><span><haz:text select="s.name"></haz:text></span></haz:one>'
     );
     expect(result.querySelector('span').textContent).toBe('only');
   });
 
-  test('haz:one with missing selector produces no output', async () => {
+  test('haz:one with missing value produces no output', async () => {
     const result = await getResult(
-      '<div haz:one="missing"><span>x</span></div>'
+      '<haz:one select="root.missing" as="m"><span>x</span></haz:one>'
     );
     expect(result.querySelector('span')).toBeNull();
   });
 
-  // --- haz:let ---
+  // --- haz:var ---
 
   test('haz:var sets a variable usable in subsequent elements', async () => {
     const result = await getResult(
       '<div>' +
-        '<haz:var name="myTitle" select="title"></haz:var>' +
-        '<span haz:text="$myTitle"></span>' +
+        '<haz:var name="myTitle" select="root.title"></haz:var>' +
+        '<span><haz:text select="myTitle"></haz:text></span>' +
       '</div>'
     );
     const span = result.querySelector('span');
     expect(span).not.toBeNull();
+    expect(span.textContent).toBe('Test Page');
+  });
+
+  test('haz:var with computed value', async () => {
+    const result = await getResult(
+      '<div>' +
+        '<haz:var name="doubled" select="root.count * 2"></haz:var>' +
+        '<span><haz:text select="doubled"></haz:text></span>' +
+      '</div>'
+    );
+    expect(result.querySelector('span').textContent).toBe('6');
   });
 
   // --- haz:choose / haz:when / haz:otherwise ---
@@ -165,8 +219,8 @@ describe('HazardProcessor', () => {
   test('haz:choose selects matching haz:when', async () => {
     const result = await getResult(
       '<haz:choose>' +
-        '<haz:when test="hidden"><span>wrong</span></haz:when>' +
-        '<haz:when test="visible"><span>right</span></haz:when>' +
+        '<haz:when test="root.hidden"><span>wrong</span></haz:when>' +
+        '<haz:when test="root.visible"><span>right</span></haz:when>' +
         '<haz:otherwise><span>default</span></haz:otherwise>' +
       '</haz:choose>'
     );
@@ -176,7 +230,7 @@ describe('HazardProcessor', () => {
   test('haz:choose falls back to haz:otherwise', async () => {
     const result = await getResult(
       '<haz:choose>' +
-        '<haz:when test="hidden"><span>wrong</span></haz:when>' +
+        '<haz:when test="root.hidden"><span>wrong</span></haz:when>' +
         '<haz:otherwise><span>default</span></haz:otherwise>' +
       '</haz:choose>'
     );
@@ -186,7 +240,7 @@ describe('HazardProcessor', () => {
   test('haz:choose with no match and no otherwise produces nothing', async () => {
     const result = await getResult(
       '<haz:choose>' +
-        '<haz:when test="hidden"><span>wrong</span></haz:when>' +
+        '<haz:when test="root.hidden"><span>wrong</span></haz:when>' +
       '</haz:choose>'
     );
     expect(result.querySelector('span')).toBeNull();
@@ -196,73 +250,257 @@ describe('HazardProcessor', () => {
 
   test('haz:call invokes a named template', async () => {
     const result = await getResult(
-      '<haz:template name="greeting"><span haz:text="title"></span></haz:template>' +
+      '<haz:template name="greeting"><span><haz:text select="root.title"></haz:text></span></haz:template>' +
       '<div><haz:call name="greeting"></haz:call></div>'
     );
     expect(result.querySelector('span').textContent).toBe('Test Page');
   });
 
-  // --- haz:mtext (mustache-style expressions) ---
+  // --- ${} attribute expressions ---
 
-  test('haz:mtext outputs interpolated text', async () => {
+  test('${} attribute sets value from JS expression', async () => {
     const result = await getResult(
-      '<span haz:mtext="Count: {{count}}"></span>'
-    );
-    expect(result.querySelector('span').textContent).toBe('Count: 3');
-  });
-
-  // --- expression with filter ---
-
-  test('expression with filter pipe', async () => {
-    const proc = new HazardProcessor({}, createNamespaces());
-    const template = document.createDocumentFragment();
-    const span = document.createElement('span');
-    span.setAttribute('haz:text', 'title //>uppercase');
-    template.appendChild(span);
-    proc.loadTemplate(template);
-    let result;
-    proc.transform(createProvider(), {}).then(r => { result = r; });
-    await timeout(300);
-    expect(result.querySelector('span').textContent).toBe('TEST PAGE');
-  });
-
-  // --- expr: attributes ---
-
-  test('expr: attribute sets attribute value from expression', async () => {
-    const result = await getResult(
-      '<span expr:title="title">text</span>'
+      '<span title="${root.title}">text</span>'
     );
     expect(result.querySelector('span').getAttribute('title')).toBe('Test Page');
   });
 
-  // --- mexpr: attributes ---
-
-  test('mexpr: attribute interpolates attribute value', async () => {
+  test('${} attribute removes attribute when undefined', async () => {
     const result = await getResult(
-      '<span mexpr:class="item-{{status}}">text</span>'
+      '<span title="${root.missing}">text</span>'
+    );
+    expect(result.querySelector('span').hasAttribute('title')).toBe(false);
+  });
+
+  // --- backtick attribute expressions ---
+
+  test('backtick attribute interpolates value', async () => {
+    const result = await getResult(
+      '<span class="`item-${root.status}`">text</span>'
     );
     expect(result.querySelector('span').getAttribute('class')).toBe('item-active');
   });
+
+  test('backtick attribute with multiple interpolations', async () => {
+    const result = await getResult(
+      '<span title="`${root.label}: ${root.count} items`">text</span>'
+    );
+    expect(result.querySelector('span').getAttribute('title')).toBe('item: 3 items');
+  });
+
+  // --- ${} content expressions ---
+
+  test('${} as sole element content evaluates expression as text', async () => {
+    const result = await getResult('<span>${root.title}</span>');
+    expect(result.querySelector('span').textContent).toBe('Test Page');
+  });
+
+  test('${} content with method call', async () => {
+    const result = await getResult('<span>${root.title.toUpperCase()}</span>');
+    expect(result.querySelector('span').textContent).toBe('TEST PAGE');
+  });
+
+  test('${} content with numeric value', async () => {
+    const result = await getResult('<span>${root.count}</span>');
+    expect(result.querySelector('span').textContent).toBe('3');
+  });
+
+  test('${} content that evaluates to undefined produces empty', async () => {
+    const result = await getResult('<span>${root.missing}</span>');
+    expect(result.querySelector('span').textContent).toBe('');
+  });
+
+  // --- backtick content expressions ---
+
+  test('backtick as sole element content evaluates template literal', async () => {
+    const result = await getResult('<span>`Hello ${root.title}`</span>');
+    expect(result.querySelector('span').textContent).toBe('Hello Test Page');
+  });
+
+  test('backtick content with multiple interpolations', async () => {
+    const result = await getResult('<span>`${root.count} ${root.label} items`</span>');
+    expect(result.querySelector('span').textContent).toBe('3 item items');
+  });
+
+  // --- negative tests: content expressions should NOT evaluate when mixed ---
+
+  test('${} with leading text is treated as literal', async () => {
+    const result = await getResult('<span>prefix ${root.title}</span>');
+    expect(result.querySelector('span').textContent).toBe('prefix ${root.title}');
+  });
+
+  test('${} with trailing text is treated as literal', async () => {
+    const result = await getResult('<span>${root.title} suffix</span>');
+    expect(result.querySelector('span').textContent).toBe('${root.title} suffix');
+  });
+
+  test('${} with child elements is treated as literal', async () => {
+    const result = await getResult('<div>${root.title}<span>child</span></div>');
+    const div = result.querySelector('div');
+    expect(div.querySelector('span').textContent).toBe('child');
+    expect(div.textContent).toContain('${root.title}');
+  });
+
+  test('backtick with leading text is treated as literal', async () => {
+    const result = await getResult('<span>prefix `Hello ${root.title}`</span>');
+    expect(result.querySelector('span').textContent).toBe('prefix `Hello ${root.title}`');
+  });
+
+  test('backtick with trailing text is treated as literal', async () => {
+    const result = await getResult('<span>`Hello ${root.title}` suffix</span>');
+    expect(result.querySelector('span').textContent).toBe('`Hello ${root.title}` suffix');
+  });
+
+  test('backtick with child elements is treated as literal', async () => {
+    const result = await getResult('<div>`Hello ${root.title}`<span>child</span></div>');
+    const div = result.querySelector('div');
+    expect(div.querySelector('span').textContent).toBe('child');
+    expect(div.textContent).toContain('`Hello ${root.title}`');
+  });
+
+  // --- custom functions in scope ---
+
+  test('custom function passed via details is available in expressions', async () => {
+    const result = await getResult(
+      '<span><haz:text select="upper(root.title)"></haz:text></span>',
+      { upper: (s) => s.toUpperCase() }
+    );
+    expect(result.querySelector('span').textContent).toBe('TEST PAGE');
+  });
+
+});
+
+// --- DOM source tests ---
+
+describe('HazardProcessor with DOM source', () => {
+
+  function createDOMProvider(html) {
+    let doc = document.implementation.createHTMLDocument('');
+    doc.body.innerHTML = html;
+    return { source: doc };
+  }
+
+  function createElementProvider(html) {
+    let el = document.createElement('div');
+    el.innerHTML = html;
+    return { source: el };
+  }
+
+  function loadAndTransformDOM(templateHTML, provider, details) {
+    const proc = new HazardProcessor({}, createNamespaces());
+    const template = document.createElement('div');
+    template.innerHTML = templateHTML;
+    proc.loadTemplate(template);
+    return proc.transform(provider, details || {});
+  }
+
+  function getResultDOM(templateHTML, provider, details) {
+    let result;
+    loadAndTransformDOM(templateHTML, provider, details)
+      .then(r => { result = r; })
+      .catch(e => { result = e; });
+    return timeout(300).then(() => result);
+  }
+
+  test('access Document title', async () => {
+    let provider = createDOMProvider('<h1>Page Title</h1>');
+    const result = await getResultDOM(
+      '<span><haz:text select="root.querySelector(\'h1\').textContent"></haz:text></span>',
+      provider
+    );
+    expect(result.querySelector('span').textContent).toBe('Page Title');
+  });
+
+  test('querySelector on document body', async () => {
+    let provider = createDOMProvider('<p class="intro">Hello</p><p>World</p>');
+    const result = await getResultDOM(
+      '<span><haz:text select="root.querySelector(\'.intro\').textContent"></haz:text></span>',
+      provider
+    );
+    expect(result.querySelector('span').textContent).toBe('Hello');
+  });
+
+  test('querySelectorAll with haz:each', async () => {
+    let provider = createDOMProvider('<ul><li>a</li><li>b</li><li>c</li></ul>');
+    const result = await getResultDOM(
+      '<haz:each select="[...root.querySelectorAll(\'li\')]" as="item"><span><haz:text select="item.textContent"></haz:text></span></haz:each>',
+      provider
+    );
+    const spans = result.querySelectorAll('span');
+    expect(spans).toHaveLength(3);
+    expect(spans[0].textContent).toBe('a');
+    expect(spans[1].textContent).toBe('b');
+    expect(spans[2].textContent).toBe('c');
+  });
+
+  test('getAttribute from DOM element', async () => {
+    let provider = createElementProvider('<a href="/page" title="My Page">link</a>');
+    const result = await getResultDOM(
+      '<span><haz:text select="root.querySelector(\'a\').getAttribute(\'href\')"></haz:text></span>',
+      provider
+    );
+    expect(result.querySelector('span').textContent).toBe('/page');
+  });
+
+  test('${} attribute with DOM source', async () => {
+    let provider = createElementProvider('<img src="/photo.jpg" alt="Photo">');
+    const result = await getResultDOM(
+      '<a href="${root.querySelector(\'img\').src}">link</a>',
+      provider
+    );
+    expect(result.querySelector('a').getAttribute('href')).toContain('/photo.jpg');
+  });
+
+  test('haz:if with DOM source - element exists', async () => {
+    let provider = createDOMProvider('<div class="error">Something went wrong</div>');
+    const result = await getResultDOM(
+      '<haz:if test="root.querySelector(\'.error\')"><span>has error</span></haz:if>',
+      provider
+    );
+    expect(result.querySelector('span')).not.toBeNull();
+  });
+
+  test('haz:if with DOM source - element does not exist', async () => {
+    let provider = createDOMProvider('<div class="success">All good</div>');
+    const result = await getResultDOM(
+      '<haz:if test="root.querySelector(\'.error\')"><span>has error</span></haz:if>',
+      provider
+    );
+    expect(result.querySelector('span')).toBeNull();
+  });
+
+  test('optional chaining with missing element', async () => {
+    let provider = createDOMProvider('<p>hello</p>');
+    const result = await getResultDOM(
+      '<span><haz:text select="root.querySelector(\'h1\')?.textContent ?? \'no title\'"></haz:text></span>',
+      provider
+    );
+    expect(result.querySelector('span').textContent).toBe('no title');
+  });
+
+  test('haz:one with DOM element', async () => {
+    let provider = createElementProvider('<article><h2>Title</h2><p>Body</p></article>');
+    const result = await getResultDOM(
+      '<haz:one select="root.querySelector(\'article\')" as="article"><h1><haz:text select="article.querySelector(\'h2\').textContent"></haz:text></h1></haz:one>',
+      provider
+    );
+    expect(result.querySelector('h1').textContent).toBe('Title');
+  });
+
+  test('children count with DOM', async () => {
+    let provider = createElementProvider('<ul><li>1</li><li>2</li><li>3</li><li>4</li></ul>');
+    const result = await getResultDOM(
+      '<span><haz:text select="root.querySelectorAll(\'li\').length"></haz:text></span>',
+      provider
+    );
+    expect(result.querySelector('span').textContent).toBe('4');
+  });
+
 });
 
 /*
   These tests verify that IE11/Edge-specific workarounds in HazardProcessor are
   unnecessary on modern browsers.
-
-  HazardProcessor.mjs contained two workarounds:
-
-  1. FRAGMENTS_ARE_INERT — detected via:
-       !(window.HTMLUnknownElement && 'runtimeStyle' in HTMLUnknownElement.prototype)
-     On IE11/Edge, DOM fragments containing certain elements or attributes could
-     crash or severely degrade the layout engine. When fragments were NOT inert,
-     HazardProcessor used document.body as a container instead.
-
-  2. PERFORMANCE_UNFRIENDLY_CONDITIONS — a list of element/attribute combinations
-     that triggered the IE11/Edge performance regression:
-       - Any element with a @style attribute
-       - A <li> element with a @value attribute
-       - An unknown or custom element (HTMLUnknownElement)
-     See: https://connect.microsoft.com/IE/feedback/details/1776195
 */
 const FRAGMENTS_ARE_INERT = !(window.HTMLUnknownElement &&
     'runtimeStyle' in window.HTMLUnknownElement.prototype);
@@ -288,7 +526,6 @@ describe('modern browser assumptions', () => {
       const frag = document.createDocumentFragment();
       let el;
       if (cond.tag === undefined) {
-        // unknown/custom element
         el = document.createElement('my-custom-element');
       } else {
         el = document.createElement(cond.tag === '*' ? 'div' : cond.tag);
@@ -302,7 +539,6 @@ describe('modern browser assumptions', () => {
   test('fragment operations with risky elements are not slower than baseline', () => {
     const iterations = 1000;
 
-    // baseline: plain div in fragment
     const t0 = performance.now();
     for (let i = 0; i < iterations; i++) {
       const frag = document.createDocumentFragment();
@@ -311,7 +547,6 @@ describe('modern browser assumptions', () => {
     }
     const baseline = Math.max(performance.now() - t0, 1);
 
-    // custom element with style attribute (triggered IE11/Edge perf bug)
     const t1 = performance.now();
     for (let i = 0; i < iterations; i++) {
       const frag = document.createDocumentFragment();
@@ -321,7 +556,6 @@ describe('modern browser assumptions', () => {
     }
     const customStyled = Math.max(performance.now() - t1, 1);
 
-    // li with value="NaN" (triggered IE11/Edge perf bug)
     const t2 = performance.now();
     for (let i = 0; i < iterations; i++) {
       const frag = document.createDocumentFragment();
@@ -331,7 +565,6 @@ describe('modern browser assumptions', () => {
     }
     const liValue = Math.max(performance.now() - t2, 1);
 
-    // risky ops should be within 10x of baseline (on IE11 they were 1000x+)
     expect(customStyled).toBeLessThan(baseline * 10);
     expect(liValue).toBeLessThan(baseline * 10);
   });

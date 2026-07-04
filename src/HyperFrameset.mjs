@@ -17,11 +17,7 @@ import httpProxy from './Meeko/httpProxy.mjs';
 import CustomNamespace from './Meeko/CustomNamespace.mjs';
 import filters from './Meeko/filters.mjs';
 import './Meeko/builtin-filters.mjs';
-import decoders from './Meeko/decoders.mjs';
-import CSSDecoder from './Meeko/CSSDecoder.mjs';
-import { MicrodataDecoder, Microdata } from './Meeko/MicrodataDecoder.mjs';
-import JSONDecoder from './Meeko/JSONDecoder.mjs';
-import './Meeko/builtin-decoders.mjs';
+import * as Microdata from './Meeko/Microdata.mjs';
 import processors from './Meeko/processors.mjs';
 import MainProcessor from './Meeko/MainProcessor.mjs';
 import ScriptProcessor from './Meeko/ScriptProcessor.mjs';
@@ -42,11 +38,11 @@ import framer, { HFrameset, HFrame } from './Meeko/framer.mjs';
         stuff, Registry, Task, Thenfu, URLux, DOM, scriptQueue,
         htmlParser, httpProxy,
         CustomNamespace,
-        filters, decoders, processors,
+        filters, processors,
         controllers,
+        Microdata,
         transcluder,
         framer,
-        CSSDecoder, MicrodataDecoder, Microdata, JSONDecoder,
         MainProcessor, ScriptProcessor, HazardProcessor,
         HFrame, HFrameset
     });

@@ -6,34 +6,15 @@
 
 import * as _ from './stuff.mjs';
 import Thenfu from './Thenfu.mjs';
-import filters from './filters.mjs';
+import { evaluate, Scope } from './expressions.mjs';
 import CustomNamespace from './CustomNamespace.mjs';
 
 let document = window.document;
-
-// Suffixes for expression attribute names (e.g. expr:_text, expr:_html)
-// NOTE same values as TEXT_ATTR/HTML_ATTR in CSSDecoder but unrelated
-const TEXT_SUFFIX = '_text';
-const HTML_SUFFIX = '_html';
-
-const PIPE_OPERATOR = '//>';
 
 const HAZARD_TRANSFORM_URN = 'HazardTransform';
 const hazDefaultNS = new CustomNamespace({
 	urn: HAZARD_TRANSFORM_URN,
 	name: 'haz',
-	style: 'xml'
-});
-const HAZARD_EXPRESSION_URN = 'HazardExpression';
-const exprDefaultNS = new CustomNamespace({
-	urn: HAZARD_EXPRESSION_URN,
-	name: 'expr',
-	style: 'xml'
-});
-const HAZARD_MEXPRESSION_URN = 'HazardMExpression';
-const mexprDefaultNS = new CustomNamespace({
-	urn: HAZARD_MEXPRESSION_URN,
-	name: 'mexpr',
 	style: 'xml'
 });
 
@@ -52,9 +33,9 @@ const _cache = new WeakMap();
     attrs to elements.
 */
 let hazLangDefinition =
-	'<otherwise <when@test <each@select <one@select +var@name,select <if@test <unless@test ' +
-	'>choose <template@name,match >eval@select >mtext@select >text@select ' +
-	'call@name apply param@name,select clone deepclone element@name attr@name';
+	'<otherwise <when@test <each@select,as <one@select,as +var@name,select <if@test <unless@test ' +
+	'>choose <template@name,match >eval@select >text@select ' +
+	'call@name apply param@name,select clone deepclone element@name attr@name,value';
 
 let hazLang = Array.from(_.words(hazLangDefinition), (def) => {
 	def = def.split('@');
@@ -142,41 +123,10 @@ constructor(options, namespaces) {
 	this.namespaces = namespaces = namespaces.clone();
 	if (!namespaces.lookupNamespace(HAZARD_TRANSFORM_URN))
 		namespaces.add(hazDefaultNS);
-	if (!namespaces.lookupNamespace(HAZARD_EXPRESSION_URN))
-		namespaces.add(exprDefaultNS);
-	if (!namespaces.lookupNamespace(HAZARD_MEXPRESSION_URN))
-		namespaces.add(mexprDefaultNS);
-	this.#init();
+	this.#hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
 }
 
 #hazPrefix;
-#exprPrefix;
-#mexprPrefix;
-#exprHtmlAttr;
-#mexprTextAttr;
-#exprTextAttr;
-#exprToHazPriority;
-#exprToHazMap;
-#mexprHtmlAttr;
-
-#init() {
-	let namespaces = this.namespaces;
-	this.#hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
-	this.#exprPrefix = namespaces.lookupPrefix(HAZARD_EXPRESSION_URN);
-	this.#mexprPrefix = namespaces.lookupPrefix(HAZARD_MEXPRESSION_URN);
-
-	this.#exprHtmlAttr = this.#exprPrefix + HTML_SUFFIX; // mapped to haz:eval
-	this.#mexprTextAttr = this.#mexprPrefix + TEXT_SUFFIX; // mapped to haz:mtext
-	this.#exprTextAttr = this.#exprPrefix + TEXT_SUFFIX; // mapped to haz:text
-	this.#mexprHtmlAttr = this.#mexprPrefix + HTML_SUFFIX; // invalid, warn if seen
-
-	// FIXME extract exprToHazPriority from hazLang
-	this.#exprToHazPriority = [ this.#exprHtmlAttr, this.#mexprTextAttr, this.#exprTextAttr ];
-	this.#exprToHazMap = {};
-	this.#exprToHazMap[this.#exprHtmlAttr] = `${this.#hazPrefix}eval`;
-	this.#exprToHazMap[this.#mexprTextAttr] = `${this.#hazPrefix}mtext`;
-	this.#exprToHazMap[this.#exprTextAttr] = `${this.#hazPrefix}text`;
-}
 
 /**
  * Get the unprefixed directive name from a hazard element's tag.
@@ -209,24 +159,10 @@ loadTemplate(template) {
 
 	let doc = template.ownerDocument;
 
-	// Pass 1: Rewrite expression attributes (expr:_text, expr:_html, etc.) into hazard elements
+	// Pass 1: Promote hazard attributes to elements
 	walkTree(template, true, (el) => {
 		let tag = el.localName;
 		if (tag.indexOf(this.#hazPrefix) === 0) return;
-
-		// pre-process @expr:_html -> @haz:eval, etc
-		_.forEach(this.#exprToHazPriority, (attr) => {
-			if (!el.hasAttribute(attr)) return;
-			let tag = this.#exprToHazMap[attr];
-			let val = el.getAttribute(attr);
-			el.removeAttribute(attr);
-			el.setAttribute(tag, val);
-		});
-
-		if (el.hasAttribute(this.#mexprHtmlAttr)) {
-			console.warn(`Removing unsupported @${this.#mexprHtmlAttr}`);
-			el.removeAttribute(this.#mexprHtmlAttr);
-		}
 
 		// promote applicable hazard attrs to elements
 		_.forEach(hazLang, (def) => {
@@ -280,12 +216,6 @@ loadTemplate(template) {
 
 	// Pass 3: Wrap loose content nodes in an implicit entry template
 	this.#implyEntryTemplate(template);
-
-	// Pass 4: Extract expression attributes and cache them per element
-	walkTree(template, true, (el) => {
-		let attrs = this.#getExprAttributes(el);
-		if (attrs.length) _cache.set(el, attrs);
-	});
 
 	// Cache the processed state
 	_cache.set(template, { root: this.root, templates: this.templates });
@@ -362,46 +292,6 @@ getEntryTemplate() {
  * @returns {Object} Details with .definition and .exprAttributes.
  */
 /**
- * Extract and remove expression/mexpression attributes from an element.
- * @param {Element} el - Element to extract from.
- * @returns {Array<Object>} Array of expression attribute descriptors.
- */
-#getExprAttributes(el) {
-	let attrs = [];
-	let namespaces = this.namespaces;
-	let exprNS = namespaces.lookupNamespace(HAZARD_EXPRESSION_URN);
-	let mexprNS = namespaces.lookupNamespace(HAZARD_MEXPRESSION_URN);
-	_.forEach(Array.from(el.attributes), (attr) => {
-		let ns = _.find([ exprNS, mexprNS ], (ns) => {
-			return (attr.name.indexOf(ns.prefix) === 0);
-		});
-		if (!ns) return;
-		let prefix = ns.prefix;
-		let namespaceURI = ns.urn;
-		let attrName = attr.name.substr(prefix.length);
-		el.removeAttribute(attr.name);
-		let desc = {
-			namespaceURI: namespaceURI,
-			prefix: prefix,
-			attrName: attrName,
-			type: 'text'
-		}
-		switch (namespaceURI) {
-		case HAZARD_EXPRESSION_URN:
-			desc.expression = interpretExpression(attr.value);
-			break;
-		case HAZARD_MEXPRESSION_URN:
-			desc.mexpression = interpretMExpression(attr.value);
-			break;
-		default: // TODO an error?
-			break;
-		}
-		attrs.push(desc);
-	});
-	return attrs;
-}
-
-/**
  * Find a template by name attribute.
  * @param {string} name - Template name to match.
  * @returns {Element|undefined} Matching template element.
@@ -420,18 +310,21 @@ getNamedTemplate(name) {
  * @returns {Element|undefined} First matching template element.
  */
 getMatchingTemplate(element) {
-	let processor = this;
-	return _.find(processor.templates, (template) => {
+	return _.find(this.templates, (template) => {
 		if (!template.hasAttribute('match')) return false;
 		let expression = template.getAttribute('match');
-		return processor.provider.matches(element, expression);
+		try { return evaluate(expression, this.scope.values); }
+		catch (err) {
+			console.warn(`Error evaluating template match="${expression}".`);
+			return false;
+		}
 	});	
 }
 
 /**
- * Transform the loaded template against a data provider.
- * @param {Object} provider - Data provider with evaluate() and matches() methods.
- * @param {Object} details - Transform details (passed as global params).
+ * Transform the loaded template against a data source.
+ * @param {Object} provider - Data source with a `source` property (the root data).
+ * @param {Object} details - Transform details (passed as initial global scope).
  * @returns {Promise<DocumentFragment>} Resolves with the transformed output fragment.
  */
 transform(provider, details) {
@@ -444,88 +337,29 @@ transform(provider, details) {
 }
 
 _transform(provider, details, frag) {
-	this.provider = provider;
+	this.scope = new Scope(details);
+	this.scope.set('root', provider.source, { global: true });
 
-	this.globalParams = _.assign({}, details);
-	this.globalVars = {};
-	this.localParams = this.globalParams;
-	this.localVars = this.globalVars;
-	this.localParamsStack = [];
-	this.localVarsStack = [];
-
-	/** @type {DecoderVariables} */
-	this.variables = {
-		has: (key) => {
-			let result =
-				key in this.localVars ||
-				key in this.localParams ||
-				key in this.globalVars ||
-				key in this.globalParams ||
-				false;
-			return result;
-		},
-		// NOTE returns the stored value for the first scope that contains the key,
-		//   even if that value is falsy (0, "", false). Only returns undefined if no scope has the key.
-		get: (key) => {
-			if (key in this.localVars) return this.localVars[key];
-			if (key in this.localParams) return this.localParams[key];
-			if (key in this.globalVars) return this.globalVars[key];
-			if (key in this.globalParams) return this.globalParams[key];
-			return undefined;
-		},
-		set: (key, value, inParams, isGlobal) => {
-			let mapName = isGlobal ?
-				( inParams ? 'globalParams' : 'globalVars' ) :
-				( inParams ? 'localParams' : 'localVars' );
-			// NOTE params are write-once
-			if (inParams && key in this[mapName]) {
-				console.warn(`Param "${key}" already set`);
-				return;
-			}
-			// NOTE null/undefined deletes the value, allowing outer scope to show through
-			if (value == null) {
-				console.warn(`Variable "${key}" set to null/undefined — removing from scope`);
-				delete this[mapName][key];
-				return;
-			}
-			this[mapName][key] = value;
-		},
-		push: (params) => {
-			this.localParamsStack.push(this.localParams);
-			this.localVarsStack.push(this.localVars);
-
-			if (typeof params !== 'object' || params == null) params = {};
-			this.localParams = params;
-			this.localVars = {};
-		},
-		pop: () => {
-			this.localParams = this.localParamsStack.pop();
-			this.localVars = this.localVarsStack.pop();
-		}
-	}
-
-	return this.transformChildNodes(this.root, null, frag)
+	return this.transformChildNodes(this.root, frag)
 	.then(() => {
 		let template = this.getEntryTemplate();
-		return this.transformTemplate(template, null, null, frag);
+		return this.transformTemplate(template, null, frag);
 	});
 }
 
 /**
- * Transform a specific template element within a context.
+ * Transform a specific template element within the current scope.
  * @param {Element} template - Template element to transform.
- * @param {Node} context - Data context node.
- * @param {Object} params - Parameters to push onto the variable stack.
+ * @param {Object} params - Parameters to push onto the scope.
  * @param {DocumentFragment} frag - Output fragment to append results to.
  * @returns {Promise<DocumentFragment>}
  */
-transformTemplate(template, context, params, frag) {
-	let processor = this;
-	processor.variables.push(params);
+transformTemplate(template, params, frag) {
+	this.scope.push(params);
 
-	return processor.transformChildNodes(template, context, frag)
+	return this.transformChildNodes(template, frag)
 	.then(() => { 
-		processor.variables.pop(); 
+		this.scope.pop(); 
 		return frag;
 	});
 }
@@ -533,235 +367,231 @@ transformTemplate(template, context, params, frag) {
 /**
  * Transform all child nodes of a source node sequentially.
  * @param {Node} srcNode - Source node whose children to transform.
- * @param {Node} context - Data context node.
  * @param {DocumentFragment} frag - Output fragment.
  * @returns {Promise}
  */
-transformChildNodes(srcNode, context, frag) {
-	let processor = this;
-
+transformChildNodes(srcNode, frag) {
 	return Thenfu.reduce(null, srcNode.childNodes, (dummy, current) => {
-		return processor.transformNode(current, context, frag);
+		return this.transformNode(current, frag);
 	});
 }
 
 /**
  * Transform a single node: clone non-elements, dispatch elements to hazard or tree transform.
  * @param {Node} srcNode - Source node to transform.
- * @param {Node} context - Data context node.
  * @param {DocumentFragment} frag - Output fragment.
  * @returns {Promise|undefined}
  */
-transformNode(srcNode, context, frag) {
+transformNode(srcNode, frag) {
 	switch (srcNode.nodeType) {
 	default: 
 		let node = srcNode.cloneNode(true);
 		frag.appendChild(node);
 		return;
-	case 3: // NOTE text-nodes are special-cased for perf testing
+	case 3: // text nodes
 		let textNode = srcNode.cloneNode(true);
 		frag.appendChild(textNode);
 		return;
 	case 1:
-		if (this.#getHazardTag(srcNode)) return this.transformHazardTree(srcNode, context, frag);
-		else return this.transformTree(srcNode, context, frag);
+		if (this.#getHazardTag(srcNode)) return this.transformHazardTree(srcNode, frag);
+		else return this.transformTree(srcNode, frag);
 	}
 }
 
 /**
- * Transform a hazard directive element (haz:if, haz:for-each, haz:choose, etc.).
+ * Transform a hazard directive element (haz:if, haz:each, haz:choose, etc.).
  * @param {Element} el - Hazard element to process.
- * @param {Node} context - Data context node.
  * @param {DocumentFragment} frag - Output fragment.
  * @returns {Promise|undefined}
  */
-transformHazardTree(el, context, frag) {
+transformHazardTree(el, frag) {
 	let doc = el.ownerDocument;
 	let tag = this.#getHazardTag(el);
 
-	let invertTest = false; // for haz:if haz:unless
+	let invertTest = false;
 
-	let name, selector, value, type, template, node, expr, mexpr;
-
-	switch (tag) { // TODO refactor these cases into individual methods, e.g transformHazardLetTree()
-	default: // for unknown (or unhandled) haz: elements just process the children
+	switch (tag) {
+	default:
 		console.warn(`Unknown hazard element <${el.localName}> — processing children only`);
-		return this.transformChildNodes(el, context, frag);
+		return this.transformChildNodes(el, frag);
 		
 	case 'template':
 		return frag;
 
-	case 'var':
-		name = el.getAttribute('name');
-		selector = el.getAttribute('select');
-		value = context;
-		if (selector) {
-			try {
-				value = this.provider.evaluate(selector, context, this.variables, false);
-			}
+	case 'var': {
+		let name = el.getAttribute('name');
+		let selectExpr = el.getAttribute('select');
+		let value;
+		if (selectExpr) {
+			try { value = evaluate(selectExpr, this.scope.values); }
 			catch (err) {
 				window.reportError(err);
-				console.warn(`Error evaluating <haz:var name="${name}" select="${selector}">. Assumed empty.`);
-				value = undefined;
+				console.warn(`Error evaluating <haz:var name="${name}" select="${selectExpr}">. Assumed undefined.`);
 			}
 		}
-
-		this.variables.set(name, value);
+		this.scope.set(name, value);
 		return frag;
+	}
 
-	case 'param':
-		name = el.getAttribute('name');
-		selector = el.getAttribute('select');
-		value = context;
-		if (selector) {
-			try {
-				value = this.provider.evaluate(selector, context, this.variables, false);
-			}
+	case 'param': {
+		let name = el.getAttribute('name');
+		let selectExpr = el.getAttribute('select');
+		let value;
+		if (selectExpr) {
+			try { value = evaluate(selectExpr, this.scope.values); }
 			catch (err) {
 				window.reportError(err);
-				console.warn(`Error evaluating <haz:param name="${name}" select="${selector}">. Assumed empty.`);
-				value = undefined;
+				console.warn(`Error evaluating <haz:param name="${name}" select="${selectExpr}">. Assumed undefined.`);
 			}
 		}
-
-		this.variables.set(name, value, true);
+		this.scope.set(name, value, { param: true });
 		return frag;
+	}
 
-
-	case 'call':
-		name = el.getAttribute('name');
-		template = this.getNamedTemplate(name);
+	case 'call': {
+		let name = el.getAttribute('name');
+		let template = this.getNamedTemplate(name);
 		if (!template) {
 			console.warn(`Hazard could not find template name="${name}"`);
 			return frag;
 		}
-	
-		return this.transformTemplate(template, context, null, frag);
+		return this.transformTemplate(template, null, frag);
+	}
 
-	case 'apply': // WARN only applies to DOM-based provider
-		template = this.getMatchingTemplate(context);
+	case 'apply': {
+		let template = this.getMatchingTemplate(this.scope.get('root'));
 		if (template) {
-			return this.transformTemplate(template, context, null, frag);
+			return this.transformTemplate(template, null, frag);
 		}
-		console.warn('<haz:apply> found no matching template:', context);
-		node = context.cloneNode(false);
-		frag.appendChild(node);
-		return Thenfu.reduce(null, context.childNodes, (dummy, child) => {
-			return this.transformHazardTree(el, child, node);
-		});
-
-	case 'clone': // WARN only applies to DOM-based providers
-		node = context.cloneNode(false);
-		frag.appendChild(node);
-		return this.transformChildNodes(el, context, node);
-
-	case 'deepclone': // WARN only applies to DOM-based providers
-		node = context.cloneNode(true);
-		frag.appendChild(node);
-		// TODO WARN if el has child-nodes
+		console.warn('<haz:apply> found no matching template');
 		return frag;
+	}
 
-	case 'element':
-		// FIXME log a warning if this directive has children
-		mexpr = el.getAttribute('name');
-		name = evalMExpression(mexpr, this.provider, context, this.variables);
-		type = typeof value;
-		if (type !== 'string') {
-			console.debug(`<haz:element name="${mexpr}"> did not resolve to a string — skipped`);
-			return frag;
-		}
-
-		node = doc.createElement(name);
+	case 'clone': {
+		let root = this.scope.get('root');
+		if (!root || !root.cloneNode) return frag;
+		let node = root.cloneNode(false);
 		frag.appendChild(node);
-		return this.transformChildNodes(el, context, node);
+		return this.transformChildNodes(el, node);
+	}
 
-	case 'attr':
-		// FIXME log a warning if this directive has children
-		mexpr = el.getAttribute('name');
-		name = evalMExpression(mexpr, this.provider, context, this.variables);
-		type = typeof value;
-		if (type !== 'string') {
-			console.debug(`<haz:attr name="${mexpr}"> did not resolve to a string — skipped`);
+	case 'deepclone': {
+		let root = this.scope.get('root');
+		if (!root || !root.cloneNode) return frag;
+		let node = root.cloneNode(true);
+		frag.appendChild(node);
+		return frag;
+	}
+
+	case 'element': {
+		let nameExpr = el.getAttribute('name');
+		let name;
+		try { name = evaluate(nameExpr, this.scope.values); }
+		catch (err) {
+			window.reportError(err);
+			console.warn(`Error evaluating <haz:element name="${nameExpr}">.`);
 			return frag;
 		}
+		if (typeof name !== 'string') {
+			console.debug(`<haz:element name="${nameExpr}"> did not resolve to a string — skipped`);
+			return frag;
+		}
+		let node = doc.createElement(name);
+		frag.appendChild(node);
+		return this.transformChildNodes(el, node);
+	}
 
-		node = doc.createDocumentFragment();
-		return this.transformChildNodes(el, context, node)
+	case 'attr': {
+		let nameExpr = el.getAttribute('name');
+		let valueExpr = el.getAttribute('value');
+		let name, value;
+		try { name = evaluate(nameExpr, this.scope.values); }
+		catch (err) {
+			window.reportError(err);
+			console.warn(`Error evaluating <haz:attr name="${nameExpr}">.`);
+			return frag;
+		}
+		if (typeof name !== 'string') {
+			console.debug(`<haz:attr name="${nameExpr}"> did not resolve to a string — skipped`);
+			return frag;
+		}
+		if (valueExpr) {
+			try { value = evaluate(valueExpr, this.scope.values); }
+			catch (err) {
+				window.reportError(err);
+				console.warn(`Error evaluating <haz:attr value="${valueExpr}">.`);
+				return frag;
+			}
+			setAttribute(frag, name, value);
+			return frag;
+		}
+		// Fall back to child text content for value
+		let node = doc.createDocumentFragment();
+		return this.transformChildNodes(el, node)
 		.then(() => {
 			value = node.textContent;
-			frag.setAttribute(name, value);
+			setAttribute(frag, name, value);
 			return frag;
 		});
+	}
 
-	case 'eval':
-		// FIXME log a warning if this directive has children
-		selector = el.getAttribute('select');
-		value = evalExpression(selector, this.provider, context, this.variables, 'node');
-		type = typeof value;
-		if (type === 'undefined' || type === 'boolean' || value == null) {
-			console.debug(`<haz:eval select="${selector}"> resolved to nothing`);
+	case 'eval': {
+		let selectExpr = el.getAttribute('select');
+		let value;
+		try { value = evaluate(selectExpr, this.scope.values); }
+		catch (err) {
+			window.reportError(err);
+			console.warn(`Error evaluating <haz:eval select="${selectExpr}">.`);
+			return this.transformChildNodes(el, frag); // fallback to children
+		}
+		if (value == null || value === false || value === undefined) {
+			// No value — render children as fallback content
+			return this.transformChildNodes(el, frag);
+		}
+		if (value.nodeType) {
+			frag.appendChild(value);
+		} else {
+			frag.appendChild(doc.createTextNode(String(value)));
+		}
+		return frag;
+	}
+
+	case 'text': {
+		let selectExpr = el.getAttribute('select');
+		let value;
+		try { value = evaluate(selectExpr, this.scope.values); }
+		catch (err) {
+			window.reportError(err);
+			console.warn(`Error evaluating <haz:text select="${selectExpr}">.`);
 			return frag;
 		}
-		if (!value.nodeType) { // TODO test performance
-			value = htmlToFragment(value, doc);
-		}
-		frag.appendChild(value);
-		return frag;
-
-	case 'mtext':
-		// FIXME log a warning if this directive has children
-		mexpr = el.getAttribute('select');
-		value = evalMExpression(mexpr, this.provider, context, this.variables);
-		// FIXME `value` should always already be "text"
-		if (type === 'undefined' || type === 'boolean' || value == null) {
-			console.debug(`<haz:mtext select="${mexpr}"> resolved to nothing`);
+		if (value == null || value === undefined) {
+			console.debug(`<haz:text select="${selectExpr}"> resolved to nothing`);
 			return frag;
 		}
-
-		if (!value.nodeType) {
-			value = doc.createTextNode(value);
-		}
-		frag.appendChild(value);
+		frag.appendChild(doc.createTextNode(String(value)));
 		return frag;
-
-	case 'text':
-		// FIXME log a warning if this directive has children
-		expr = el.getAttribute('select');
-		value = evalExpression(expr, this.provider, context, this.variables, 'text');
-		// FIXME `value` should always already be "text"
-		type = typeof value;
-		if (type === 'undefined' || type === 'boolean' || value == null) {
-			console.debug(`<haz:text select="${expr}"> resolved to nothing`);
-			return frag;
-		}
-		if (!value.nodeType) {
-			value = doc.createTextNode(value);
-		}
-		frag.appendChild(value);
-		return frag;
+	}
 
 	case 'unless':
 		invertTest = true;
-	case 'if':
-		let testVal = el.getAttribute('test');
+	case 'if': {
+		let testExpr = el.getAttribute('test');
 		let pass = false;
-		try {
-			pass = evalExpression(testVal, this.provider, context, this.variables, 'boolean');
-		}
+		try { pass = evaluate(testExpr, this.scope.values); }
 		catch (err) {
 			window.reportError(err);
-			console.warn(`Error evaluating <haz:if test="${testVal}">. Assumed false.`);
-			pass = false;
+			console.warn(`Error evaluating <haz:if test="${testExpr}">. Assumed false.`);
 		}
 		if (invertTest) pass = !pass;
 		if (!pass) return frag;
-		return this.transformChildNodes(el, context, frag);
+		return this.transformChildNodes(el, frag);
+	}
 
-	case 'choose':
- 		// NOTE if no successful `when` then chooses *first* `otherwise`
+	case 'choose': {
 		let otherwise;
 		let when;
-		let found = _.some(el.childNodes, (child) => { // TODO .children??
+		let found = _.some(el.childNodes, (child) => {
 			if (child.nodeType !== 1) return false;
 			let childTag = this.#getHazardTag(child);
 			if (!childTag) return false;
@@ -770,8 +600,13 @@ transformHazardTree(el, context, frag) {
 				return false;
 			}
 			if (childTag !== 'when') return false;
-			let testVal = child.getAttribute('test');
-			let pass = evalExpression(testVal, this.provider, context, this.variables, 'boolean');
+			let testExpr = child.getAttribute('test');
+			let pass = false;
+			try { pass = evaluate(testExpr, this.scope.values); }
+			catch (err) {
+				window.reportError(err);
+				console.warn(`Error evaluating <haz:when test="${testExpr}">. Assumed false.`);
+			}
 			if (!pass) return false;
 			when = child;
 			return true;
@@ -781,93 +616,94 @@ transformHazardTree(el, context, frag) {
 			console.debug('<haz:choose> had no matching <haz:when> and no <haz:otherwise>');
 			return frag;
 		}
-		return this.transformChildNodes(when, context, frag);
+		return this.transformChildNodes(when, frag);
+	}
 
-	case 'one': // FIXME refactor common parts with `case 'each':`
-		selector = el.getAttribute('select');
-		let subContext;
-		try {
-			subContext = this.provider.evaluate(selector, context, this.variables, false);
-		}
+	case 'one': {
+		let selectExpr = el.getAttribute('select');
+		let asName = el.getAttribute('as');
+		let value;
+		try { value = evaluate(selectExpr, this.scope.values); }
 		catch (err) {
 			window.reportError(err);
-			console.warn(`Error evaluating <haz:one select="${selector}">. Assumed empty.`);
+			console.warn(`Error evaluating <haz:one select="${selectExpr}">. Assumed empty.`);
 			return frag;
 		}
-
-		if (!subContext) {
-			console.debug(`<haz:one select="${selector}"> resolved to nothing`);
+		if (!value) {
+			console.debug(`<haz:one select="${selectExpr}"> resolved to nothing`);
 			return frag;
 		}
-		return this.transformChildNodes(el, subContext, frag);
+		if (asName) this.scope.set(asName, value);
+		return this.transformChildNodes(el, frag);
+	}
 
-
-	case 'each':
-		selector = el.getAttribute('select');
-		let subContexts;
-		try {
-			subContexts = this.provider.evaluate(selector, context, this.variables, true);
-		}
+	case 'each': {
+		let selectExpr = el.getAttribute('select');
+		let asName = el.getAttribute('as');
+		let items;
+		try { items = evaluate(selectExpr, this.scope.values); }
 		catch (err) {
 			window.reportError(err);
-			console.warn(`Error evaluating <haz:each select="${selector}">. Assumed empty.`);
+			console.warn(`Error evaluating <haz:each select="${selectExpr}">. Assumed empty.`);
 			return frag;
 		}
-
-		return Thenfu.reduce(null, subContexts, (dummy, subContext) => {
-			return this.transformChildNodes(el, subContext, frag);
+		if (!items) {
+			console.debug(`<haz:each select="${selectExpr}"> resolved to nothing`);
+			return frag;
+		}
+		return Thenfu.reduce(null, items, (dummy, item) => {
+			if (asName) this.scope.set(asName, item);
+			return this.transformChildNodes(el, frag);
 		});
+	}
 
 	}
-			
 }
 
 /**
  * Transform a non-hazard element: clone it, evaluate expression attributes, then recurse into children.
  * @param {Element} srcNode - Source element to transform.
- * @param {Node} context - Data context node.
  * @param {DocumentFragment} frag - Output fragment.
  * @returns {Promise}
  */
-transformTree(srcNode, context, frag) { // srcNode is Element
-	let processor = this;
-	
-	let nodeType = srcNode.nodeType;
-	if (nodeType !== 1) throw Error('transformTree() expects Element');
-	let node = processor.transformSingleElement(srcNode, context);
-	let nodeAsFrag = frag.appendChild(node); // WARN use returned value not `node` ...
-	// ... this allows frag to be a custom object, which in turn 
-	// ... allows a different type of output construction
+transformTree(srcNode, frag) {
+	let node = this.transformSingleElement(srcNode);
+	let nodeAsFrag = frag.appendChild(node);
 
-	return processor.transformChildNodes(srcNode, context, nodeAsFrag);
+	return this.transformChildNodes(srcNode, nodeAsFrag);
 }
 
 /**
- * Clone an element (shallow) and evaluate its expression attributes.
+ * Clone an element (shallow) and evaluate any ${} expression attributes.
  * @param {Element} srcNode - Source element to clone and evaluate.
- * @param {Node} context - Data context node.
  * @returns {Element} Cloned element with evaluated attributes.
  */
-transformSingleElement(srcNode, context) {
-	let processor = this;
-	let exprAttributes = _cache.get(srcNode);
-
+transformSingleElement(srcNode) {
 	let el = srcNode.cloneNode(false);
 
-	if (exprAttributes) _.forEach(exprAttributes, (desc) => {
-		let value;
-		try {
-			value = (desc.namespaceURI === HAZARD_MEXPRESSION_URN) ?
-				processMExpression(desc.mexpression, processor.provider, context, processor.variables) :
-				processExpression(desc.expression, processor.provider, context, processor.variables, desc.type);
+	for (let attr of Array.from(el.attributes)) {
+		let value = attr.value;
+		if (value.startsWith('`') && value.endsWith('`')) {
+			// Template literal: `text ${expr}`
+			try { value = evaluate(value, this.scope.values); }
+			catch (err) {
+				window.reportError(err);
+				console.warn(`Error evaluating attribute ${attr.name}="${value}".`);
+				continue;
+			}
+			setAttribute(el, attr.name, value);
+		} else if (value.startsWith('${') && value.endsWith('}')) {
+			// Single expression: ${expr}
+			let expr = value.slice(2, -1);
+			try { value = evaluate(expr, this.scope.values); }
+			catch (err) {
+				window.reportError(err);
+				console.warn(`Error evaluating attribute ${attr.name}="${value}".`);
+				continue;
+			}
+			setAttribute(el, attr.name, value);
 		}
-		catch (err) {
-			window.reportError(err);
-			console.warn(`Error evaluating @${desc.attrName}="${desc.expression}". Assumed false.`);
-			value = false;
-		}
-		setAttribute(el, desc.attrName, value);
-	});
+	}
 
 	return el;
 }
@@ -893,198 +729,6 @@ function setAttribute(el, attrName, value) {
 	else {
 		el.setAttribute(attrName, value.toString());
 	}
-}
-
-/**
- * Parse and evaluate a mustache-style expression string.
- * @param {string} mexprText - Mustache expression text (e.g. "Hello {{.name}}").
- * @param {Object} provider - Data provider with evaluate/matches methods.
- * @param {Node} context - Context node for evaluation.
- * @param {Object} variables - Variable bindings.
- * @returns {string} Evaluated result.
- */
-function evalMExpression(mexprText, provider, context, variables) {
-	let mexpr = interpretMExpression(mexprText);
-	return processMExpression(mexpr, provider, context, variables);
-}
-
-/**
- * Parse and evaluate a single expression string.
- * @param {string} exprText - Expression text (e.g. ".title //> uppercase").
- * @param {Object} provider - Data provider with evaluate/matches methods.
- * @param {Node} context - Context node for evaluation.
- * @param {Object} variables - Variable bindings.
- * @param {string} type - Result type ('text' or 'node').
- * @returns {*} Evaluated result.
- */
-function evalExpression(exprText, provider, context, variables, type) {
-	let expr = interpretExpression(exprText);
-	return processExpression(expr, provider, context, variables, type);
-}
-	
-/**
- * Parse a mustache-style expression into a template and expression list.
- * @param {string} mexprText - Text containing {{expression}} placeholders.
- * @returns {{template: string, expressions: Array<Object>}} Parsed representation.
- */
-function interpretMExpression(mexprText) {
-	let expressions = [];
-	let mexpr = mexprText.replace(/\{\{((?:[^}]|\}(?=\}\})|\}(?!\}))*)\}\}/g, (all, expr) => {
-		expressions.push(expr);
-		return '{{}}';
-	});
-
-	expressions = expressions.map((expr) => { return interpretExpression(expr); });
-	return {
-		template: mexpr,
-		expressions: expressions
-	};
-}
-
-/**
- * Parse a single expression into a selector and filter chain.
- * @param {string} exprText - Expression text (selector optionally followed by //> filter calls).
- * @returns {{text: string, selector: string, filters: Array<Object>}} Parsed expression.
- */
-function interpretExpression(exprText) { // FIXME robustness
-	let expression = {};
-	expression.text = exprText;
-	let exprParts = exprText.split(PIPE_OPERATOR);
-	expression.selector = exprParts.shift();
-	expression.filters = [];
-
-	_.forEach(exprParts, (filterSpec) => {
-		filterSpec = filterSpec.trim();
-		let text = filterSpec;
-		let m = text.match(/^([_a-zA-Z][_a-zA-Z0-9]*)\s*(:?)/);
-		if (!m) {
-			console.warn(`Syntax Error in filter call: ${filterSpec}`);
-			return false;
-		}
-		let filterName = m[1];
-		let hasParams = m[2];
-		text = text.substr(m[0].length);
-		if (!hasParams && /\S+/.test(text)) {
-			console.warn(`Syntax Error in filter call: ${filterSpec}`);
-			return false;
-		}
-
-		try {
-			let filterParams = (Function('return [' + text + '];'))();
-			expression.filters.push({
-				text: filterSpec,
-				name: filterName,
-				params: filterParams
-			});
-			return true;
-		}
-		catch (err) {
-			console.warn(`Syntax Error in filter call: ${filterSpec}`);
-			return false;
-		}
-	});
-
-	return expression;
-}
-
-
-/**
- * Evaluate a parsed mustache expression by replacing placeholders with evaluated values.
- * @param {Object} mexpr - Parsed mustache expression from interpretMExpression.
- * @param {Object} provider - Data provider.
- * @param {Node} context - Context node.
- * @param {Object} variables - Variable bindings.
- * @returns {string} Fully evaluated string.
- */
-function processMExpression(mexpr, provider, context, variables) {
-	let i = 0;
-	return mexpr.template.replace(/\{\{\}\}/g, (all) => {
-		return processExpression(mexpr.expressions[i++], provider, context, variables, 'text');
-	});
-}
-
-/**
- * Evaluate a parsed expression: resolve selector, apply filter chain, cast to type.
- * @param {Object} expr - Parsed expression from interpretExpression.
- * @param {Object} provider - Data provider with evaluate method.
- * @param {Node} context - Context node for selector evaluation.
- * @param {Object} variables - Variable bindings.
- * @param {string} type - Result type ('text' or 'node').
- * @returns {*} Evaluated and cast result.
- */
-function processExpression(expr, provider, context, variables, type) { // FIXME robustness
-	let value = provider.evaluate(expr.selector, context, variables);
-
-	_.every(expr.filters, (filter) => {
-		if (value == null) value = '';
-		if (value.nodeType) {
-			if (value.nodeType === 1) value = value.textContent;
-			else value = '';
-		}
-		try {
-			value = filters.evaluate(filter.name, value, filter.params);
-			return true;
-		}
-		catch (err) {
-			window.reportError(err);
-			console.warn(`Failure processing filter call: "${filter.text}" with input: "${value}"`);
-			value = '';
-			return false;
-		}
-	});
-
-	return cast(value, type, context);
-}
-
-/**
- * Get the ownerDocument from a context node.
- * @param {Node} context - A document, element, or other node.
- * @returns {Document}
- */
-function getDocument(context) {
-	if (context && context.nodeType === 9) return context;
-	if (context && context.ownerDocument) return context.ownerDocument;
-	return document;
-}
-
-/**
- * Cast a value to the specified output type.
- * @param {*} value - The value to cast.
- * @param {string} type - Target type: 'text', 'node', or 'boolean'.
- * @param {Node} context - Context node (used to derive document for fragment creation).
- * @returns {string|DocumentFragment|boolean} The cast value.
- */
-function cast(value, type, context) {
-	switch (type) {
-	case 'text':
-		if (value && value.nodeType) value = value.textContent;
-		break;
-	case 'node':
-		let doc = getDocument(context);
-		let frag = doc.createDocumentFragment();
-		if (value && value.nodeType) frag.appendChild(doc.importNode(value, true)); // NOTE no adoption
-		else {
-			let div = doc.createElement('div');
-			div.innerHTML = value;
-			let node;
-			while (node = div.firstChild) frag.appendChild(node); // NOTE no adoption
-		}
-		value = frag;
-		break;
-	case 'boolean':
-		// NOTE only literal `false` or absence (null/undefined) means false; all other values are true
-		if (value == null || value === false) value = false;
-		else {
-			if (!value) console.warn(`Casting present but falsy value (${JSON.stringify(value)}) to true`);
-			value = true;
-		}
-		break;
-	default:
-		console.warn(`Unexpected cast type: ${type}`);
-		if (value && value.nodeType) value = value.textContent;
-		break;
-	}
-	return value;
 }
 
 export default HazardProcessor;

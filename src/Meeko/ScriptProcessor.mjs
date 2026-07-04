@@ -56,7 +56,7 @@ loadTemplate(template) {
 }
 
 transform(provider, details) {
-	let srcNode = provider.srcNode;
+	let srcNode = provider.source;
 	if (!this.processor || !this.processor.transform) {
 		console.warn('"script" transform template did not produce valid transform object');
 		return;
