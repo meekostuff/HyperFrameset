@@ -183,6 +183,38 @@ loadTemplate(template) {
 		}
 	});
 
+	// Pass 0b: Promote ${expr} and `template` content expressions to haz:eval / haz:text elements
+	walkTree(template, true, (el) => {
+		if (el.localName.indexOf(this.#hazPrefix) === 0) return;
+		// Must have exactly one child node which is a text node
+		if (el.childNodes.length !== 1) return;
+		let child = el.firstChild;
+		if (child.nodeType !== 3) return;
+		let text = child.nodeValue.trim();
+		if (!text) return;
+
+		if (text.startsWith('${')) {
+			if (!text.endsWith('}')) {
+				console.warn(`<${el.localName}> content starts with \${ but does not end with }: "${text}"`);
+				return;
+			}
+			let expr = text.slice(2, -1);
+			let directive = doc.createElement(this.#hazPrefix + 'eval');
+			directive.setAttribute('select', expr);
+			el.removeChild(child);
+			el.appendChild(directive);
+		} else if (text.startsWith('`')) {
+			if (!text.endsWith('`')) {
+				console.warn(`<${el.localName}> content starts with backtick but does not end with one: "${text}"`);
+				return;
+			}
+			let directive = doc.createElement(this.#hazPrefix + 'text');
+			directive.setAttribute('select', text);
+			el.removeChild(child);
+			el.appendChild(directive);
+		}
+	});
+
 	// Pass 1: Promote hazard attributes to elements
 	walkTree(template, true, (el) => {
 		let tag = el.localName;
