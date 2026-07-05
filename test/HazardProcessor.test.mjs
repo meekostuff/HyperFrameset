@@ -280,8 +280,8 @@ describe('HazardProcessor', () => {
         '<span><haz:text select="secret"></haz:text></span>' +
       '</div>'
     );
-    // secret should be undefined outside the call
-    expect(result.querySelector('span').textContent).toBe('');
+    // secret is undefined outside the call — template literal produces "undefined"
+    expect(result.querySelector('span').textContent).toBe('undefined');
   });
 
   // --- ${} attribute expressions ---

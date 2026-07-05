@@ -33,9 +33,9 @@ const _cache = new WeakMap();
     attrs to elements.
 */
 let hazLangDefinition =
-	'<otherwise <when@test <each@select,as <one@select,as +var@name,select <if@test <unless@test ' +
-	'>choose <template@name,match >eval@select >text@select ' +
-	'call@name apply param@name,select clone deepclone element@name attr@name,value';
+	'<otherwise <when@$test <each@$select,as <one@$select,as +var@name,$select <if@$test <unless@$test ' +
+	'>choose <template@name,$match >eval@$select >text@"select ' +
+	'call@name apply@$select,as clone deepclone element@"name attr@"name,"value';
 
 let hazLang = Array.from(_.words(hazLangDefinition), (def) => {
 	def = def.split('@');
@@ -49,12 +49,23 @@ let hazLang = Array.from(_.words(hazLangDefinition), (def) => {
 		break;
 	}
 	if (attrToElement) tag = tag.substr(1);
-	let attrs = def[1];
-	attrs = (attrs && attrs !== '') ? attrs.split(',') : [];
+	let attrDefs = def[1];
+	let attrs = [];
+	let attrTypes = {};
+	if (attrDefs && attrDefs !== '') {
+		for (let a of attrDefs.split(',')) {
+			let type = 'bare';
+			if (a.startsWith('"')) { type = 'string'; a = a.substring(1); }
+			else if (a.startsWith('$')) { type = 'expr'; a = a.substring(1); }
+			attrs.push(a);
+			attrTypes[a] = type;
+		}
+	}
 	return {
 		tag: tag,
 		attrToElement: attrToElement,
-		attrs: attrs
+		attrs: attrs,
+		attrTypes: attrTypes
 	}
 });
 
@@ -101,16 +112,182 @@ function childNodesToFragment(el) {
 }
 
 /**
- * Parse an HTML string into a DocumentFragment.
- * @param {string} html - HTML string to parse.
- * @param {Document} [doc] - Document to create elements in.
- * @returns {DocumentFragment}
+ * Convert html: prefixed elements and attributes to their unprefixed equivalents.
+ * @param {Element} el - Element to process.
  */
-function htmlToFragment(html, doc) {
-	if (!doc) doc = document;
-	let div = doc.createElement('div');
-	div.innerHTML = html;
-	return childNodesToFragment(div);
+function convertHtmlPrefix(el) {
+	let doc = el.ownerDocument;
+	// Convert html:* element to unprefixed
+	if (el.localName.startsWith('html:')) {
+		let newEl = doc.createElement(el.localName.substring(5));
+		for (let attr of Array.from(el.attributes)) {
+			newEl.setAttribute(attr.name, attr.value);
+		}
+		while (el.firstChild) newEl.appendChild(el.firstChild);
+		el.parentNode.replaceChild(newEl, el);
+		el = newEl;
+	}
+	// Convert html:* attributes to unprefixed
+	for (let attr of Array.from(el.attributes)) {
+		if (!attr.name.startsWith('html:')) continue;
+		let targetName = attr.name.substring(5);
+		if (el.hasAttribute(targetName)) {
+			console.warn(`<${el.localName}> html:${targetName} overrides existing @${targetName}`);
+		}
+		el.removeAttribute(attr.name);
+		el.setAttribute(targetName, attr.value);
+	}
+}
+
+/**
+ * Promote ${expr} and `template` content expressions to haz:eval / haz:text child elements.
+ * Only applies when the element's sole content is a single text node matching the pattern.
+ * @param {Element} el - Element to process.
+ * @param {string} hazPrefix - The hazard namespace prefix (e.g. 'haz:').
+ */
+function promoteContentExpressions(el, hazPrefix) {
+	if (el.localName.startsWith(hazPrefix)) return;
+	// Must have exactly one child node which is a text node
+	if (el.childNodes.length !== 1) return;
+	let child = el.firstChild;
+	if (child.nodeType !== 3) return;
+	let text = child.nodeValue.trim();
+	if (!text) return;
+
+	let doc = el.ownerDocument;
+	if (text.startsWith('${')) {
+		if (!text.endsWith('}')) {
+			console.warn(`<${el.localName}> content starts with \${ but does not end with }: "${text}"`);
+			return;
+		}
+		let expr = text.slice(2, -1);
+		let directive = doc.createElement(hazPrefix + 'eval');
+		directive.setAttribute('select', expr);
+		el.removeChild(child);
+		el.appendChild(directive);
+	} else if (text.startsWith('`')) {
+		if (!text.endsWith('`')) {
+			console.warn(`<${el.localName}> content starts with backtick but does not end with one: "${text}"`);
+			return;
+		}
+		let directive = doc.createElement(hazPrefix + 'text');
+		directive.setAttribute('select', text);
+		el.removeChild(child);
+		el.appendChild(directive);
+	}
+}
+
+/**
+ * Normalize expression attributes on haz:* elements for inspectability.
+ * Wraps 'expr' type attrs with ${}, 'string' type attrs with backticks.
+ * Strips unnecessary double-wrapping with a warning.
+ * @param {Element} el - Element to process.
+ * @param {string} hazPrefix - The hazard namespace prefix (e.g. 'haz:').
+ */
+function normalizeExprAttrs(el, hazPrefix) {
+	if (!el.localName.startsWith(hazPrefix)) return;
+	let tag = el.localName.substring(hazPrefix.length);
+	let def = hazLangLookup[tag];
+	if (!def) return;
+	for (let attrName of def.attrs) {
+		let value = el.getAttribute(attrName);
+		if (!value) continue;
+		let type = def.attrTypes[attrName];
+		if (type === 'bare') continue;
+		// Strip double ${} wrapping
+		if (value.startsWith('${') && value.endsWith('}')) {
+			if (type === 'expr') {
+				// Already wrapped — leave as-is
+				continue;
+			}
+			// String type with ${} — strip and re-wrap as backtick
+			console.warn(`<${el.localName}> @${attrName} does not need \${} wrapper.`);
+			value = value.slice(2, -1);
+		}
+		// Wrap for display and evaluation
+		if (type === 'expr') {
+			if (!value.startsWith('${')) {
+				el.setAttribute(attrName, '${' + value + '}');
+			}
+		} else if (type === 'string') {
+			if (!value.startsWith('`')) {
+				el.setAttribute(attrName, '`${' + value + '}`');
+			}
+		}
+	}
+}
+
+/**
+ * Promote hazard attributes on HTML elements to hazard directive elements.
+ * Each promotable attribute is converted to a wrapping or child element
+ * according to its direction (<, >, +) defined in hazLang.
+ * @param {Element} el - Element to process.
+ * @param {string} hazPrefix - The hazard namespace prefix (e.g. 'haz:').
+ */
+function promoteHazAttrs(el, hazPrefix) {
+	if (el.localName.startsWith(hazPrefix)) return;
+
+	_.forEach(hazLang, (def) => {
+		if (!def.attrToElement) return;
+		let nsTag = hazPrefix + def.tag;
+		if (!el.hasAttribute(nsTag)) return;
+
+		let doc = el.ownerDocument;
+		// create <haz:element> ...
+		let directiveEl = doc.createElement(nsTag);
+		// with default attr set from @haz:attr on original element
+		let defaultAttr = def.attrs[0];
+		let value = el.getAttribute(nsTag);
+		el.removeAttribute(nsTag);
+		if (defaultAttr) directiveEl.setAttribute(defaultAttr, value);
+
+		// copy non-default hazard attrs
+		_.forEach(def.attrs, (attr, i) => {
+			if (i === 0) return; // the defaultAttr
+			let nsAttr = hazPrefix + attr;
+			if (!el.hasAttribute(nsAttr)) return;
+			let value = el.getAttribute(nsAttr);
+			el.removeAttribute(nsAttr);
+			directiveEl.setAttribute(attr, value);
+		});
+		// insert the hazard element goes below or above the current element
+		switch (def.attrToElement) {
+		case '>':
+			let frag = childNodesToFragment(el);
+			directiveEl.appendChild(frag);
+			el.appendChild(directiveEl);
+			break;
+		case '<':
+			el.parentNode.replaceChild(directiveEl, el);
+			directiveEl.appendChild(el);
+			break;
+		case '+':
+			el.parentNode.insertBefore(directiveEl, el);
+			break;
+		default:
+			break;
+		}
+	});
+}
+
+/**
+ * Wrap non-<haz:when> children of a <haz:choose> in an implied <haz:otherwise>.
+ * NOTE this slurps *any* non-<haz:when>, including <haz:otherwise>
+ * @param {Element} el - The <haz:choose> element.
+ * @param {string} hazPrefix - The hazard namespace prefix (e.g. 'haz:').
+ */
+// TODO handle scenarios:
+// 1. Explicit <haz:otherwise> already exists — don't wrap it in another one
+// 2. Multiple explicit <haz:otherwise> — warn, use the first
+// 3. Loose nodes mixed with explicit <haz:otherwise> — warn or slurp into it
+function implyOtherwise(el, hazPrefix) {
+	let otherwise = el.ownerDocument.createElement(hazPrefix + 'otherwise');
+	_.forEach(Array.from(el.childNodes), (node) => {
+		let tag = node.localName;
+		if (tag === hazPrefix + 'when') return;
+		otherwise.appendChild(node);
+	});
+	el.appendChild(otherwise);
 }
 
 /**
@@ -157,117 +334,26 @@ loadTemplate(template) {
 	this.root = template;
 	this.templates = [];
 
-	let doc = template.ownerDocument;
+	let hazPrefix = this.#hazPrefix;
 
-	// Pass 0: Convert html: prefixed elements and attributes to unprefixed
-	walkTree(template, true, (el) => {
-		// Convert html:* element to unprefixed
-		if (el.localName.startsWith('html:')) {
-			let newEl = doc.createElement(el.localName.substring(5));
-			for (let attr of Array.from(el.attributes)) {
-				newEl.setAttribute(attr.name, attr.value);
-			}
-			while (el.firstChild) newEl.appendChild(el.firstChild);
-			el.parentNode.replaceChild(newEl, el);
-			el = newEl;
-		}
-		// Convert html:* attributes to unprefixed
-		for (let attr of Array.from(el.attributes)) {
-			if (!attr.name.startsWith('html:')) continue;
-			let targetName = attr.name.substring(5);
-			if (el.hasAttribute(targetName)) {
-				console.warn(`<${el.localName}> html:${targetName} overrides existing @${targetName}`);
-			}
-			el.removeAttribute(attr.name);
-			el.setAttribute(targetName, attr.value);
-		}
-	});
+	// Pass 0: Convert html: prefixed elements and attributes to unprefixed.
+	// Must be first — subsequent passes need to see real tag/attribute names.
+	walkTree(template, true, (el) => convertHtmlPrefix(el));
+	// Pass 0b: Promote ${expr} and `template` content expressions to haz:eval / haz:text elements.
+	// Must run before Pass 1 — relies on "sole text node" detection which Pass 1 would break.
+	walkTree(template, true, (el) => promoteContentExpressions(el, hazPrefix));
+	// Pass 1: Promote hazard attributes to directive elements.
+	// Must run after 0b (tree restructuring breaks content detection) and before 1b (creates new haz:* elements).
+	walkTree(template, true, (el) => promoteHazAttrs(el, hazPrefix));
+	// Pass 1b: Normalize expression attributes on haz:* elements for inspectability.
+	// Must run last — needs to see ALL haz:* elements (authored and promoted by Pass 1).
+	walkTree(template, true, (el) => normalizeExprAttrs(el, hazPrefix));
 
-	// Pass 0b: Promote ${expr} and `template` content expressions to haz:eval / haz:text elements
-	walkTree(template, true, (el) => {
-		if (el.localName.indexOf(this.#hazPrefix) === 0) return;
-		// Must have exactly one child node which is a text node
-		if (el.childNodes.length !== 1) return;
-		let child = el.firstChild;
-		if (child.nodeType !== 3) return;
-		let text = child.nodeValue.trim();
-		if (!text) return;
-
-		if (text.startsWith('${')) {
-			if (!text.endsWith('}')) {
-				console.warn(`<${el.localName}> content starts with \${ but does not end with }: "${text}"`);
-				return;
-			}
-			let expr = text.slice(2, -1);
-			let directive = doc.createElement(this.#hazPrefix + 'eval');
-			directive.setAttribute('select', expr);
-			el.removeChild(child);
-			el.appendChild(directive);
-		} else if (text.startsWith('`')) {
-			if (!text.endsWith('`')) {
-				console.warn(`<${el.localName}> content starts with backtick but does not end with one: "${text}"`);
-				return;
-			}
-			let directive = doc.createElement(this.#hazPrefix + 'text');
-			directive.setAttribute('select', text);
-			el.removeChild(child);
-			el.appendChild(directive);
-		}
-	});
-
-	// Pass 1: Promote hazard attributes to elements
-	walkTree(template, true, (el) => {
-		let tag = el.localName;
-		if (tag.indexOf(this.#hazPrefix) === 0) return;
-
-		// promote applicable hazard attrs to elements
-		_.forEach(hazLang, (def) => {
-			if (!def.attrToElement) return;
-			let nsTag = this.#hazPrefix + def.tag;
-			if (!el.hasAttribute(nsTag)) return;
-
-			// create <haz:element> ...
-			let directiveEl = doc.createElement(nsTag);
-			// with default attr set from @haz:attr on original element
-			let defaultAttr = def.attrs[0];
-			let value = el.getAttribute(nsTag);
-			el.removeAttribute(nsTag);
-			if (defaultAttr) directiveEl.setAttribute(defaultAttr, value);
-
-			// copy non-default hazard attrs
-			_.forEach(def.attrs, (attr, i) => {
-				if (i === 0) return; // the defaultAttr
-				let nsAttr = this.#hazPrefix + attr;
-				if (!el.hasAttribute(nsAttr)) return;
-				let value = el.getAttribute(nsAttr);
-				el.removeAttribute(nsAttr);
-				directiveEl.setAttribute(attr, value);
-			});
-			// insert the hazard element goes below or above the current element
-			switch (def.attrToElement) {
-			case '>':
-				let frag = childNodesToFragment(el);
-				directiveEl.appendChild(frag);
-				el.appendChild(directiveEl);
-				break;
-			case '<':
-				el.parentNode.replaceChild(directiveEl, el);
-				directiveEl.appendChild(el);
-				break;
-			case '+':
-				el.parentNode.insertBefore(directiveEl, el);
-				break;
-			default:
-				break;
-			}
-		});
-	});
-	
 	// Pass 2: Mark named templates and imply <haz:otherwise> in <haz:choose> blocks
 	walkTree(template, true, (el) => {
 		let tag = el.localName;
-		if (tag === this.#hazPrefix + 'template') this.#markTemplate(el);
-		if (tag === this.#hazPrefix + 'choose') this.#implyOtherwise(el);
+		if (tag === hazPrefix + 'template') this.#markTemplate(el);
+		if (tag === hazPrefix + 'choose') implyOtherwise(el, hazPrefix);
 	});
 
 	// Pass 3: Wrap loose content nodes in an implicit entry template
@@ -283,25 +369,6 @@ loadTemplate(template) {
  */
 #markTemplate(el) {
 	this.templates.push(el);
-}
-
-/**
- * Wrap non-<haz:when> children of a <haz:choose> in an implied <haz:otherwise>.
- * NOTE this slurps *any* non-<haz:when>, including <haz:otherwise>
- * @param {Element} el - The <haz:choose> element.
- */
-// TODO handle scenarios:
-// 1. Explicit <haz:otherwise> already exists — don't wrap it in another one
-// 2. Multiple explicit <haz:otherwise> — warn, use the first
-// 3. Loose nodes mixed with explicit <haz:otherwise> — warn or slurp into it
-#implyOtherwise(el) {
-	let otherwise = el.ownerDocument.createElement(this.#hazPrefix + 'otherwise');
-	_.forEach(Array.from(el.childNodes), (node) => {
-		let tag = node.localName;
-		if (tag === this.#hazPrefix + 'when') return;
-		otherwise.appendChild(node);
-	});
-	el.appendChild(otherwise);
 }
 
 /**
@@ -606,10 +673,6 @@ transformHazardTree(el, frag) {
 			console.warn(`Error evaluating <haz:text select="${selectExpr}">.`);
 			return frag;
 		}
-		if (value == null || value === undefined) {
-			console.debug(`<haz:text select="${selectExpr}"> resolved to nothing`);
-			return frag;
-		}
 		frag.appendChild(doc.createTextNode(String(value)));
 		return frag;
 	}
@@ -779,3 +842,4 @@ function setAttribute(el, attrName, value) {
 }
 
 export default HazardProcessor;
+export { convertHtmlPrefix, promoteContentExpressions, normalizeExprAttrs, promoteHazAttrs, implyOtherwise };

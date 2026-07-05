@@ -44,7 +44,12 @@ function compile(exprText) {
 	if (_cache.has(exprText)) return _cache.get(exprText);
 	let fn;
 	try {
-		let body = new Function('__scope__', `with (__scope__) { return (${exprText}); }`);
+		// Unwrap ${expr} or pass through backtick template literals and raw expressions
+		let jsExpr = exprText;
+		if (exprText.startsWith('${') && exprText.endsWith('}')) {
+			jsExpr = exprText.slice(2, -1);
+		}
+		let body = new Function('__scope__', `with (__scope__) { return (${jsExpr}); }`);
 		fn = (scope) => body(_wrapScope(scope));
 	}
 	catch (err) {
