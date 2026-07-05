@@ -659,6 +659,7 @@ transformHazardTree(el, frag) {
 	case 'one': {
 		let selectExpr = el.getAttribute('select');
 		let asName = el.getAttribute('as');
+		if (!asName) console.warn(`<haz:one select="${selectExpr}"> has no @as — selected value will be inaccessible.`);
 		let value;
 		try { value = evaluate(selectExpr, this.scope.values); }
 		catch (err) {
@@ -676,6 +677,7 @@ transformHazardTree(el, frag) {
 	case 'each': {
 		let selectExpr = el.getAttribute('select');
 		let asName = el.getAttribute('as');
+		if (!asName) console.warn(`<haz:each select="${selectExpr}"> has no @as — iteration variable will be inaccessible.`);
 		let items;
 		try { items = evaluate(selectExpr, this.scope.values); }
 		catch (err) {
