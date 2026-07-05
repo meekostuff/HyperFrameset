@@ -35,7 +35,7 @@ const _cache = new WeakMap();
 let hazLangDefinition =
 	'<otherwise <when@$test <each@$select,as <one@$select,as +var@name,$select <if@$test <unless@$test ' +
 	'>choose <template@name,$match >eval@$select >text@"select ' +
-	'call@name apply@$select,as clone deepclone element@"name attr@"name,"value';
+	'call@name apply@$select,as';
 
 let hazLang = Array.from(_.words(hazLangDefinition), (def) => {
 	def = def.split('@');
@@ -578,71 +578,6 @@ transformHazardTree(el, frag) {
 	case 'apply': {
 		console.warn('<haz:apply> is not currently supported. Use haz:call with explicit template names.');
 		return frag;
-	}
-
-	case 'clone': {
-		let root = this.scope.get('root');
-		if (!root || !root.cloneNode) return frag;
-		let node = root.cloneNode(false);
-		frag.appendChild(node);
-		return this.transformChildNodes(el, node);
-	}
-
-	case 'deepclone': {
-		let root = this.scope.get('root');
-		if (!root || !root.cloneNode) return frag;
-		let node = root.cloneNode(true);
-		frag.appendChild(node);
-		return frag;
-	}
-
-	case 'element': {
-		let nameExpr = el.getAttribute('name');
-		let name;
-		try { name = evaluate(nameExpr, this.scope.values); }
-		catch (err) {
-			console.warn(`Error evaluating <haz:element name="${nameExpr}">.`);
-			return frag;
-		}
-		if (typeof name !== 'string') {
-			console.debug(`<haz:element name="${nameExpr}"> did not resolve to a string — skipped`);
-			return frag;
-		}
-		let node = doc.createElement(name);
-		frag.appendChild(node);
-		return this.transformChildNodes(el, node);
-	}
-
-	case 'attr': {
-		let nameExpr = el.getAttribute('name');
-		let valueExpr = el.getAttribute('value');
-		let name, value;
-		try { name = evaluate(nameExpr, this.scope.values); }
-		catch (err) {
-			console.warn(`Error evaluating <haz:attr name="${nameExpr}">.`);
-			return frag;
-		}
-		if (typeof name !== 'string') {
-			console.debug(`<haz:attr name="${nameExpr}"> did not resolve to a string — skipped`);
-			return frag;
-		}
-		if (valueExpr) {
-			try { value = evaluate(valueExpr, this.scope.values); }
-			catch (err) {
-				console.warn(`Error evaluating <haz:attr value="${valueExpr}">.`);
-				return frag;
-			}
-			setAttribute(frag, name, value);
-			return frag;
-		}
-		// Fall back to child text content for value
-		let node = doc.createDocumentFragment();
-		return this.transformChildNodes(el, node)
-		.then(() => {
-			value = node.textContent;
-			setAttribute(frag, name, value);
-			return frag;
-		});
 	}
 
 	case 'eval': {
