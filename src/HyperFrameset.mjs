@@ -15,8 +15,6 @@ import controllers from './Meeko/controllers.mjs';
 import htmlParser from './Meeko/htmlParser.mjs';
 import httpProxy from './Meeko/httpProxy.mjs';
 import CustomNamespace from './Meeko/CustomNamespace.mjs';
-import filters from './Meeko/filters.mjs';
-import './Meeko/builtin-filters.mjs';
 import * as Microdata from './Meeko/Microdata.mjs';
 import processors from './Meeko/processors.mjs';
 import MainProcessor from './Meeko/MainProcessor.mjs';
@@ -38,7 +36,7 @@ import framer, { HFrameset, HFrame } from './Meeko/framer.mjs';
         stuff, Registry, Task, Thenfu, URLux, DOM, scriptQueue,
         htmlParser, httpProxy,
         CustomNamespace,
-        filters, processors,
+        processors,
         controllers,
         Microdata,
         transcluder,
