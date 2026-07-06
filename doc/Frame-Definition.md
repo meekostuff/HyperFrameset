@@ -1,58 +1,55 @@
-## Frame Definition
+# Frame Definition
 
-``` .html
+```html
 <hf-frame defid="hfdef_frameX">
-	<hf-body condition="loaded">
-		<hf-transform type="main">
-		</hf-transform>
-	</hf-body>
+  <hf-body condition="loaded">
+    <hf-transform type="hazard">
+      <h1><haz:text select="root.querySelector('h1').textContent"></haz:text></h1>
+    </hf-transform>
+  </hf-body>
 </hf-frame>
 ```
-	
-### `<hf-frame>`
+
+## `<hf-frame>`
 
 A frame definition must contain one or more `<hf-body>` elements.
 
-If it is to be referenced by other frame declarations then it must also have an `@id`.
+If it is to be referenced by other frame declarations then it must also have a `@defid`.
 
 Since a frame definition is also a frame declaration it will typically contain
-other attributes detailed in the [Frame Declaration](./Frame-Declaration.html) section.
+other attributes detailed in the [Frame Declaration](./Frame-Declaration.md) section.
 
-### `<hf-body>`
+Frame definitions are stored in `<template>` elements in the document `<head>`
+after preprocessing, making them inspectable in devtools.
+
+## `<hf-body>`
 
 A frame body is a container for frame content.
 
 Within a frame definition it will contain one or more `<hf-transform>` child elements.
 
-Within the browser view it will contain a processed representation of the document fetched from the frame's `@src`.
-The processing involves applying each of the child transforms in turn -
-the first transform is applied to the `@src` document,
+Within the browser view it will contain a processed representation of the document
+fetched from the frame's `@src`. The processing involves applying each of the child
+transforms in turn — the first transform is applied to the source document,
 subsequent transforms are fed the output of the previous transform.
 
-**TODO:** 
+### `@condition`
 
-- `@condition`: `loaded`, `loading`, `uninitialized`
-- transition details
+- `loaded` — used when the frame has received content (default)
+- `loading` — used while content is being fetched (shows fallback content)
 
-### `<hf-transform>`
+## `<hf-transform>`
 
 The type of the transform is selected with `@type`.
-The type must be compatible with the input format.
 
-There are three built-in transform types: 
+Built-in transform types:
 
-- [`main`](Main-Processor.html): compatible with "html" input
-- [`script`](Script-Processor.html): compatible with "html" or "json" input
-- [`hazard`](Hazard-Processor.html): compatibility depends on the "provider"
+- [`hazard`](Hazard-Processor.md) — declarative template engine with JS expressions (default)
+- [`main`](Main-Processor.md) — pass-through extraction of `<main>` content
+- [`script`](Script-Processor.md) — custom JS transform function
 
-Some types of transform (e.g. `hazard`) support programmable querying of the input content. 
-In this case the transform processor will use a "provider" which is responsible for 
-decoding the input content and processing specific queries. 
-The provider is specified with `@format` which must be compatible with the type of transform and the input format. 
+If no `@type` is specified, `hazard` is used.
 
-There are three built-in providers: 
-
-- [`css`](CSS-Decoder.html): compatible with `hazard` transform and "html" input
-- [`microdata`](Microdata-Decoder.html): compatible with `hazard` transform and "html" input
-- [`json`](JSON-Decoder): compatible with `hazard` transform and "json" input
-
+The `@format` attribute is no longer supported — decoders have been removed.
+All data access is done via JavaScript expressions in the template (e.g.
+`root.querySelector(...)` for DOM sources, `root.property` for JSON).

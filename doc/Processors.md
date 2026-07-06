@@ -1,43 +1,82 @@
-## Processors
+# Processors
 
-A processor transforms an input (typically a DOM-fragment or DOM-document) to an output. 
-The processing MAY be configurable with a processing-template and other options passed during initialization, and input related details passed before processing. 
+A processor transforms source data into DOM output using a template.
 
-A processor is a javascript "class" which is registered with the frame-overseer by calling 
+## Registration
 
-``` .javascript
-Meeko.processors.register(name, processor)
+Processors are registered by name:
+
+```javascript
+Meeko.processors.register(name, ProcessorClass)
 ```
 
-where 
+Built-in processors:
+- `'hazard'` — the primary template engine (default)
+- `'main'` — pass-through: extracts `<main>` or `[role=main]` content
+- `'script'` — evaluates a `<script>` to produce a custom transform function
 
-- `name` is a string-identifier for the processor
-- `processor` is the processor class constructor function
+## Interface
 
-The frame-overseer will create a processor instance by calling
+A processor class must implement:
 
-``` .javascript
-new processor(options)
+```javascript
+class MyProcessor {
+    constructor(options, namespaces) {}
+    loadTemplate(element) {}
+    transform(provider, details) {}
+}
 ```
 
-where `options` is the configuration object associated with a `<hf-transform>` definition.
+### `loadTemplate(element)`
 
-The processor prototype MUST have two methods:
+Called once during preprocessing. Receives the `<hf-transform>` element
+containing the template markup. The processor should parse and prepare
+the template for later rendering.
 
-``` .javascript
-loadTemplate: function(template)
+### `transform(provider, details)`
 
-transform: function(input, details)
+Called at render time. Returns a DocumentFragment (or a Promise resolving to one).
+
+- `provider.source` — the source data (Document, Element, or JS object)
+- `details` — render context (url, scope, mainSelector, plus any custom values)
+
+## Default: Hazard Processor
+
+The default transform type is `hazard`. If no `type` attribute is specified
+on `<hf-transform>`, the hazard processor is used.
+
+See [Hazard-Processor.md](Hazard-Processor.md) for full documentation.
+
+## Main Processor
+
+The `main` processor extracts content from the source document without
+applying any template logic:
+
+```html
+<hf-transform type="main"></hf-transform>
 ```
 
-`loadTemplate(template)` is called immediately after processor construction, 
-where `template` is a DOM-fragment. 
+It finds `<main>`, `[role=main]`, or falls back to `<body>` content,
+and returns the children as a fragment.
 
-If the processor doesn't use a template then the implementation should log a warning if the template is non-empty.
+## Script Processor
 
-`transform(input, details)` is called to process the `input` 
-where `details` is a JS object with the following fields:
+The `script` processor evaluates a `<script>` inside the transform element
+to produce a custom transform object:
 
-- url: the url of the original document which is being processed
-- scope: the scope-url in which the current frameset is operating
+```html
+<hf-transform type="script">
+  <script>
+  ({
+      transform(source, details) {
+          // custom logic
+          let frag = document.createDocumentFragment();
+          // ... build output ...
+          return frag;
+      }
+  })
+  </script>
+</hf-transform>
+```
 
+The script must return an object with a `transform(source, details)` method.

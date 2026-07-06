@@ -1,181 +1,254 @@
-## Hazard Processor
+# Hazard Processor
 
-``` .html
-<hf-transform type="hazard" format="css">
-<!-- Your HTML template here -->
-	<nav>
-		<haz:each select=".navigation ul li">
-			<div>
-				<span expr:_html="a"></span><!-- span.innerHTML = a.outerHTML -->
-			</div>
-		</haz:each>
-	</nav>
+```html
+<hf-transform type="hazard">
+  <nav>
+    <haz:each select="[...root.querySelectorAll('nav li')]" as="item">
+      <div><haz:eval select="item.querySelector('a')"></haz:eval></div>
+    </haz:each>
+  </nav>
 </hf-transform>
 ```
 
-The `hazard` processor provides a simple templating service.
-The content will be HTML with special templating elements and attributes,
-which include directives such as `<haz:if>`
-and data expressions such as `@expr:href`.
+The `hazard` processor provides a declarative templating engine.
+Templates are HTML with special directive elements and JavaScript expression attributes.
 
-Directives and data expressions are interpreted using an input data decoder
-which is selected by `@format`. Current `format` options are `css`, `microdata`, `json`.
+All expressions are JavaScript, evaluated against a scope that includes:
+- `root` — the source data (Document, Element, or JS object)
+- Variables declared with `haz:var`, `haz:param`, or `@as`
+- Global values passed via the `details` parameter
 
-### Directives
+## Directives
 
-#### `<haz:if>`
+### `<haz:if>` / `<haz:unless>`
 
-``` .html
-<haz:if test="expression">...</haz:if>
+```html
+<haz:if test="root.items.length > 0">
+  <p>There are items.</p>
+</haz:if>
+
+<haz:unless test="root.user">
+  <p>Not logged in.</p>
+</haz:unless>
 ```
 
-The contents of this element will be part of the output only if the expression evaluates to `true`.
+Standard JavaScript truthiness: `false`, `0`, `""`, `null`, `undefined`, `NaN` are falsy.
 
-#### `<haz:unless>`
+### `<haz:choose>`, `<haz:when>`, `<haz:otherwise>`
 
-``` .html
-<haz:unless test="expression">...</haz:unless>
-```
-
-The contents of this element will be part of the output only if the expression evaluates to `false`.
-
-#### `<haz:choose>`, `<haz:when>`, `<haz:otherwise>`
-
-``` .html
+```html
 <haz:choose>
-	<haz:when test="expression1">...</haz:when>
-	<haz:when test="expression2">...</haz:when>
-	<haz:otherwise>...</haz:otherwise>
+  <haz:when test="root.status === 'active'"><span>Active</span></haz:when>
+  <haz:when test="root.status === 'pending'"><span>Pending</span></haz:when>
+  <haz:otherwise><span>Unknown</span></haz:otherwise>
 </haz:choose>
 ```
 
-The `<haz:choose>` element will be replaced by the contents of 
-the first child `<haz:when>` whose expression evaluates to `true`, 
-or (if none of them do) the contents of `<haz-otherwise>` child elements.
+### `<haz:each>`
 
-#### `<haz:each>`
-
-``` .html
-<haz:each select="expression">
+```html
+<haz:each select="root.items" as="item">
+  <div>${item.name}</div>
+</haz:each>
 ```
 
-The contents of this element will be repeated in the output 
-for each item found by the expression. 
-If zero items are found then the contents will not be in the output at all.
+`@select` must evaluate to an iterable (array, NodeList, etc.).
+`@as` names the iteration variable (required).
 
-#### `<haz:one>` EXPERIMENTAL
+### `<haz:one>`
 
-``` .html
-<haz:one select="expression">
+```html
+<haz:one select="root.querySelector('.hero')" as="hero">
+  <h1><haz:text select="hero.textContent"></haz:text></h1>
+</haz:one>
 ```
 
-This is like `<haz:each>` but
-only for the *first* item found by the expression. 
-If zero items are found then the contents will not be in the output at all.
+Like `haz:each` but for a single value. If the expression is falsy, children are skipped.
 
+### `<haz:var>`
 
-#### `<haz:template>`
-
-``` .html
-<haz:template name="ID">
+```html
+<haz:var name="count" select="root.items.length"></haz:var>
 ```
 
-This declares a template which will be used 
-to *replace* an `<haz:call>` element identified by `ID`.
+Sets a named variable in the current scope.
 
-#### `<haz:call>`
+### `<haz:text>`
 
-``` .html
-<haz:call name="ID">
+```html
+<haz:text select="root.title"></haz:text>
+<haz:text select="`Hello ${root.name}, you have ${root.count} items`"></haz:text>
 ```
 
-The element will be *replaced* with 
-the contents of the `<haz:template>` element identified by `ID`.
-This template must be in the *current* hazard transform.
+Inserts the expression result as text content (stringified).
 
-**TODO:** 
+### `<haz:eval>`
 
-- `<haz:apply>`
-- `<haz:var name="alphanumeric_name" select="expression">`
-- `<haz:template match="expression">`
-- `<haz:eval select="expression">` 
-- `<haz:text select="expression">` 
-- `<haz:mtext select="mexpression">`
-- `<haz:clone>more processing</haz:clone>`
-- `<haz:deepclone>`
-- `<haz:element name="mexpression">`,
-- `<haz:attr name="mexpression">contents</haz:attr>`
-
-
-### Directives as attributes
-
-There are a few HTML elements which cannot be wrapped inside arbitrary elements.
-For example, when parsing a HTML table any unexpected non-table-tags 
-between `<table>` and `<td>` are dropped from the output.
-
-In this situation you cannot markup with Hazard elements, 
-but most of them can be implemented with attribute markup. 
-These Hazard attributes are promoted to elements after parsing,
-according to the following rules in order:
-
-``` .html
-<element haz:otherwise /> -> 
-	<haz:otherwise><element /></haz:otherwise>
-
-<element haz:when="expression" /> -> 
-	<haz:when test="expression"><element /></haz:when>
-
-<element haz:each="expression" /> ->
-	<haz:each select="expression"><element /></haz:each>
-
-<element haz:if="expression" /> -> 
-	<haz:if test="expression"><element /></haz:if>
-
-<element haz:unless="expression" /> -> 
-	<haz:unless test="expression"><element /></haz:unless>
-
-<element haz:choose /> -> 
-	<element><haz:choose /></element>
-
-<element haz:template="id" /> -> 
-	<haz:template name="id"><element /></haz:template>
+```html
+<haz:eval select="root.querySelector('#content')">
+  <p>Fallback if #content not found</p>
+</haz:eval>
 ```
 
-### Data Expressions
+Inserts the expression result as-is (node or text). If the result is
+`null`, `undefined`, or `false` — or if the expression throws — children
+are rendered as fallback content.
 
-These attributes have a name composed of a prefix then a colon (:) then a regular attribute name, e.g.
+### `<haz:template>` / `<haz:call>` / `<haz:param>`
 
-```
-expr:href
-```
-	
-The prefix determines how the expression given in the attribute value is processed.
-After processing the unprefixed attribute is set to the returned value.
+```html
+<haz:template name="user-card">
+  <div class="card"><haz:text select="user.name"></haz:text></div>
+</haz:template>
 
-If the returned value is `boolean` then the attribute is either removed (`false`) or added as an empty attribute (`true`).
-
-If the attribute name is `_html` then the `innerHTML` of the element is set to the returned value
-(or if a node is returned then all current children of the element are reoved and the node is appended to the element).
-
-If the attribute name is `_text` then the `textContent` of the element is set to the returned value.
-
-There are two possible prefixes: `expr` and `mexpr`.
-
-*`expr:`* attribute values have the form (FIXME BNF or something)
-
-```
-query //> filter-name: params //> filter-name: params
+<haz:call name="user-card">
+  <haz:param name="user" select="root.currentUser"></haz:param>
+</haz:call>
 ```
 
-where
-- `query` is a string in the specified decoder format
-- `filter-name` identifies a registered filter function
-- `params` is a COMMA (,) separated list of JSON-like objects.
-	It is evaluated with `(Function('return [' + params + '];'))()`
-	to create an `arguments` array to pass to the `filter` function
+Templates receive data explicitly via `<haz:param>`. Params are scoped
+to the called template. Global variables (including `root`) remain accessible.
 
-Filters are optional
+## Attribute expressions
 
+On non-hazard HTML elements, attributes can contain expressions:
 
-*`mexpr:`* attribute values are plain-text with sections bounded by `{{` and `}}` being interpolated by the algorithm of `expr:` attributes.
+```html
+<a href="${root.url}" title="${root.title}">link</a>
+<span class="`item-${root.status}`">text</span>
+<img html:src="${root.imageUrl}" alt="${root.alt}">
+```
 
+| Syntax | Meaning |
+|--------|---------|
+| `attr="${expr}"` | Single expression — result sets the attribute. `undefined`/`null`/`false` removes it. |
+| `` attr="`text ${expr}`" `` | Template literal — always produces a string. |
+| `html:attr="${expr}"` | Same as above but the `html:` prefix prevents browser fetch during parsing (frameset-first mode). |
+
+## Directives as attributes
+
+Most directives can be written as attributes on HTML elements.
+They are promoted to elements during preprocessing:
+
+```html
+<!-- Attribute form -->
+<li haz:each="root.items" haz:as="item" haz:text="item.name"></li>
+
+<!-- Promoted to -->
+<haz:each select="root.items" as="item">
+  <li><haz:text select="item.name"></haz:text></li>
+</haz:each>
+```
+
+Promotion directions:
+- `<` wraps the element (haz:if, haz:unless, haz:each, haz:one, haz:when, haz:otherwise, haz:template)
+- `>` wraps children (haz:choose, haz:eval, haz:text)
+- `+` inserts before the element (haz:var)
+
+## Content expressions
+
+An element whose sole text content is `${expr}` or `` `template` `` is
+promoted to contain a `<haz:eval>` or `<haz:text>` element:
+
+```html
+<!-- Author writes -->
+<span>${root.name}</span>
+<p>`Hello ${root.name}`</p>
+
+<!-- Promoted to -->
+<span><haz:eval select="root.name"></haz:eval></span>
+<p><haz:text select="`Hello ${root.name}`"></haz:text></p>
+```
+
+The expression must be the entire content of the element — mixed text/element content is not promoted.
+
+## `html:` prefix
+
+For elements or attributes that would trigger unwanted browser behavior during parsing
+(resource fetches, parser restrictions), use the `html:` prefix:
+
+```html
+<!-- Prevents fetch of literal "${expr}" during parse -->
+<img html:src="${root.imageUrl}">
+
+<!-- Prevents parser interference with table elements -->
+<html:table>
+  <haz:each select="root.rows" as="row">
+    <html:tr><html:td><haz:text select="row.name"></haz:text></html:td></html:tr>
+  </haz:each>
+</html:table>
+```
+
+The `html:` prefix is stripped during preprocessing — the output contains standard HTML elements.
+
+## Injecting globals (helper functions)
+
+Custom functions and values can be made available in template expressions
+by declaring a `globals` property in a behavior config.
+
+### Frameset-wide globals
+
+Declare `globals` in the frameset body's `<script for>`:
+
+```html
+<body>
+<script for>
+({
+    lookup: function(url) { return 'hf_main'; },
+    globals: {
+        fn: { formatDate, normalize, truncate },
+        q: (el, sel) => el.querySelector(sel),
+        qa: (el, sel) => [...el.querySelectorAll(sel)]
+    }
+})
+</script>
+...
+</body>
+```
+
+Everything in `globals` is available by name in all template expressions:
+
+```html
+<span><haz:text select="fn.formatDate(root.date)"></haz:text></span>
+<haz:each select="qa(root, '.item')" as="item">
+  <p><haz:text select="q(item, 'h2').textContent"></haz:text></p>
+</haz:each>
+```
+
+### Transform-specific globals
+
+Declare `globals` in a `<script for>` inside `<hf-transform>`:
+
+```html
+<hf-transform type="hazard">
+  <script for>({ globals: { fmt: { currency } } })</script>
+  <span><haz:text select="fmt.currency(root.price)"></haz:text></span>
+</hf-transform>
+```
+
+Transform-level globals override frameset-level globals with the same name.
+
+### Programmatic globals
+
+Set globals from JavaScript before frames load:
+
+```js
+Meeko.transcluder.setGlobals({
+    fn: { formatDate, normalize },
+    q: (el, sel) => el.querySelector(sel)
+});
+```
+
+### Merge order (last wins)
+
+1. `transcluder.setGlobals({...})` — programmatic baseline
+2. Body `<script for>` `globals` — frameset-wide
+3. Transform `<script for>` `globals` — most specific
+
+### Namespacing
+
+Use an object (`fn`, `utils`, etc.) to avoid name collisions with data:
+
+```html
+<span>${fn.truncate(root.title, 50)}</span>
+```

@@ -1,63 +1,59 @@
-## Frameset Definition
+# Frameset Definition
 
 The frameset definition is created by processing the `<body>` of the frameset document.
 Every `<hf-frame>` is **both** a frame definition and a frame declaration,
-unless it has a `def` attribute in which case it is only a declaration - `@def` will contain the ID of a frame definition. 
+unless it has a `@def` attribute in which case it is only a declaration —
+`@def` will contain the defid of a frame definition.
 
-Each frame definition is added to the list of definitions maintained in the frameset definition.
+Each frame definition is wrapped in a `<template defid="...">` element and placed in
+the document `<head>` (or a configured frame container). This makes frame definitions
+inspectable in devtools while keeping them inert (not matched by document-level selectors).
 
-Each frame declaration has its children - if any - removed.
-
-The result of this processing is list of frame definitions which contain
-zero or more frame declarations as descendants.
-Likewise, the `<body>` will contain one or more frame declarations as descendants.
+Each frame declaration (a shallow clone placeholder with `@def`) remains in
+the `<body>` where it was declared.
 
 After processing, the `<body>` is inserted into the browser view.
 Its contained frame declarations are automatically handled,
 typically by fetching and rendering the frame `@src`.
 These renderings may insert more frame declarations which are again automatically handled.
 
-### Configuration
+## Configuration
 
-Any `<script for>` in the `<body>` is used to 
-to generate an options object for the "associated element", see
-[script-handling](./Frameset-Document.html#script-handling).
+Any `<script for>` in the `<body>` is used to generate an options object
+for the "associated element", see
+[script-handling](./Frameset-Document.md#script-handling).
 
-The script SHOULD have a format like
+The script SHOULD have a format like:
 
-``` .html
+```html
 <script for>
 ({
-	lookup: function(url) { }
+    lookup: function(url, details) { return 'hf_main'; }
 })
 </script>
 ```
-    
-This options object will configure how HyperFrameset determines 
-the appropriate frame target for `requestnavigation` events 
+
+This options object configures how HyperFrameset determines
+the appropriate frame target for navigation events
 triggered by clicks on hyperlinks or form-submission (GET only).
 
-The following callbacks can be configured
+### `lookup(url, details)`
 
-- **`lookup(url, details)`**
-	return the target frame `targetname` for the landing-page URL or a `requestnavigation` event.  
-	For `requestnavigation` events the `details` object has the following fields:
-		+ url: the URL to be navigated to 
-		+ element: the source element for the event ( `<a href>` or `<form method="get">` ) 
-		+ referrer: the current document.URL
+Return the target frame `targetname` for the given URL.
 
-	If this method returns a valid target frame `targetname` then 
-	pushState-assisted-navigation is initiated
-	and frames with that target `targetname` are loaded with the hyperlinked resource.  
-	If it returns `true` then the `requestnavigation` event is cancelled.
-	Otherwise the `requestnavigation` event continues to bubble, 
-	where it might be handled elsewhere or eventually 
-	result in a normal browser navigation being performed.
+For navigation events the `details` object has the following fields:
+- `url` — the URL to be navigated to
+- `element` — the source element for the event (`<a href>` or `<form method="get">`)
+- `referrer` — the current document.URL
+
+Return values:
+- A valid `targetname` string — initiates pushState-assisted navigation to that frame
+- `true` — cancels the navigation event
+- Falsy — the event continues to bubble (may result in normal browser navigation)
 
 The `lookup()` callback can be configured for any of
-`<hf-frame>`, `<hf-panel>`, `<hf-vlayout>`, `<hf-hlayout>`, `<hf-deck>`, `<hf-rdeck>`. 
+`<hf-frame>`, `<hf-panel>`, `<hf-vlayout>`, `<hf-hlayout>`, `<hf-deck>`, `<hf-rdeck>`.
 
-It can also be configured for `<body>`, which means that it is used for 
-determining the target-frame of the landing-page URL, and
-for `requestnavigation` events will result in the document URL being changed. 
-
+It can also be configured for `<body>`, which means it is used for
+determining the target-frame of the landing-page URL and
+for handling navigation events at the document level.
