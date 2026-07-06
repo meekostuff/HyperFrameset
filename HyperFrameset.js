@@ -144,7 +144,7 @@
     function findIndex(a, fn, context) {
         return _find(a, fn, context, true);
     }
-    function find$2(a, fn, context) {
+    function find$1(a, fn, context) {
         return _find(a, fn, context, false);
     }
     function words(text) {
@@ -186,7 +186,7 @@
         defaults: defaults,
         every: every,
         filter: filter,
-        find: find$2,
+        find: find$1,
         findIndex: findIndex,
         forEach: forEach,
         forIn: forIn,
@@ -587,7 +587,7 @@
         node[nodeIdProperty] = nodeId;
         return nodeId;
     }
-    function matches$1(element, selector, scope) {
+    function matches(element, selector, scope) {
         if (!(element && element.nodeType === 1)) return false;
         if (typeof selector === "function") return selector(element, scope);
         return scopeify(absSelector => element.matches(absSelector), selector, scope);
@@ -656,7 +656,7 @@
             return result;
         }, selector, scope);
     }
-    function find$1(selector, node, scope, inclusive) {
+    function find(selector, node, scope, inclusive) {
         if (!node) node = document$4;
         if (!node.querySelector) return null;
         if (scope && !scope.nodeType) scope = node;
@@ -799,12 +799,12 @@
         createHTMLDocument: createHTMLDocument,
         cssReady: cssReady,
         dispatchEvent: dispatchEvent,
-        find: find$1,
+        find: find,
         findAll: findAll,
         findId: findId,
         insertNode: insertNode,
         isVisible: isVisible,
-        matches: matches$1,
+        matches: matches,
         removeAttributes: removeAttributes,
         whenVisible: whenVisible
     });
@@ -1065,7 +1065,7 @@
             this.#cache.push(entry);
         }
         #cacheLookup(request) {
-            const entry = find$2(this.#cache, entry => {
+            const entry = find$1(this.#cache, entry => {
                 if (!this.#cacheMatch(request, entry)) return false;
                 return true;
             });
@@ -1201,7 +1201,7 @@
         constructor(options) {
             if (!options) return;
             let style = options.style = lc(options.style);
-            let styleInfo = find$2(CustomNamespace.namespaceStyles, styleInfo => styleInfo.style === style);
+            let styleInfo = find$1(CustomNamespace.namespaceStyles, styleInfo => styleInfo.style === style);
             if (!styleInfo) throw Error(`Unexpected namespace style: ${style}`);
             let name = options.name = lc(options.name);
             if (!name) throw Error(`Unexpected name: ${name}`);
@@ -1249,7 +1249,7 @@
             let coll = this;
             forEach(Array.from(doc.documentElement.attributes), attr => {
                 let fullName = lc(attr.name);
-                let styleInfo = find$2(CustomNamespace.namespaceStyles, styleInfo => fullName.indexOf(styleInfo.configPrefix) === 0);
+                let styleInfo = find$1(CustomNamespace.namespaceStyles, styleInfo => fullName.indexOf(styleInfo.configPrefix) === 0);
                 if (!styleInfo) return;
                 let name = fullName.substr(styleInfo.configPrefix.length);
                 let nsDef = new CustomNamespace({
@@ -1269,7 +1269,7 @@
         }
         add(nsDef) {
             let coll = this;
-            let matchingNS = find$2(coll.items, def => {
+            let matchingNS = find$1(coll.items, def => {
                 if (lc(def.urn) === lc(nsDef.urn)) {
                     if (def.prefix !== nsDef.prefix) console.warn(`Attempted to add namespace with same urn as one already present: ${def.urn}`);
                     return true;
@@ -1285,7 +1285,7 @@
         lookupNamespace(urn) {
             let coll = this;
             urn = lc(urn);
-            let nsDef = find$2(coll.items, def => lc(def.urn) === urn);
+            let nsDef = find$1(coll.items, def => lc(def.urn) === urn);
             return nsDef;
         }
         lookupPrefix(urn) {
@@ -1296,7 +1296,7 @@
         lookupNamespaceURI(prefix) {
             let coll = this;
             prefix = lc(prefix);
-            let nsDef = find$2(coll.items, def => def.prefix === prefix);
+            let nsDef = find$1(coll.items, def => def.prefix === prefix);
             return nsDef && nsDef.urn;
         }
         lookupTagNameNS(name, urn) {
@@ -1312,220 +1312,6 @@
         }
     }
     const HYPERFRAMESET_URN = "hyperframeset";
-    /*!
-	 * filters
-	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
-	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
-	 */    let filters = new Registry({
-        writeOnce: true,
-        keyValidator: key => /^[_a-zA-Z][_a-zA-Z0-9]*$/.test(key),
-        valueValidator: fn => typeof fn === "function"
-    });
-    assign(filters, {
-        evaluate: function(name, value, params) {
-            let fn = this.get(name);
-            let args = params.slice(0);
-            args.unshift(value);
-            return fn.apply(undefined, args);
-        }
-    });
-    /*!
-	 * builtin-filters
-	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
-	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
-	 */    filters.register("lowercase", (value, text) => value.toLowerCase());
-    filters.register("uppercase", (value, text) => value.toUpperCase());
-    filters.register("if", (value, yep) => !!value ? yep : value);
-    filters.register("unless", (value, nope) => !value ? nope : value);
-    filters.register("if_unless", (value, yep, nope) => !!value ? yep : nope);
-    filters.register("map", (value, dict) => {
-        if (Array.isArray(dict)) {
-            let patterns = filter(dict, (item, i) => !(i % 2));
-            let results = filter(dict, (item, i) => !!(i % 2));
-            some(patterns, (pattern, i) => {
-                if (!(pattern instanceof RegExp)) pattern = new RegExp(`^${pattern}$`);
-                if (!pattern.test(value)) return false;
-                value = results[i];
-                return true;
-            });
-            return value;
-        }
-        if (value in dict) return dict[value];
-        return value;
-    });
-    filters.register("match", (value, pattern, yep, nope) => {
-        if (!(pattern instanceof RegExp)) pattern = new RegExp(`^${pattern}$`);
-        let bMatch = pattern.test(value);
-        if (yep != null && bMatch) return yep;
-        if (nope != null && !bMatch) return nope;
-        return bMatch;
-    });
-    filters.register("replace", (value, pattern, text) => value.replace(pattern, text));
-    filters.register("date", (value, format, utc) => dateFormat(value, format, utc));
-    /*!
-	 * decoders
-	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
-	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
-	 */    let decoders = new Registry({
-        writeOnce: true,
-        keyValidator: key => typeof key === "string" && /^[_a-zA-Z][_a-zA-Z0-9]*/.test(key),
-        valueValidator: constructor => typeof constructor === "function"
-    });
-    assign(decoders, {
-        create: function(type, options, namespaces) {
-            let constructor = this.get(type);
-            return new constructor(options, namespaces);
-        }
-    });
-    /*!
-	 * CSSDecoder
-	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
-	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
-	 */    const TEXT_ATTR = "_text";
-    const HTML_ATTR = "_html";
-    const CSS_CONTEXT_VARIABLE = "_";
-    class CSSDecoder {
-        constructor(options, namespaces) {}
-        init(node) {
-            this.srcNode = node;
-        }
-        matches(element, query) {
-            let queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
-            let selector = queryParts[1];
-            let attr = queryParts[2];
-            if (!matches(element, selector)) return;
-            let node = element;
-            let result = node;
-            if (attr) {
-                attr = attr.trim();
-                if (attr.charAt(0) === "@") attr = attr.substr(1);
-                result = getAttr(node, attr);
-            }
-            return result;
-        }
-        evaluate(query, context, variables, wantArray) {
-            if (!context) context = this.srcNode;
-            let queryParts = query.match(/^\s*([^{]*)\s*(?:\{\s*([^}]*)\s*\}\s*)?$/);
-            let selector = queryParts[1];
-            let attr = queryParts[2];
-            let result = find(selector, context, variables, wantArray);
-            if (attr) {
-                attr = attr.trim();
-                if (attr.charAt(0) === "@") attr = attr.substr(1);
-                if (!wantArray) result = [ result ];
-                result = Array.from(result, node => getAttr(node, attr));
-                if (!wantArray) result = result[0];
-            }
-            return result;
-        }
-    }
-    function getAttr(node, attr) {
-        switch (attr) {
-          case null:
-          case undefined:
-          case "":
-            return node;
-
-          case TEXT_ATTR:
-            return node.textContent;
-
-          case HTML_ATTR:
-            let doc = node.ownerDocument;
-            let frag = doc.createDocumentFragment();
-            forEach(node.childNodes, child => {
-                frag.appendChild(doc.importNode(child, true));
-            });
-            return frag;
-
-          default:
-            return node.getAttribute(attr);
-        }
-    }
-    function matches(element, selectorGroup) {
-        if (selectorGroup.trim() === "") return;
-        return matches$1(element, selectorGroup);
-    }
-    function find(selectorGroup, context, variables, wantArray) {
-        selectorGroup = selectorGroup.trim();
-        if (selectorGroup === "") return wantArray ? [ context ] : context;
-        let nullResult = wantArray ? [] : null;
-        let selectors = selectorGroup.split(/,(?![^\(]*\)|[^\[]*\])/);
-        selectors = Array.from(selectors, s => s.trim());
-        let invalidVarUse = false;
-        let contextVar;
-        forEach(selectors, (s, i) => {
-            let m = s.match(/\\?\$[_a-zA-Z][_a-zA-Z0-9]*\b/g);
-            if (!m) {
-                if (i > 0 && contextVar) {
-                    invalidVarUse = true;
-                    console.warn(`All individual selectors in a selector-group must share same context: ${selectorGroup}`);
-                }
-                return;
-            }
-            forEach(m, (varRef, j) => {
-                if (varRef.charAt(0) === "\\") return;
-                let varName = varRef.substr(1);
-                let varPos = s.indexOf(varRef);
-                if (j > 0 || varPos > 0) {
-                    invalidVarUse = true;
-                    console.warn(`Invalid use of ${varRef} in ${selectorGroup}`);
-                    return;
-                }
-                if (i > 0) {
-                    if (varName !== contextVar) {
-                        invalidVarUse = true;
-                        console.warn(`All individual selectors in a selector-group must share same context: ${selectorGroup}`);
-                    }
-                    return;
-                }
-                contextVar = varName;
-            });
-        });
-        if (invalidVarUse) {
-            console.error("Invalid use of variables in CSS selector. Assuming no match.");
-            return nullResult;
-        }
-        if (contextVar && contextVar !== CSS_CONTEXT_VARIABLE) {
-            if (!variables.has(contextVar)) {
-                console.debug(`Context variable $${contextVar} not defined for ${selectorGroup}`);
-                return nullResult;
-            }
-            if (contextVar !== CSS_CONTEXT_VARIABLE) context = variables.get(contextVar);
-            if (selectorGroup === `$${contextVar}`) return context;
-            if (!(context && context.nodeType === 1)) {
-                console.debug("Context variable $" + contextVar + " not an element in " + selectorGroup);
-                return nullResult;
-            }
-        }
-        let isRoot = false;
-        if (context.nodeType === 9 || context.nodeType === 11) isRoot = true;
-        selectors = filter(selectors, s => {
-            switch (s.charAt(0)) {
-              case "+":
-              case "~":
-                console.warn("Siblings of context-node cannot be selected in " + selectorGroup);
-                return false;
-
-              case ">":
-                return isRoot ? false : true;
-
-              default:
-                return true;
-            }
-        });
-        if (selectors.length <= 0) return nullResult;
-        selectors = Array.from(selectors, s => {
-            if (isRoot) return s;
-            let prefix = ":scope";
-            return contextVar ? s.replace("$" + contextVar, prefix) : prefix + " " + s;
-        });
-        let finalSelector = selectors.join(", ");
-        if (wantArray) {
-            return findAll(finalSelector, context, !isRoot, !isRoot);
-        } else {
-            return find$1(finalSelector, context, !isRoot, !isRoot);
-        }
-    }
     /*!
 	 * Microdata
 	 * HTML Microdata parsing and querying
@@ -1564,7 +1350,7 @@
         };
         return list;
     }
-    function evaluate(el) {
+    function evaluate$1(el) {
         let tagName = el.tagName.toLowerCase();
         let attrName = valueAttr[tagName];
         if (attrName) return el[attrName] || el.getAttribute(attrName);
@@ -1574,7 +1360,7 @@
         if (nodeData.has(el)) return nodeData.get(el);
         let prop = {
             name: el.getAttribute("itemprop"),
-            value: evaluate(el)
+            value: evaluate$1(el)
         };
         nodeData.set(el, prop);
         return prop;
@@ -1640,108 +1426,6 @@
         getValue: getValue
     });
     /*!
-	 * MicrodataDecoder
-	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
-	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
-	 */    class MicrodataDecoder {
-        constructor(options, namespaces) {}
-        init(node) {
-            getItems(node);
-            this.rootNode = node;
-        }
-        evaluate(query, context, variables, wantArray) {
-            if (!context) context = this.rootNode;
-            query = query.trim();
-            let startAtRoot = false;
-            let baseSchema;
-            let pathParts;
-            if (query === ".") return wantArray ? [ context ] : context;
-            let m = query.match(/^(?:(\^)?\[([^\]]*)\]\.)/);
-            if (m && m.length) {
-                query = query.substr(m[0].length);
-                startAtRoot = !!m[1];
-                baseSchema = words(m[2].trim());
-            }
-            pathParts = words(query.trim());
-            let nodes;
-            if (baseSchema) {
-                if (startAtRoot) context = this.view;
-                nodes = getItems(context, baseSchema);
-            } else nodes = [ context ];
-            let resultList = nodes;
-            forEach(pathParts, (relPath, i) => {
-                let parents = resultList;
-                resultList = [];
-                forEach(parents, el => {
-                    let props = getProperties(el);
-                    if (!props) return;
-                    let nodeList = props.namedItem(relPath);
-                    if (!nodeList) return;
-                    [].push.apply(resultList, nodeList);
-                });
-            });
-            resultList = Array.from(resultList, el => {
-                let props = getProperties(el);
-                if (props) return el;
-                return getValue(el);
-            });
-            if (wantArray) return resultList;
-            return resultList[0];
-        }
-        matches(context, query) {
-            console.warn("MicrodataDecoder.matches() is not implemented");
-            return false;
-        }
-    }
-    /*!
-	 * JSONDecoder
-	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
-	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
-	 */    class JSONDecoder {
-        constructor(options, namespaces) {}
-        init(object) {
-            if (typeof object !== "object" || object === null) throw Error("JSONDecoder cannot handle non-object");
-            this.object = object;
-        }
-        evaluate(query, context, variables, wantArray) {
-            if (!context) context = this.object;
-            query = query.trim();
-            let pathParts;
-            if (query === ".") return wantArray ? [ context ] : context;
-            let m = query.match(/^\^/);
-            if (m && m.length) {
-                query = query.substr(m[0].length);
-                context = this.object;
-            }
-            pathParts = query.split(".");
-            let resultList = [ context ];
-            forEach(pathParts, (relPath, i) => {
-                let parents = resultList;
-                resultList = [];
-                forEach(parents, item => {
-                    let child = item[relPath];
-                    if (child != null) {
-                        if (Array.isArray(child)) [].push.apply(resultList, child); else resultList.push(child);
-                    }
-                });
-            });
-            if (wantArray) return resultList;
-            let value = resultList[0];
-            return value;
-        }
-        matches(context, query) {
-            console.warn("JSONDecoder.matches() is not implemented");
-            return false;
-        }
-    }
-    /*!
-	 * builtin-decoders
-	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
-	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
-	 */    decoders.register("css", CSSDecoder);
-    decoders.register("microdata", MicrodataDecoder);
-    decoders.register("json", JSONDecoder);
-    /*!
 	 * HyperFrameset Processors
 	 * Copyright 2014-2015 Sean Hogan (http://meekostuff.net/)
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
@@ -1766,10 +1450,10 @@
             if (/\S+/.test(template.textContent)) console.warn('"main" transforms do not use templates');
         }
         transform(provider, details) {
-            let srcNode = provider.srcNode;
+            let srcNode = provider.source;
             let srcDoc = srcNode.nodeType === 9 ? srcNode : srcNode.ownerDocument;
             let main;
-            if (!main) main = find$1("main, [role=main]", srcNode);
+            if (!main) main = find("main, [role=main]", srcNode);
             if (!main && srcNode === srcDoc) main = srcDoc.body;
             if (!main) main = srcNode;
             let frag = srcDoc.createDocumentFragment();
@@ -1830,7 +1514,7 @@
             }
         }
         transform(provider, details) {
-            let srcNode = provider.srcNode;
+            let srcNode = provider.source;
             if (!this.processor || !this.processor.transform) {
                 console.warn('"script" transform template did not produce valid transform object');
                 return;
@@ -1839,33 +1523,105 @@
         }
     }
     /*!
+	 * Expressions
+	 * Copyright 2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    const _cache$1 = new Map;
+    const _scopeHandler = {
+        has() {
+            return true;
+        },
+        get(target, key) {
+            if (key === Symbol.unscopables) return undefined;
+            return target[key];
+        }
+    };
+    function _wrapScope(scope) {
+        return new Proxy(scope, _scopeHandler);
+    }
+    function compile(exprText) {
+        if (_cache$1.has(exprText)) return _cache$1.get(exprText);
+        let fn;
+        try {
+            let jsExpr = exprText;
+            if (exprText.startsWith("${") && exprText.endsWith("}")) {
+                jsExpr = exprText.slice(2, -1);
+            }
+            let body = new Function("__scope__", `with (__scope__) { return (${jsExpr}); }`);
+            fn = scope => body(_wrapScope(scope));
+        } catch (err) {
+            console.warn(`Expression compilation failed: "${exprText}"`, err);
+            fn = () => undefined;
+        }
+        _cache$1.set(exprText, fn);
+        return fn;
+    }
+    function evaluate(exprText, scope) {
+        let fn = compile(exprText);
+        return fn(scope);
+    }
+    class Scope {
+        constructor(initial) {
+            this.globalParams = initial ? {
+                ...initial
+            } : {};
+            this.globalVars = {};
+            this.localParams = {};
+            this.localVars = {};
+            this._localParamsStack = [];
+            this._localVarsStack = [];
+            this._proxy = new Proxy(this, _scopeLookupHandler);
+        }
+        set(name, value, {param: param = false, global: global = false} = {}) {
+            let target = global ? param ? this.globalParams : this.globalVars : param ? this.localParams : this.localVars;
+            target[name] = value;
+        }
+        get(name) {
+            if (name in this.localVars) return this.localVars[name];
+            if (name in this.localParams) return this.localParams[name];
+            if (name in this.globalVars) return this.globalVars[name];
+            if (name in this.globalParams) return this.globalParams[name];
+            return undefined;
+        }
+        has(name) {
+            return name in this.localVars || name in this.localParams || name in this.globalVars || name in this.globalParams;
+        }
+        push(params) {
+            this._localParamsStack.push(this.localParams);
+            this._localVarsStack.push(this.localVars);
+            this.localParams = params || {};
+            this.localVars = {};
+        }
+        pop() {
+            this.localParams = this._localParamsStack.pop();
+            this.localVars = this._localVarsStack.pop();
+        }
+        get values() {
+            return this._proxy;
+        }
+    }
+    const _scopeLookupHandler = {
+        has() {
+            return true;
+        },
+        get(scope, key) {
+            if (key === Symbol.unscopables) return undefined;
+            return scope.get(key);
+        }
+    };
+    /*!
 	 * HazardProcessor
 	 * Copyright 2014-2016 Sean Hogan (http://meekostuff.net/)
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
 	 */    let document$2 = window.document;
-    const TEXT_SUFFIX = "_text";
-    const HTML_SUFFIX = "_html";
-    const PIPE_OPERATOR = "//>";
     const HAZARD_TRANSFORM_URN = "HazardTransform";
     const hazDefaultNS = new CustomNamespace({
         urn: HAZARD_TRANSFORM_URN,
         name: "haz",
         style: "xml"
     });
-    const HAZARD_EXPRESSION_URN = "HazardExpression";
-    const exprDefaultNS = new CustomNamespace({
-        urn: HAZARD_EXPRESSION_URN,
-        name: "expr",
-        style: "xml"
-    });
-    const HAZARD_MEXPRESSION_URN = "HazardMExpression";
-    const mexprDefaultNS = new CustomNamespace({
-        urn: HAZARD_MEXPRESSION_URN,
-        name: "mexpr",
-        style: "xml"
-    });
     const _cache = new WeakMap;
-    let hazLangDefinition = "<otherwise <when@test <each@select <one@select +var@name,select <if@test <unless@test " + ">choose <template@name,match >eval@select >mtext@select >text@select " + "call@name apply param@name,select clone deepclone element@name attr@name";
+    let hazLangDefinition = "<otherwise <when@$test <each@$select,as <one@$select,as +var@name,$select <if@$test <unless@$test " + '>choose <template@name,$match >eval@$select >text@"select ' + "call@name apply@$select,as";
     let hazLang = Array.from(words(hazLangDefinition), def => {
         def = def.split("@");
         let tag = def[0];
@@ -1881,12 +1637,28 @@
             break;
         }
         if (attrToElement) tag = tag.substr(1);
-        let attrs = def[1];
-        attrs = attrs && attrs !== "" ? attrs.split(",") : [];
+        let attrDefs = def[1];
+        let attrs = [];
+        let attrTypes = {};
+        if (attrDefs && attrDefs !== "") {
+            for (let a of attrDefs.split(",")) {
+                let type = "bare";
+                if (a.startsWith('"')) {
+                    type = "string";
+                    a = a.substring(1);
+                } else if (a.startsWith("$")) {
+                    type = "expr";
+                    a = a.substring(1);
+                }
+                attrs.push(a);
+                attrTypes[a] = type;
+            }
+        }
         return {
             tag: tag,
             attrToElement: attrToElement,
-            attrs: attrs
+            attrs: attrs,
+            attrTypes: attrTypes
         };
     });
     let hazLangLookup = {};
@@ -1911,45 +1683,142 @@
         });
         return frag;
     }
-    function htmlToFragment(html, doc) {
-        if (!doc) doc = document$2;
-        let div = doc.createElement("div");
-        div.innerHTML = html;
-        return childNodesToFragment(div);
+    function convertHtmlPrefix(el) {
+        let doc = el.ownerDocument;
+        if (el.localName.startsWith("html:")) {
+            let newEl = doc.createElement(el.localName.substring(5));
+            for (let attr of Array.from(el.attributes)) {
+                newEl.setAttribute(attr.name, attr.value);
+            }
+            while (el.firstChild) newEl.appendChild(el.firstChild);
+            el.parentNode.replaceChild(newEl, el);
+            el = newEl;
+        }
+        for (let attr of Array.from(el.attributes)) {
+            if (!attr.name.startsWith("html:")) continue;
+            let targetName = attr.name.substring(5);
+            if (el.hasAttribute(targetName)) {
+                console.warn(`<${el.localName}> html:${targetName} overrides existing @${targetName}`);
+            }
+            el.removeAttribute(attr.name);
+            el.setAttribute(targetName, attr.value);
+        }
+    }
+    function promoteContentExpressions(el, hazPrefix) {
+        if (el.localName.startsWith(hazPrefix)) return;
+        if (el.childNodes.length !== 1) return;
+        let child = el.firstChild;
+        if (child.nodeType !== 3) return;
+        let text = child.nodeValue.trim();
+        if (!text) return;
+        let doc = el.ownerDocument;
+        if (text.startsWith("${")) {
+            if (!text.endsWith("}")) {
+                console.warn(`<${el.localName}> content starts with \${ but does not end with }: "${text}"`);
+                return;
+            }
+            let expr = text.slice(2, -1);
+            let directive = doc.createElement(hazPrefix + "eval");
+            directive.setAttribute("select", expr);
+            el.removeChild(child);
+            el.appendChild(directive);
+        } else if (text.startsWith("`")) {
+            if (!text.endsWith("`")) {
+                console.warn(`<${el.localName}> content starts with backtick but does not end with one: "${text}"`);
+                return;
+            }
+            let directive = doc.createElement(hazPrefix + "text");
+            directive.setAttribute("select", text);
+            el.removeChild(child);
+            el.appendChild(directive);
+        }
+    }
+    function normalizeExprAttrs(el, hazPrefix) {
+        if (!el.localName.startsWith(hazPrefix)) return;
+        let tag = el.localName.substring(hazPrefix.length);
+        let def = hazLangLookup[tag];
+        if (!def) return;
+        for (let attrName of def.attrs) {
+            let value = el.getAttribute(attrName);
+            if (!value) continue;
+            let type = def.attrTypes[attrName];
+            if (type === "bare") continue;
+            if (value.startsWith("${") && value.endsWith("}")) {
+                if (type === "expr") {
+                    continue;
+                }
+                console.warn(`<${el.localName}> @${attrName} does not need \${} wrapper.`);
+                value = value.slice(2, -1);
+            }
+            if (type === "expr") {
+                if (!value.startsWith("${")) {
+                    el.setAttribute(attrName, "${" + value + "}");
+                }
+            } else if (type === "string") {
+                if (!value.startsWith("`")) {
+                    el.setAttribute(attrName, "`${" + value + "}`");
+                }
+            }
+        }
+    }
+    function promoteHazAttrs(el, hazPrefix) {
+        if (el.localName.startsWith(hazPrefix)) return;
+        forEach(hazLang, def => {
+            if (!def.attrToElement) return;
+            let nsTag = hazPrefix + def.tag;
+            if (!el.hasAttribute(nsTag)) return;
+            let doc = el.ownerDocument;
+            let directiveEl = doc.createElement(nsTag);
+            let defaultAttr = def.attrs[0];
+            let value = el.getAttribute(nsTag);
+            el.removeAttribute(nsTag);
+            if (defaultAttr) directiveEl.setAttribute(defaultAttr, value);
+            forEach(def.attrs, (attr, i) => {
+                if (i === 0) return;
+                let nsAttr = hazPrefix + attr;
+                if (!el.hasAttribute(nsAttr)) return;
+                let value = el.getAttribute(nsAttr);
+                el.removeAttribute(nsAttr);
+                directiveEl.setAttribute(attr, value);
+            });
+            switch (def.attrToElement) {
+              case ">":
+                let frag = childNodesToFragment(el);
+                directiveEl.appendChild(frag);
+                el.appendChild(directiveEl);
+                break;
+
+              case "<":
+                el.parentNode.replaceChild(directiveEl, el);
+                directiveEl.appendChild(el);
+                break;
+
+              case "+":
+                el.parentNode.insertBefore(directiveEl, el);
+                break;
+
+              default:
+                break;
+            }
+        });
+    }
+    function implyOtherwise(el, hazPrefix) {
+        let otherwise = el.ownerDocument.createElement(hazPrefix + "otherwise");
+        forEach(Array.from(el.childNodes), node => {
+            let tag = node.localName;
+            if (tag === hazPrefix + "when") return;
+            otherwise.appendChild(node);
+        });
+        el.appendChild(otherwise);
     }
     class HazardProcessor {
         constructor(options, namespaces) {
             this.templates = [];
             this.namespaces = namespaces = namespaces.clone();
             if (!namespaces.lookupNamespace(HAZARD_TRANSFORM_URN)) namespaces.add(hazDefaultNS);
-            if (!namespaces.lookupNamespace(HAZARD_EXPRESSION_URN)) namespaces.add(exprDefaultNS);
-            if (!namespaces.lookupNamespace(HAZARD_MEXPRESSION_URN)) namespaces.add(mexprDefaultNS);
-            this.#init();
+            this.#hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
         }
         #hazPrefix;
-        #exprPrefix;
-        #mexprPrefix;
-        #exprHtmlAttr;
-        #mexprTextAttr;
-        #exprTextAttr;
-        #exprToHazPriority;
-        #exprToHazMap;
-        #mexprHtmlAttr;
-        #init() {
-            let namespaces = this.namespaces;
-            this.#hazPrefix = namespaces.lookupPrefix(HAZARD_TRANSFORM_URN);
-            this.#exprPrefix = namespaces.lookupPrefix(HAZARD_EXPRESSION_URN);
-            this.#mexprPrefix = namespaces.lookupPrefix(HAZARD_MEXPRESSION_URN);
-            this.#exprHtmlAttr = this.#exprPrefix + HTML_SUFFIX;
-            this.#mexprTextAttr = this.#mexprPrefix + TEXT_SUFFIX;
-            this.#exprTextAttr = this.#exprPrefix + TEXT_SUFFIX;
-            this.#mexprHtmlAttr = this.#mexprPrefix + HTML_SUFFIX;
-            this.#exprToHazPriority = [ this.#exprHtmlAttr, this.#mexprTextAttr, this.#exprTextAttr ];
-            this.#exprToHazMap = {};
-            this.#exprToHazMap[this.#exprHtmlAttr] = `${this.#hazPrefix}eval`;
-            this.#exprToHazMap[this.#mexprTextAttr] = `${this.#hazPrefix}mtext`;
-            this.#exprToHazMap[this.#exprTextAttr] = `${this.#hazPrefix}text`;
-        }
         #getHazardTag(el) {
             if (!el.localName.startsWith(this.#hazPrefix)) return null;
             return el.localName.substring(this.#hazPrefix.length);
@@ -1963,69 +1832,17 @@
             }
             this.root = template;
             this.templates = [];
-            let doc = template.ownerDocument;
+            let hazPrefix = this.#hazPrefix;
+            walkTree(template, true, el => convertHtmlPrefix(el));
+            walkTree(template, true, el => promoteContentExpressions(el, hazPrefix));
+            walkTree(template, true, el => promoteHazAttrs(el, hazPrefix));
+            walkTree(template, true, el => normalizeExprAttrs(el, hazPrefix));
             walkTree(template, true, el => {
                 let tag = el.localName;
-                if (tag.indexOf(this.#hazPrefix) === 0) return;
-                forEach(this.#exprToHazPriority, attr => {
-                    if (!el.hasAttribute(attr)) return;
-                    let tag = this.#exprToHazMap[attr];
-                    let val = el.getAttribute(attr);
-                    el.removeAttribute(attr);
-                    el.setAttribute(tag, val);
-                });
-                if (el.hasAttribute(this.#mexprHtmlAttr)) {
-                    console.warn(`Removing unsupported @${this.#mexprHtmlAttr}`);
-                    el.removeAttribute(this.#mexprHtmlAttr);
-                }
-                forEach(hazLang, def => {
-                    if (!def.attrToElement) return;
-                    let nsTag = this.#hazPrefix + def.tag;
-                    if (!el.hasAttribute(nsTag)) return;
-                    let directiveEl = doc.createElement(nsTag);
-                    let defaultAttr = def.attrs[0];
-                    let value = el.getAttribute(nsTag);
-                    el.removeAttribute(nsTag);
-                    if (defaultAttr) directiveEl.setAttribute(defaultAttr, value);
-                    forEach(def.attrs, (attr, i) => {
-                        if (i === 0) return;
-                        let nsAttr = this.#hazPrefix + attr;
-                        if (!el.hasAttribute(nsAttr)) return;
-                        let value = el.getAttribute(nsAttr);
-                        el.removeAttribute(nsAttr);
-                        directiveEl.setAttribute(attr, value);
-                    });
-                    switch (def.attrToElement) {
-                      case ">":
-                        let frag = childNodesToFragment(el);
-                        directiveEl.appendChild(frag);
-                        el.appendChild(directiveEl);
-                        break;
-
-                      case "<":
-                        el.parentNode.replaceChild(directiveEl, el);
-                        directiveEl.appendChild(el);
-                        break;
-
-                      case "+":
-                        el.parentNode.insertBefore(directiveEl, el);
-                        break;
-
-                      default:
-                        break;
-                    }
-                });
-            });
-            walkTree(template, true, el => {
-                let tag = el.localName;
-                if (tag === this.#hazPrefix + "template") this.#markTemplate(el);
-                if (tag === this.#hazPrefix + "choose") this.#implyOtherwise(el);
+                if (tag === hazPrefix + "template") this.#markTemplate(el);
+                if (tag === hazPrefix + "choose") implyOtherwise(el, hazPrefix);
             });
             this.#implyEntryTemplate(template);
-            walkTree(template, true, el => {
-                let attrs = this.#getExprAttributes(el);
-                if (attrs.length) _cache.set(el, attrs);
-            });
             _cache.set(template, {
                 root: this.root,
                 templates: this.templates
@@ -2033,15 +1850,6 @@
         }
         #markTemplate(el) {
             this.templates.push(el);
-        }
-        #implyOtherwise(el) {
-            let otherwise = el.ownerDocument.createElement(this.#hazPrefix + "otherwise");
-            forEach(Array.from(el.childNodes), node => {
-                let tag = node.localName;
-                if (tag === this.#hazPrefix + "when") return;
-                otherwise.appendChild(node);
-            });
-            el.appendChild(otherwise);
         }
         #implyEntryTemplate(el) {
             let firstExplicitTemplate;
@@ -2071,52 +1879,10 @@
         getEntryTemplate() {
             return this.templates[0];
         }
-        #getExprAttributes(el) {
-            let attrs = [];
-            let namespaces = this.namespaces;
-            let exprNS = namespaces.lookupNamespace(HAZARD_EXPRESSION_URN);
-            let mexprNS = namespaces.lookupNamespace(HAZARD_MEXPRESSION_URN);
-            forEach(Array.from(el.attributes), attr => {
-                let ns = find$2([ exprNS, mexprNS ], ns => attr.name.indexOf(ns.prefix) === 0);
-                if (!ns) return;
-                let prefix = ns.prefix;
-                let namespaceURI = ns.urn;
-                let attrName = attr.name.substr(prefix.length);
-                el.removeAttribute(attr.name);
-                let desc = {
-                    namespaceURI: namespaceURI,
-                    prefix: prefix,
-                    attrName: attrName,
-                    type: "text"
-                };
-                switch (namespaceURI) {
-                  case HAZARD_EXPRESSION_URN:
-                    desc.expression = interpretExpression(attr.value);
-                    break;
-
-                  case HAZARD_MEXPRESSION_URN:
-                    desc.mexpression = interpretMExpression(attr.value);
-                    break;
-
-                  default:
-                    break;
-                }
-                attrs.push(desc);
-            });
-            return attrs;
-        }
         getNamedTemplate(name) {
             let processor = this;
             name = lc(name);
-            return find$2(processor.templates, template => lc(template.getAttribute("name")) === name);
-        }
-        getMatchingTemplate(element) {
-            let processor = this;
-            return find$2(processor.templates, template => {
-                if (!template.hasAttribute("match")) return false;
-                let expression = template.getAttribute("match");
-                return processor.provider.matches(element, expression);
-            });
+            return find$1(processor.templates, template => lc(template.getAttribute("name")) === name);
         }
         transform(provider, details) {
             let doc = this.root.ownerDocument;
@@ -2124,68 +1890,26 @@
             return this._transform(provider, details, frag).then(() => frag);
         }
         _transform(provider, details, frag) {
-            this.provider = provider;
-            this.globalParams = assign({}, details);
-            this.globalVars = {};
-            this.localParams = this.globalParams;
-            this.localVars = this.globalVars;
-            this.localParamsStack = [];
-            this.localVarsStack = [];
-            this.variables = {
-                has: key => {
-                    let result = key in this.localVars || key in this.localParams || key in this.globalVars || key in this.globalParams || false;
-                    return result;
-                },
-                get: key => {
-                    if (key in this.localVars) return this.localVars[key];
-                    if (key in this.localParams) return this.localParams[key];
-                    if (key in this.globalVars) return this.globalVars[key];
-                    if (key in this.globalParams) return this.globalParams[key];
-                    return undefined;
-                },
-                set: (key, value, inParams, isGlobal) => {
-                    let mapName = isGlobal ? inParams ? "globalParams" : "globalVars" : inParams ? "localParams" : "localVars";
-                    if (inParams && key in this[mapName]) {
-                        console.warn(`Param "${key}" already set`);
-                        return;
-                    }
-                    if (value == null) {
-                        console.warn(`Variable "${key}" set to null/undefined — removing from scope`);
-                        delete this[mapName][key];
-                        return;
-                    }
-                    this[mapName][key] = value;
-                },
-                push: params => {
-                    this.localParamsStack.push(this.localParams);
-                    this.localVarsStack.push(this.localVars);
-                    if (typeof params !== "object" || params == null) params = {};
-                    this.localParams = params;
-                    this.localVars = {};
-                },
-                pop: () => {
-                    this.localParams = this.localParamsStack.pop();
-                    this.localVars = this.localVarsStack.pop();
-                }
-            };
-            return this.transformChildNodes(this.root, null, frag).then(() => {
+            this.scope = new Scope(details);
+            this.scope.set("root", provider.source, {
+                global: true
+            });
+            return this.transformChildNodes(this.root, frag).then(() => {
                 let template = this.getEntryTemplate();
-                return this.transformTemplate(template, null, null, frag);
+                return this.transformTemplate(template, null, frag);
             });
         }
-        transformTemplate(template, context, params, frag) {
-            let processor = this;
-            processor.variables.push(params);
-            return processor.transformChildNodes(template, context, frag).then(() => {
-                processor.variables.pop();
+        transformTemplate(template, params, frag) {
+            this.scope.push(params);
+            return this.transformChildNodes(template, frag).then(() => {
+                this.scope.pop();
                 return frag;
             });
         }
-        transformChildNodes(srcNode, context, frag) {
-            let processor = this;
-            return Thenfu.reduce(null, srcNode.childNodes, (dummy, current) => processor.transformNode(current, context, frag));
+        transformChildNodes(srcNode, frag) {
+            return Thenfu.reduce(null, srcNode.childNodes, (dummy, current) => this.transformNode(current, frag));
         }
-        transformNode(srcNode, context, frag) {
+        transformNode(srcNode, frag) {
             switch (srcNode.nodeType) {
               default:
                 let node = srcNode.cloneNode(true);
@@ -2198,245 +1922,252 @@
                 return;
 
               case 1:
-                if (this.#getHazardTag(srcNode)) return this.transformHazardTree(srcNode, context, frag); else return this.transformTree(srcNode, context, frag);
+                if (this.#getHazardTag(srcNode)) return this.transformHazardTree(srcNode, frag); else return this.transformTree(srcNode, frag);
             }
         }
-        transformHazardTree(el, context, frag) {
+        transformHazardTree(el, frag) {
             let doc = el.ownerDocument;
             let tag = this.#getHazardTag(el);
             let invertTest = false;
-            let name, selector, value, type, template, node, expr, mexpr;
             switch (tag) {
               default:
                 console.warn(`Unknown hazard element <${el.localName}> — processing children only`);
-                return this.transformChildNodes(el, context, frag);
+                return this.transformChildNodes(el, frag);
 
               case "template":
                 return frag;
 
               case "var":
-                name = el.getAttribute("name");
-                selector = el.getAttribute("select");
-                value = context;
-                if (selector) {
-                    try {
-                        value = this.provider.evaluate(selector, context, this.variables, false);
-                    } catch (err) {
-                        window.reportError(err);
-                        console.warn(`Error evaluating <haz:var name="${name}" select="${selector}">. Assumed empty.`);
-                        value = undefined;
+                {
+                    let name = el.getAttribute("name");
+                    let selectExpr = el.getAttribute("select");
+                    let value;
+                    if (selectExpr) {
+                        try {
+                            value = evaluate(selectExpr, this.scope.values);
+                        } catch (err) {
+                            console.warn(`Error evaluating <haz:var name="${name}" select="${selectExpr}">. Assumed undefined.`);
+                        }
                     }
+                    this.scope.set(name, value);
+                    return frag;
                 }
-                this.variables.set(name, value);
-                return frag;
 
               case "param":
-                name = el.getAttribute("name");
-                selector = el.getAttribute("select");
-                value = context;
-                if (selector) {
-                    try {
-                        value = this.provider.evaluate(selector, context, this.variables, false);
-                    } catch (err) {
-                        window.reportError(err);
-                        console.warn(`Error evaluating <haz:param name="${name}" select="${selector}">. Assumed empty.`);
-                        value = undefined;
+                {
+                    let name = el.getAttribute("name");
+                    let selectExpr = el.getAttribute("select");
+                    let value;
+                    if (selectExpr) {
+                        try {
+                            value = evaluate(selectExpr, this.scope.values);
+                        } catch (err) {
+                            console.warn(`Error evaluating <haz:param name="${name}" select="${selectExpr}">. Assumed undefined.`);
+                        }
                     }
+                    this.scope.set(name, value, {
+                        param: true
+                    });
+                    return frag;
                 }
-                this.variables.set(name, value, true);
-                return frag;
 
               case "call":
-                name = el.getAttribute("name");
-                template = this.getNamedTemplate(name);
-                if (!template) {
-                    console.warn(`Hazard could not find template name="${name}"`);
-                    return frag;
+                {
+                    let name = el.getAttribute("name");
+                    let template = this.getNamedTemplate(name);
+                    if (!template) {
+                        console.warn(`Hazard could not find template name="${name}"`);
+                        return frag;
+                    }
+                    let params = {};
+                    for (let child of el.children) {
+                        if (this.#getHazardTag(child) === "param") {
+                            let pName = child.getAttribute("name");
+                            let pSelect = child.getAttribute("select");
+                            if (pName && pSelect) {
+                                try {
+                                    params[pName] = evaluate(pSelect, this.scope.values);
+                                } catch (err) {
+                                    console.warn(`Error evaluating param "${pName}": ${pSelect}`);
+                                }
+                            }
+                        }
+                    }
+                    return this.transformTemplate(template, params, frag);
                 }
-                return this.transformTemplate(template, context, null, frag);
 
               case "apply":
-                template = this.getMatchingTemplate(context);
-                if (template) {
-                    return this.transformTemplate(template, context, null, frag);
-                }
-                console.warn("<haz:apply> found no matching template:", context);
-                node = context.cloneNode(false);
-                frag.appendChild(node);
-                return Thenfu.reduce(null, context.childNodes, (dummy, child) => this.transformHazardTree(el, child, node));
-
-              case "clone":
-                node = context.cloneNode(false);
-                frag.appendChild(node);
-                return this.transformChildNodes(el, context, node);
-
-              case "deepclone":
-                node = context.cloneNode(true);
-                frag.appendChild(node);
-                return frag;
-
-              case "element":
-                mexpr = el.getAttribute("name");
-                name = evalMExpression(mexpr, this.provider, context, this.variables);
-                type = typeof value;
-                if (type !== "string") {
-                    console.debug(`<haz:element name="${mexpr}"> did not resolve to a string — skipped`);
+                {
+                    console.warn("<haz:apply> is not currently supported. Use haz:call with explicit template names.");
                     return frag;
                 }
-                node = doc.createElement(name);
-                frag.appendChild(node);
-                return this.transformChildNodes(el, context, node);
-
-              case "attr":
-                mexpr = el.getAttribute("name");
-                name = evalMExpression(mexpr, this.provider, context, this.variables);
-                type = typeof value;
-                if (type !== "string") {
-                    console.debug(`<haz:attr name="${mexpr}"> did not resolve to a string — skipped`);
-                    return frag;
-                }
-                node = doc.createDocumentFragment();
-                return this.transformChildNodes(el, context, node).then(() => {
-                    value = node.textContent;
-                    frag.setAttribute(name, value);
-                    return frag;
-                });
 
               case "eval":
-                selector = el.getAttribute("select");
-                value = evalExpression(selector, this.provider, context, this.variables, "node");
-                type = typeof value;
-                if (type === "undefined" || type === "boolean" || value == null) {
-                    console.debug(`<haz:eval select="${selector}"> resolved to nothing`);
+                {
+                    let selectExpr = el.getAttribute("select");
+                    let value;
+                    try {
+                        value = evaluate(selectExpr, this.scope.values);
+                    } catch (err) {
+                        console.warn(`Error evaluating <haz:eval select="${selectExpr}">.`);
+                        return this.transformChildNodes(el, frag);
+                    }
+                    if (value == null || value === false || value === undefined) {
+                        return this.transformChildNodes(el, frag);
+                    }
+                    if (value.nodeType) {
+                        frag.appendChild(value);
+                    } else {
+                        frag.appendChild(doc.createTextNode(String(value)));
+                    }
                     return frag;
                 }
-                if (!value.nodeType) {
-                    value = htmlToFragment(value, doc);
-                }
-                frag.appendChild(value);
-                return frag;
-
-              case "mtext":
-                mexpr = el.getAttribute("select");
-                value = evalMExpression(mexpr, this.provider, context, this.variables);
-                if (type === "undefined" || type === "boolean" || value == null) {
-                    console.debug(`<haz:mtext select="${mexpr}"> resolved to nothing`);
-                    return frag;
-                }
-                if (!value.nodeType) {
-                    value = doc.createTextNode(value);
-                }
-                frag.appendChild(value);
-                return frag;
 
               case "text":
-                expr = el.getAttribute("select");
-                value = evalExpression(expr, this.provider, context, this.variables, "text");
-                type = typeof value;
-                if (type === "undefined" || type === "boolean" || value == null) {
-                    console.debug(`<haz:text select="${expr}"> resolved to nothing`);
+                {
+                    let selectExpr = el.getAttribute("select");
+                    let value;
+                    try {
+                        value = evaluate(selectExpr, this.scope.values);
+                    } catch (err) {
+                        console.warn(`Error evaluating <haz:text select="${selectExpr}">.`);
+                        return frag;
+                    }
+                    frag.appendChild(doc.createTextNode(String(value)));
                     return frag;
                 }
-                if (!value.nodeType) {
-                    value = doc.createTextNode(value);
-                }
-                frag.appendChild(value);
-                return frag;
 
               case "unless":
                 invertTest = true;
 
               case "if":
-                let testVal = el.getAttribute("test");
-                let pass = false;
-                try {
-                    pass = evalExpression(testVal, this.provider, context, this.variables, "boolean");
-                } catch (err) {
-                    window.reportError(err);
-                    console.warn(`Error evaluating <haz:if test="${testVal}">. Assumed false.`);
-                    pass = false;
+                {
+                    let testExpr = el.getAttribute("test");
+                    let pass = false;
+                    try {
+                        pass = evaluate(testExpr, this.scope.values);
+                    } catch (err) {
+                        console.warn(`Error evaluating <haz:if test="${testExpr}">. Assumed false.`);
+                    }
+                    if (invertTest) pass = !pass;
+                    if (!pass) return frag;
+                    return this.transformChildNodes(el, frag);
                 }
-                if (invertTest) pass = !pass;
-                if (!pass) return frag;
-                return this.transformChildNodes(el, context, frag);
 
               case "choose":
-                let otherwise;
-                let when;
-                let found = some(el.childNodes, child => {
-                    if (child.nodeType !== 1) return false;
-                    let childTag = this.#getHazardTag(child);
-                    if (!childTag) return false;
-                    if (childTag === "otherwise") {
-                        if (!otherwise) otherwise = child;
-                        return false;
+                {
+                    let otherwise;
+                    let when;
+                    let found = some(el.childNodes, child => {
+                        if (child.nodeType !== 1) return false;
+                        let childTag = this.#getHazardTag(child);
+                        if (!childTag) return false;
+                        if (childTag === "otherwise") {
+                            if (!otherwise) otherwise = child;
+                            return false;
+                        }
+                        if (childTag !== "when") return false;
+                        let testExpr = child.getAttribute("test");
+                        let pass = false;
+                        try {
+                            pass = evaluate(testExpr, this.scope.values);
+                        } catch (err) {
+                            console.warn(`Error evaluating <haz:when test="${testExpr}">. Assumed false.`);
+                        }
+                        if (!pass) return false;
+                        when = child;
+                        return true;
+                    });
+                    if (!found) when = otherwise;
+                    if (!when) {
+                        console.debug("<haz:choose> had no matching <haz:when> and no <haz:otherwise>");
+                        return frag;
                     }
-                    if (childTag !== "when") return false;
-                    let testVal = child.getAttribute("test");
-                    let pass = evalExpression(testVal, this.provider, context, this.variables, "boolean");
-                    if (!pass) return false;
-                    when = child;
-                    return true;
-                });
-                if (!found) when = otherwise;
-                if (!when) {
-                    console.debug("<haz:choose> had no matching <haz:when> and no <haz:otherwise>");
-                    return frag;
+                    return this.transformChildNodes(when, frag);
                 }
-                return this.transformChildNodes(when, context, frag);
 
               case "one":
-                selector = el.getAttribute("select");
-                let subContext;
-                try {
-                    subContext = this.provider.evaluate(selector, context, this.variables, false);
-                } catch (err) {
-                    window.reportError(err);
-                    console.warn(`Error evaluating <haz:one select="${selector}">. Assumed empty.`);
-                    return frag;
+                {
+                    let selectExpr = el.getAttribute("select");
+                    let asName = el.getAttribute("as");
+                    if (!asName) console.warn(`<haz:one select="${selectExpr}"> has no @as — selected value will be inaccessible.`);
+                    let value;
+                    try {
+                        value = evaluate(selectExpr, this.scope.values);
+                    } catch (err) {
+                        console.warn(`Error evaluating <haz:one select="${selectExpr}">. Assumed empty.`);
+                        return frag;
+                    }
+                    if (!value) {
+                        console.debug(`<haz:one select="${selectExpr}"> resolved to nothing`);
+                        return frag;
+                    }
+                    if (asName) this.scope.set(asName, value);
+                    return this.transformChildNodes(el, frag);
                 }
-                if (!subContext) {
-                    console.debug(`<haz:one select="${selector}"> resolved to nothing`);
-                    return frag;
-                }
-                return this.transformChildNodes(el, subContext, frag);
 
               case "each":
-                selector = el.getAttribute("select");
-                let subContexts;
-                try {
-                    subContexts = this.provider.evaluate(selector, context, this.variables, true);
-                } catch (err) {
-                    window.reportError(err);
-                    console.warn(`Error evaluating <haz:each select="${selector}">. Assumed empty.`);
-                    return frag;
+                {
+                    let selectExpr = el.getAttribute("select");
+                    let asName = el.getAttribute("as");
+                    if (!asName) console.warn(`<haz:each select="${selectExpr}"> has no @as — iteration variable will be inaccessible.`);
+                    let items;
+                    try {
+                        items = evaluate(selectExpr, this.scope.values);
+                    } catch (err) {
+                        console.warn(`Error evaluating <haz:each select="${selectExpr}">. Assumed empty.`);
+                        return frag;
+                    }
+                    if (!items) {
+                        console.debug(`<haz:each select="${selectExpr}"> resolved to nothing`);
+                        return frag;
+                    }
+                    return Thenfu.reduce(null, items, (dummy, item) => {
+                        if (asName) this.scope.set(asName, item);
+                        return this.transformChildNodes(el, frag);
+                    });
                 }
-                return Thenfu.reduce(null, subContexts, (dummy, subContext) => this.transformChildNodes(el, subContext, frag));
             }
         }
-        transformTree(srcNode, context, frag) {
-            let processor = this;
-            let nodeType = srcNode.nodeType;
-            if (nodeType !== 1) throw Error("transformTree() expects Element");
-            let node = processor.transformSingleElement(srcNode, context);
+        transformTree(srcNode, frag) {
+            let node = this.transformSingleElement(srcNode);
             let nodeAsFrag = frag.appendChild(node);
-            return processor.transformChildNodes(srcNode, context, nodeAsFrag);
+            return this.transformChildNodes(srcNode, nodeAsFrag);
         }
-        transformSingleElement(srcNode, context) {
-            let processor = this;
-            let exprAttributes = _cache.get(srcNode);
+        transformSingleElement(srcNode) {
             let el = srcNode.cloneNode(false);
-            if (exprAttributes) forEach(exprAttributes, desc => {
-                let value;
-                try {
-                    value = desc.namespaceURI === HAZARD_MEXPRESSION_URN ? processMExpression(desc.mexpression, processor.provider, context, processor.variables) : processExpression(desc.expression, processor.provider, context, processor.variables, desc.type);
-                } catch (err) {
-                    window.reportError(err);
-                    console.warn(`Error evaluating @${desc.attrName}="${desc.expression}". Assumed false.`);
-                    value = false;
+            for (let attr of Array.from(srcNode.attributes)) {
+                let name = attr.name;
+                let value = attr.value;
+                if (value.startsWith("`")) {
+                    if (!value.endsWith("`")) {
+                        console.warn(`<${srcNode.localName}> @${name} starts with backtick but does not end with one: "${value}"`);
+                        continue;
+                    }
+                    el.removeAttribute(name);
+                    try {
+                        value = evaluate(value, this.scope.values);
+                    } catch (err) {
+                        console.warn(`Error evaluating attribute ${name}="${attr.value}".`);
+                        continue;
+                    }
+                    setAttribute(el, name, value);
+                } else if (value.startsWith("${")) {
+                    if (!value.endsWith("}")) {
+                        console.warn(`<${srcNode.localName}> @${name} starts with \${ but does not end with }: "${value}"`);
+                        continue;
+                    }
+                    el.removeAttribute(name);
+                    let expr = value.slice(2, -1);
+                    try {
+                        value = evaluate(expr, this.scope.values);
+                    } catch (err) {
+                        console.warn(`Error evaluating attribute ${name}="${attr.value}".`);
+                        continue;
+                    }
+                    setAttribute(el, name, value);
                 }
-                setAttribute(el, desc.attrName, value);
-            });
+            }
             return el;
         }
     }
@@ -2447,122 +2178,6 @@
         } else {
             el.setAttribute(attrName, value.toString());
         }
-    }
-    function evalMExpression(mexprText, provider, context, variables) {
-        let mexpr = interpretMExpression(mexprText);
-        return processMExpression(mexpr, provider, context, variables);
-    }
-    function evalExpression(exprText, provider, context, variables, type) {
-        let expr = interpretExpression(exprText);
-        return processExpression(expr, provider, context, variables, type);
-    }
-    function interpretMExpression(mexprText) {
-        let expressions = [];
-        let mexpr = mexprText.replace(/\{\{((?:[^}]|\}(?=\}\})|\}(?!\}))*)\}\}/g, (all, expr) => {
-            expressions.push(expr);
-            return "{{}}";
-        });
-        expressions = expressions.map(expr => interpretExpression(expr));
-        return {
-            template: mexpr,
-            expressions: expressions
-        };
-    }
-    function interpretExpression(exprText) {
-        let expression = {};
-        expression.text = exprText;
-        let exprParts = exprText.split(PIPE_OPERATOR);
-        expression.selector = exprParts.shift();
-        expression.filters = [];
-        forEach(exprParts, filterSpec => {
-            filterSpec = filterSpec.trim();
-            let text = filterSpec;
-            let m = text.match(/^([_a-zA-Z][_a-zA-Z0-9]*)\s*(:?)/);
-            if (!m) {
-                console.warn(`Syntax Error in filter call: ${filterSpec}`);
-                return false;
-            }
-            let filterName = m[1];
-            let hasParams = m[2];
-            text = text.substr(m[0].length);
-            if (!hasParams && /\S+/.test(text)) {
-                console.warn(`Syntax Error in filter call: ${filterSpec}`);
-                return false;
-            }
-            try {
-                let filterParams = Function("return [" + text + "];")();
-                expression.filters.push({
-                    text: filterSpec,
-                    name: filterName,
-                    params: filterParams
-                });
-                return true;
-            } catch (err) {
-                console.warn(`Syntax Error in filter call: ${filterSpec}`);
-                return false;
-            }
-        });
-        return expression;
-    }
-    function processMExpression(mexpr, provider, context, variables) {
-        let i = 0;
-        return mexpr.template.replace(/\{\{\}\}/g, all => processExpression(mexpr.expressions[i++], provider, context, variables, "text"));
-    }
-    function processExpression(expr, provider, context, variables, type) {
-        let value = provider.evaluate(expr.selector, context, variables);
-        every(expr.filters, filter => {
-            if (value == null) value = "";
-            if (value.nodeType) {
-                if (value.nodeType === 1) value = value.textContent; else value = "";
-            }
-            try {
-                value = filters.evaluate(filter.name, value, filter.params);
-                return true;
-            } catch (err) {
-                window.reportError(err);
-                console.warn(`Failure processing filter call: "${filter.text}" with input: "${value}"`);
-                value = "";
-                return false;
-            }
-        });
-        return cast(value, type, context);
-    }
-    function getDocument(context) {
-        if (context && context.nodeType === 9) return context;
-        if (context && context.ownerDocument) return context.ownerDocument;
-        return document$2;
-    }
-    function cast(value, type, context) {
-        switch (type) {
-          case "text":
-            if (value && value.nodeType) value = value.textContent;
-            break;
-
-          case "node":
-            let doc = getDocument(context);
-            let frag = doc.createDocumentFragment();
-            if (value && value.nodeType) frag.appendChild(doc.importNode(value, true)); else {
-                let div = doc.createElement("div");
-                div.innerHTML = value;
-                let node;
-                while (node = div.firstChild) frag.appendChild(node);
-            }
-            value = frag;
-            break;
-
-          case "boolean":
-            if (value == null || value === false) value = false; else {
-                if (!value) console.warn(`Casting present but falsy value (${JSON.stringify(value)}) to true`);
-                value = true;
-            }
-            break;
-
-          default:
-            console.warn(`Unexpected cast type: ${type}`);
-            if (value && value.nodeType) value = value.textContent;
-            break;
-        }
-        return value;
     }
     /*!
 	 * Builtin Processors
@@ -2714,7 +2329,7 @@
                 return;
             }
             controllers.listen(name, values => {
-                let activePanel = find$2(this.owns, child => {
+                let activePanel = find$1(this.owns, child => {
                     let value = child.getAttribute("value");
                     return includes(values, value);
                 });
@@ -2730,7 +2345,7 @@
         #refresh() {
             let width = parseFloat(window.getComputedStyle(this).width);
             let panels = this.owns;
-            let activePanel = find$2(panels, panel => {
+            let activePanel = find$1(panels, panel => {
                 let minWidth = window.getComputedStyle(panel).minWidth;
                 if (minWidth == null || minWidth === "" || minWidth === "0px") return true;
                 minWidth = parseFloat(minWidth);
@@ -2954,13 +2569,13 @@
             if (element) this.element = element;
         }
         find(selector, scope) {
-            return find$1(selector, this.element, scope);
+            return find(selector, this.element, scope);
         }
         findAll(selector, scope) {
             return findAll(selector, this.element, scope);
         }
         matches(selector, scope) {
-            return matches$1(this.element, selector, scope);
+            return matches(this.element, selector, scope);
         }
         closest(selector, scope) {
             return closest(this.element, selector, scope);
@@ -3063,6 +2678,10 @@
     function setDefinitionLookup(fn) {
         definitionLookup = fn;
     }
+    let _globals = {};
+    function setGlobals(globals) {
+        _globals = globals;
+    }
     function registerElement(ns, name, Cls) {
         let tagName = ns.lookupTagName(name);
         customElements.define(tagName, Cls);
@@ -3073,7 +2692,8 @@
     }
     let transcluder = {
         registerElement: registerElement,
-        setDefinitionLookup: setDefinitionLookup
+        setDefinitionLookup: setDefinitionLookup,
+        setGlobals: setGlobals
     };
     class HTransclude extends Panel {
         static observedAttributes=[ "src" ];
@@ -3093,7 +2713,10 @@
         }
         attributeChangedCallback(name, oldValue, newValue) {
             if (!this._connected) return;
-            if (name === "src") this.refresh();
+            if (name === "src") {
+                console.info(`[HyperFrameset] Frame "${this.targetname || "(unnamed)"}" src changed: "${oldValue}" → "${newValue}"`);
+                this.refresh();
+            }
         }
         get options() {
             let behaviors = instance();
@@ -3106,9 +2729,15 @@
         }
         load(response) {
             if (response) this.src = response.url;
-            return Thenfu.pipe(response, [ response => this.definition.render(response, "loaded", {
+            let details = {
                 mainSelector: this.mainSelector
-            }), result => {
+            };
+            Object.assign(details, _globals);
+            let bodyBehavior = document.body.behavior;
+            if (bodyBehavior && bodyBehavior.globals) Object.assign(details, bodyBehavior.globals);
+            let options = this.options;
+            if (options && options.globals) Object.assign(details, options.globals);
+            return Thenfu.pipe(response, [ response => this.definition.render(response, "loaded", details), result => {
                 if (result) return this.insert(result, this.hasAttribute("replace"));
             } ]);
         }
@@ -3159,6 +2788,11 @@
                 let response;
                 return Thenfu.pipe(null, [ () => this.preload(request), () => httpProxy.load(nohash, request), resp => {
                     response = resp;
+                    if (response && response.status === 404) {
+                        console.warn(`[HyperFrameset] Frame "${this.targetname || "(unnamed)"}" src returned 404: ${nohash}`);
+                    } else if (!response || !response.document) {
+                        console.warn(`[HyperFrameset] Frame "${this.targetname || "(unnamed)"}" src returned empty/null document: ${nohash}`);
+                    }
                 }, () => whenVisible(this), () => {
                     if (this.getAttribute("src") !== src) return;
                     return this.load(response);
@@ -3182,24 +2816,20 @@
         init(el) {
             defaults(this, {
                 element: el,
-                type: el.getAttribute("type") || "main",
-                format: el.getAttribute("format")
+                type: el.getAttribute("type") || "hazard"
             });
-            if (this.type === "main") this.format = "";
-            let doc = this.framesetDefinition.document;
             let options = el.behavior;
             let processor = this.processor = processors.create(this.type, options, this.framesetDefinition.namespaces);
             processor.loadTemplate(el);
         }
-        process(srcNode, details) {
-            let decoder;
-            if (this.format) {
-                decoder = decoders.create(this.format, {}, this.framesetDefinition.namespaces);
-                decoder.init(srcNode);
-            } else decoder = {
-                srcNode: srcNode
-            };
-            return this.processor.transform(decoder, details);
+        process(source, details) {
+            let behavior = this.element.behavior;
+            if (behavior && behavior.globals) {
+                details = Object.assign({}, details, behavior.globals);
+            }
+            return this.processor.transform({
+                source: source
+            }, details);
         }
     }
     /*!
@@ -3258,10 +2888,13 @@
             let doc = resource.document;
             if (!doc) return null;
             let frag0 = doc;
-            if (details.mainSelector) frag0 = find$1(details.mainSelector, doc);
+            if (details.mainSelector) {
+                frag0 = find(details.mainSelector, doc);
+                if (frag0 == null) console.warn(`[HyperFrameset] Main selector "${details.mainSelector}" matched nothing in document. Content will be empty.`);
+            }
             return Thenfu.reduce(frag0, this.transforms, (fragment, transform) => transform.process(fragment, details)).then(fragment => {
                 let el = this.element.cloneNode(false);
-                let htmlBody = find$1("body", fragment);
+                let htmlBody = find("body", fragment);
                 if (htmlBody) fragment = adoptContents(htmlBody, el.ownerDocument);
                 forEach(findAll("link[rel~=stylesheet], style", fragment), node => {
                     node.parentNode.removeChild(node);
@@ -3307,7 +2940,7 @@
                 url: resource && resource.url,
                 mainSelector: this.mainSelector
             });
-            let bodyDef = find$2(this.bodies, body => body.condition === condition);
+            let bodyDef = find$1(this.bodies, body => body.condition === condition);
             if (!bodyDef) return;
             return bodyDef.render(resource, details);
         }
@@ -3472,7 +3105,7 @@
             });
             forEach(frameRefElts, el => {
                 let def = el.getAttribute(DEF_ATTR);
-                let tmpl = find$1(`template[${DEFID_ATTR}="${def}"]`, container);
+                let tmpl = find(`template[${DEFID_ATTR}="${def}"]`, container);
                 let refEl = tmpl && tmpl.content.firstElementChild;
                 if (!refEl) {
                     console.warn("Frame declaration references non-existant frame definition: " + def);
@@ -3498,7 +3131,7 @@
             return templates.map(tmpl => tmpl.getAttribute(DEFID_ATTR));
         }
         getFrame(defId) {
-            let tmpl = find$1(`template[${DEFID_ATTR}="${defId}"]`, this.frameContainer);
+            let tmpl = find(`template[${DEFID_ATTR}="${defId}"]`, this.frameContainer);
             if (!tmpl) return undefined;
             let el = tmpl.content.firstElementChild;
             if (!el) return undefined;
@@ -3611,11 +3244,16 @@
                 framer.framesetURL = framerConfig.framesetURL = framesetURL.nohash;
                 return httpProxy.load(framer.framesetURL, {
                     responseType: "document"
-                }).then(response => new HFramesetDefinition(response.document, {
-                    ...framerConfig,
-                    behaviors: framer.behaviors,
-                    frameContainer: document$1.head
-                }));
+                }).then(response => {
+                    if (!response || !response.document) {
+                        console.warn(`[HyperFrameset] Frameset document failed to load or is empty: ${framer.framesetURL}`);
+                    }
+                    return new HFramesetDefinition(response.document, {
+                        ...framerConfig,
+                        behaviors: framer.behaviors,
+                        frameContainer: document$1.head
+                    });
+                });
             }, definition => Thenfu.pipe(definition, [ () => {
                 framer.definition = definition;
                 return Framer.#prepareFrameset(document$1, definition);
@@ -3682,6 +3320,9 @@
                     let target = this.options.lookupTarget(url);
                     if (target) this.currentChangeset = Framer.#inferChangeset(url, target);
                     console.debug("framesetEntered: config.lookupTarget returned", this.currentChangeset);
+                }
+                if (!this.currentChangeset && url.indexOf(this.scope) === 0) {
+                    console.warn(`[HyperFrameset] No target found for URL "${url}" within scope "${this.scope}". Check your frameset lookup() function.`);
                 }
             }, () => {
                 let changeset = this.currentChangeset;
@@ -3769,7 +3410,7 @@
             if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey) return;
             let linkElement = closest(e.target, "[link]");
             if (!linkElement) return;
-            let hyperlink = find$1("a, link", linkElement);
+            let hyperlink = find("a, link", linkElement);
             if (!hyperlink) return;
             let href = hyperlink.getAttribute("href");
             if (!href) return;
@@ -4002,11 +3643,11 @@
         }
         static #getFramesetMarker(doc) {
             if (!doc) doc = document$1;
-            return find$1(`link[rel~=${FRAMESET_REL}]`, doc.head);
+            return find(`link[rel~=${FRAMESET_REL}]`, doc.head);
         }
         static #getSelfMarker(doc) {
             if (!doc) doc = document$1;
-            return find$1(`link[rel~=${SELF_REL}]`, doc.head);
+            return find(`link[rel~=${SELF_REL}]`, doc.head);
         }
         static #insertMarkers(selfURL, framesetURL) {
             let head = document$1.head;
@@ -4175,16 +3816,11 @@
             htmlParser: htmlParser,
             httpProxy: httpProxy,
             CustomNamespace: CustomNamespace,
-            filters: filters,
-            decoders: decoders,
             processors: processors,
             controllers: controllers,
+            Microdata: Microdata,
             transcluder: transcluder,
             framer: framer,
-            CSSDecoder: CSSDecoder,
-            MicrodataDecoder: MicrodataDecoder,
-            Microdata: Microdata,
-            JSONDecoder: JSONDecoder,
             MainProcessor: MainProcessor,
             ScriptProcessor: ScriptProcessor,
             HazardProcessor: HazardProcessor,
