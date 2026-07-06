@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html custom-hf="HyperFrameset">
+<head>
+<style>
+main { padding: 0.5em; }
+</style>
+</head>
+<body>
+<script for>
+({
+	lookup: function(url) { return 'hf_main'; }
+})
+</script>
+
+<main>
+<hf-frame targetname="hf_main" main="main">
+	<hf-body condition="loaded">
+		<hf-transform type="hazard">
+			<script for>
+				({
+					globals: {
+						fn: {
+							upper: function(s) { return s ? s.toUpperCase() : ''; },
+							exclaim: function(s) { return s + '!'; }
+						},
+						q: function(el, sel) { return el.querySelector(sel); },
+						qa: function(el, sel) { return Array.from(el.querySelectorAll(sel)); }
+					}
+				})
+			</script>
+			<h1 id="title"><haz:text select="fn.upper(q(root, 'h1').textContent)"></haz:text></h1>
+			<p id="exclaimed"><haz:text select="fn.exclaim(q(root, 'p').textContent)"></haz:text></p>
+			<ul id="links">
+				<haz:each select="qa(root, 'a')" as="link">
+					<li><haz:text select="${link.textContent}"></haz:text></li>
+				</haz:each>
+			</ul>
+		</hf-transform>
+	</hf-body>
+</hf-frame>
+</main>
+</body>
+</html>

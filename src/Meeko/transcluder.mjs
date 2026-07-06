@@ -27,6 +27,17 @@ function setDefinitionLookup(fn) {
 	definitionLookup = fn;
 }
 
+/** @type {Object} Global values available in all template expression scopes. */
+let _globals = {};
+
+/**
+ * Set global values available in all template expression scopes.
+ * @param {Object} globals - Object whose properties are available by name in expressions.
+ */
+function setGlobals(globals) {
+	_globals = globals;
+}
+
 /**
  * Register a transclusion custom element with the detected namespace.
  * @param {CustomNamespace} ns - The namespace for resolving tag names.
@@ -45,7 +56,8 @@ function registerElement(ns, name, Cls) {
 
 let transcluder = {
 	registerElement,
-	setDefinitionLookup
+	setDefinitionLookup,
+	setGlobals
 };
 
 class HTransclude extends Panel {
@@ -90,8 +102,16 @@ preload(request) {
 
 load(response) {
 	if (response) this.src = response.url;
+	let details = { mainSelector: this.mainSelector };
+	Object.assign(details, _globals);
+	// Merge frameset-level globals (from body's behavior config)
+	let bodyBehavior = document.body.behavior;
+	if (bodyBehavior && bodyBehavior.globals) Object.assign(details, bodyBehavior.globals);
+	// Merge frame-level globals (from this frame's behavior config)
+	let options = this.options;
+	if (options && options.globals) Object.assign(details, options.globals);
 	return Thenfu.pipe(response, [
-		(response) => this.definition.render(response, 'loaded', { mainSelector: this.mainSelector }),
+		(response) => this.definition.render(response, 'loaded', details),
 		(result) => { if (result) return this.insert(result, this.hasAttribute('replace')); }
 	]);
 }

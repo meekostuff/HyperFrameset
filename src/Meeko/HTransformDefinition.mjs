@@ -26,6 +26,10 @@ init(el) {
 }
 
 process(source, details) {
+	let behavior = this.element.behavior;
+	if (behavior && behavior.globals) {
+		details = Object.assign({}, details, behavior.globals);
+	}
 	return this.processor.transform({ source }, details);
 }
 
