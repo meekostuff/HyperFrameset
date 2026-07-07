@@ -68,7 +68,7 @@ describe('framesetDefinitions exports', () => {
     it('is a constructor with init, preprocess and render on prototype', () => {
       expect(typeof HFramesetDefinition).toBe('function');
       expect(typeof HFramesetDefinition.prototype.init).toBe('function');
-      expect(typeof HFramesetDefinition.prototype.preprocess).toBe('function');
+      expect(typeof HFramesetDefinition.prototype.process).toBe('function');
       expect(typeof HFramesetDefinition.prototype.render).toBe('function');
     });
 
@@ -279,8 +279,7 @@ describe('framesetDefinitions exports', () => {
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
-      def.preprocess();
-      expect(def.frameIds.length).toBe(1);
+      def.process();
       expect(def.getFrame('main_frame')).toBeInstanceOf(HFrameDefinition);
     });
 
@@ -290,9 +289,8 @@ describe('framesetDefinitions exports', () => {
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
-      def.preprocess();
-      expect(def.frameIds.length).toBe(1);
-      expect(def.frameIds[0]).toMatch(/^__frame_\d+__$/);
+      def.process();
+      expect(def.getFrame('__frame_0__')).toBeInstanceOf(HFrameDefinition);
     });
 
     it('preprocess handles multiple frames', () => {
@@ -303,7 +301,7 @@ describe('framesetDefinitions exports', () => {
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
-      def.preprocess();
+      def.process();
       expect(def.getFrame('nav')).toBeInstanceOf(HFrameDefinition);
       expect(def.getFrame('main')).toBeInstanceOf(HFrameDefinition);
     });
@@ -331,7 +329,7 @@ describe('framesetDefinitions exports', () => {
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
-      def.preprocess();
+      def.process();
 
       const frameDef = def.getFrame('content');
       expect(frameDef.bodies.length).toBe(2);
@@ -444,7 +442,7 @@ describe('framesetDefinitions exports', () => {
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
-      def.preprocess();
+      def.process();
       expect(spy).toHaveBeenCalledWith(expect.stringContaining('may not contain external scripts'));
       expect(def.element.querySelectorAll('script[src]').length).toBe(0);
       spy.mockRestore();
@@ -462,7 +460,7 @@ describe('framesetDefinitions exports', () => {
       const script = document.createElement('script');
       script.text = 'var x = 1;';
       def.element.appendChild(script);
-      def.preprocess();
+      def.process();
       expect(spy).toHaveBeenCalledWith(expect.stringContaining('may not contain non-@for scripts'));
       expect(def.element.querySelectorAll('script:not([for])').length).toBe(0);
       spy.mockRestore();
@@ -480,7 +478,7 @@ describe('framesetDefinitions exports', () => {
       script.setAttribute('sourceurl', 'test');
       script.text = '({})';
       def.element.appendChild(script);
-      def.preprocess();
+      def.process();
       expect(spy).toHaveBeenCalledWith(expect.stringContaining('may only contain EMPTY @for'));
       spy.mockRestore();
     });
@@ -494,7 +492,7 @@ describe('framesetDefinitions exports', () => {
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
-      def.preprocess();
+      def.process();
       // The div should have a @config attribute set by preprocess
       const div = def.element.querySelector('div');
       expect(div.hasAttribute('config')).toBe(true);
@@ -514,7 +512,7 @@ describe('framesetDefinitions exports', () => {
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
-      def.preprocess();
+      def.process();
       window.removeEventListener('error', handler);
       expect(errorFired).toBe(true);
     });
@@ -528,7 +526,7 @@ describe('framesetDefinitions exports', () => {
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
-      def.preprocess();
+      def.process();
       expect(spy).toHaveBeenCalledWith(expect.stringContaining('non-existant frame definition'));
       spy.mockRestore();
     });
@@ -542,7 +540,7 @@ describe('framesetDefinitions exports', () => {
         framesetURL: 'http://example.com/frameset.html',
         scope: 'http://example.com/'
       });
-      def.preprocess();
+      def.process();
       expect(def.getFrame('shared')).toBeInstanceOf(HFrameDefinition);
     });
   });

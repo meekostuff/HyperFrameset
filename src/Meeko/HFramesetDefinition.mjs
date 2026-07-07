@@ -67,45 +67,54 @@ constructor(doc, settings) {
 	if (!settings?.behaviors) throw Error('HFramesetDefinition requires settings.behaviors');
 	this.behaviors = settings.behaviors;
 	if (settings.frameContainer) this.frameContainer = settings.frameContainer;
-	this.namespaces = null;
-	this.init(doc, settings);
-}
-
-/**
- * Initializes the definition from a frameset document:
- * - Registers custom namespaces (or adds the default hf: namespace).
- * - Rebases all URLs relative to the scope.
- * - Assigns @id and @sourceurl to inline scripts.
- * - Moves <script for> from <head> to <body> and plain scripts from <body> to <head>.
- * - Normalizes scoped styles.
- * - Detaches the <body> for use as a render template.
- * 
- * @param {Document} doc - The frameset document.
- * @param {Object} settings - Contains framesetURL and scope.
- */
-init(doc, settings) {
-	this.#initMetadata(doc, settings);
-	this.#rebaseURLs(doc);
-	this.#normalizeScripts(doc);
-	this.#normalizeStyles(doc);
-	let body = doc.body;
-	this.document = doc;
-	this.element = body;
-	if (!this.frameContainer) this.frameContainer = doc.head;
-}
-
-#initMetadata(doc, settings) {
 	_.defaults(this, {
 		url: settings.framesetURL,
 		scope: settings.scope
 	});
+	this.document = doc;
+	this.element = doc.body;
+	if (!this.frameContainer) this.frameContainer = doc.head;
+	this.namespaces = this.#getNamespaces(doc);
+	this.init(doc);
+}
 
-	let namespaces = this.namespaces = CustomNamespace.getNamespaces(doc);
+/**
+ * Normalize the frameset document in preparation for merging into the live document.
+ * - Rebases all URLs (hrefs, srcs, scope: prefixes) relative to the frameset scope.
+ * - Adds @id and //# sourceURL to inline scripts for devtools debugging.
+ * - Moves <script for> from <head> to <body> (behavior scripts belong near targets).
+ * - Moves non-@for scripts from <body> to <head> (infrastructure scripts).
+ * - Rewrites <style scoped> into @scope rules and moves them to <head>.
+ *
+ * Must run before #prepareFrameset (content-first) or process (frameset-first).
+ * 
+ * @param {Document} doc - The frameset document.
+ */
+init(doc) {
+	this.#rebaseURLs(doc);
+	this.#normalizeScripts(doc);
+	this.#normalizeStyles(doc);
+}
+
+/**
+ * Extract namespace declarations from the document and ensure the HyperFrameset
+ * default namespace is registered.
+ * @param {Document} doc - The frameset document.
+ * @returns {NamespaceCollection} The namespace collection for this frameset.
+ */
+#getNamespaces(doc) {
+	let namespaces = CustomNamespace.getNamespaces(doc);
 	if (!namespaces.lookupNamespace(HYPERFRAMESET_URN)) {
 		namespaces.add(hfDefaultNamespace);
 	}
+	return namespaces;
 }
 
+/**
+ * Rebase all URLs in the document relative to the frameset scope.
+ * Also rebases `src` attributes on frame elements specifically.
+ * @param {Document} doc - The frameset document.
+ */
 #rebaseURLs(doc) {
 	let scopeURL = URLux.create(this.scope);
 	rebase(doc, scopeURL);
@@ -121,6 +130,14 @@ init(doc, settings) {
 	});
 }
 
+/**
+ * Normalize script elements in the frameset document:
+ * - Warns about @id usage in body (discouraged).
+ * - Adds @id and @sourceurl to inline scripts for debugging.
+ * - Moves <script for> from <head> to <body> (behavior scripts belong near targets).
+ * - Moves non-@for scripts from <body> to <head> (infrastructure scripts).
+ * @param {Document} doc - The frameset document.
+ */
 #normalizeScripts(doc) {
 	// warn about not using @id
 	let idElements = DOM.findAll('*[id]:not(script)', doc.body);
@@ -161,6 +178,11 @@ init(doc, settings) {
 	});
 }
 
+/**
+ * Add @id and //# sourceURL to an inline script for devtools debugging.
+ * @param {HTMLScriptElement} script - The script element.
+ * @param {number} i - Index used for auto-generating an ID if none exists.
+ */
 #normalizeScript(script, i) {
 	let id = script.id;
 	// TODO generating ID always has a chance of duplicating IDs
@@ -174,12 +196,18 @@ init(doc, settings) {
 	script.text += `\n//# sourceURL=${sourceURL}`;
 }
 
+/**
+ * Process <style scoped> elements: rewrite selectors with @scope rules
+ * and move to <head>. Only allows scoping on panel/frame elements.
+ * @param {Document} doc - The frameset document.
+ */
 #normalizeStyles(doc) {
 	let allowedScope = 'panel, frame';
 	let allowedScopeSelector = this.namespaces.lookupSelector(allowedScope, HYPERFRAMESET_URN);
 	normalizeScopedStyles(doc, allowedScopeSelector);
 }
-	/**
+
+/**
  * Processes the detached body template:
  * - Evaluates <script for> elements and stores results in configData.
  * - Associates config IDs with their target elements via @config attributes.
@@ -188,30 +216,38 @@ init(doc, settings) {
  * 
  * Must be called after construction and before render().
  */
-preprocess() {
-	this.#preprocessScripts();
-	this.#preprocessFrames();
+process() {
+	this.#processScripts();
+	this.#processFrames();
 }
 
-#preprocessScripts() {
+/**
+ * Validate and process behavior scripts in the frameset body.
+ * Removes invalid scripts (external, non-@for, non-empty @for) with warnings.
+ * Then delegates to the behavior registry to register all valid <script for> elements.
+ */
+#processScripts() {
 	let body = this.element;
 
-	// Validate: warn and remove any scripts that shouldn't be in body
+	// Step 1: Validate — warn and remove scripts that shouldn't be in body
 	let scripts = DOM.findAll('script', body);
 	_.forEach(scripts, (script) => {
 		if (script.type && !/^text\/javascript/.test(script.type)) return;
+		// External scripts are not allowed in frameset body
 		if (script.hasAttribute('src')) {
 			console.warn('Frameset <body> may not contain external scripts: \n' +
 				script.cloneNode(false).outerHTML);
 			script.parentNode.removeChild(script);
 			return;
 		}
+		// Non-@for scripts should have been moved to <head> during init
 		if (!script.hasAttribute('for')) {
 			console.warn('Frameset <body> may not contain non-@for scripts:\n' +
 				this.url + '#' + script.id);
 			script.parentNode.removeChild(script);
 			return;
 		}
+		// @for must be empty (target is determined by position, not by value)
 		if (script.getAttribute('for') !== '') {
 			console.warn('<script> may only contain EMPTY @for: \n' +
 				script.cloneNode(false).outerHTML);
@@ -220,47 +256,66 @@ preprocess() {
 		}
 	});
 
+	// Step 2: Register behaviors — evaluates each <script for> and associates
+	// the result with its target element via the _config attribute
 	this.behaviors.processScripts(body);
 }
 
-#preprocessFrames() {
+/**
+ * Extract frame definitions from the body template and store them in the frame container.
+ * Each <hf-frame> in the body is replaced with a shallow placeholder (keeping @def),
+ * and the full definition element is wrapped in a <template defid="..."> in the container.
+ * Also resolves frame declaration references (@def pointing to another frame's @defid).
+ */
+#processFrames() {
 	let body = this.element;
 	let container = this.frameContainer;
+
+	// Step 1: Find all frame elements in the body
 	let frameElts = DOM.findAll(
 		this.namespaces.lookupSelector('frame', HYPERFRAMESET_URN),
 		body);
 	let frameDefElts = [];
 	let frameRefElts = [];
+
+	// Step 2: Replace each frame with a placeholder and classify as definition or reference
 	_.forEach(frameElts, (el, index) => { // FIXME hyperframes can't be outside of <body> OR descendants of repetition blocks
 
+		// Replace the full element with a shallow clone (placeholder) in the body
 		// NOTE even if the frame is only a declaration (@def && @def !== @defid) it still has its content removed
 		let placeholder = el.cloneNode(false);
 		el.parentNode.replaceChild(placeholder, el); // NOTE no adoption
 
 		let defId = el.getAttribute(DEFID_ATTR);
 		let def = el.getAttribute(DEF_ATTR);
+
+		// If @def points elsewhere, it's a reference (not a definition)
 		if (def && def !== defId) {
 			frameRefElts.push(el);
 			return;
 		}
+		// Auto-generate defid if not provided
 		if (!defId) {
 			defId = '__frame_' + index + '__'; // FIXME not guaranteed to be unique. Should be a function at top of module
 			el.setAttribute(DEFID_ATTR, defId);
 		}
+		// Link the placeholder to the definition via @def
 		if (!def) {
 			def = defId;
 			placeholder.setAttribute(DEF_ATTR, def);
 		}
 		frameDefElts.push(el);
 	});
+
+	// Step 3: Store each definition in a <template> in the frame container (inspectable in devtools)
 	_.forEach(frameDefElts, (el) => {
-		// Wrap in <template> so the definition is inert (not matched by document-level selectors)
-		// but still inspectable in devtools.
 		let tmpl = container.ownerDocument.createElement('template');
 		tmpl.setAttribute(DEFID_ATTR, el.getAttribute(DEFID_ATTR));
 		tmpl.content.appendChild(el);
 		container.appendChild(tmpl);
 	});
+
+	// Step 4: Resolve frame references — copy scopeid from definition to declaration if needed
 	_.forEach(frameRefElts, (el) => {
 		let def = el.getAttribute(DEF_ATTR);
 		let tmpl = DOM.find(`template[${DEFID_ATTR}="${def}"]`, container);
@@ -283,15 +338,6 @@ preprocess() {
 		}
 		el.setAttribute('id', scopeId);
 	});
-}
-
-/**
- * Get all frame definition IDs from the template elements stored in the frame container.
- * @returns {string[]} Array of defid values.
- */
-get frameIds() {
-	let templates = DOM.findAll(`template[${DEFID_ATTR}]`, this.frameContainer);
-	return templates.map(tmpl => tmpl.getAttribute(DEFID_ATTR));
 }
 
 /**

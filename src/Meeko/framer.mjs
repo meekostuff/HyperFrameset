@@ -174,7 +174,7 @@ start(startOptions) {
 			framer.definition = definition;
 			return Framer.#prepareFrameset(document, definition);
 		},
-		() => definition.preprocess(),
+		() => definition.process(),
 		() => Framer.#prerenderFrameset(document, definition)
 		]);
 	},
@@ -234,7 +234,7 @@ start(startOptions) {
 		},
 
 		// Parse frameset definition (extract frame configs, transforms, etc.)
-		() => definition.preprocess(),
+		() => definition.process(),
 
 		// Insert frameset/self markers so content-specific head elements can be managed
 		// Order: [self marker] [content elements] [frameset marker] [frameset elements]
