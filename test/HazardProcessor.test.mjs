@@ -171,6 +171,17 @@ describe('HazardProcessor', () => {
     expect(lis[0].textContent).toBe('bravo');
   });
 
+  test('haz:each with index variable', async () => {
+    const result = await getResult(
+      '<ul><haz:each select="root.items" as="item" index="i"><li><haz:text select="`${i}: ${item.name}`"></haz:text></li></haz:each></ul>'
+    );
+    const lis = result.querySelectorAll('li');
+    expect(lis).toHaveLength(3);
+    expect(lis[0].textContent).toBe('0: alpha');
+    expect(lis[1].textContent).toBe('1: bravo');
+    expect(lis[2].textContent).toBe('2: charlie');
+  });
+
   // --- haz:one ---
 
   test('haz:one selects single item with @as', async () => {

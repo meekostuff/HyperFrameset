@@ -33,7 +33,7 @@ const _cache = new WeakMap();
     attrs to elements.
 */
 let hazLangDefinition =
-	'<otherwise <when@$test <each@$select,as <one@$select,as +var@name,$select <if@$test <unless@$test ' +
+	'<otherwise <when@$test <each@$select,as,index <one@$select,as +var@name,$select <if@$test <unless@$test ' +
 	'>choose <template@name,$match >eval@$select >text@"select ' +
 	'call@name apply@$select,as';
 
@@ -677,6 +677,7 @@ transformHazardTree(el, frag) {
 	case 'each': {
 		let selectExpr = el.getAttribute('select');
 		let asName = el.getAttribute('as');
+		let indexName = el.getAttribute('index');
 		if (!asName) console.warn(`<haz:each select="${selectExpr}"> has no @as — iteration variable will be inaccessible.`);
 		let items;
 		try { items = evaluate(selectExpr, this.scope.values); }
@@ -688,8 +689,9 @@ transformHazardTree(el, frag) {
 			console.debug(`<haz:each select="${selectExpr}"> resolved to nothing`);
 			return frag;
 		}
-		return Thenfu.reduce(null, items, (dummy, item) => {
+		return Thenfu.reduce(null, items, (dummy, item, index) => {
 			if (asName) this.scope.set(asName, item);
+			if (indexName) this.scope.set(indexName, index);
 			return this.transformChildNodes(el, frag);
 		});
 	}
