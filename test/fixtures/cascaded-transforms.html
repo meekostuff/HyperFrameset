@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html custom-hf="HyperFrameset">
+<head>
+<script type="module">
+import '../../src/HyperFrameset.mjs';
+
+Meeko.resourceProxy.register('data:', (url) => {
+	return {
+		url,
+		type: 'json',
+		body: { first: 'Alice', last: 'Smith', role: 'admin', items: [1, 2, 3] }
+	};
+});
+
+Meeko.framer.start();
+</script>
+</head>
+<body>
+<script for>
+({
+	lookup: function(url) { return 'hf_main'; }
+})
+</script>
+
+<main>
+<hf-frame targetname="hf_main" src="data:user">
+	<hf-body condition="loaded">
+		<hf-transform type="script">
+			<script>({
+				transform(source, details) {
+					return {
+						fullName: source.first + ' ' + source.last,
+						role: source.role.toUpperCase(),
+						itemCount: source.items.length
+					};
+				}
+			})</script>
+		</hf-transform>
+		<hf-transform type="hazard">
+			<div id="result">
+				<span id="name"><haz:text select="root.fullName"></haz:text></span>
+				<span id="role"><haz:text select="root.role"></haz:text></span>
+				<span id="count"><haz:text select="root.itemCount"></haz:text></span>
+			</div>
+		</hf-transform>
+	</hf-body>
+</hf-frame>
+</main>
+</body>
+</html>

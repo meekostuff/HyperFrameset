@@ -16,6 +16,13 @@ constructor(options) {
 }
 
 loadTemplate(template) {
+	// Try behavior first — set by <script for> during preprocessing
+	if (template.behavior && template.behavior.transform) {
+		this.processor = template.behavior;
+		return;
+	}
+
+	// Fallback: find a <script> child and eval it
 	let script;
 	_.forEach(Array.from(template.childNodes), (node) => {
 		switch (node.nodeType) {
@@ -41,13 +48,12 @@ loadTemplate(template) {
 		}
 	});
 	if (!script) {
-		// no problem if already a processor defined in new ScriptProcessor(options)
-		if (this.processor) return;
-		console.warn('No <script> found in "script" transform template');
+		if (this.processor) return; // already set via constructor options
+		console.warn('No <script> or behavior found in "script" transform template');
 		return;
 	}
-	try { this.processor = (Function(`return (${script.text})`))(); }
-	catch(err) { window.reportError(err); }
+	try { this.processor = (Function(`return (${script.text}\n)`))(); }
+	catch(err) { console.warn(`Error evaluating script transform: ${err.message}`); }
 	
 	if (!this.processor || !this.processor.transform) {
 		console.warn('"script" transform template did not produce valid transform object');

@@ -18,6 +18,21 @@ const DEFID_ATTR = 'defid';
 /** Attribute name for the frame declaration reference (on the placeholder element, pointing to a defid). */
 const DEF_ATTR = 'def';
 
+/**
+ * Check if a script element has an executable type (would be run by the browser).
+ * Empty type, text/javascript, application/javascript, and module are all executable.
+ * @param {HTMLScriptElement} script
+ * @returns {boolean}
+ */
+function isExecutableScript(script) {
+	let type = script.type;
+	if (!type) return true;
+	if (/^text\/javascript/i.test(type)) return true;
+	if (/^application\/javascript/i.test(type)) return true;
+	if (type === 'module') return true;
+	return false;
+}
+
 /** Fallback namespace registered when the frameset document doesn't declare one. */
 const hfDefaultNamespace = new CustomNamespace({
 	name: 'hf',
@@ -151,7 +166,7 @@ init(doc) {
 	let scripts = DOM.findAll('script', doc);
 	_.forEach(scripts, (script, i) => {
 		// ignore non-javascript scripts
-		if (script.type && !/^text\/javascript/.test(script.type)) return;
+		if (!isExecutableScript(script)) return;
 		// ignore external scripts
 		if (script.hasAttribute('src')) return;
 		// ignore @for scripts (behaviors handles sourceURL)
@@ -167,12 +182,14 @@ init(doc) {
 		console.info('Moved <script for> in frameset <head> to <body>');
 	});
 
-	// Move all non-@for, javascript <script> in <body> to <head>
+	// Move executable scripts from <body> to <head>, except:
+	// - scripts with @for (behavior scripts, positional)
+	// - inline scripts inside a custom element (transform scripts, positional)
+	// - non-executable types (data/config scripts, left in place)
 	_.forEach(DOM.findAll('script', doc.body), (script) => {
-		// ignore non-javascript scripts
-		if (script.type && !/^text\/javascript/.test(script.type)) return;
-		// ignore @for scripts
+		if (!isExecutableScript(script)) return;
 		if (script.hasAttribute('for')) return;
+		if (!script.hasAttribute('src') && script.parentElement.localName.includes('-')) return;
 		doc.head.appendChild(script);
 		console.info('Moved <script> in frameset <body> to <head>');
 	});
@@ -232,26 +249,26 @@ process() {
 	// Step 1: Validate — warn and remove scripts that shouldn't be in body
 	let scripts = DOM.findAll('script', body);
 	_.forEach(scripts, (script) => {
-		if (script.type && !/^text\/javascript/.test(script.type)) return;
+		if (!isExecutableScript(script)) return;
 		// External scripts are not allowed in frameset body
 		if (script.hasAttribute('src')) {
 			console.warn('Frameset <body> may not contain external scripts: \n' +
 				script.cloneNode(false).outerHTML);
-			script.parentNode.removeChild(script);
+			script.type = 'text/javascript?disabled';
 			return;
 		}
 		// Non-@for scripts should have been moved to <head> during init
 		if (!script.hasAttribute('for')) {
-			console.warn('Frameset <body> may not contain non-@for scripts:\n' +
+			console.warn('non-@for script in frameset <body> are disabled :\n' +
 				this.url + '#' + script.id);
-			script.parentNode.removeChild(script);
+			script.type = 'behavior';
 			return;
 		}
-		// @for must be empty (target is determined by position, not by value)
+		// @for with a value is not currently supported — warn but leave in place
 		if (script.getAttribute('for') !== '') {
-			console.warn('<script> may only contain EMPTY @for: \n' +
+			console.warn('<script for="..."> with non-empty @for is not supported: \n' +
 				script.cloneNode(false).outerHTML);
-			script.parentNode.removeChild(script);
+			script.type = 'text/javascript?disabled';
 			return;
 		}
 	});
