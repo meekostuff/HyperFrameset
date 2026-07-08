@@ -17,4 +17,5 @@
 - [Microdata Utility](Microdata-Decoder.md)
 - [Frameset Layout](Frameset-Layout.md)
 - [Frame Declaration](Frame-Declaration.md)
+- [Resource Proxy](Resource-Proxy.md)
 - [Debugging](Debugging.md)

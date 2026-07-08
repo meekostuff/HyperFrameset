@@ -21,7 +21,7 @@ function to perform the transformation.
 The script MUST NOT have a `src` attribute. It is evaluated with:
 
 ```js
-(Function('return (' + script.text + ');'))()
+(Function(`return (${script.text}\n)`))()
 ```
 
 to produce a processing object. The object MUST have a `transform` method:
