@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html custom-hf="HyperFrameset">
+<head>
+<style>
+main { padding: 1em; }
+</style>
+<script type="module">
+import '../../src/HyperFrameset.mjs';
+
+Meeko.resourceProxy.register('mock:', (url) => {
+	let id = url.replace('mock:', '');
+	let data = {
+		alice: { name: 'Alice', role: 'admin', active: true },
+		bob: { name: 'Bob', role: 'user', active: false }
+	};
+	let person = data[id];
+	if (!person) return { url, type: 'json', body: null };
+	return { url, type: 'json', body: person };
+});
+
+Meeko.framer.start();
+</script>
+</head>
+<body>
+<script for>
+({
+	lookup: function(url) {
+		if (url.startsWith('mock:')) return 'hf_main';
+		return false;
+	}
+})
+</script>
+
+<main>
+<hf-frame targetname="hf_main" src="mock:alice">
+	<hf-body condition="loaded">
+		<hf-transform type="hazard">
+			<div id="person">
+				<span id="name"><haz:text select="root.name"></haz:text></span>
+				<span id="role"><haz:text select="root.role"></haz:text></span>
+				<haz:if test="root.active"><span id="active">active</span></haz:if>
+			</div>
+		</hf-transform>
+	</hf-body>
+	<hf-body condition="loading">
+		<p>Loading...</p>
+	</hf-body>
+</hf-frame>
+</main>
+</body>
+</html>

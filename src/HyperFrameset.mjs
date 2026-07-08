@@ -13,7 +13,7 @@ import * as DOM from './Meeko/DOM.mjs';
 import scriptQueue from './Meeko/scriptQueue.mjs';
 import controllers from './Meeko/controllers.mjs';
 import htmlParser from './Meeko/htmlParser.mjs';
-import httpProxy from './Meeko/httpProxy.mjs';
+import resourceProxy from './Meeko/resourceProxy.mjs';
 import CustomNamespace from './Meeko/CustomNamespace.mjs';
 import * as Microdata from './Meeko/Microdata.mjs';
 import processors from './Meeko/processors.mjs';
@@ -34,7 +34,7 @@ import framer, { HFrameset, HFrame } from './Meeko/framer.mjs';
     if (!this.Meeko) this.Meeko = {};
     _.assign(this.Meeko, {
         stuff, Registry, Task, Thenfu, URLux, DOM, scriptQueue,
-        htmlParser, httpProxy,
+        htmlParser, resourceProxy,
         CustomNamespace,
         processors,
         controllers,

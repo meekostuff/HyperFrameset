@@ -7,7 +7,7 @@
 import Thenfu from './Thenfu.mjs';
 import URLux from './URLux.mjs';
 import * as DOM from './DOM.mjs';
-import httpProxy from './httpProxy.mjs';
+import resourceProxy from './resourceProxy.mjs';
 import { instance } from './behaviors.mjs';
 import { Panel } from './layoutElements.mjs';
 
@@ -89,8 +89,7 @@ attributeChangedCallback(name, oldValue, newValue) {
 }
 
 get options() {
-	let behaviors = instance();
-	return behaviors.getInstance(this);
+	return this.behavior;
 }
 
 preload(request) {
@@ -146,6 +145,9 @@ insert(bodyElement, replace) {
 	}
 }
 
+// FIXME concurrent refresh() calls can race. Changing src while a previous load is in
+// progress relies on a stale-src guard, but doesn't fully prevent overlapping renders.
+// Consider an abort signal or generation counter to invalidate stale pipelines.
 refresh() {
 	let src = this.getAttribute('src');
 
@@ -158,19 +160,19 @@ refresh() {
 		if (src === '') return;
 
 		let fullURL = URLux.create(src);
-		let nohash = fullURL.nohash;
+		let nohash = fullURL.supportsResolve ? fullURL.nohash : src;
 
 		let request = { method: 'get', url: nohash, responseType: 'document' };
 		let response;
 
 		return Thenfu.pipe(null, [
 			() => this.preload(request),
-			() => httpProxy.load(nohash, request),
+			() => resourceProxy.load(nohash, request),
 			(resp) => {
 				response = resp;
 				if (response && response.status === 404) {
 					console.warn(`[HyperFrameset] Frame "${this.targetname || '(unnamed)'}" src returned 404: ${nohash}`);
-				} else if (!response || !response.document) {
+				} else if (!response || !response.body) {
 					console.warn(`[HyperFrameset] Frame "${this.targetname || '(unnamed)'}" src returned empty/null document: ${nohash}`);
 				}
 			},

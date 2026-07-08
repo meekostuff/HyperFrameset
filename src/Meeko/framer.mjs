@@ -14,7 +14,7 @@ import Thenfu from './Thenfu.mjs';
 import URLux from './URLux.mjs';
 import * as DOM from './DOM.mjs';
 import scriptQueue from './scriptQueue.mjs';
-import httpProxy from './httpProxy.mjs';
+import resourceProxy from './resourceProxy.mjs';
 import HistoryState from './HistoryState.mjs';
 import {install} from './behaviors.mjs';
 import layoutElements from './layoutElements.mjs';
@@ -106,7 +106,7 @@ config(options) {
  * Main entry point for HyperFrameset initialization.
  *
  * In content-first mode (startOptions.contentDocument provided): the content document
- * is captured and cached in httpProxy, the frameset is resolved via lookup/detect,
+ * is captured and cached in resourceProxy, the frameset is resolved via lookup/detect,
  * fetched, and applied to the live document. The captured content is then loaded
  * into the appropriate frame.
  *
@@ -131,7 +131,7 @@ start(startOptions) {
 
 	Thenfu.asap(startOptions.contentDocument)
 	.then((doc) => { // FIXME potential race condition between document finished loading and frameset rendering
-		return httpProxy.add({ url: document.URL, type: 'document', document: doc });
+		return resourceProxy.add({ url: document.URL, type: 'document', body: doc });
 	});
 
 	return Thenfu.pipe(null, [
@@ -157,12 +157,12 @@ start(startOptions) {
 		let framesetURL = URLux.create(framerConfig.framesetURL);
 		if (framesetURL.hash) console.info(`Ignoring hash component of frameset URL: ${framesetURL.hash}`);
 		framer.framesetURL = framerConfig.framesetURL = framesetURL.nohash;
-		return httpProxy.load(framer.framesetURL, { responseType: 'document' })
+		return resourceProxy.load(framer.framesetURL, { responseType: 'document' })
 		.then((response) => {
-			if (!response || !response.document) {
+			if (!response || !response.body) {
 				console.warn(`[HyperFrameset] Frameset document failed to load or is empty: ${framer.framesetURL}`);
 			}
-			return new HFramesetDefinition(response.document, { ...framerConfig, behaviors: framer.behaviors, frameContainer: document.head });
+			return new HFramesetDefinition(response.body, { ...framerConfig, behaviors: framer.behaviors, frameContainer: document.head });
 		});
 	},
 
@@ -589,8 +589,8 @@ navigate(url, changeset, useReplace) { // FIXME doesn't support replaceState
 	() => {
 		if (isFrameset && !firstLoad) return Framer.#notify({ module: 'frameset', type: 'leftState', stage: 'before', url: document.URL });
 	},
-	// Preload the document via httpProxy (will be a cache hit when frames fetch)
-	() => httpProxy.load(nohash, request).then((resp) => { response = resp; }),
+	// Preload the document via resourceProxy (will be a cache hit when frames fetch)
+	() => resourceProxy.load(nohash, request).then((resp) => { response = resp; }),
 	// Set @src on matching frames to trigger their refresh/load cycle
 	() => { _.forEach(frames, (frame) => { frame.setAttribute('src', fullURL); }); },
 	() => {
@@ -601,7 +601,7 @@ navigate(url, changeset, useReplace) { // FIXME doesn't support replaceState
 		Framer.#separateHead(document, false);
 		let selfMarker = Framer.#getSelfMarker();
 		if (selfMarker) selfMarker.href = url;
-		if (response?.document?.head) Framer.#mergeHead(document, response.document.head, false);
+		if (response?.body?.head) Framer.#mergeHead(document, response.body.head, false);
 	},
 	// Notify lifecycle: entered new state
 	() => {

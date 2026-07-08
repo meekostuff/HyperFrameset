@@ -70,7 +70,7 @@ render(resource, details) {
 		return this.element.cloneNode(true);
 	}
 	if (!resource) return null;
-	let doc = resource.document; // FIXME what if resource is a Request?
+	let doc = resource.body;
 	if (!doc) return null;
 	let frag0 = doc;
 	if (details.mainSelector) {
