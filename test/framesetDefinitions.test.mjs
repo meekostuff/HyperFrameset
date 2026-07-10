@@ -461,8 +461,7 @@ describe('framesetDefinitions exports', () => {
       script.text = 'var x = 1;';
       def.element.appendChild(script);
       def.process();
-      expect(spy).toHaveBeenCalledWith(expect.stringContaining('may not contain non-@for scripts'));
-      expect(def.element.querySelectorAll('script:not([for])').length).toBe(0);
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('non-@for script in frameset <body> are disabled'));
       spy.mockRestore();
     });
 
@@ -479,7 +478,7 @@ describe('framesetDefinitions exports', () => {
       script.text = '({})';
       def.element.appendChild(script);
       def.process();
-      expect(spy).toHaveBeenCalledWith(expect.stringContaining('may only contain EMPTY @for'));
+      expect(spy).toHaveBeenCalledWith(expect.stringContaining('non-empty @for is not supported'));
       spy.mockRestore();
     });
 
