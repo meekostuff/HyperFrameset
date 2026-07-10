@@ -1043,45 +1043,21 @@
         rebaseURL: rebaseURL$1,
         normalizeScopedStyles: normalizeScopedStyles$1
     };
-    const HTML_IN_XHR = true;
-    class HttpProxy {
+    /*!
+	 * ResourceProxy
+	 * Copyright 2026 Sean Hogan (http://meekostuff.net/)
+	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
+	 */    class ResourceProxy {
+        #handlers=new Map;
         #methods=words("get");
-        #responseTypes=words("document");
+        #responseTypes=words("document json text");
         #defaultInfo={
             method: "get",
             responseType: "document"
         };
         #cache=[];
-        #cacheAdd(request, response) {
-            const rq = defaults({}, request);
-            const entry = {
-                invalid: false,
-                request: rq
-            };
-            if (Thenfu.isThenable(response)) entry.response = response.then(this.#cloneResponse, status => {
-                entry.invalid = true;
-                entry.response = null;
-            }); else entry.response = this.#cloneResponse(response);
-            this.#cache.push(entry);
-        }
-        #cacheLookup(request) {
-            const entry = find$1(this.#cache, entry => {
-                if (!this.#cacheMatch(request, entry)) return false;
-                return true;
-            });
-            if (!(entry && entry.response)) return;
-            const response = entry.response;
-            if (Thenfu.isThenable(response)) return response.then(this.#cloneResponse); else return this.#cloneResponse(response);
-        }
-        #cacheMatch(request, entry) {
-            if (entry.invalid || entry.response == null) return false;
-            if (request.url !== entry.request.url) return false;
-            return true;
-        }
-        #cloneResponse(response) {
-            const resp = defaults({}, response);
-            resp.document = cloneDocument(response.document);
-            return resp;
+        register(protocol, handler) {
+            this.#handlers.set(protocol, handler);
         }
         add(response) {
             const url = response.url;
@@ -1091,10 +1067,14 @@
                 url: response.url
             };
             defaults(request, this.#defaultInfo);
-            return Thenfu.pipe(undefined, [ () => htmlParser.normalize(response.document, request), doc => {
-                response.document = doc;
-                this.#cacheAdd(request, response);
-            } ]);
+            if (response.type === "document") {
+                return Thenfu.pipe(undefined, [ () => htmlParser.normalize(response.body, request), doc => {
+                    response.body = doc;
+                    this.#cacheAdd(request, response);
+                } ]);
+            }
+            this.#cacheAdd(request, response);
+            return Thenfu.asap();
         }
         load(url, requestInfo) {
             const info = {
@@ -1102,9 +1082,59 @@
             };
             if (requestInfo) defaults(info, requestInfo);
             defaults(info, this.#defaultInfo);
+            for (let [protocol, handler] of this.#handlers) {
+                if (url.startsWith(protocol)) {
+                    return Thenfu.asap(handler(url, info)).then(response => {
+                        if (!response.url) response.url = url;
+                        return response;
+                    });
+                }
+            }
             if (!includes(this.#methods, info.method)) throw Error(`method not supported: ${info.method}`);
             if (!includes(this.#responseTypes, info.responseType)) throw Error(`responseType not supported: ${info.responseType}`);
             return this.#request(info);
+        }
+        #cacheAdd(request, response) {
+            const rq = defaults({}, request);
+            const entry = {
+                invalid: false,
+                request: rq
+            };
+            if (Thenfu.isThenable(response)) {
+                entry.response = response.then(r => this.#cloneResponse(r), () => {
+                    entry.invalid = true;
+                    entry.response = null;
+                });
+            } else {
+                entry.response = this.#cloneResponse(response);
+            }
+            this.#cache.push(entry);
+        }
+        #cacheLookup(request) {
+            const entry = find$1(this.#cache, entry => {
+                if (entry.invalid || entry.response == null) return false;
+                if (request.url !== entry.request.url) return false;
+                return true;
+            });
+            if (!(entry && entry.response)) return;
+            const response = entry.response;
+            if (Thenfu.isThenable(response)) return response.then(r => this.#cloneResponse(r)); else return this.#cloneResponse(response);
+        }
+        #cloneResponse(response) {
+            const resp = defaults({}, response);
+            switch (response.type) {
+              case "document":
+                resp.body = cloneDocument(response.body);
+                break;
+
+              case "json":
+                resp.body = JSON.parse(JSON.stringify(response.body));
+                break;
+
+              case "text":
+                break;
+            }
+            return resp;
         }
         #request(info) {
             const method = lc(info.method);
@@ -1120,43 +1150,37 @@
                 return pending;
 
               default:
-                let METHOD = uc(method);
-                throw Error(`${METHOD} not supported`);
+                throw Error(`${uc(method)} not supported`);
             }
         }
         #doRequest(info) {
             return new Promise((resolve, reject) => {
                 const method = info.method;
                 const url = info.url;
-                const sendText = info.body;
                 const xhr = new XMLHttpRequest;
                 xhr.onreadystatechange = onchange;
                 xhr.open(method, url, true);
-                if (HTML_IN_XHR) {
-                    xhr.responseType = info.responseType;
-                    if (info.responseType === "document" && xhr.overrideMimeType) xhr.overrideMimeType("text/html");
+                if (info.responseType === "document") {
+                    xhr.responseType = "document";
+                    if (xhr.overrideMimeType) xhr.overrideMimeType("text/html");
                 }
-                xhr.send(sendText);
+                xhr.send(null);
                 function onchange() {
                     if (xhr.readyState != 4) return;
                     const protocol = URLux.create(url).protocol;
                     switch (protocol) {
                       case "http:":
                       case "https:":
-                        switch (xhr.status) {
-                          default:
+                        if (xhr.status !== 200) {
                             reject(() => {
                                 throw Error(`Unexpected status ${xhr.status} for ${url}`);
                             });
                             return;
-
-                          case 200:
-                            break;
                         }
                         break;
 
                       default:
-                        if (HTML_IN_XHR ? !xhr.response : !xhr.responseText) {
+                        if (!xhr.response && !xhr.responseText) {
                             reject(() => {
                                 throw Error(`No response for ${url}`);
                             });
@@ -1179,20 +1203,32 @@
                 status: xhr.status,
                 statusText: xhr.statusText
             };
-            if (HTML_IN_XHR) {
+            switch (info.responseType) {
+              case "document":
                 return htmlParser.normalize(xhr.response, info).then(doc => {
-                    response.document = doc;
+                    response.body = doc;
                     return response;
                 });
-            } else {
-                return htmlParser.parse(String(xhr.responseText), info).then(doc => {
-                    response.document = doc;
-                    return response;
-                });
+
+              case "json":
+                try {
+                    response.body = JSON.parse(xhr.responseText);
+                } catch (e) {
+                    response.body = null;
+                }
+                return response;
+
+              case "text":
+                response.body = xhr.responseText;
+                return response;
+
+              default:
+                response.body = xhr.response || xhr.responseText;
+                return response;
             }
         }
     }
-    var httpProxy = new HttpProxy;
+    var resourceProxy = new ResourceProxy;
     /*!
 	 * CustomNamespace
 	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
@@ -1471,6 +1507,10 @@
             this.processor = options;
         }
         loadTemplate(template) {
+            if (template.behavior && template.behavior.transform) {
+                this.processor = template.behavior;
+                return;
+            }
             let script;
             forEach(Array.from(template.childNodes), node => {
                 switch (node.nodeType) {
@@ -1500,13 +1540,13 @@
             });
             if (!script) {
                 if (this.processor) return;
-                console.warn('No <script> found in "script" transform template');
+                console.warn('No <script> or behavior found in "script" transform template');
                 return;
             }
             try {
-                this.processor = Function(`return (${script.text})`)();
+                this.processor = Function(`return (${script.text}\n)`)();
             } catch (err) {
-                window.reportError(err);
+                console.warn(`Error evaluating script transform: ${err.message}`);
             }
             if (!this.processor || !this.processor.transform) {
                 console.warn('"script" transform template did not produce valid transform object');
@@ -1621,7 +1661,7 @@
         style: "xml"
     });
     const _cache = new WeakMap;
-    let hazLangDefinition = "<otherwise <when@$test <each@$select,as <one@$select,as +var@name,$select <if@$test <unless@$test " + '>choose <template@name,$match >eval@$select >text@"select ' + "call@name apply@$select,as";
+    let hazLangDefinition = "<otherwise <when@$test <each@$select,as,index <one@$select,as +var@name,$select <if@$test <unless@$test " + '>choose <template@name,$match >eval@$select >text@"select ' + "call@name apply@$select,as";
     let hazLang = Array.from(words(hazLangDefinition), def => {
         def = def.split("@");
         let tag = def[0];
@@ -2110,6 +2150,7 @@
                 {
                     let selectExpr = el.getAttribute("select");
                     let asName = el.getAttribute("as");
+                    let indexName = el.getAttribute("index");
                     if (!asName) console.warn(`<haz:each select="${selectExpr}"> has no @as — iteration variable will be inaccessible.`);
                     let items;
                     try {
@@ -2122,8 +2163,9 @@
                         console.debug(`<haz:each select="${selectExpr}"> resolved to nothing`);
                         return frag;
                     }
-                    return Thenfu.reduce(null, items, (dummy, item) => {
+                    return Thenfu.reduce(null, items, (dummy, item, index) => {
                         if (asName) this.scope.set(asName, item);
+                        if (indexName) this.scope.set(indexName, index);
                         return this.transformChildNodes(el, frag);
                     });
                 }
@@ -2252,7 +2294,7 @@
         connectedCallback() {
             super.connectedCallback();
             this.#adjustLayout();
-            this.#normalizeChildren();
+            queueMicrotask(() => this.#normalizeChildren());
         }
         #adjustLayout() {
             let parent = this.parentNode;
@@ -2278,7 +2320,7 @@
         connectedCallback() {
             super.connectedCallback();
             this.#adjustLayout();
-            this.#normalizeChildren();
+            queueMicrotask(() => this.#normalizeChildren());
         }
         #adjustLayout() {
             let parent = this.parentNode;
@@ -2359,11 +2401,53 @@
             }
         }
     }
+    class Splitter extends HBase {
+        connectedCallback() {
+            this.addEventListener("pointerdown", e => this.#startResize(e));
+        }
+        #startResize(startEvent) {
+            startEvent.preventDefault();
+            this.setPointerCapture(startEvent.pointerId);
+            let prev = this.previousElementSibling;
+            let next = this.nextElementSibling;
+            if (!prev || !next) return;
+            let parent = this.parentElement;
+            let isVertical = parent instanceof VLayout;
+            let startPos = isVertical ? startEvent.clientY : startEvent.clientX;
+            let prevSize = isVertical ? prev.offsetHeight : prev.offsetWidth;
+            let nextSize = isVertical ? next.offsetHeight : next.offsetWidth;
+            let prevMin = parseFloat(prev.getAttribute("min-width") || prev.getAttribute("min-height") || "0");
+            let prevMax = parseFloat(prev.getAttribute("max-width") || prev.getAttribute("max-height") || "Infinity");
+            let nextMin = parseFloat(next.getAttribute("min-width") || next.getAttribute("min-height") || "0");
+            let nextMax = parseFloat(next.getAttribute("max-width") || next.getAttribute("max-height") || "Infinity");
+            let onMove = e => {
+                let delta = (isVertical ? e.clientY : e.clientX) - startPos;
+                let newPrev = prevSize + delta;
+                let newNext = nextSize - delta;
+                if (newPrev < prevMin) delta = prevMin - prevSize; else if (newPrev > prevMax) delta = prevMax - prevSize;
+                if (newNext < nextMin) delta = nextSize - nextMin; else if (newNext > nextMax) delta = -(nextMax - nextSize);
+                prev.style.flexBasis = prevSize + delta + "px";
+                next.style.flexBasis = nextSize - delta + "px";
+                prev.style.flexGrow = "0";
+                next.style.flexGrow = "0";
+            };
+            let onUp = () => {
+                this.removeEventListener("pointermove", onMove);
+                this.removeEventListener("pointerup", onUp);
+                this.releasePointerCapture(startEvent.pointerId);
+            };
+            this.addEventListener("pointermove", onMove);
+            this.addEventListener("pointerup", onUp);
+        }
+        static isSplitter(element) {
+            return element instanceof Splitter;
+        }
+    }
     function normalizeChild(node) {
         let element = this;
         switch (node.nodeType) {
           case 1:
-            if (Panel.isPanel(node) || VLayout.isLayout(node)) return;
+            if (Panel.isPanel(node) || VLayout.isLayout(node) || Splitter.isSplitter(node)) return;
             node.hidden = true;
             return;
 
@@ -2386,7 +2470,7 @@
         let boxSizingCSS = "box-sizing: border-box;";
         let layoutResetCSS = "display: block; width: 0; height: 0; text-align: left; margin: 0; padding: 0;";
         let layoutSizeCSS = "width: 100%; height: 100%;";
-        let defs = [ [ "layer", Layer, `${boxSizingCSS} display: block; position: fixed; top: 0; left: 0; width: 0; height: 0;` ], [ "popup", Popup, `${boxSizingCSS} display: block; position: relative; width: 0; height: 0;`, "position: absolute; top: 0; left: 0;" ], [ "panel", Panel, `${boxSizingCSS} display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0;` ], [ "vlayout", VLayout, `${boxSizingCSS} ${layoutResetCSS} ${layoutSizeCSS} display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch;` ], [ "hlayout", HLayout, `${boxSizingCSS} ${layoutResetCSS} ${layoutSizeCSS} display: flex; flex-direction: row; justify-content: space-between; align-items: stretch;` ], [ "deck", Deck, `${boxSizingCSS} ${layoutResetCSS} ${layoutSizeCSS}`, "width: 100%; height: 100%;" ], [ "rdeck", ResponsiveDeck, `${boxSizingCSS} ${layoutResetCSS} ${layoutSizeCSS}`, "width: 0; height: 0;" ] ];
+        let defs = [ [ "layer", Layer, `${boxSizingCSS} display: block; position: fixed; top: 0; left: 0; width: 0; height: 0;` ], [ "popup", Popup, `${boxSizingCSS} display: block; position: relative; width: 0; height: 0;`, "position: absolute; top: 0; left: 0;" ], [ "panel", Panel, `${boxSizingCSS} display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0;` ], [ "splitter", Splitter, `${boxSizingCSS} flex: 0 0 4px; background: #ccc; user-select: none; touch-action: none;` ], [ "vlayout", VLayout, `${boxSizingCSS} ${layoutResetCSS} ${layoutSizeCSS} display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch;` ], [ "hlayout", HLayout, `${boxSizingCSS} ${layoutResetCSS} ${layoutSizeCSS} display: flex; flex-direction: row; justify-content: space-between; align-items: stretch;` ], [ "deck", Deck, `${boxSizingCSS} ${layoutResetCSS} ${layoutSizeCSS}`, "width: 100%; height: 100%;" ], [ "rdeck", ResponsiveDeck, `${boxSizingCSS} ${layoutResetCSS} ${layoutSizeCSS}`, "width: 0; height: 0;" ] ];
         let cssText = "*[hidden] { display: none !important; }\n";
         for (let [name, Cls, css, childCss] of defs) {
             let tagName = ns.lookupTagName(name);
@@ -2395,6 +2479,10 @@
             if (childCss) cssText += `${tagName} > * { ${childCss} }\n`;
         }
         cssText += `${ns.lookupTagName("body")} { ${boxSizingCSS} display: block; width: auto; height: auto; margin: 0; }\n`;
+        let splitterTag = ns.lookupTagName("splitter");
+        cssText += `${splitterTag}:hover { background: #999; }\n`;
+        cssText += `${ns.lookupTagName("hlayout")} > ${splitterTag} { cursor: col-resize; }\n`;
+        cssText += `${ns.lookupTagName("vlayout")} > ${splitterTag} { cursor: row-resize; }\n`;
         let style = document.createElement("style");
         style.textContent = cssText;
         document.head.append(style);
@@ -2411,6 +2499,7 @@
         Panel: Panel,
         Popup: Popup,
         ResponsiveDeck: ResponsiveDeck,
+        Splitter: Splitter,
         VLayout: VLayout,
         default: layoutElements
     });
@@ -2719,8 +2808,7 @@
             }
         }
         get options() {
-            let behaviors = instance();
-            return behaviors.getInstance(this);
+            return this.behavior;
         }
         preload(request) {
             return Thenfu.pipe(request, [ request => this.definition.render(request, "loading"), result => {
@@ -2779,18 +2867,18 @@
                 }
                 if (src === "") return;
                 let fullURL = URLux.create(src);
-                let nohash = fullURL.nohash;
+                let nohash = fullURL.supportsResolve ? fullURL.nohash : src;
                 let request = {
                     method: "get",
                     url: nohash,
                     responseType: "document"
                 };
                 let response;
-                return Thenfu.pipe(null, [ () => this.preload(request), () => httpProxy.load(nohash, request), resp => {
+                return Thenfu.pipe(null, [ () => this.preload(request), () => resourceProxy.load(nohash, request), resp => {
                     response = resp;
                     if (response && response.status === 404) {
                         console.warn(`[HyperFrameset] Frame "${this.targetname || "(unnamed)"}" src returned 404: ${nohash}`);
-                    } else if (!response || !response.document) {
+                    } else if (!response || !response.body) {
                         console.warn(`[HyperFrameset] Frame "${this.targetname || "(unnamed)"}" src returned empty/null document: ${nohash}`);
                     }
                 }, () => whenVisible(this), () => {
@@ -2885,7 +2973,7 @@
                 return this.element.cloneNode(true);
             }
             if (!resource) return null;
-            let doc = resource.document;
+            let doc = resource.body;
             if (!doc) return null;
             let frag0 = doc;
             if (details.mainSelector) {
@@ -2952,6 +3040,14 @@
 	 */    const {rebase: rebase, rebaseURL: rebaseURL, normalizeScopedStyles: normalizeScopedStyles} = htmlParser;
     const DEFID_ATTR = "defid";
     const DEF_ATTR = "def";
+    function isExecutableScript$1(script) {
+        let type = script.type;
+        if (!type) return true;
+        if (/^text\/javascript/i.test(type)) return true;
+        if (/^application\/javascript/i.test(type)) return true;
+        if (type === "module") return true;
+        return false;
+    }
     const hfDefaultNamespace = new CustomNamespace({
         name: "hf",
         style: "vendor",
@@ -2969,28 +3065,27 @@
             if (!settings?.behaviors) throw Error("HFramesetDefinition requires settings.behaviors");
             this.behaviors = settings.behaviors;
             if (settings.frameContainer) this.frameContainer = settings.frameContainer;
-            this.namespaces = null;
-            this.init(doc, settings);
-        }
-        init(doc, settings) {
-            this.#initMetadata(doc, settings);
-            this.#rebaseURLs(doc);
-            this.#normalizeScripts(doc);
-            this.#normalizeStyles(doc);
-            let body = doc.body;
-            this.document = doc;
-            this.element = body;
-            if (!this.frameContainer) this.frameContainer = doc.head;
-        }
-        #initMetadata(doc, settings) {
             defaults(this, {
                 url: settings.framesetURL,
                 scope: settings.scope
             });
-            let namespaces = this.namespaces = CustomNamespace.getNamespaces(doc);
+            this.document = doc;
+            this.element = doc.body;
+            if (!this.frameContainer) this.frameContainer = doc.head;
+            this.namespaces = this.#getNamespaces(doc);
+            this.init(doc);
+        }
+        init(doc) {
+            this.#rebaseURLs(doc);
+            this.#normalizeScripts(doc);
+            this.#normalizeStyles(doc);
+        }
+        #getNamespaces(doc) {
+            let namespaces = CustomNamespace.getNamespaces(doc);
             if (!namespaces.lookupNamespace(HYPERFRAMESET_URN)) {
                 namespaces.add(hfDefaultNamespace);
             }
+            return namespaces;
         }
         #rebaseURLs(doc) {
             let scopeURL = URLux.create(this.scope);
@@ -3012,7 +3107,7 @@
             }
             let scripts = findAll("script", doc);
             forEach(scripts, (script, i) => {
-                if (script.type && !/^text\/javascript/.test(script.type)) return;
+                if (!isExecutableScript$1(script)) return;
                 if (script.hasAttribute("src")) return;
                 if (script.hasAttribute("for")) return;
                 this.#normalizeScript(script, i);
@@ -3024,8 +3119,9 @@
                 console.info("Moved <script for> in frameset <head> to <body>");
             });
             forEach(findAll("script", doc.body), script => {
-                if (script.type && !/^text\/javascript/.test(script.type)) return;
+                if (!isExecutableScript$1(script)) return;
                 if (script.hasAttribute("for")) return;
+                if (!script.hasAttribute("src") && script.parentElement.localName.includes("-")) return;
                 doc.head.appendChild(script);
                 console.info("Moved <script> in frameset <body> to <head>");
             });
@@ -3045,34 +3141,34 @@
             let allowedScopeSelector = this.namespaces.lookupSelector(allowedScope, HYPERFRAMESET_URN);
             normalizeScopedStyles(doc, allowedScopeSelector);
         }
-        preprocess() {
-            this.#preprocessScripts();
-            this.#preprocessFrames();
+        process() {
+            this.#processScripts();
+            this.#processFrames();
         }
-        #preprocessScripts() {
+        #processScripts() {
             let body = this.element;
             let scripts = findAll("script", body);
             forEach(scripts, script => {
-                if (script.type && !/^text\/javascript/.test(script.type)) return;
+                if (!isExecutableScript$1(script)) return;
                 if (script.hasAttribute("src")) {
                     console.warn("Frameset <body> may not contain external scripts: \n" + script.cloneNode(false).outerHTML);
-                    script.parentNode.removeChild(script);
+                    script.type = "text/javascript?disabled";
                     return;
                 }
                 if (!script.hasAttribute("for")) {
-                    console.warn("Frameset <body> may not contain non-@for scripts:\n" + this.url + "#" + script.id);
-                    script.parentNode.removeChild(script);
+                    console.warn("non-@for script in frameset <body> are disabled :\n" + this.url + "#" + script.id);
+                    script.type = "behavior";
                     return;
                 }
                 if (script.getAttribute("for") !== "") {
-                    console.warn("<script> may only contain EMPTY @for: \n" + script.cloneNode(false).outerHTML);
-                    script.parentNode.removeChild(script);
+                    console.warn('<script for="..."> with non-empty @for is not supported: \n' + script.cloneNode(false).outerHTML);
+                    script.type = "text/javascript?disabled";
                     return;
                 }
             });
             this.behaviors.processScripts(body);
         }
-        #preprocessFrames() {
+        #processFrames() {
             let body = this.element;
             let container = this.frameContainer;
             let frameElts = findAll(this.namespaces.lookupSelector("frame", HYPERFRAMESET_URN), body);
@@ -3125,10 +3221,6 @@
                 }
                 el.setAttribute("id", scopeId);
             });
-        }
-        get frameIds() {
-            let templates = findAll(`template[${DEFID_ATTR}]`, this.frameContainer);
-            return templates.map(tmpl => tmpl.getAttribute(DEFID_ATTR));
         }
         getFrame(defId) {
             let tmpl = find(`template[${DEFID_ATTR}="${defId}"]`, this.frameContainer);
@@ -3226,10 +3318,10 @@
                 console.info("No contentDocument passed to start(). Assuming landing-page is the frameset.");
                 return framer.#startAsFrameset(startOptions);
             }
-            Thenfu.asap(startOptions.contentDocument).then(doc => httpProxy.add({
+            Thenfu.asap(startOptions.contentDocument).then(doc => resourceProxy.add({
                 url: document$1.URL,
                 type: "document",
-                document: doc
+                body: doc
             }));
             return Thenfu.pipe(null, [ () => Thenfu.wait(() => !!document$1.body), () => {
                 let framerConfig;
@@ -3242,13 +3334,13 @@
                 let framesetURL = URLux.create(framerConfig.framesetURL);
                 if (framesetURL.hash) console.info(`Ignoring hash component of frameset URL: ${framesetURL.hash}`);
                 framer.framesetURL = framerConfig.framesetURL = framesetURL.nohash;
-                return httpProxy.load(framer.framesetURL, {
+                return resourceProxy.load(framer.framesetURL, {
                     responseType: "document"
                 }).then(response => {
-                    if (!response || !response.document) {
+                    if (!response || !response.body) {
                         console.warn(`[HyperFrameset] Frameset document failed to load or is empty: ${framer.framesetURL}`);
                     }
-                    return new HFramesetDefinition(response.document, {
+                    return new HFramesetDefinition(response.body, {
                         ...framerConfig,
                         behaviors: framer.behaviors,
                         frameContainer: document$1.head
@@ -3257,7 +3349,7 @@
             }, definition => Thenfu.pipe(definition, [ () => {
                 framer.definition = definition;
                 return Framer.#prepareFrameset(document$1, definition);
-            }, () => definition.preprocess(), () => Framer.#prerenderFrameset(document$1, definition) ]), () => framer.#activate() ]);
+            }, () => definition.process(), () => Framer.#prerenderFrameset(document$1, definition) ]), () => framer.#activate() ]);
         }
         #startAsFrameset(startOptions) {
             let framer = this;
@@ -3281,7 +3373,7 @@
                 });
             }), () => {
                 if (startURL) history.replaceState(null, "", startURL);
-            }, () => definition.preprocess(), () => Framer.#insertMarkers(document$1.URL, framer.framesetURL), () => framer.#activate(), () => {
+            }, () => definition.process(), () => Framer.#insertMarkers(document$1.URL, framer.framesetURL), () => framer.#activate(), () => {
                 if (startOptions && startOptions.hide) document$1.body.hidden = false;
             } ]);
         }
@@ -3489,7 +3581,7 @@
                     stage: "before",
                     url: document$1.URL
                 });
-            }, () => httpProxy.load(nohash, request).then(resp => {
+            }, () => resourceProxy.load(nohash, request).then(resp => {
                 response = resp;
             }), () => {
                 forEach(frames, frame => {
@@ -3500,7 +3592,7 @@
                 Framer.#separateHead(document$1, false);
                 let selfMarker = Framer.#getSelfMarker();
                 if (selfMarker) selfMarker.href = url;
-                if (response?.document?.head) Framer.#mergeHead(document$1, response.document.head, false);
+                if (response?.body?.head) Framer.#mergeHead(document$1, response.body.head, false);
             }, () => {
                 if (isFrameset) return Framer.#notify({
                     module: "frameset",
@@ -3814,7 +3906,7 @@
             DOM: DOM,
             scriptQueue: scriptQueue,
             htmlParser: htmlParser,
-            httpProxy: httpProxy,
+            resourceProxy: resourceProxy,
             CustomNamespace: CustomNamespace,
             processors: processors,
             controllers: controllers,
