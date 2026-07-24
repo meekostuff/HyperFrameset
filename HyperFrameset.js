@@ -924,6 +924,7 @@
         values: {},
         listeners: {},
         create: function(name) {
+            if (this.has(name)) throw Error(`Controller "${name}" already exists`);
             this.values[name] = [];
             this.listeners[name] = [];
         },
@@ -2232,56 +2233,21 @@
 	 * HyperFrameset Layout Custom Elements
 	 * Copyright 2009-2026 Sean Hogan (http://meekostuff.net/)
 	 * Mozilla Public License v2.0 (http://mozilla.org/MPL/2.0/)
-	 */    let zIndex = 1;
-    class HBase extends HTMLElement {
+	 */    class HBase extends HTMLElement {
         get options() {
             return this.behavior || {};
         }
     }
-    class Layer extends HBase {
-        connectedCallback() {
-            this.style.zIndex = zIndex++;
-        }
-        static isLayer(element) {
-            return element instanceof Layer;
-        }
-    }
-    class Popup extends HBase {
-        connectedCallback() {
-            this.#connectController();
-        }
-        #connectController() {
-            let name = this.getAttribute("name");
-            let value = this.getAttribute("value");
-            if (!name && !value) return;
-            this.hidden = true;
-            if (!name) return;
-            controllers.listen(name, values => {
-                this.hidden = !includes(values, value);
-            });
-        }
-    }
     class Panel extends HBase {
         connectedCallback() {
-            this.#adjustBox();
             this.#connectController();
-        }
-        #adjustBox() {
-            let overflow = this.getAttribute("overflow");
-            if (overflow) this.style.overflow = overflow;
-            let height = this.getAttribute("height");
-            if (height) this.style.height = height;
-            let width = this.getAttribute("width");
-            if (width) this.style.width = width;
-            let minWidth = this.getAttribute("minwidth");
-            if (minWidth) this.style.minWidth = minWidth;
         }
         #connectController() {
             let name = this.getAttribute("name");
-            let value = this.getAttribute("value");
-            if (!name && !value) return;
-            this.hidden = true;
             if (!name) return;
+            let value = this.getAttribute("value");
+            this.hidden = true;
+            if (!controllers.has(name)) controllers.create(name);
             controllers.listen(name, values => {
                 this.hidden = !includes(values, value);
             });
@@ -2290,66 +2256,54 @@
             return element instanceof Panel;
         }
     }
-    class VLayout extends Panel {
+    class BaseLayout extends Panel {
         connectedCallback() {
             super.connectedCallback();
-            this.#adjustLayout();
-            queueMicrotask(() => this.#normalizeChildren());
+            queueMicrotask(() => this.#initChildren());
         }
-        #adjustLayout() {
-            let parent = this.parentNode;
-            if (parent instanceof Layer) {
-                let height = this.getAttribute("height");
-                if (!height) height = "100vh"; else height = height.replace("%", "vh");
-                this.style.height = height;
-                let width = this.getAttribute("width");
-                if (!width) width = "100vw"; else width = width.replace("%", "vw");
-                this.style.width = width;
+        #initChildren() {
+            let isVertical = this instanceof VLayout;
+            for (let node of Array.from(this.childNodes)) {
+                if (node.nodeType === 3) {
+                    if (/^\s*$/.test(node.nodeValue)) {
+                        this.removeChild(node);
+                        continue;
+                    }
+                    let wbr = this.ownerDocument.createElement("wbr");
+                    wbr.hidden = true;
+                    this.replaceChild(wbr, node);
+                    wbr.appendChild(node);
+                    continue;
+                }
+                if (node.nodeType !== 1) continue;
+                if (Splitter.isSplitter(node)) continue;
+                if (!(Panel.isPanel(node) || VLayout.isLayout(node))) {
+                    node.hidden = true;
+                    continue;
+                }
+                let size = isVertical ? node.getAttribute("height") : node.getAttribute("width");
+                if (size) {
+                    node.style.flex = `0 0 ${size}`;
+                } else {
+                    node.style.flex = "1 1 0";
+                    node.style.minWidth = "0";
+                    node.style.minHeight = "0";
+                    node.style.overflow = "hidden";
+                }
             }
-            let hAlign = this.getAttribute("align");
-            if (hAlign) this.style.textAlign = hAlign;
-        }
-        #normalizeChildren() {
-            forEach(Array.from(this.childNodes), normalizeChild, this);
         }
         static isLayout(element) {
             return element instanceof VLayout || element instanceof HLayout;
         }
     }
-    class HLayout extends Panel {
-        connectedCallback() {
-            super.connectedCallback();
-            this.#adjustLayout();
-            queueMicrotask(() => this.#normalizeChildren());
-        }
-        #adjustLayout() {
-            let parent = this.parentNode;
-            if (parent instanceof Layer) {
-                let height = this.getAttribute("height");
-                if (!height) height = "100vh"; else height = height.replace("%", "vh");
-                this.style.height = height;
-                let width = this.getAttribute("width");
-                if (!width) width = "100vw"; else width = width.replace("%", "vw");
-                this.style.width = width;
-            }
-            let vAlign = this.getAttribute("align");
-            if (vAlign) {
-                for (let child of this.children) {
-                    if (Panel.isPanel(child) || VLayout.isLayout(child)) {
-                        child.style.verticalAlign = vAlign;
-                    }
-                }
-            }
-        }
-        #normalizeChildren() {
-            forEach(Array.from(this.childNodes), normalizeChild, this);
-        }
-    }
+    class VLayout extends BaseLayout {}
+    class HLayout extends BaseLayout {}
     class Deck extends Panel {
         connectedCallback() {
-            super.connectedCallback();
-            this.#normalizeChildren();
-            this.#connectDeckController();
+            queueMicrotask(() => {
+                this.#normalizeChildren();
+                this.#connectDeckController();
+            });
         }
         get owns() {
             return filter(Array.from(this.children), el => Panel.isPanel(el) || VLayout.isLayout(el));
@@ -2362,7 +2316,14 @@
             });
         }
         #normalizeChildren() {
-            forEach(Array.from(this.childNodes), normalizeChild, this);
+            for (let node of Array.from(this.childNodes)) {
+                if (node.nodeType === 1) {
+                    if (Panel.isPanel(node) || VLayout.isLayout(node)) continue;
+                    node.hidden = true;
+                } else if (node.nodeType === 3) {
+                    if (/^\s*$/.test(node.nodeValue)) this.removeChild(node);
+                }
+            }
         }
         #connectDeckController() {
             let name = this.getAttribute("name");
@@ -2370,35 +2331,14 @@
                 this.activedescendant = this.owns[0];
                 return;
             }
+            if (!controllers.has(name)) controllers.create(name);
             controllers.listen(name, values => {
                 let activePanel = find$1(this.owns, child => {
                     let value = child.getAttribute("value");
                     return includes(values, value);
                 });
-                if (activePanel) this.activedescendant = activePanel;
+                this.activedescendant = activePanel || this.owns[0];
             });
-        }
-    }
-    class ResponsiveDeck extends Deck {
-        connectedCallback() {
-            super.connectedCallback();
-            this.#refresh();
-        }
-        #refresh() {
-            let width = parseFloat(window.getComputedStyle(this).width);
-            let panels = this.owns;
-            let activePanel = find$1(panels, panel => {
-                let minWidth = window.getComputedStyle(panel).minWidth;
-                if (minWidth == null || minWidth === "" || minWidth === "0px") return true;
-                minWidth = parseFloat(minWidth);
-                if (minWidth > width) return false;
-                return true;
-            });
-            if (activePanel) {
-                activePanel.style.height = "100%";
-                activePanel.style.width = "100%";
-                this.activedescendant = activePanel;
-            }
         }
     }
     class Splitter extends HBase {
@@ -2428,8 +2368,6 @@
                 if (newNext < nextMin) delta = nextSize - nextMin; else if (newNext > nextMax) delta = -(nextMax - nextSize);
                 prev.style.flexBasis = prevSize + delta + "px";
                 next.style.flexBasis = nextSize - delta + "px";
-                prev.style.flexGrow = "0";
-                next.style.flexGrow = "0";
             };
             let onUp = () => {
                 this.removeEventListener("pointermove", onMove);
@@ -2443,46 +2381,22 @@
             return element instanceof Splitter;
         }
     }
-    function normalizeChild(node) {
-        let element = this;
-        switch (node.nodeType) {
-          case 1:
-            if (Panel.isPanel(node) || VLayout.isLayout(node) || Splitter.isSplitter(node)) return;
-            node.hidden = true;
-            return;
-
-          case 3:
-            if (/^\s*$/.test(node.nodeValue)) {
-                element.removeChild(node);
-                return;
-            }
-            let wbr = element.ownerDocument.createElement("wbr");
-            wbr.hidden = true;
-            element.replaceChild(wbr, node);
-            wbr.appendChild(node);
-            return;
-
-          default:
-            return;
-        }
-    }
     function registerLayoutElements(ns) {
         let boxSizingCSS = "box-sizing: border-box;";
-        let layoutResetCSS = "display: block; width: 0; height: 0; text-align: left; margin: 0; padding: 0;";
-        let layoutSizeCSS = "width: 100%; height: 100%;";
-        let defs = [ [ "layer", Layer, `${boxSizingCSS} display: block; position: fixed; top: 0; left: 0; width: 0; height: 0;` ], [ "popup", Popup, `${boxSizingCSS} display: block; position: relative; width: 0; height: 0;`, "position: absolute; top: 0; left: 0;" ], [ "panel", Panel, `${boxSizingCSS} display: block; width: auto; height: auto; text-align: left; margin: 0; padding: 0;` ], [ "splitter", Splitter, `${boxSizingCSS} flex: 0 0 4px; background: #ccc; user-select: none; touch-action: none;` ], [ "vlayout", VLayout, `${boxSizingCSS} ${layoutResetCSS} ${layoutSizeCSS} display: flex; flex-direction: column; justify-content: flex-start; align-items: stretch;` ], [ "hlayout", HLayout, `${boxSizingCSS} ${layoutResetCSS} ${layoutSizeCSS} display: flex; flex-direction: row; justify-content: space-between; align-items: stretch;` ], [ "deck", Deck, `${boxSizingCSS} ${layoutResetCSS} ${layoutSizeCSS}`, "width: 100%; height: 100%;" ], [ "rdeck", ResponsiveDeck, `${boxSizingCSS} ${layoutResetCSS} ${layoutSizeCSS}`, "width: 0; height: 0;" ] ];
+        let defs = [ [ "panel", Panel, `${boxSizingCSS} display: block; margin: 0; padding: 0;` ], [ "splitter", Splitter, `${boxSizingCSS} flex: 0 0 4px; background: #ccc; user-select: none; touch-action: none;` ], [ "vlayout", VLayout, `${boxSizingCSS} display: flex; flex-direction: column; align-items: stretch; margin: 0; padding: 0; width: 100%; height: 100%;` ], [ "hlayout", HLayout, `${boxSizingCSS} display: flex; flex-direction: row; align-items: stretch; margin: 0; padding: 0; width: 100%; height: 100%;` ], [ "deck", Deck, `${boxSizingCSS} display: block; position: relative; margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden;` ] ];
         let cssText = "*[hidden] { display: none !important; }\n";
-        for (let [name, Cls, css, childCss] of defs) {
+        for (let [name, Cls, css] of defs) {
             let tagName = ns.lookupTagName(name);
             customElements.define(tagName, Cls);
             cssText += `${tagName} { ${css} }\n`;
-            if (childCss) cssText += `${tagName} > * { ${childCss} }\n`;
         }
-        cssText += `${ns.lookupTagName("body")} { ${boxSizingCSS} display: block; width: auto; height: auto; margin: 0; }\n`;
+        let deckTag = ns.lookupTagName("deck");
+        cssText += `${deckTag} > * { width: 100%; height: 100%; }\n`;
         let splitterTag = ns.lookupTagName("splitter");
         cssText += `${splitterTag}:hover { background: #999; }\n`;
         cssText += `${ns.lookupTagName("hlayout")} > ${splitterTag} { cursor: col-resize; }\n`;
         cssText += `${ns.lookupTagName("vlayout")} > ${splitterTag} { cursor: row-resize; }\n`;
+        cssText += `${ns.lookupTagName("body")} { ${boxSizingCSS} display: block; width: auto; height: auto; margin: 0; }\n`;
         let style = document.createElement("style");
         style.textContent = cssText;
         document.head.append(style);
@@ -2495,10 +2409,7 @@
         Deck: Deck,
         HBase: HBase,
         HLayout: HLayout,
-        Layer: Layer,
         Panel: Panel,
-        Popup: Popup,
-        ResponsiveDeck: ResponsiveDeck,
         Splitter: Splitter,
         VLayout: VLayout,
         default: layoutElements
@@ -3371,9 +3282,9 @@
                 if (document$1.readyState !== "loading") resolve(); else document$1.addEventListener("DOMContentLoaded", resolve, {
                     once: true
                 });
-            }), () => {
+            }), () => Framer.#insertMarkers(document$1.URL, framer.framesetURL, true), () => {
                 if (startURL) history.replaceState(null, "", startURL);
-            }, () => definition.process(), () => Framer.#insertMarkers(document$1.URL, framer.framesetURL), () => framer.#activate(), () => {
+            }, () => definition.process(), () => framer.#activate(), () => {
                 if (startOptions && startOptions.hide) document$1.body.hidden = false;
             } ]);
         }
@@ -3652,16 +3563,11 @@
         static #prepareFrameset(dstDoc, definition) {
             if (Framer.#getFramesetMarker(dstDoc)) throw Error("The HFrameset has already been applied");
             let srcDoc = cloneDocument(definition.document);
-            return Thenfu.pipe(null, [ () => {
-                let dstHead = dstDoc.head;
-                forEach(findAll("link[rel|=stylesheet]", dstHead), node => {
-                    dstHead.removeChild(node);
-                });
-            }, () => {
+            return Thenfu.pipe(null, [ () => Framer.#insertMarkers(document$1.URL, definition.src, false), () => Framer.#separateHead(dstDoc, false), () => {
                 let dstBody = dstDoc.body;
                 let node;
                 while (node = dstBody.firstChild) dstBody.removeChild(node);
-            }, () => Framer.#insertMarkers(dstDoc.URL, definition.src), () => {
+            }, () => {
                 Framer.#mergeElement(dstDoc.documentElement, srcDoc.documentElement);
                 Framer.#mergeElement(dstDoc.head, srcDoc.head);
                 Framer.#mergeHead(dstDoc, srcDoc.head, true);
@@ -3741,19 +3647,22 @@
             if (!doc) doc = document$1;
             return find(`link[rel~=${SELF_REL}]`, doc.head);
         }
-        static #insertMarkers(selfURL, framesetURL) {
+        static #insertMarkers(selfURL, framesetURL, isFrameset) {
             let head = document$1.head;
-            let framesetMarker = document$1.createElement("link");
-            framesetMarker.rel = FRAMESET_REL;
-            framesetMarker.href = framesetURL;
+            let framesetMarker = Framer.#getFramesetMarker();
+            if (!framesetMarker) {
+                framesetMarker = document$1.createElement("link");
+                framesetMarker.rel = FRAMESET_REL;
+                framesetMarker.href = framesetURL;
+            }
+            if (isFrameset) head.prepend(framesetMarker); else head.append(framesetMarker);
             let selfMarker = Framer.#getSelfMarker();
             if (!selfMarker) {
                 selfMarker = document$1.createElement("link");
                 selfMarker.rel = SELF_REL;
                 selfMarker.href = selfURL;
-                head.prepend(selfMarker);
             }
-            head.append(framesetMarker);
+            head.prepend(selfMarker);
             walkSiblings(selfMarker.nextSibling, node => {
                 if (isExecutableScript(node)) head.insertBefore(node, selfMarker);
             }, framesetMarker);
@@ -3827,7 +3736,7 @@
             return Thenfu.asap();
         }
         #registerFramesetElement() {
-            let cssText = [ "html, body { margin: 0; padding: 0; }", "html { width: 100%; height: 100%; }" ];
+            let cssText = [ "html, body { margin: 0; padding: 0; }", "html, body { width: 100%; height: 100%; }" ];
             let style = document$1.createElement("style");
             style.textContent = cssText.join("\n");
             document$1.head.append(style);
