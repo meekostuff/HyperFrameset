@@ -299,6 +299,17 @@ static #deriveScope(scope, startURL, framesetURL) {
 		// start history management
 		navigation.addEventListener('navigate', (e) => this.onNavigate(e));
 
+		// intercept soft-reload
+		window.addEventListener('keydown', (e) => {
+			if (e.defaultPrevented) return;
+			let isReload =
+				e.key === 'F5' ||
+				(e.key === 'r' && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey);
+			if (!isReload) return;
+			e.preventDefault();
+			navigation.reload();
+		}, {capture: true});
+
 		// Handle clicks on [link] elements — card-pattern navigation where
 		// the clickable area is larger than the actual <a href> inside it.
 		window.addEventListener('click', (e) => {
@@ -343,6 +354,9 @@ static #deriveScope(scope, startURL, framesetURL) {
 /**
  * Navigation API event handler. Handles all navigate events:
  *
+ * - 'reload' (soft reload via navigation.reload()): intercepts and scrolls to the
+ *   current hash target or the top of the page. Browser-initiated reloads (Cmd+R)
+ *   are routed here by the reload-prolyfill.
  * - 'traverse' (back/forward): reads state from destination entry (with WebKit fallback),
  *   intercepts and calls onPopState to restore frame content.
  * - 'push'/'replace' (link clicks, programmatic): dispatches a 'requestnavigation' event
@@ -358,6 +372,18 @@ onNavigate(e) {
 	console.debug('navigate event:', e.navigationType, e.destination.url, 'canIntercept:', e.canIntercept, 'hashChange:', e.hashChange);
 	if (!e.canIntercept) {
 		console.debug('navigate: not interceptable, allowing default');
+		return;
+	}
+	if (e.navigationType === 'reload') {
+		console.debug('navigate: intercepting reload (soft reload)');
+		e.intercept({
+			handler: async () => {
+				let hash = new URL(e.destination.url).hash;
+				let target = hash ? document.getElementById(hash.slice(1)) : null;
+				if (target) target.scrollIntoView();
+				else window.scrollTo(0, 0);
+			}
+		});
 		return;
 	}
 	if (e.navigationType === 'traverse') {
@@ -412,8 +438,6 @@ onNavigate(e) {
 				console.debug('navigate: frameset did not handle, allowing default navigation');
 			}
 		}
-		// TODO intercept 'reload' to support re-rendering POST response pages
-		//   without a real network request. Requires storing POST body in entry state.
 	}
 }
 
