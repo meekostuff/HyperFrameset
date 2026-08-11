@@ -3307,6 +3307,15 @@
                 transcluder.registerElement(namespace, "frame", HFrame);
             }, () => {
                 navigation.addEventListener("navigate", e => this.onNavigate(e));
+                window.addEventListener("keydown", e => {
+                    if (e.defaultPrevented) return;
+                    let isReload = e.key === "F5" || e.key === "r" && (e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey;
+                    if (!isReload) return;
+                    e.preventDefault();
+                    navigation.reload();
+                }, {
+                    capture: true
+                });
                 window.addEventListener("click", e => {
                     if (e.defaultPrevented) return;
                     let acceptDefault = framer.onClick(e);
@@ -3346,6 +3355,17 @@
             console.debug("navigate event:", e.navigationType, e.destination.url, "canIntercept:", e.canIntercept, "hashChange:", e.hashChange);
             if (!e.canIntercept) {
                 console.debug("navigate: not interceptable, allowing default");
+                return;
+            }
+            if (e.navigationType === "reload") {
+                console.debug("navigate: intercepting reload (soft reload)");
+                e.intercept({
+                    handler: async () => {
+                        let hash = new URL(e.destination.url).hash;
+                        let target = hash ? document$1.getElementById(hash.slice(1)) : null;
+                        if (target) target.scrollIntoView(); else window.scrollTo(0, 0);
+                    }
+                });
                 return;
             }
             if (e.navigationType === "traverse") {
